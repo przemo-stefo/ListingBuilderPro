@@ -1,0 +1,13 @@
+# Amazon Listing Builder - Requirements
+# System uses Python stdlib only - no external dependencies required!
+
+# Python version required
+# python>=3.10
+
+# Optional: For Web GUI
+# gradio>=4.0.0
+
+# Optional: For development/testing
+# pytest>=7.0.0
+# black>=22.0.0
+# mypy>=0.950

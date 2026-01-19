@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listing Builder Pro</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1A1A1A;
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { margin-bottom: 20px; color: #fff; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+        .panel {
+            background: #121212;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .panel h2 {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+
+        label { display: block; margin-bottom: 5px; color: #aaa; font-size: 13px; }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            background: #1A1A1A;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #555;
+        }
+        textarea { resize: vertical; min-height: 150px; font-family: monospace; }
+
+        .btn {
+            background: #2d5a27;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        .btn:hover { background: #3d7a37; }
+        .btn:disabled { background: #333; cursor: not-allowed; }
+
+        .output {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        .status.success { background: #1a3d1a; color: #4ade80; }
+        .status.error { background: #3d1a1a; color: #f87171; }
+        .status.loading { background: #3d3d1a; color: #fbbf24; }
+
+        .coverage {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            background: #1A1A1A;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .coverage.high { color: #4ade80; }
+        .coverage.medium { color: #fbbf24; }
+        .coverage.low { color: #f87171; }
+
+        .endpoint-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .endpoint-toggle button {
+            flex: 1;
+            padding: 8px;
+            background: #1A1A1A;
+            border: 1px solid #333;
+            color: #888;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .endpoint-toggle button.active {
+            background: #2d5a27;
+            border-color: #2d5a27;
+            color: #fff;
+        }
+
+        .result-section { margin-bottom: 20px; }
+        .result-section h3 {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .result-section pre {
+            background: #0a0a0a;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Listing Builder Pro</h1>
+
+        <div class="grid">
+            <div class="panel">
+                <h2>Input</h2>
+
+                <div class="endpoint-toggle">
+                    <button id="btn-local" onclick="setEndpoint('local')">Local</button>
+                    <button id="btn-prod" class="active" onclick="setEndpoint('prod')">Production (Mikrus)</button>
+                </div>
+
+                <label>Brand</label>
+                <input type="text" id="brand" value="PREMIUM HOME" placeholder="Enter brand name">
+
+                <label>Product Line</label>
+                <input type="text" id="productLine" value="Bamboo Cutting Board Set" placeholder="Enter product line">
+
+                <label>Mode</label>
+                <select id="mode">
+                    <option value="aggressive">Aggressive (8 phrases in title)</option>
+                    <option value="conservative">Conservative (4 phrases in title)</option>
+                </select>
+
+                <label>Keywords (JSON array or one per line)</label>
+                <textarea id="keywords" placeholder='["bamboo cutting board", "wood chopping board"]
+or
+bamboo cutting board
+wood chopping board'>bamboo cutting board
+cutting board set
+wood cutting board
+chopping board
+kitchen cutting board
+large cutting board</textarea>
+
+                <button class="btn" id="generateBtn" onclick="generate()">Generate Listing</button>
+            </div>
+
+            <div class="panel">
+                <h2>Output</h2>
+                <div id="status"></div>
+                <div id="coverage"></div>
+                <div id="results"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ENDPOINTS = {
+            local: 'http://localhost:5678/webhook/listing-builder',
+            prod: 'http://izabela166.mikrus.xyz:30166/webhook/listing-builder'
+        };
+        const API_KEY = 'lbp-2026-secret-xK9mN2pQ';
+        let currentEndpoint = 'prod';
+
+        function setEndpoint(ep) {
+            currentEndpoint = ep;
+            document.getElementById('btn-local').classList.toggle('active', ep === 'local');
+            document.getElementById('btn-prod').classList.toggle('active', ep === 'prod');
+        }
+
+        function parseKeywords(input) {
+            const trimmed = input.trim();
+            // Try JSON first
+            if (trimmed.startsWith('[')) {
+                try {
+                    const arr = JSON.parse(trimmed);
+                    return arr.map((kw, idx) => {
+                        if (typeof kw === 'string') {
+                            return { phrase: kw, relevancy: 1 - (idx * 0.03) };
+                        }
+                        return kw;
+                    });
+                } catch (e) {}
+            }
+            // Parse as newline-separated
+            return trimmed.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map((phrase, idx) => ({ phrase, relevancy: 1 - (idx * 0.03) }));
+        }
+
+        async function generate() {
+            const btn = document.getElementById('generateBtn');
+            const status = document.getElementById('status');
+            const coverage = document.getElementById('coverage');
+            const results = document.getElementById('results');
+
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            status.className = 'status loading';
+            status.textContent = 'Calling ' + currentEndpoint + ' endpoint...';
+            coverage.innerHTML = '';
+            results.innerHTML = '';
+
+            const payload = {
+                brand: document.getElementById('brand').value,
+                productLine: document.getElementById('productLine').value,
+                mode: document.getElementById('mode').value,
+                keywords: parseKeywords(document.getElementById('keywords').value)
+            };
+
+            try {
+                const response = await fetch(ENDPOINTS[currentEndpoint], {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.className = 'status success';
+                    status.textContent = 'Generated successfully! ' + data.keywordsLoaded + ' keywords processed.';
+
+                    const pct = parseFloat(data.coverage.percentage);
+                    coverage.className = 'coverage ' + (pct >= 80 ? 'high' : pct >= 50 ? 'medium' : 'low');
+                    coverage.textContent = data.coverage.percentage + ' Coverage';
+
+                    results.innerHTML = `
+                        <div class="result-section">
+                            <h3>Title (${data.listing.title.length} chars)</h3>
+                            <pre>${data.listing.title}</pre>
+                        </div>
+                        <div class="result-section">
+                            <h3>Bullets</h3>
+                            <pre>${data.listing.bullets.join('\n')}</pre>
+                        </div>
+                        <div class="result-section">
+                            <h3>Description</h3>
+                            <pre>${data.listing.description}</pre>
+                        </div>
+                        <div class="result-section">
+                            <h3>Backend Keywords (${data.listing.backend.length} bytes)</h3>
+                            <pre>${data.listing.backend || '(empty)'}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.message || 'Unknown error');
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = 'Error: ' + error.message;
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Generate Listing';
+        }
+    </script>
+</body>
+</html>

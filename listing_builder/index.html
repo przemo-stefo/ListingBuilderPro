@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listing Builder Pro | Multi-Marketplace Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #1f2937;
+            min-height: 100vh;
+        }
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 28px 20px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            color: #111827;
+        }
+        .header h1 span { color: #2563eb; }
+        .header p { color: #6b7280; font-size: 15px; }
+
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 24px;
+        }
+        @media (max-width: 1000px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .panel-title {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 24px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .panel-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #2563eb;
+            border-radius: 2px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            font-size: 12px;
+            color: #374151;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            color: #111827;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            background: #ffffff;
+        }
+        input::placeholder, textarea::placeholder {
+            color: #9ca3af;
+        }
+        textarea {
+            min-height: 100px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 13px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        @media (max-width: 500px) {
+            .checkbox-group { grid-template-columns: repeat(2, 1fr); }
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .checkbox-item:hover {
+            border-color: #9ca3af;
+            background: #f3f4f6;
+        }
+        .checkbox-item.selected {
+            background: rgba(37, 99, 235, 0.08);
+            border-color: #2563eb;
+        }
+        .checkbox-item input { display: none; }
+        .checkbox-item span { font-size: 13px; font-weight: 500; color: #374151; }
+
+        .btn {
+            width: 100%;
+            padding: 16px 24px;
+            background: #2563eb;
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .btn:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        .btn.loading .spinner { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-bar {
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-bar::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-bar.loading {
+            display: flex;
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .status-bar.loading::before {
+            background: #fbbf24;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .status-bar.success {
+            display: flex;
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .status-bar.success::before { background: #4ade80; }
+        .status-bar.error {
+            display: flex;
+            background: rgba(248, 113, 113, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+        .status-bar.error::before { background: #f87171; }
+
+        .results-container { display: none; }
+        .results-container.visible { display: block; }
+
+        .marketplace-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 6px;
+            background: #f3f4f6;
+            border-radius: 12px;
+        }
+        .tab-btn {
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: #374151; background: #e5e7eb; }
+        .tab-btn.active {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .result-section {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            background: #f3f4f6;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .result-header h3 {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 600;
+        }
+        .result-header .badge {
+            font-size: 11px;
+            padding: 5px 10px;
+            background: #e5e7eb;
+            border-radius: 6px;
+            color: #6b7280;
+            margin-right: 10px;
+        }
+        .result-content {
+            padding: 18px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 320px;
+            overflow-y: auto;
+            color: #1f2937;
+            background: #ffffff;
+        }
+        .result-content.bullets { white-space: normal; }
+        .result-content .bullet {
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+            position: relative;
+            padding-left: 18px;
+        }
+        .result-content .bullet::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background: #2563eb;
+            border-radius: 50%;
+        }
+        .result-content .bullet:last-child { border-bottom: none; }
+
+        .copy-btn {
+            padding: 7px 14px;
+            background: transparent;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+        .copy-btn.copied {
+            background: #10b981;
+            border-color: #10b981;
+            color: #fff;
+        }
+
+        .coverage-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .coverage-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .coverage-badge.high {
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .coverage-badge.high::before { background: #4ade80; }
+        .coverage-badge.medium {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .coverage-badge.medium::before { background: #fbbf24; }
+        .coverage-badge.low {
+            background: rgba(248, 113, 113, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+        .coverage-badge.low::before { background: #f87171; }
+
+        .endpoint-info {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f3f4f6; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state-text { font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Listing<span>Builder</span>Pro</h1>
+        <p>Generate optimized listings for 9 marketplaces in seconds</p>
+    </div>
+
+    <div class="container">
+        <div class="grid">
+            <!-- Input Panel -->
+            <div class="panel">
+                <div class="panel-title">Dane produktu</div>
+
+                <div class="form-group">
+                    <label>Nazwa produktu / Tytuł</label>
+                    <input type="text" id="title" placeholder="np. Bamboo Cutting Board Set with Juice Groove">
+                </div>
+
+                <div class="form-group">
+                    <label>Marka</label>
+                    <input type="text" id="brand" placeholder="np. PREMIUM HOME">
+                </div>
+
+                <div class="form-group">
+                    <label>Kategoria</label>
+                    <input type="text" id="category" placeholder="np. Kitchen & Dining">
+                </div>
+
+                <div class="form-group">
+                    <label>Opis produktu / Cechy</label>
+                    <textarea id="description" placeholder="Opisz produkt, jego cechy, materiały, wymiary..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Słowa kluczowe (jedno na linię)</label>
+                    <textarea id="keywords" placeholder="bamboo cutting board
+cutting board set
+wood chopping board
+kitchen accessories"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Marketplaces</label>
+                    <div class="checkbox-group" id="marketplaces">
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="amazon_us" checked>
+                            <span>🇺🇸 Amazon US</span>
+                        </label>
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="amazon_de" checked>
+                            <span>🇩🇪 Amazon DE</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_uk">
+                            <span>🇬🇧 Amazon UK</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_fr">
+                            <span>🇫🇷 Amazon FR</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_it">
+                            <span>🇮🇹 Amazon IT</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_es">
+                            <span>🇪🇸 Amazon ES</span>
+                        </label>
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="ebay" checked>
+                            <span>🛒 eBay</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="etsy">
+                            <span>🎨 Etsy</span>
+                        </label>
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="allegro" checked>
+                            <span>🇵🇱 Allegro</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn" id="generateBtn" onclick="generate()">
+                    <span id="btnText">Generate Listings</span>
+                    <div class="spinner"></div>
+                </button>
+
+                <div class="endpoint-info">
+                    API: listing.automatyzacja-ai.pl
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="panel">
+                <div class="panel-title">Wyniki</div>
+
+                <div id="status" class="status-bar"></div>
+
+                <div id="resultsContainer" class="results-container">
+                    <div id="coverage" class="coverage-badge"></div>
+
+                    <div class="marketplace-tabs" id="tabs"></div>
+
+                    <div id="results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const WEBHOOK_URL = 'https://listing.automatyzacja-ai.pl/webhook/v2/product';
+        const API_KEY = 'REDACTED_N8N_WEBHOOK_API_KEY';
+
+        let currentData = null;
+        let currentMarketplace = null;
+
+        // Marketplace display names
+        const MARKETPLACE_NAMES = {
+            'amazon_us': '🇺🇸 Amazon US',
+            'amazon_uk': '🇬🇧 Amazon UK',
+            'amazon_de': '🇩🇪 Amazon DE',
+            'amazon_fr': '🇫🇷 Amazon FR',
+            'amazon_it': '🇮🇹 Amazon IT',
+            'amazon_es': '🇪🇸 Amazon ES',
+            'ebay': '🛒 eBay',
+            'etsy': '🎨 Etsy',
+            'allegro': '🇵🇱 Allegro'
+        };
+
+        // Checkbox toggle
+        document.querySelectorAll('.checkbox-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const checkbox = item.querySelector('input');
+                checkbox.checked = !checkbox.checked;
+                item.classList.toggle('selected', checkbox.checked);
+            });
+        });
+
+        function getSelectedMarketplaces() {
+            return Array.from(document.querySelectorAll('#marketplaces input:checked'))
+                .map(cb => cb.value);
+        }
+
+        function parseKeywords(text) {
+            return text.trim().split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+        }
+
+        async function generate() {
+            const btn = document.getElementById('generateBtn');
+            const btnText = document.getElementById('btnText');
+            const status = document.getElementById('status');
+            const resultsContainer = document.getElementById('resultsContainer');
+
+            const selectedMarketplaces = getSelectedMarketplaces();
+            if (selectedMarketplaces.length === 0) {
+                alert('Please select at least one marketplace');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btnText.textContent = 'Generating...';
+            status.className = 'status-bar loading';
+            status.textContent = 'Generating listings with AI... This may take 1-2 minutes for translations.';
+            resultsContainer.classList.remove('visible');
+
+            const payload = {
+                title: document.getElementById('title').value,
+                brand: document.getElementById('brand').value || 'Brand',
+                category: document.getElementById('category').value || 'General',
+                specs: {},
+                marketplaces: selectedMarketplaces
+            };
+
+            // Parse description as specs if provided
+            const description = document.getElementById('description').value;
+            if (description) {
+                payload.specs.description = description;
+            }
+
+            // Parse keywords
+            const keywords = parseKeywords(document.getElementById('keywords').value);
+            if (keywords.length > 0) {
+                payload.keywords = keywords;
+            }
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                currentData = data;
+
+                if (data.listings) {
+                    const count = Object.keys(data.listings).length;
+                    status.className = 'status-bar success';
+                    status.textContent = `Generated ${count} marketplace listings successfully!`;
+                    displayResults(data);
+                } else {
+                    throw new Error(data.error || data.message || 'No listings in response');
+                }
+            } catch (error) {
+                status.className = 'status-bar error';
+                status.textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btnText.textContent = 'Generate Listings';
+        }
+
+        function displayResults(data) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const tabsContainer = document.getElementById('tabs');
+            const resultsDiv = document.getElementById('results');
+            const coverageDiv = document.getElementById('coverage');
+
+            resultsContainer.classList.add('visible');
+
+            // Quality Score
+            if (data.quality_score) {
+                coverageDiv.className = 'coverage-badge high';
+                coverageDiv.textContent = 'Quality Score: ' + data.quality_score;
+            } else if (data.coverage) {
+                const pct = parseFloat(data.coverage.percentage || data.coverage);
+                coverageDiv.className = 'coverage-badge ' + (pct >= 80 ? 'high' : pct >= 50 ? 'medium' : 'low');
+                coverageDiv.textContent = pct + '% Keyword Coverage';
+            } else {
+                coverageDiv.style.display = 'none';
+            }
+
+            // Tabs
+            const listings = data.listings;
+            const marketplaces = Object.keys(listings);
+
+            tabsContainer.innerHTML = marketplaces.map((mp, idx) =>
+                `<button class="tab-btn ${idx === 0 ? 'active' : ''}" data-mp="${mp}" onclick="showMarketplace('${mp}')">${MARKETPLACE_NAMES[mp] || mp}</button>`
+            ).join('');
+
+            if (marketplaces.length > 0) {
+                currentMarketplace = marketplaces[0];
+                renderMarketplaceListing(listings[currentMarketplace], currentMarketplace);
+            }
+        }
+
+        function showMarketplace(mp) {
+            currentMarketplace = mp;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mp === mp);
+            });
+            const listings = currentData.listings;
+            renderMarketplaceListing(listings[mp], mp);
+        }
+
+        function renderMarketplaceListing(listing, marketplace) {
+            const resultsDiv = document.getElementById('results');
+
+            if (!listing) {
+                resultsDiv.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><p class="empty-state-text">No data for this marketplace</p></div>';
+                return;
+            }
+
+            let html = '';
+
+            // Title
+            if (listing.title) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Title</h3>
+                            <div>
+                                <span class="badge">${listing.title.length} chars</span>
+                                <button class="copy-btn" onclick="copyText(this, '${escapeQuotes(listing.title)}')">Copy</button>
+                            </div>
+                        </div>
+                        <div class="result-content">${escapeHtml(listing.title)}</div>
+                    </div>
+                `;
+            }
+
+            // Bullets
+            if (listing.bullets && listing.bullets.length) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Bullet Points (${listing.bullets.length})</h3>
+                            <button class="copy-btn" onclick="copyBullets(this)">Copy All</button>
+                        </div>
+                        <div class="result-content bullets">
+                            ${listing.bullets.map(b => `<div class="bullet">${escapeHtml(b)}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Description
+            if (listing.description) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Description</h3>
+                            <button class="copy-btn" onclick="copyText(this, \`${escapeQuotes(listing.description)}\`)">Copy</button>
+                        </div>
+                        <div class="result-content">${escapeHtml(listing.description)}</div>
+                    </div>
+                `;
+            }
+
+            // Tags (Etsy)
+            if (listing.tags && listing.tags.length) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Tags (${listing.tags.length})</h3>
+                            <button class="copy-btn" onclick="copyText(this, '${listing.tags.join(', ')}')">Copy</button>
+                        </div>
+                        <div class="result-content">${listing.tags.map(t => `<span style="display:inline-block;padding:4px 10px;background:#1a1a1a;border-radius:4px;margin:3px;font-size:12px;">${escapeHtml(t)}</span>`).join('')}</div>
+                    </div>
+                `;
+            }
+
+            // Item Specifics (eBay)
+            if (listing.item_specifics) {
+                const specs = Object.entries(listing.item_specifics);
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Item Specifics</h3>
+                        </div>
+                        <div class="result-content bullets">
+                            ${specs.map(([k, v]) => `<div class="bullet"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Backend Keywords
+            if (listing.backend_keywords || listing.searchTerms) {
+                const keywords = listing.backend_keywords || listing.searchTerms;
+                const keywordsText = Array.isArray(keywords) ? keywords.join(', ') : keywords;
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Backend Keywords</h3>
+                            <div>
+                                <span class="badge">${keywordsText.length} bytes</span>
+                                <button class="copy-btn" onclick="copyText(this, \`${escapeQuotes(keywordsText)}\`)">Copy</button>
+                            </div>
+                        </div>
+                        <div class="result-content">${escapeHtml(keywordsText)}</div>
+                    </div>
+                `;
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function escapeQuotes(text) {
+            if (!text) return '';
+            return text.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/'/g, "\\'");
+        }
+
+        function copyText(btn, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                btn.classList.add('copied');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
+        function copyBullets(btn) {
+            const listings = currentData.listings;
+            const bullets = listings[currentMarketplace]?.bullets || [];
+            navigator.clipboard.writeText(bullets.join('\n')).then(() => {
+                btn.classList.add('copied');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.textContent = 'Copy All';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
