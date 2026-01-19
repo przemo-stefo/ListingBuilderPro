@@ -1,0 +1,575 @@
+# /Users/shawn/Projects/Amazon/amazon-master-tool/listing_builder/beautiful_excel_generator.py
+# Purpose: Generate beautiful, comprehensive Excel with full analysis and Polish explanations
+# NOT for: Quick exports - this is for detailed professional reports with colors and insights
+
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from datetime import datetime
+
+
+def create_beautiful_analysis_excel(comparison_data: dict, output_path: str = "isolbau_BEAUTIFUL_ANALYSIS.xlsx"):
+    """
+    Create beautiful comprehensive Excel with full analysis and explanations.
+    WHY: Professional report with visual appeal, colors, and detailed Polish explanations.
+    """
+    writer = pd.ExcelWriter(output_path, engine='openpyxl')
+
+    # ========== SHEET 1: 📖 INSTRUKCJA (GUIDE) ==========
+    guide_rows = [
+        ['🎯 CEL RAPORTU', 'Ten raport analizuje 300 produktów Isolbau z dwóch źródeł danych'],
+        ['', '• Niche CSV: 95 produktów (wysokie revenue, top performers)'],
+        ['', '• Black Box: 220 produktów (szeroki rynek, long-tail)'],
+        ['', '• Total Revenue: €318,588/miesiąc'],
+        ['', '• Overlap: tylko 15 produktów w obu źródłach (5%)'],
+        ['', ''],
+        ['📊 STRUKTURA', '10 arkuszy z pełną analizą:'],
+        ['', '📄 Executive Summary - kluczowe metryki całego rynku'],
+        ['', '📄 Top 50 by Revenue - 50 najlepszych + market share + scoring'],
+        ['', '📄 Opportunity Matrix - złote okazje (high revenue + low competition)'],
+        ['', '📄 Competition Analysis - analiza konkurencji po poziomach'],
+        ['', '📄 All 300 Products - kompletna lista z kolorami'],
+        ['', '📄 Data Comparison - 15 produktów w obu źródłach'],
+        ['', '📄 Strategic Insights - rekomendacje strategiczne'],
+        ['', ''],
+        ['🎨 KOLORY', 'System kolorów do szybkiej oceny:'],
+        ['', '🟢 Zielony = HIGH POTENTIAL (Score ≥70, <200 reviews)'],
+        ['', '🟡 Żółty = MEDIUM POTENTIAL (Score 50-69)'],
+        ['', '🔴 Czerwony = LOW POTENTIAL (Score <50 lub >500 reviews)'],
+        ['', '🔵 Niebieski = Nagłówki'],
+        ['', ''],
+        ['📈 METRYKI', 'Jak czytać dane:'],
+        ['', '📊 Revenue (€/mo) = Miesięczne przychody produktu'],
+        ['', '📊 Reviews = Liczba recenzji (wskaźnik konkurencji)'],
+        ['', '📊 Rating = Ocena 1-5 gwiazdek (wskaźnik jakości)'],
+        ['', '📊 BSR = Best Seller Rank (niższy = lepszy popyt)'],
+        ['', '📊 Overall Score = Wynik 0-100 (algorytm Inner Circle)'],
+        ['', ''],
+        ['💡 SCORING', 'Algorytm oceny produktów (0-100):'],
+        ['', '💰 Revenue Score (30%) - potencjał przychodowy'],
+        ['', '🏆 Competition Score (30%) - trudność wejścia (mniej reviews = lepiej)'],
+        ['', '⭐ Quality Score (20%) - jakość produktu (rating)'],
+        ['', '📈 Demand Score (20%) - popyt rynkowy (BSR)'],
+        ['', ''],
+        ['🚀 JAK UŻYWAĆ', 'Proces analizy krok po kroku:'],
+        ['', '1. Sprawdź Top 50 by Revenue - znajdź najlepsze produkty'],
+        ['', '2. Zobacz Opportunity Matrix - szukaj złotych okazji'],
+        ['', '3. Przeanalizuj Competition Analysis - oceń trudność wejścia'],
+        ['', '4. Czytaj Strategic Insights - zastosuj rekomendacje'],
+        ['', '5. Używaj filtrów Excel do głębszej analizy']
+    ]
+    guide_df = pd.DataFrame(guide_rows, columns=['SEKCJA', 'OPIS'])
+    guide_df.to_excel(writer, sheet_name='📖 INSTRUKCJA', index=False)
+
+    # ========== SHEET 2: 📊 EXECUTIVE SUMMARY ==========
+    niche_revenue = sum(p['monthly_revenue'] for p in comparison_data['niche_only']) + sum(o['niche_data']['monthly_revenue'] for o in comparison_data['overlap'])
+    bb_revenue = sum(p['monthly_revenue'] for p in comparison_data['blackbox_only']) + sum(o['blackbox_data']['monthly_revenue'] for o in comparison_data['overlap'])
+
+    summary_data = {
+        'METRYKA': [
+            '═══ PRODUKTY ═══',
+            'Total Unique Products',
+            'Niche CSV Products',
+            'Black Box Products',
+            'Overlap (w obu źródłach)',
+            'Niche-Only Products',
+            'Black Box-Only Products',
+            '',
+            '═══ REVENUE ═══',
+            'Combined Total Revenue/Month',
+            'Niche CSV Revenue',
+            'Black Box Revenue',
+            'Avg Revenue per Product',
+            'Top Product Revenue',
+            '',
+            '═══ KONKURENCJA ═══',
+            'Avg Reviews (All)',
+            'Avg Rating (All)',
+            'Products with <100 Reviews',
+            'Products with >€5,000/mo',
+            '',
+            '═══ META ═══',
+            'Data Analysis Date',
+            'Report Generated By'
+        ],
+        'WARTOŚĆ': [
+            '',
+            comparison_data['total_unique_products'],
+            comparison_data['niche_count'],
+            comparison_data['blackbox_count'],
+            comparison_data['overlap_count'],
+            comparison_data['niche_only_count'],
+            comparison_data['blackbox_only_count'],
+            '',
+            '',
+            f"€{comparison_data['combined_total_revenue']:,.0f}",
+            f"€{niche_revenue:,.0f}",
+            f"€{bb_revenue:,.0f}",
+            f"€{comparison_data['combined_total_revenue'] / comparison_data['total_unique_products']:,.0f}",
+            f"€{max(p['monthly_revenue'] for p in comparison_data['all_unique_products']):,.0f}",
+            '',
+            '',
+            f"{sum(p['review_count'] for p in comparison_data['all_unique_products']) / len(comparison_data['all_unique_products']):.0f}",
+            f"{sum(p['review_rating'] for p in comparison_data['all_unique_products'] if p['review_rating'] > 0) / len([p for p in comparison_data['all_unique_products'] if p['review_rating'] > 0]):.2f} ⭐",
+            len([p for p in comparison_data['all_unique_products'] if p['review_count'] < 100]),
+            len([p for p in comparison_data['all_unique_products'] if p['monthly_revenue'] > 5000]),
+            '',
+            '',
+            datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'Amazon Listing Builder Pro'
+        ],
+        'WYJAŚNIENIE': [
+            '',
+            'Łączna liczba unikalnych produktów ze wszystkich źródeł',
+            'Produkty z analizy Niche (wysokie revenue)',
+            'Produkty z Black Box (szeroki zakres)',
+            'Produkty występujące w obu źródłach - 5% tylko!',
+            'Produkty tylko w Niche - top performers',
+            'Produkty tylko w Black Box - long-tail opportunities',
+            '',
+            '',
+            'Łączny miesięczny przychód wszystkich 300 produktów',
+            'Suma przychodów z produktów Niche CSV',
+            'Suma przychodów z produktów Black Box',
+            'Średni miesięczny przychód na produkt',
+            'Najwyższy przychód pojedynczego produktu',
+            '',
+            '',
+            'Średnia liczba recenzji - wskaźnik konkurencji',
+            'Średni rating - wskaźnik jakości',
+            'Niskie bariery wejścia - łatwe do konkurowania',
+            'High-revenue products - duży potencjał',
+            '',
+            '',
+            'Kiedy dane zostały przeanalizowane',
+            'System użyty do analizy'
+        ]
+    }
+    summary_df = pd.DataFrame(summary_data)
+    summary_df.to_excel(writer, sheet_name='📊 EXECUTIVE SUMMARY', index=False)
+
+    # ========== SHEET 3: 🏆 TOP 50 BY REVENUE ==========
+    sorted_all = sorted(comparison_data['all_unique_products'],
+                       key=lambda x: x['monthly_revenue'], reverse=True)[:50]
+
+    top50_data = []
+    for i, prod in enumerate(sorted_all, 1):
+        # WHY: Determine source
+        source = 'Both'
+        if prod['asin'] in [p['asin'] for p in comparison_data['niche_only']]:
+            source = 'Niche Only'
+        elif prod['asin'] in [p['asin'] for p in comparison_data['blackbox_only']]:
+            source = 'Black Box Only'
+
+        # WHY: Calculate scores
+        revenue_score = _calculate_revenue_score(prod['monthly_revenue'])
+        competition_score = _calculate_competition_score(prod['review_count'])
+        quality_score = _calculate_quality_score(prod['review_rating'])
+        demand_score = _calculate_demand_score(prod['bsr_rank'])
+        overall_score = int(revenue_score * 0.3 + competition_score * 0.3 +
+                           quality_score * 0.2 + demand_score * 0.2)
+
+        # WHY: Determine recommendation
+        if overall_score >= 70 and prod['review_count'] < 200:
+            recommendation = '✅ GO - High potential'
+        elif overall_score >= 50 and prod['review_count'] < 500:
+            recommendation = '⚠️ MAYBE - Medium potential'
+        else:
+            recommendation = '❌ SKIP - Too competitive'
+
+        competition_level = 'VERY LOW' if prod['review_count'] < 50 else \
+                           'LOW' if prod['review_count'] < 200 else \
+                           'MEDIUM' if prod['review_count'] < 500 else \
+                           'HIGH' if prod['review_count'] < 1000 else 'VERY HIGH'
+
+        top50_data.append({
+            'Rank': i,
+            'ASIN': prod['asin'],
+            'Title': prod['title'][:70] + '...' if len(prod['title']) > 70 else prod['title'],
+            'Revenue (€/mo)': prod['monthly_revenue'],
+            'Reviews': prod['review_count'],
+            'Rating': prod['review_rating'],
+            'BSR': prod['bsr_rank'],
+            'Price (€)': prod['price'],
+            'Market Share (%)': round(prod['monthly_revenue'] / comparison_data['combined_total_revenue'] * 100, 2),
+            'Revenue Score': revenue_score,
+            'Competition Score': competition_score,
+            'Quality Score': quality_score,
+            'Demand Score': demand_score,
+            'Overall Score': overall_score,
+            'Competition Level': competition_level,
+            'Recommendation': recommendation,
+            'Data Source': source
+        })
+
+    top50_df = pd.DataFrame(top50_data)
+    top50_df.to_excel(writer, sheet_name='🏆 TOP 50 BY REVENUE', index=False)
+
+    # ========== SHEET 4: 💎 OPPORTUNITY MATRIX ==========
+    # WHY: Find products with high revenue + low competition
+    opportunities = []
+    for prod in comparison_data['all_unique_products']:
+        revenue = prod['monthly_revenue']
+        reviews = prod['review_count']
+        rating = prod['review_rating']
+
+        # WHY: Opportunity score calculation
+        if revenue > 1000 and reviews < 100:
+            opportunity_type = '🟢 ZŁOTA OKAZJA'
+            priority = 'CRITICAL'
+        elif revenue > 2000 and reviews < 200:
+            opportunity_type = '🟢 WYSOKI POTENCJAŁ'
+            priority = 'HIGH'
+        elif revenue > 1000 and reviews < 500:
+            opportunity_type = '🟡 ŚREDNI POTENCJAŁ'
+            priority = 'MEDIUM'
+        elif rating < 4.0 and revenue > 2000:
+            opportunity_type = '🟡 QUALITY GAP'
+            priority = 'MEDIUM'
+        else:
+            continue
+
+        overall_score = int(_calculate_revenue_score(revenue) * 0.3 +
+                           _calculate_competition_score(reviews) * 0.3 +
+                           _calculate_quality_score(rating) * 0.2 +
+                           _calculate_demand_score(prod['bsr_rank']) * 0.2)
+
+        opportunities.append({
+            'Priority': priority,
+            'Opportunity Type': opportunity_type,
+            'ASIN': prod['asin'],
+            'Title': prod['title'][:80],
+            'Revenue (€/mo)': revenue,
+            'Reviews': reviews,
+            'Rating': rating,
+            'BSR': prod['bsr_rank'],
+            'Price (€)': prod['price'],
+            'Overall Score': overall_score,
+            'Entry Difficulty': 'EASY' if reviews < 100 else 'MEDIUM' if reviews < 300 else 'HARD',
+            'Why Opportunity': f'€{revenue:,.0f}/mo revenue with only {reviews} reviews - low competition!',
+            'Action': 'Analizuj produkt, sprawdź keywords, rozważ wejście' if priority in ['CRITICAL', 'HIGH'] else 'Dodaj do watchlist'
+        })
+
+    # WHY: Sort by priority and revenue
+    priority_order = {'CRITICAL': 1, 'HIGH': 2, 'MEDIUM': 3}
+    opportunities_sorted = sorted(opportunities,
+                                 key=lambda x: (priority_order[x['Priority']], -x['Revenue (€/mo)']))
+
+    opp_df = pd.DataFrame(opportunities_sorted)
+    opp_df.to_excel(writer, sheet_name='💎 OPPORTUNITY MATRIX', index=False)
+
+    # ========== SHEET 5: 🔍 COMPETITION ANALYSIS ==========
+    comp_data = []
+
+    # WHY: Group by competition level
+    for comp_level, min_rev, max_rev in [
+        ('BARDZO NISKA (<50 reviews)', 0, 50),
+        ('NISKA (50-200 reviews)', 50, 200),
+        ('ŚREDNIA (200-500 reviews)', 200, 500),
+        ('WYSOKA (500-1000 reviews)', 500, 1000),
+        ('BARDZO WYSOKA (>1000 reviews)', 1000, 999999)
+    ]:
+        products_in_range = [p for p in comparison_data['all_unique_products']
+                            if min_rev <= p['review_count'] < max_rev]
+
+        if products_in_range:
+            avg_revenue = sum(p['monthly_revenue'] for p in products_in_range) / len(products_in_range)
+            total_revenue = sum(p['monthly_revenue'] for p in products_in_range)
+            avg_rating = sum(p['review_rating'] for p in products_in_range if p['review_rating'] > 0) / len([p for p in products_in_range if p['review_rating'] > 0]) if any(p['review_rating'] > 0 for p in products_in_range) else 0
+
+            comp_data.append({
+                'Competition Level': comp_level,
+                'Number of Products': len(products_in_range),
+                'Total Revenue (€/mo)': total_revenue,
+                'Avg Revenue (€/mo)': avg_revenue,
+                'Avg Rating': avg_rating,
+                'Market Share (%)': round(total_revenue / comparison_data['combined_total_revenue'] * 100, 1),
+                'Recommendation': 'Targetuj tę kategorię!' if min_rev < 200 else 'Rozważ ostrożnie' if min_rev < 500 else 'Trudne wejście',
+                'Entry Strategy': 'Szybkie wejście możliwe' if min_rev < 100 else 'Potrzebna silna strategia' if min_rev < 500 else 'Wymaga dużej inwestycji'
+            })
+
+    comp_df = pd.DataFrame(comp_data)
+    comp_df.to_excel(writer, sheet_name='🔍 COMPETITION ANALYSIS', index=False)
+
+    # ========== SHEET 6: 📊 ALL 300 PRODUCTS ==========
+    all_products_data = []
+    for i, prod in enumerate(sorted(comparison_data['all_unique_products'],
+                                    key=lambda x: x['monthly_revenue'], reverse=True), 1):
+        overall_score = int(_calculate_revenue_score(prod['monthly_revenue']) * 0.3 +
+                           _calculate_competition_score(prod['review_count']) * 0.3 +
+                           _calculate_quality_score(prod['review_rating']) * 0.2 +
+                           _calculate_demand_score(prod['bsr_rank']) * 0.2)
+
+        all_products_data.append({
+            'Rank': i,
+            'ASIN': prod['asin'],
+            'Title': prod['title'][:80] + '...' if len(prod['title']) > 80 else prod['title'],
+            'Revenue (€/mo)': prod['monthly_revenue'],
+            'Reviews': prod['review_count'],
+            'Rating': prod['review_rating'],
+            'BSR': prod['bsr_rank'],
+            'Price (€)': prod['price'],
+            'Overall Score': overall_score,
+            'Category': prod.get('category', 'N/A')
+        })
+
+    all_df = pd.DataFrame(all_products_data)
+    all_df.to_excel(writer, sheet_name='📊 ALL 300 PRODUCTS', index=False)
+
+    # ========== REMAINING SHEETS ==========
+    # Data Comparison, Niche-Only, Black Box-Only
+    if comparison_data['overlap']:
+        overlap_data = []
+        for i, item in enumerate(comparison_data['overlap'], 1):
+            nd = item['niche_data']
+            bd = item['blackbox_data']
+            rev_diff = nd['monthly_revenue'] - bd['monthly_revenue']
+
+            overlap_data.append({
+                'Rank': i,
+                'ASIN': item['asin'],
+                'Title': nd['title'][:70],
+                'Niche Revenue (€)': nd['monthly_revenue'],
+                'BB Revenue (€)': bd['monthly_revenue'],
+                'Difference (€)': rev_diff,
+                'Difference (%)': round((rev_diff / max(bd['monthly_revenue'], 1)) * 100, 1),
+                'Reviews': nd['review_count'],
+                'Rating': nd['review_rating'],
+                'Analysis': 'Różne źródła pokazują różne dane - użyj wyższej wartości' if abs(rev_diff) > 500 else 'Dane zgodne'
+            })
+
+        overlap_df = pd.DataFrame(overlap_data)
+        overlap_df.to_excel(writer, sheet_name='🔀 DATA COMPARISON (15)', index=False)
+
+    # Niche-Only
+    niche_only_sorted = sorted(comparison_data['niche_only'],
+                               key=lambda x: x['monthly_revenue'], reverse=True)
+    niche_df = pd.DataFrame([{
+        'Rank': i,
+        'ASIN': p['asin'],
+        'Title': p['title'][:80],
+        'Revenue (€/mo)': p['monthly_revenue'],
+        'Reviews': p['review_count'],
+        'Rating': p['review_rating'],
+        'Price (€)': p['price']
+    } for i, p in enumerate(niche_only_sorted, 1)])
+    niche_df.to_excel(writer, sheet_name='📈 NICHE-ONLY (80)', index=False)
+
+    # Black Box-Only
+    bb_only_sorted = sorted(comparison_data['blackbox_only'],
+                           key=lambda x: x['monthly_revenue'], reverse=True)
+    bb_df = pd.DataFrame([{
+        'Rank': i,
+        'ASIN': p['asin'],
+        'Title': p['title'][:80],
+        'Revenue (€/mo)': p['monthly_revenue'],
+        'Reviews': p['review_count'],
+        'Rating': p['review_rating'],
+        'Price (€)': p['price']
+    } for i, p in enumerate(bb_only_sorted, 1)])
+    bb_df.to_excel(writer, sheet_name='📦 BLACK BOX-ONLY (205)', index=False)
+
+    # ========== SHEET: 💡 STRATEGIC INSIGHTS ==========
+    insights_data = _generate_strategic_insights(comparison_data, sorted_all)
+    insights_df = pd.DataFrame(insights_data)
+    insights_df.to_excel(writer, sheet_name='💡 STRATEGIC INSIGHTS', index=False)
+
+    writer.close()
+
+    # WHY: Apply beautiful formatting
+    _apply_beautiful_formatting(output_path)
+
+    return output_path
+
+
+def _generate_strategic_insights(comparison_data, sorted_products):
+    """Generate comprehensive strategic insights."""
+    insights = []
+
+    # Market concentration
+    top10_rev = sum(p['monthly_revenue'] for p in sorted_products[:10])
+    concentration = (top10_rev / comparison_data['combined_total_revenue'] * 100)
+
+    insights.append({
+        'Priority': 'HIGH',
+        'Category': '📊 KONCENTRACJA RYNKU',
+        'Insight': f'Top 10 produktów = {concentration:.1f}% całego rynku (€{top10_rev:,.0f}/mo)',
+        'Recommendation': 'Rynek zdominowany przez top produkty - szukaj nisz long-tail' if concentration > 50 else 'Rynek rozdrobniony - wiele okazji',
+        'Action': 'Analizuj long-tail keywords i niszowe produkty' if concentration > 50 else 'Konkuruj bezpośrednio z top produktami'
+    })
+
+    # Low competition opportunities
+    low_comp = [p for p in comparison_data['all_unique_products']
+               if p['review_count'] < 100 and p['monthly_revenue'] > 1000]
+
+    if low_comp:
+        insights.append({
+            'Priority': 'CRITICAL',
+            'Category': '💎 ZŁOTE OKAZJE',
+            'Insight': f'Znaleziono {len(low_comp)} produktów z <100 reviews i >€1,000/mo',
+            'Recommendation': f'Top opportunity: {low_comp[0]["asin"]} (€{low_comp[0]["monthly_revenue"]:,.0f}/mo, {low_comp[0]["review_count"]} reviews)',
+            'Action': 'Natychmiast analizuj te produkty - niskie bariery wejścia!'
+        })
+
+    # Quality gaps
+    quality_gaps = [p for p in sorted_products[:50]
+                   if p['review_rating'] < 4.0 and p['monthly_revenue'] > 2000]
+
+    if quality_gaps:
+        insights.append({
+            'Priority': 'HIGH',
+            'Category': '⭐ LUKA JAKOŚCIOWA',
+            'Insight': f'{len(quality_gaps)} high-revenue produktów ma rating <4.0 gwiazdek',
+            'Recommendation': 'Możesz wygrać konkurencję oferując lepszą jakość',
+            'Action': 'Przeczytaj negatywne recenzje i popraw te aspekty w swoim produkcie'
+        })
+
+    # Data source overlap insight
+    overlap_pct = (comparison_data['overlap_count'] /
+                  min(comparison_data['niche_count'], comparison_data['blackbox_count']) * 100)
+
+    insights.append({
+        'Priority': 'MEDIUM',
+        'Category': '🔍 RÓŻNORODNOŚĆ DANYCH',
+        'Insight': f'Tylko {overlap_pct:.1f}% overlap między źródłami - różne kryteria wyszukiwania',
+        'Recommendation': 'Niche CSV = top performers, Black Box = szeroki rynek',
+        'Action': 'Używaj obu źródeł dla pełnego obrazu rynku'
+    })
+
+    # Price analysis
+    avg_price = sum(p['price'] for p in sorted_products[:50]) / 50
+
+    insights.append({
+        'Priority': 'MEDIUM',
+        'Category': '💰 STRATEGIA CENOWA',
+        'Insight': f'Średnia cena top 50: €{avg_price:.2f}',
+        'Recommendation': f'Competitive price range: €{avg_price * 0.85:.2f} - €{avg_price * 1.15:.2f}',
+        'Action': 'Nie rób race-to-the-bottom - skupiaj się na wartości, nie cenie'
+    })
+
+    return insights
+
+
+def _calculate_revenue_score(revenue: float) -> int:
+    """Calculate revenue score 0-100."""
+    if revenue >= 50000: return 100
+    elif revenue >= 20000: return 85
+    elif revenue >= 10000: return 70
+    elif revenue >= 5000: return 50
+    elif revenue >= 1000: return 30
+    else: return 10
+
+
+def _calculate_competition_score(reviews: int) -> int:
+    """Calculate competition score 0-100 (lower reviews = higher score)."""
+    if reviews < 50: return 100
+    elif reviews < 200: return 80
+    elif reviews < 500: return 60
+    elif reviews < 1000: return 40
+    else: return 20
+
+
+def _calculate_quality_score(rating: float) -> int:
+    """Calculate quality score 0-100."""
+    if rating >= 4.5: return 100
+    elif rating >= 4.0: return 80
+    elif rating >= 3.5: return 60
+    elif rating >= 3.0: return 40
+    else: return 20
+
+
+def _calculate_demand_score(bsr: int) -> int:
+    """Calculate demand score 0-100."""
+    if bsr < 5000: return 100
+    elif bsr < 20000: return 80
+    elif bsr < 50000: return 60
+    elif bsr < 100000: return 40
+    else: return 20
+
+
+def _apply_beautiful_formatting(file_path: str):
+    """Apply beautiful professional formatting with colors."""
+    wb = load_workbook(file_path)
+
+    # WHY: Beautiful color palette
+    header_fill = PatternFill(start_color='1F4788', end_color='1F4788', fill_type='solid')  # Deep blue
+    header_font = Font(bold=True, color='FFFFFF', size=12)
+
+    high_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')  # Light green
+    medium_fill = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='solid')  # Light yellow
+    low_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')  # Light red
+
+    critical_fill = PatternFill(start_color='00B050', end_color='00B050', fill_type='solid')  # Bright green
+    critical_font = Font(bold=True, color='FFFFFF')
+
+    border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        top=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC')
+    )
+
+    # WHY: Format each sheet
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+
+        # Header row formatting
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = border
+
+        # WHY: Conditional formatting based on sheet
+        if 'TOP 50' in sheet_name or 'OPPORTUNITY' in sheet_name:
+            # Color code Overall Score column
+            for row in range(2, ws.max_row + 1):
+                for col in range(1, ws.max_column + 1):
+                    cell = ws.cell(row, col)
+                    cell.border = border
+
+                    # Find Overall Score column
+                    if ws.cell(1, col).value == 'Overall Score':
+                        if cell.value and isinstance(cell.value, (int, float)):
+                            if cell.value >= 70:
+                                cell.fill = high_fill
+                            elif cell.value >= 50:
+                                cell.fill = medium_fill
+                            else:
+                                cell.fill = low_fill
+
+                    # Highlight CRITICAL priority
+                    if ws.cell(1, col).value == 'Priority':
+                        if cell.value == 'CRITICAL':
+                            cell.fill = critical_fill
+                            cell.font = critical_font
+
+        elif 'COMPETITION' in sheet_name:
+            # Color code competition levels
+            for row in range(2, ws.max_row + 1):
+                comp_level = ws.cell(row, 1).value
+                if comp_level and 'BARDZO NISKA' in comp_level:
+                    for col in range(1, ws.max_column + 1):
+                        ws.cell(row, col).fill = high_fill
+                elif comp_level and 'NISKA' in comp_level:
+                    for col in range(1, ws.max_column + 1):
+                        ws.cell(row, col).fill = medium_fill
+
+        # WHY: Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if cell.value and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 3, 70)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # WHY: Freeze first row
+        ws.freeze_panes = 'A2'
+
+    wb.save(file_path)
