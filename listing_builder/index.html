@@ -393,15 +393,300 @@
         }
         .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
         .empty-state-text { font-size: 14px; }
+
+        /* Main Navigation */
+        .main-nav {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .main-nav-btn {
+            padding: 12px 24px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .main-nav-btn:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .main-nav-btn.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+
+        /* View containers */
+        .view-container { display: none; }
+        .view-container.active { display: block; }
+
+        /* Review Analyzer specific styles */
+        .health-score {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 24px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .health-score-value {
+            font-size: 48px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .health-score-value.good { color: #10b981; }
+        .health-score-value.medium { color: #fbbf24; }
+        .health-score-value.bad { color: #ef4444; }
+        .health-score-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .health-details {
+            flex: 1;
+        }
+        .health-details-row {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+        .health-stat {
+            font-size: 13px;
+            color: #374151;
+        }
+        .health-stat span {
+            font-weight: 600;
+        }
+
+        .sentiment-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .sentiment-positive { background: #10b981; }
+        .sentiment-neutral { background: #6b7280; }
+        .sentiment-negative { background: #ef4444; }
+
+        .issues-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .issue-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+        .issue-name {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+        .issue-count {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+        }
+        .issue-pct {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .alerts-container {
+            margin-bottom: 20px;
+        }
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            color: #dc2626;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .alert-item::before {
+            content: '⚠️';
+        }
+
+        .reviews-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .review-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .review-rating {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .review-sentiment {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .review-sentiment.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+        .review-sentiment.neutral {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+        }
+        .review-sentiment.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+        .review-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #111827;
+        }
+        .review-excerpt {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+        .review-issues {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .review-issue-tag {
+            font-size: 10px;
+            padding: 3px 8px;
+            background: #fee2e2;
+            color: #dc2626;
+            border-radius: 4px;
+        }
+
+        /* Insights */
+        .insights-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .insight-item.warning {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            color: #b45309;
+        }
+        .insight-item.action {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            color: #1d4ed8;
+        }
+        .insight-item.critical {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #dc2626;
+        }
+        .insight-item.opportunity {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #059669;
+        }
+        .insight-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .insight-category {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        /* Issue priority */
+        .issue-priority {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+        .issue-priority.critical { background: #fee2e2; color: #dc2626; }
+        .issue-priority.high { background: #fef3c7; color: #b45309; }
+        .issue-priority.medium { background: #e0e7ff; color: #4338ca; }
+
+        /* Positive card */
+        .positive-card {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .positive-card .issue-count { color: #059669; }
+
+        /* Severity badge */
+        .severity-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .severity-badge.critical { background: #fee2e2; color: #dc2626; }
+        .severity-badge.moderate { background: #fef3c7; color: #b45309; }
+        .severity-badge.minor { background: #d1fae5; color: #059669; }
+
+        @media (max-width: 800px) {
+            #reviewResultsContainer > div[style*="grid-template-columns: 1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Listing<span>Builder</span>Pro</h1>
         <p>Generate optimized listings for 9 marketplaces in seconds</p>
+        <div class="main-nav" style="margin-top: 20px;">
+            <button class="main-nav-btn active" data-view="listing" onclick="switchView('listing')">📝 Listing Generator</button>
+            <button class="main-nav-btn" data-view="reviews" onclick="switchView('reviews')">⭐ Review Analyzer</button>
+        </div>
     </div>
 
     <div class="container">
+        <!-- LISTING GENERATOR VIEW -->
+        <div id="listingView" class="view-container active">
         <div class="grid">
             <!-- Input Panel -->
             <div class="panel">
@@ -502,6 +787,89 @@ kitchen accessories"></textarea>
                 </div>
             </div>
         </div>
+        </div><!-- END LISTING VIEW -->
+
+        <!-- REVIEW ANALYZER VIEW -->
+        <div id="reviewsView" class="view-container">
+        <div class="grid">
+            <!-- Review Input Panel -->
+            <div class="panel">
+                <div class="panel-title">Review Analyzer</div>
+
+                <div class="form-group">
+                    <label>ASIN (opcjonalne)</label>
+                    <input type="text" id="reviewAsin" placeholder="np. B0XXXXXXXXX">
+                </div>
+
+                <div class="form-group">
+                    <label>Nazwa produktu (opcjonalne)</label>
+                    <input type="text" id="reviewProductName" placeholder="np. Wireless Bluetooth Headphones">
+                </div>
+
+                <div class="form-group">
+                    <label>Recenzje (JSON lub tekst)</label>
+                    <textarea id="reviewsInput" style="min-height: 200px;" placeholder='Wklej recenzje w formacie JSON:
+[
+  {"rating": 5, "title": "Great product!", "text": "Love this item..."},
+  {"rating": 2, "title": "Disappointed", "text": "Quality was poor..."}
+]
+
+Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
+                </div>
+
+                <button class="btn" id="analyzeBtn" onclick="analyzeReviews()">
+                    <span id="analyzeBtnText">Analyze Reviews</span>
+                    <div class="spinner"></div>
+                </button>
+
+                <div class="endpoint-info">
+                    API: listing.automatyzacja-ai.pl/webhook/review-analyzer
+                </div>
+            </div>
+
+            <!-- Review Results Panel -->
+            <div class="panel">
+                <div class="panel-title">Analiza</div>
+
+                <div id="reviewStatus" class="status-bar"></div>
+
+                <div id="reviewResultsContainer" class="results-container">
+                    <!-- Health Score -->
+                    <div id="healthScore" class="health-score"></div>
+
+                    <!-- Sentiment Bar -->
+                    <div id="sentimentBar" class="sentiment-bar"></div>
+
+                    <!-- Actionable Insights -->
+                    <div id="insightsContainer" class="insights-container" style="margin-bottom: 20px;"></div>
+
+                    <!-- Top Issues & Positives Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <div class="panel-title" style="margin-bottom: 12px;">Top Issues</div>
+                            <div id="issuesGrid" class="issues-grid" style="grid-template-columns: 1fr;"></div>
+                        </div>
+                        <div>
+                            <div class="panel-title" style="margin-bottom: 12px;">Strengths</div>
+                            <div id="positivesGrid" class="issues-grid" style="grid-template-columns: 1fr;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Critical Reviews -->
+                    <div id="criticalSection" style="margin-bottom: 20px;">
+                        <div class="panel-title" style="margin-bottom: 12px;">Critical Reviews (Need Attention)</div>
+                        <div id="criticalList" class="reviews-list"></div>
+                    </div>
+
+                    <!-- All Reviews -->
+                    <div>
+                        <div class="panel-title" style="margin-bottom: 12px;">All Analyzed Reviews</div>
+                        <div id="reviewsList" class="reviews-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div><!-- END REVIEW VIEW -->
     </div>
 
     <script>
@@ -798,6 +1166,249 @@ kitchen accessories"></textarea>
                     btn.textContent = 'Copy All';
                 }, 2000);
             });
+        }
+
+        // ========== REVIEW ANALYZER ==========
+        const REVIEWS_URL = 'https://listing.automatyzacja-ai.pl/webhook/review-analyzer';
+
+        function switchView(view) {
+            document.querySelectorAll('.main-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
+            document.querySelectorAll('.view-container').forEach(container => {
+                container.classList.toggle('active', container.id === view + 'View');
+            });
+        }
+
+        function parseReviewsInput(text) {
+            text = text.trim();
+            // Try JSON first
+            if (text.startsWith('[')) {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.log('Not valid JSON, parsing as text');
+                }
+            }
+            // Parse as plain text - one review per line
+            const lines = text.split('\n').filter(l => l.trim());
+            return lines.map((line, i) => ({
+                text: line.trim(),
+                rating: 3 // default rating
+            }));
+        }
+
+        async function analyzeReviews() {
+            const btn = document.getElementById('analyzeBtn');
+            const btnText = document.getElementById('analyzeBtnText');
+            const status = document.getElementById('reviewStatus');
+            const resultsContainer = document.getElementById('reviewResultsContainer');
+
+            const reviewsText = document.getElementById('reviewsInput').value;
+            if (!reviewsText.trim()) {
+                alert('Please enter some reviews to analyze');
+                return;
+            }
+
+            const reviews = parseReviewsInput(reviewsText);
+            if (reviews.length === 0) {
+                alert('No valid reviews found');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btnText.textContent = 'Analyzing...';
+            status.className = 'status-bar loading';
+            status.textContent = 'Analyzing ' + reviews.length + ' reviews...';
+            resultsContainer.classList.remove('visible');
+
+            const payload = {
+                reviews: reviews,
+                asin: document.getElementById('reviewAsin').value || 'unknown',
+                product_name: document.getElementById('reviewProductName').value || ''
+            };
+
+            try {
+                const response = await fetch(REVIEWS_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.className = 'status-bar success';
+                    status.textContent = 'Analyzed ' + (data.summary?.total || reviews.length) + ' reviews successfully!';
+                    displayReviewResults(data);
+                } else {
+                    throw new Error(data.error || data.message || 'Analysis failed');
+                }
+            } catch (error) {
+                status.className = 'status-bar error';
+                status.textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btnText.textContent = 'Analyze Reviews';
+        }
+
+        function displayReviewResults(data) {
+            const resultsContainer = document.getElementById('reviewResultsContainer');
+            resultsContainer.classList.add('visible');
+
+            // Health Score
+            const healthDiv = document.getElementById('healthScore');
+            const health = data.summary?.health_score || data.summary?.health || 50;
+            const avgRating = data.summary?.avg_rating || 0;
+            const total = data.summary?.total || 0;
+            const positive = data.summary?.sentiment?.positive || 0;
+            const negative = data.summary?.sentiment?.negative || 0;
+            const neutral = data.summary?.sentiment?.neutral || 0;
+            const severity = data.summary?.severity || {};
+
+            const healthClass = health >= 70 ? 'good' : health >= 40 ? 'medium' : 'bad';
+            healthDiv.innerHTML = `
+                <div>
+                    <div class="health-score-value ${healthClass}">${health}</div>
+                    <div class="health-score-label">Health Score</div>
+                </div>
+                <div class="health-details">
+                    <div class="health-details-row">
+                        <div class="health-stat">Avg Rating: <span>${avgRating}/5</span></div>
+                        <div class="health-stat">Total: <span>${total} reviews</span></div>
+                    </div>
+                    <div class="health-details-row">
+                        <div class="health-stat" style="color:#10b981">Positive: <span>${positive}</span></div>
+                        <div class="health-stat" style="color:#6b7280">Neutral: <span>${neutral}</span></div>
+                        <div class="health-stat" style="color:#ef4444">Negative: <span>${negative}</span></div>
+                    </div>
+                    ${severity.critical ? `
+                    <div class="health-details-row" style="margin-top:8px;">
+                        <div class="health-stat"><span class="severity-badge critical">${severity.critical} Critical</span></div>
+                        <div class="health-stat"><span class="severity-badge moderate">${severity.moderate || 0} Moderate</span></div>
+                        <div class="health-stat"><span class="severity-badge minor">${severity.minor || 0} Minor</span></div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Sentiment Bar
+            const sentimentBar = document.getElementById('sentimentBar');
+            const posPct = data.summary?.sentiment?.positive_pct || (total > 0 ? Math.round((positive / total) * 100) : 0);
+            const negPct = data.summary?.sentiment?.negative_pct || (total > 0 ? Math.round((negative / total) * 100) : 0);
+            const neuPct = 100 - posPct - negPct;
+            sentimentBar.innerHTML = `
+                <div class="sentiment-positive" style="width:${posPct}%" title="${posPct}% positive"></div>
+                <div class="sentiment-neutral" style="width:${neuPct}%" title="${neuPct}% neutral"></div>
+                <div class="sentiment-negative" style="width:${negPct}%" title="${negPct}% negative"></div>
+            `;
+
+            // Actionable Insights
+            const insightsDiv = document.getElementById('insightsContainer');
+            if (data.insights && data.insights.length > 0) {
+                const icons = {warning:'⚠️',action:'💡',critical:'🚨',opportunity:'✨'};
+                insightsDiv.innerHTML = data.insights.map(ins =>
+                    `<div class="insight-item ${ins.type}">
+                        <span class="insight-icon">${icons[ins.type] || '📌'}</span>
+                        <div>
+                            <div>${ins.text}</div>
+                            <div class="insight-category">${ins.category}</div>
+                        </div>
+                    </div>`
+                ).join('');
+            } else {
+                insightsDiv.innerHTML = '';
+            }
+
+            // Top Issues
+            const issuesGrid = document.getElementById('issuesGrid');
+            if (data.top_issues && data.top_issues.length > 0) {
+                issuesGrid.innerHTML = data.top_issues.map(issue =>
+                    `<div class="issue-card">
+                        <div class="issue-name">${issue.issue}</div>
+                        <div class="issue-count">${issue.count}</div>
+                        <div class="issue-pct">${issue.pct}% of reviews</div>
+                        ${issue.priority ? `<div class="issue-priority ${issue.priority}">${issue.priority}</div>` : ''}
+                    </div>`
+                ).join('');
+            } else {
+                issuesGrid.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No issues detected</p>';
+            }
+
+            // Top Positives (Strengths)
+            const positivesGrid = document.getElementById('positivesGrid');
+            if (data.top_positives && data.top_positives.length > 0) {
+                positivesGrid.innerHTML = data.top_positives.map(pos =>
+                    `<div class="issue-card positive-card">
+                        <div class="issue-name">${pos.aspect}</div>
+                        <div class="issue-count">${pos.count}</div>
+                        <div class="issue-pct">${pos.pct}% of reviews</div>
+                    </div>`
+                ).join('');
+            } else {
+                positivesGrid.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No strengths detected</p>';
+            }
+
+            // Critical Reviews
+            const criticalSection = document.getElementById('criticalSection');
+            const criticalList = document.getElementById('criticalList');
+            const criticals = data.critical_reviews || [];
+            if (criticals.length > 0) {
+                criticalSection.style.display = 'block';
+                criticalList.innerHTML = criticals.map(r =>
+                    `<div class="review-item" style="border-left:3px solid #ef4444;">
+                        <div class="review-header">
+                            <div class="review-rating">${'⭐'.repeat(r.rating || 1)}</div>
+                            <span class="severity-badge critical">CRITICAL</span>
+                        </div>
+                        ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
+                        <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
+                        ${r.issues && r.issues.length > 0 ? `
+                            <div class="review-issues">
+                                ${r.issues.map(i => `<span class="review-issue-tag">${i}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>`
+                ).join('');
+            } else {
+                criticalSection.style.display = 'none';
+            }
+
+            // All Reviews List
+            const reviewsList = document.getElementById('reviewsList');
+            const reviews = data.reviews || [];
+            if (reviews.length > 0) {
+                reviewsList.innerHTML = reviews.slice(0, 20).map(r =>
+                    `<div class="review-item">
+                        <div class="review-header">
+                            <div class="review-rating">${'⭐'.repeat(r.rating || 3)}</div>
+                            <div>
+                                <span class="review-sentiment ${r.sentiment || 'neutral'}">${r.sentiment || 'neutral'}</span>
+                                ${r.severity ? `<span class="severity-badge ${r.severity}" style="margin-left:6px;">${r.severity}</span>` : ''}
+                            </div>
+                        </div>
+                        ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
+                        <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
+                        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                            ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${i}</span>`).join('') : ''}
+                            ${r.positives && r.positives.length > 0 ? r.positives.map(p => `<span class="review-issue-tag" style="background:#d1fae5;color:#059669;">${p}</span>`).join('') : ''}
+                        </div>
+                    </div>`
+                ).join('');
+            } else {
+                reviewsList.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No reviews to display</p>';
+            }
         }
     </script>
 </body>
