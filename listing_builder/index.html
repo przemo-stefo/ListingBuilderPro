@@ -477,6 +477,195 @@
         .sentiment-neutral { background: #6b7280; }
         .sentiment-negative { background: #ef4444; }
 
+        /* V3: Authenticity Score */
+        .authenticity-section {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .authenticity-score {
+            text-align: center;
+            min-width: 80px;
+        }
+        .authenticity-value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+        .authenticity-value.high { color: #10b981; }
+        .authenticity-value.medium { color: #f59e0b; }
+        .authenticity-value.low { color: #ef4444; }
+        .authenticity-label {
+            font-size: 10px;
+            color: #0369a1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .authenticity-details {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+        }
+        .authenticity-stat {
+            font-size: 12px;
+            color: #374151;
+        }
+        .authenticity-stat span { font-weight: 600; }
+        .suspicious-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #fef2f2;
+            color: #dc2626;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+        .verified-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #d1fae5;
+            color: #059669;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+
+        /* V3: Competitor Intelligence */
+        .competitors-section {
+            padding: 16px;
+            background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);
+            border: 1px solid #e879f9;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .competitors-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #86198f;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .competitor-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .competitor-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9d5ff;
+        }
+        .competitor-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #7c3aed;
+            text-transform: capitalize;
+        }
+        .competitor-mentions {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        /* V3: Trend Analysis */
+        .trends-section {
+            padding: 16px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .trends-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .trends-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 60px;
+            padding: 8px 0;
+        }
+        .trend-bar {
+            flex: 1;
+            min-width: 30px;
+            background: linear-gradient(to top, #3b82f6, #60a5fa);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .trend-bar:hover {
+            background: linear-gradient(to top, #2563eb, #3b82f6);
+        }
+        .trend-bar::after {
+            content: attr(data-label);
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: #9ca3af;
+            white-space: nowrap;
+        }
+        .trend-bar.negative {
+            background: linear-gradient(to top, #ef4444, #f87171);
+        }
+
+        /* V3: Priority badges on insights */
+        .insight-priority {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 9px;
+            font-weight: 600;
+            border-radius: 3px;
+            margin-left: 8px;
+            text-transform: uppercase;
+        }
+        .insight-priority.p1 { background: #fef2f2; color: #dc2626; }
+        .insight-priority.p2 { background: #fff7ed; color: #ea580c; }
+        .insight-priority.p3 { background: #fefce8; color: #ca8a04; }
+        .insight-priority.p4 { background: #f0fdf4; color: #16a34a; }
+        .insight-priority.p5 { background: #f0f9ff; color: #0284c7; }
+
+        /* V3: Review authenticity indicator */
+        .review-auth-score {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .review-auth-score.suspicious {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        .review-auth-score.trusted {
+            background: #d1fae5;
+            color: #059669;
+        }
+
         .issues-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -829,7 +1018,7 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
 
             <!-- Review Results Panel -->
             <div class="panel">
-                <div class="panel-title">Analiza</div>
+                <div class="panel-title">Analiza <span style="font-size:10px;background:#3b82f6;color:white;padding:2px 6px;border-radius:4px;margin-left:8px;">v3</span></div>
 
                 <div id="reviewStatus" class="status-bar"></div>
 
@@ -839,6 +1028,30 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
 
                     <!-- Sentiment Bar -->
                     <div id="sentimentBar" class="sentiment-bar"></div>
+
+                    <!-- V3: Authenticity Section -->
+                    <div id="authenticitySection" class="authenticity-section" style="display:none;">
+                        <div class="authenticity-score">
+                            <div id="authValue" class="authenticity-value">-</div>
+                            <div class="authenticity-label">Verified %</div>
+                        </div>
+                        <div class="authenticity-details">
+                            <div class="authenticity-stat">Verified Purchases: <span id="verifiedCount">-</span></div>
+                            <div class="authenticity-stat">Suspicious Reviews: <span id="suspiciousCount">-</span></div>
+                        </div>
+                    </div>
+
+                    <!-- V3: Competitor Intelligence -->
+                    <div id="competitorSection" class="competitors-section" style="display:none;">
+                        <div class="competitors-title">🎯 Competitor Intelligence</div>
+                        <div id="competitorList" class="competitor-list"></div>
+                    </div>
+
+                    <!-- V3: Trend Analysis -->
+                    <div id="trendsSection" class="trends-section" style="display:none;">
+                        <div class="trends-title">📈 Review Trends (Last 6 months)</div>
+                        <div id="trendsChart" class="trends-chart"></div>
+                    </div>
 
                     <!-- Actionable Insights -->
                     <div id="insightsContainer" class="insights-container" style="margin-bottom: 20px;"></div>
@@ -1320,88 +1533,156 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
                 <div class="sentiment-negative" style="width:${negPct}%" title="${negPct}% negative"></div>
             `;
 
-            // Actionable Insights
+            // V3: Authenticity Section
+            const authSection = document.getElementById('authenticitySection');
+            const authenticity = data.summary?.authenticity;
+            if (authenticity) {
+                authSection.style.display = 'flex';
+                const verifiedPct = authenticity.verified_pct || 0;
+                const suspiciousPct = authenticity.suspicious_pct || 0;
+                const suspiciousCount = authenticity.suspicious_count || 0;
+                const authClass = verifiedPct >= 70 ? 'high' : verifiedPct >= 40 ? 'medium' : 'low';
+                document.getElementById('authValue').className = 'authenticity-value ' + authClass;
+                document.getElementById('authValue').textContent = verifiedPct + '%';
+                document.getElementById('verifiedCount').textContent = verifiedPct + '% of reviews';
+                document.getElementById('suspiciousCount').innerHTML = suspiciousCount > 0
+                    ? `<span class="suspicious-badge">⚠️ ${suspiciousCount} suspicious (${suspiciousPct}%)</span>`
+                    : '<span class="verified-badge">✓ No suspicious reviews</span>';
+            } else {
+                authSection.style.display = 'none';
+            }
+
+            // V3: Competitor Intelligence
+            const compSection = document.getElementById('competitorSection');
+            const compList = document.getElementById('competitorList');
+            const competitors = data.competitor_intelligence || [];
+            if (competitors.length > 0) {
+                compSection.style.display = 'block';
+                compList.innerHTML = competitors.map(c => `
+                    <div class="competitor-item">
+                        <span class="competitor-name">${escapeHtml(c.name)}</span>
+                        <span class="competitor-mentions">${c.mentions} mentions (${c.comparison_rate}%)</span>
+                    </div>
+                `).join('');
+            } else {
+                compSection.style.display = 'none';
+            }
+
+            // V3: Trend Analysis
+            const trendsSection = document.getElementById('trendsSection');
+            const trendsChart = document.getElementById('trendsChart');
+            const trends = data.trends || [];
+            if (trends.length > 1) {
+                trendsSection.style.display = 'block';
+                const maxReviews = Math.max(...trends.map(t => t.reviews));
+                trendsChart.innerHTML = trends.map(t => {
+                    const height = maxReviews > 0 ? Math.max(10, (t.reviews / maxReviews) * 100) : 10;
+                    const isNegative = t.avg_rating < 3.5;
+                    return `<div class="trend-bar ${isNegative ? 'negative' : ''}"
+                        style="height:${height}%"
+                        data-label="${t.month.substring(5)}"
+                        title="${t.month}: ${t.reviews} reviews, ${t.avg_rating}★ avg"></div>`;
+                }).join('');
+            } else {
+                trendsSection.style.display = 'none';
+            }
+
+            // Actionable Insights with V3 priority badges
             const insightsDiv = document.getElementById('insightsContainer');
             if (data.insights && data.insights.length > 0) {
-                const icons = {warning:'⚠️',action:'💡',critical:'🚨',opportunity:'✨'};
-                insightsDiv.innerHTML = data.insights.map(ins =>
-                    `<div class="insight-item ${ins.type}">
+                const icons = {warning:'⚠️',action:'💡',critical:'🚨',opportunity:'✨',alert:'🔔',info:'ℹ️',intelligence:'🎯'};
+                insightsDiv.innerHTML = data.insights.map(ins => {
+                    const priority = ins.priority || 5;
+                    const priorityLabel = priority <= 2 ? 'URGENT' : priority <= 3 ? 'HIGH' : priority <= 4 ? 'MEDIUM' : 'LOW';
+                    return `<div class="insight-item ${safeCssClass(ins.type)}">
                         <span class="insight-icon">${icons[ins.type] || '📌'}</span>
-                        <div>
-                            <div>${ins.text}</div>
-                            <div class="insight-category">${ins.category}</div>
+                        <div style="flex:1;">
+                            <div>${escapeHtml(ins.text)}<span class="insight-priority p${priority}">${priorityLabel}</span></div>
+                            <div class="insight-category">${escapeHtml(ins.category)}</div>
                         </div>
-                    </div>`
-                ).join('');
+                    </div>`;
+                }).join('');
             } else {
                 insightsDiv.innerHTML = '';
             }
 
-            // Top Issues
+            // Top Issues with V3 weighted scoring
             const issuesGrid = document.getElementById('issuesGrid');
             if (data.top_issues && data.top_issues.length > 0) {
                 issuesGrid.innerHTML = data.top_issues.map(issue =>
                     `<div class="issue-card">
-                        <div class="issue-name">${issue.issue}</div>
+                        <div class="issue-name">${escapeHtml(issue.issue)}</div>
                         <div class="issue-count">${issue.count}</div>
                         <div class="issue-pct">${issue.pct}% of reviews</div>
-                        ${issue.priority ? `<div class="issue-priority ${issue.priority}">${issue.priority}</div>` : ''}
+                        ${issue.weighted_score ? `<div style="font-size:10px;color:#6b7280;margin-top:4px;">Impact: ${issue.weighted_score}</div>` : ''}
+                        ${issue.priority ? `<div class="issue-priority ${safeCssClass(issue.priority)}">${escapeHtml(issue.priority)}</div>` : ''}
                     </div>`
                 ).join('');
             } else {
                 issuesGrid.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No issues detected</p>';
             }
 
-            // Top Positives (Strengths)
+            // Top Positives (Strengths) with V3 impact scoring
             const positivesGrid = document.getElementById('positivesGrid');
             if (data.top_positives && data.top_positives.length > 0) {
                 positivesGrid.innerHTML = data.top_positives.map(pos =>
                     `<div class="issue-card positive-card">
-                        <div class="issue-name">${pos.aspect}</div>
+                        <div class="issue-name">${escapeHtml(pos.aspect)}</div>
                         <div class="issue-count">${pos.count}</div>
                         <div class="issue-pct">${pos.pct}% of reviews</div>
+                        ${pos.impact_score ? `<div style="font-size:10px;color:#059669;margin-top:4px;">Impact: ${pos.impact_score}</div>` : ''}
                     </div>`
                 ).join('');
             } else {
                 positivesGrid.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No strengths detected</p>';
             }
 
-            // Critical Reviews
+            // Critical Reviews with V3 features
             const criticalSection = document.getElementById('criticalSection');
             const criticalList = document.getElementById('criticalList');
             const criticals = data.critical_reviews || [];
             if (criticals.length > 0) {
                 criticalSection.style.display = 'block';
-                criticalList.innerHTML = criticals.map(r =>
-                    `<div class="review-item" style="border-left:3px solid #ef4444;">
+                criticalList.innerHTML = criticals.map(r => {
+                    const authScore = r.authenticity_score !== undefined ? r.authenticity_score : null;
+                    return `<div class="review-item" style="border-left:3px solid #ef4444;">
                         <div class="review-header">
                             <div class="review-rating">${'⭐'.repeat(r.rating || 1)}</div>
-                            <span class="severity-badge critical">CRITICAL</span>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <span class="severity-badge critical">CRITICAL</span>
+                                ${r.verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                                ${authScore !== null && authScore >= 7 ? '<span class="review-auth-score trusted">✓ Trusted</span>' : ''}
+                            </div>
                         </div>
                         ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
                         <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
-                        ${r.issues && r.issues.length > 0 ? `
-                            <div class="review-issues">
-                                ${r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('')}
-                            </div>
-                        ` : ''}
-                    </div>`
-                ).join('');
+                        <div class="review-issues" style="margin-top:8px;">
+                            ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('') : ''}
+                            ${r.issue_weight ? `<span style="font-size:10px;color:#9ca3af;margin-left:8px;">Impact: ${r.issue_weight}</span>` : ''}
+                        </div>
+                        ${r.date ? `<div style="font-size:11px;color:#9ca3af;margin-top:6px;">📅 ${escapeHtml(r.date)}</div>` : ''}
+                    </div>`;
+                }).join('');
             } else {
                 criticalSection.style.display = 'none';
             }
 
-            // All Reviews List
+            // All Reviews List with V3 authenticity features
             const reviewsList = document.getElementById('reviewsList');
             const reviews = data.reviews || [];
             if (reviews.length > 0) {
-                reviewsList.innerHTML = reviews.slice(0, 20).map(r =>
-                    `<div class="review-item">
+                reviewsList.innerHTML = reviews.slice(0, 20).map(r => {
+                    const authScore = r.authenticity_score !== undefined ? r.authenticity_score : null;
+                    const authClass = authScore !== null ? (authScore >= 7 ? 'trusted' : authScore <= 3 ? 'suspicious' : '') : '';
+                    const authLabel = authScore !== null ? (authScore >= 7 ? '✓ Trusted' : authScore <= 3 ? '⚠ Suspicious' : `Auth: ${authScore}/10`) : '';
+                    return `<div class="review-item">
                         <div class="review-header">
                             <div class="review-rating">${'⭐'.repeat(r.rating || 3)}</div>
-                            <div>
+                            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                                 <span class="review-sentiment ${safeCssClass(r.sentiment) || 'neutral'}">${escapeHtml(r.sentiment) || 'neutral'}</span>
-                                ${r.severity ? `<span class="severity-badge ${safeCssClass(r.severity)}" style="margin-left:6px;">${escapeHtml(r.severity)}</span>` : ''}
+                                ${r.severity ? `<span class="severity-badge ${safeCssClass(r.severity)}">${escapeHtml(r.severity)}</span>` : ''}
+                                ${r.verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                                ${authScore !== null ? `<span class="review-auth-score ${authClass}">${authLabel}</span>` : ''}
                             </div>
                         </div>
                         ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
@@ -1409,9 +1690,11 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
                         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
                             ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('') : ''}
                             ${r.positives && r.positives.length > 0 ? r.positives.map(p => `<span class="review-issue-tag" style="background:#d1fae5;color:#059669;">${escapeHtml(p)}</span>`).join('') : ''}
+                            ${r.competitors && r.competitors.length > 0 ? r.competitors.map(c => `<span class="review-issue-tag" style="background:#e9d5ff;color:#7c3aed;">vs ${escapeHtml(c)}</span>`).join('') : ''}
                         </div>
-                    </div>`
-                ).join('');
+                        ${r.date ? `<div style="font-size:11px;color:#9ca3af;margin-top:6px;">📅 ${escapeHtml(r.date)}</div>` : ''}
+                    </div>`;
+                }).join('');
             } else {
                 reviewsList.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No reviews to display</p>';
             }
