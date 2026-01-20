@@ -861,6 +861,186 @@
                 grid-template-columns: 1fr !important;
             }
         }
+
+        /* Description & FAQ Sections */
+        .info-section {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            padding: 20px 24px;
+            font-weight: 600;
+            color: #1f2937;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .faq-question:hover {
+            background: #f9fafb;
+        }
+
+        .faq-question::after {
+            content: '+';
+            font-size: 24px;
+            color: #3b82f6;
+            font-weight: 300;
+            transition: transform 0.2s;
+        }
+
+        .faq-item.active .faq-question::after {
+            transform: rotate(45deg);
+        }
+
+        .faq-answer {
+            padding: 0 24px;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .faq-item.active .faq-answer {
+            padding: 0 24px 20px;
+            max-height: 500px;
+        }
+
+        .faq-answer p {
+            color: #6b7280;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .faq-answer ul {
+            margin: 10px 0;
+            padding-left: 20px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .faq-answer li {
+            margin-bottom: 6px;
+        }
+
+        .tools-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        @media (max-width: 700px) {
+            .tools-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tool-box {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
+            padding: 28px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .tool-box h3 {
+            font-size: 20px;
+            color: #1e40af;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tool-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tool-box li {
+            padding: 8px 0;
+            color: #475569;
+            font-size: 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .tool-box li::before {
+            content: '✓';
+            color: #22c55e;
+            font-weight: bold;
+        }
+
+        .footer-info {
+            text-align: center;
+            padding: 40px 20px;
+            color: #9ca3af;
+            font-size: 13px;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 40px;
+        }
     </style>
 </head>
 <body>
@@ -1083,6 +1263,189 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
             </div>
         </div>
         </div><!-- END REVIEW VIEW -->
+    </div>
+
+    <!-- DESCRIPTION SECTION -->
+    <div class="info-section">
+        <h2 class="section-title">Jak to działa?</h2>
+
+        <div class="tools-comparison">
+            <div class="tool-box">
+                <h3>📝 Listing Generator</h3>
+                <ul>
+                    <li>Wpisz dane produktu (tytuł, marka, opis, słowa kluczowe)</li>
+                    <li>Wybierz marketplace'y (Amazon US/DE/UK/FR/IT/ES, eBay, Etsy, Allegro)</li>
+                    <li>Kliknij "Generate Listings"</li>
+                    <li>AI wygeneruje zoptymalizowane listingi z tłumaczeniami</li>
+                    <li>Skopiuj tytuł, bullets i opis jednym kliknięciem</li>
+                </ul>
+            </div>
+            <div class="tool-box">
+                <h3>⭐ Review Analyzer v3</h3>
+                <ul>
+                    <li>Wklej recenzje w formacie JSON lub tekst</li>
+                    <li>Kliknij "Analyze Reviews"</li>
+                    <li>Otrzymasz Health Score, analizę sentymentu i priorytety</li>
+                    <li>Zobacz Competitor Intelligence - z czym klienci porównują</li>
+                    <li>Sprawdź Trend Analysis - jak zmieniają się recenzje w czasie</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2 class="section-title">Główne funkcje</h2>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <div class="feature-title">9 Marketplace'ów</div>
+                <div class="feature-desc">Generuj listingi dla Amazon (6 rynków), eBay, Etsy i Allegro. Automatyczne tłumaczenia na język docelowy.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <div class="feature-title">AI-Powered</div>
+                <div class="feature-desc">Wykorzystujemy Groq AI do generowania tytułów, bullet pointów i opisów zoptymalizowanych pod SEO.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Health Score</div>
+                <div class="feature-desc">Natychmiastowa ocena kondycji produktu na podstawie recenzji. Skala 0-100 z kolorowym wskaźnikiem.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <div class="feature-title">Competitor Intelligence</div>
+                <div class="feature-desc">Dowiedz się z jakimi produktami klienci porównują Twój produkt. Analizuj przewagi konkurencyjne.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <div class="feature-title">Trend Analysis</div>
+                <div class="feature-desc">Śledź jak zmieniają się recenzje w czasie. Wykrywaj problemy zanim wpłyną na sprzedaż.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚠️</div>
+                <div class="feature-title">Safety Alerts</div>
+                <div class="feature-desc">Automatyczne wykrywanie problemów bezpieczeństwa. Ochrona przed zawieszeniem ASIN.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ SECTION -->
+    <div class="info-section">
+        <h2 class="section-title">FAQ - Często zadawane pytania</h2>
+
+        <div class="faq-container">
+            <div class="faq-item">
+                <div class="faq-question">Jak wprowadzić słowa kluczowe?</div>
+                <div class="faq-answer">
+                    <p>Wpisz słowa kluczowe w polu "Słowa kluczowe", każde w nowej linii. Możesz wkleić listę z Helium 10, Jungle Scout lub Data Dive. System automatycznie przetworzy je i wykorzysta do optymalizacji listingu.</p>
+                    <ul>
+                        <li>Jedno słowo kluczowe na linię</li>
+                        <li>Najważniejsze słowa na górze</li>
+                        <li>Maksymalnie 50-100 słów dla najlepszych rezultatów</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Jak wybrać marketplace?</div>
+                <div class="faq-answer">
+                    <p>W sekcji "MARKETPLACES" kliknij na przyciski, aby wybrać lub odznaczyć marketplace'y. Niebieskie tło = wybrany. Możesz wybrać wiele naraz.</p>
+                    <ul>
+                        <li>🇺🇸 Amazon US - angielski</li>
+                        <li>🇩🇪 Amazon DE - niemiecki</li>
+                        <li>🇬🇧 Amazon UK - angielski (British)</li>
+                        <li>🇫🇷 Amazon FR - francuski</li>
+                        <li>🇮🇹 Amazon IT - włoski</li>
+                        <li>🇪🇸 Amazon ES - hiszpański</li>
+                        <li>🛒 eBay - angielski</li>
+                        <li>🎨 Etsy - angielski (kreatywny styl)</li>
+                        <li>🇵🇱 Allegro - polski</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">W jakim formacie wkleić recenzje?</div>
+                <div class="faq-answer">
+                    <p>Review Analyzer akceptuje format JSON. Każda recenzja powinna zawierać rating i text:</p>
+                    <ul>
+                        <li><strong>rating</strong> - ocena 1-5 (wymagane)</li>
+                        <li><strong>text</strong> - treść recenzji (wymagane)</li>
+                        <li><strong>title</strong> - tytuł recenzji (opcjonalnie)</li>
+                        <li><strong>verified_purchase</strong> - true/false (opcjonalnie)</li>
+                        <li><strong>date</strong> - data w formacie YYYY-MM-DD (opcjonalnie)</li>
+                    </ul>
+                    <p>Przykład: <code>[{"rating": 5, "text": "Great product!"}, {"rating": 2, "text": "Poor quality"}]</code></p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Co oznacza Health Score?</div>
+                <div class="faq-answer">
+                    <p>Health Score to ogólna ocena kondycji produktu na podstawie recenzji:</p>
+                    <ul>
+                        <li><strong>80-100</strong> - Doskonały produkt, niskie ryzyko</li>
+                        <li><strong>60-79</strong> - Dobry produkt, wymaga uwagi</li>
+                        <li><strong>40-59</strong> - Problematyczny, pilne działanie</li>
+                        <li><strong>0-39</strong> - Krytyczny, ryzyko zawieszenia</li>
+                    </ul>
+                    <p>Score uwzględnia: średnią ocenę, % negatywnych recenzji, problemy bezpieczeństwa, autentyczność recenzji.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Co to jest Competitor Intelligence?</div>
+                <div class="faq-answer">
+                    <p>Competitor Intelligence automatycznie wykrywa nazwy konkurencyjnych produktów w recenzjach. Gdy klienci piszą "lepszy niż AirPods" lub "gorszy od Sony", system to wyłapuje.</p>
+                    <ul>
+                        <li>Zobacz z czym klienci porównują Twój produkt</li>
+                        <li>Zidentyfikuj głównych konkurentów</li>
+                        <li>Wykorzystaj to w strategii marketingowej</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Jak działa Trend Analysis?</div>
+                <div class="faq-answer">
+                    <p>Trend Analysis pokazuje jak zmieniają się recenzje w czasie (ostatnie 6 miesięcy). Wymaga pola "date" w recenzjach.</p>
+                    <ul>
+                        <li>Wykres pokazuje liczbę recenzji i średnią ocenę miesięcznie</li>
+                        <li>Czerwone słupki = miesiące z problemami</li>
+                        <li>Zielone słupki = dobre miesiące</li>
+                        <li>Wykrywaj spadki jakości zanim wpłyną na ranking</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Co oznaczają priorytety URGENT/MEDIUM/LOW?</div>
+                <div class="faq-answer">
+                    <p>Insights są posortowane według priorytetu działania:</p>
+                    <ul>
+                        <li><strong>URGENT (czerwony)</strong> - Natychmiastowe działanie! Problemy bezpieczeństwa, wysoki % negatywnych, ryzyko zawieszenia</li>
+                        <li><strong>MEDIUM (żółty)</strong> - Ważne ale nie krytyczne. Okazje marketingowe, problemy jakościowe</li>
+                        <li><strong>LOW (szary)</strong> - Informacyjne. Intelligence o konkurencji, sugestie</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Czy mogę skopiować wygenerowany listing?</div>
+                <div class="faq-answer">
+                    <p>Tak! Przy każdej sekcji jest przycisk "Copy":</p>
+                    <ul>
+                        <li><strong>Copy (przy tytule)</strong> - kopiuje tytuł</li>
+                        <li><strong>Copy All (przy bullets)</strong> - kopiuje wszystkie bullet points</li>
+                        <li><strong>Copy (przy opisie)</strong> - kopiuje opis</li>
+                    </ul>
+                    <p>Po kliknięciu przycisk zmieni się na "Copied!" na chwilę.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-info">
+        ListingBuilderPro v3.0 | Powered by Groq AI | © 2026
     </div>
 
     <script>
@@ -1699,6 +2062,24 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
                 reviewsList.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No reviews to display</p>';
             }
         }
+
+        // FAQ Accordion functionality
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const faqItem = question.parentElement;
+                const wasActive = faqItem.classList.contains('active');
+
+                // Close all other FAQ items
+                document.querySelectorAll('.faq-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                // Toggle current item
+                if (!wasActive) {
+                    faqItem.classList.add('active');
+                }
+            });
+        });
     </script>
 </body>
 </html>
