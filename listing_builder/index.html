@@ -1144,6 +1144,12 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
             return text.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/'/g, "\\'");
         }
 
+        // Sanitize CSS class names - only allow alphanumeric, hyphen, underscore
+        function safeCssClass(text) {
+            if (!text) return '';
+            return text.replace(/[^a-zA-Z0-9_-]/g, '');
+        }
+
         function copyText(btn, text) {
             navigator.clipboard.writeText(text).then(() => {
                 btn.classList.add('copied');
@@ -1376,7 +1382,7 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
                         <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
                         ${r.issues && r.issues.length > 0 ? `
                             <div class="review-issues">
-                                ${r.issues.map(i => `<span class="review-issue-tag">${i}</span>`).join('')}
+                                ${r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('')}
                             </div>
                         ` : ''}
                     </div>`
@@ -1394,15 +1400,15 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
                         <div class="review-header">
                             <div class="review-rating">${'⭐'.repeat(r.rating || 3)}</div>
                             <div>
-                                <span class="review-sentiment ${r.sentiment || 'neutral'}">${r.sentiment || 'neutral'}</span>
-                                ${r.severity ? `<span class="severity-badge ${r.severity}" style="margin-left:6px;">${r.severity}</span>` : ''}
+                                <span class="review-sentiment ${safeCssClass(r.sentiment) || 'neutral'}">${escapeHtml(r.sentiment) || 'neutral'}</span>
+                                ${r.severity ? `<span class="severity-badge ${safeCssClass(r.severity)}" style="margin-left:6px;">${escapeHtml(r.severity)}</span>` : ''}
                             </div>
                         </div>
                         ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
                         <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
                         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-                            ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${i}</span>`).join('') : ''}
-                            ${r.positives && r.positives.length > 0 ? r.positives.map(p => `<span class="review-issue-tag" style="background:#d1fae5;color:#059669;">${p}</span>`).join('') : ''}
+                            ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('') : ''}
+                            ${r.positives && r.positives.length > 0 ? r.positives.map(p => `<span class="review-issue-tag" style="background:#d1fae5;color:#059669;">${escapeHtml(p)}</span>`).join('') : ''}
                         </div>
                     </div>`
                 ).join('');
