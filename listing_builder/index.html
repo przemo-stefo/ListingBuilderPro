@@ -1082,11 +1082,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Słowa kluczowe (jedno na linię)</label>
-                    <textarea id="keywords" placeholder="bamboo cutting board
+                    <label>Słowa kluczowe (wklej CSV lub jedno na linię)</label>
+                    <textarea id="keywords" placeholder="Wklej eksport z Helium 10, Jungle Scout lub Data Dive
+lub wpisz słowa kluczowe, każde w nowej linii:
+
+bamboo cutting board
 cutting board set
-wood chopping board
-kitchen accessories"></textarea>
+wood chopping board"></textarea>
                 </div>
 
                 <div class="form-group">
@@ -1336,12 +1338,19 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
             <div class="faq-item">
                 <div class="faq-question">Jak wprowadzić słowa kluczowe?</div>
                 <div class="faq-answer">
-                    <p>Wpisz słowa kluczowe w polu "Słowa kluczowe", każde w nowej linii. Możesz wkleić listę z Helium 10, Jungle Scout lub Data Dive. System automatycznie przetworzy je i wykorzysta do optymalizacji listingu.</p>
+                    <p><strong>Obsługujemy eksport CSV!</strong> Możesz bezpośrednio wkleić eksport z:</p>
                     <ul>
-                        <li>Jedno słowo kluczowe na linię</li>
-                        <li>Najważniejsze słowa na górze</li>
-                        <li>Maksymalnie 50-100 słów dla najlepszych rezultatów</li>
+                        <li><strong>Helium 10</strong> (Cerebro, Magnet) - skopiuj całą tabelę</li>
+                        <li><strong>Jungle Scout</strong> (Keyword Scout) - eksportuj CSV i wklej</li>
+                        <li><strong>Data Dive</strong> - eksportuj keywords i wklej</li>
                     </ul>
+                    <p>System automatycznie:</p>
+                    <ul>
+                        <li>Rozpoznaje format CSV (nagłówki, kolumny)</li>
+                        <li>Wyciąga tylko słowa kluczowe (pomija Search Volume itp.)</li>
+                        <li>Usuwa duplikaty</li>
+                    </ul>
+                    <p>Możesz też wpisać ręcznie - jedno słowo kluczowe na linię. Najważniejsze na górze, max 50-100 słów.</p>
                 </div>
             </div>
 
@@ -1484,9 +1493,48 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
         }
 
         function parseKeywords(text) {
-            return text.trim().split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
+            // Detect CSV format (Helium 10, Jungle Scout, Data Dive)
+            const lines = text.trim().split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+            if (lines.length === 0) return [];
+
+            // Check if first line looks like CSV header
+            const firstLine = lines[0].toLowerCase();
+            const isCSV = firstLine.includes(',') || firstLine.includes('\t');
+            const hasHeader = firstLine.includes('keyword') || firstLine.includes('search volume') ||
+                             firstLine.includes('phrase') || firstLine.includes('cerebro') ||
+                             firstLine.includes('exact') || firstLine.includes('broad');
+
+            let keywords = [];
+            const startIndex = hasHeader ? 1 : 0;
+
+            for (let i = startIndex; i < lines.length; i++) {
+                let keyword = lines[i];
+
+                if (isCSV) {
+                    // Handle CSV: extract first column (keyword)
+                    // Support both comma and tab separators
+                    const separator = lines[i].includes('\t') ? '\t' : ',';
+                    const parts = lines[i].split(separator);
+
+                    // First column is usually the keyword
+                    keyword = parts[0].trim();
+
+                    // Remove quotes if present (CSV format)
+                    keyword = keyword.replace(/^["']|["']$/g, '');
+                }
+
+                // Clean and validate keyword
+                keyword = keyword.trim();
+                if (keyword.length > 0 && keyword.length < 200) {
+                    keywords.push(keyword);
+                }
+            }
+
+            // Remove duplicates while preserving order
+            keywords = [...new Set(keywords)];
+
+            return keywords;
         }
 
         async function generate() {
