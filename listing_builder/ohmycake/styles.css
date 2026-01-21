@@ -1,0 +1,211 @@
+/*
+ * location: ohmycake/styles.css
+ * Purpose: Custom CSS for Oh My Cake website - styles that Tailwind doesn't cover
+ * NOT for: Tailwind utility classes (those are in CDN), component-specific inline styles
+ */
+
+/* ============================================
+   FONT & BASE
+   ============================================ */
+
+/* Font fallback while loading */
+@font-face {
+    font-family: 'Poppins';
+    font-display: swap;
+    src: local('Poppins');
+}
+
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Hide elements before scroll animation */
+.animate-on-scroll {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.animate-on-scroll.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Fade in animation for form steps */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Pulsing CTA button - coral tones */
+@keyframes pulse-pink {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(232, 150, 125, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 15px rgba(232, 150, 125, 0);
+    }
+}
+
+.pulse-cta {
+    animation: pulse-pink 2s infinite;
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #F8F1F1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #E8A095;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #D4847A;
+}
+
+/* ============================================
+   FORM COMPONENTS
+   ============================================ */
+
+/* Form step transitions */
+.form-step {
+    display: none;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.form-step.active {
+    display: block;
+}
+
+/* Progress bar fill animation */
+.progress-fill {
+    transition: width 0.4s ease-out;
+}
+
+/* Radio/checkbox custom styling */
+.custom-radio:checked + label,
+.custom-checkbox:checked + label {
+    background: linear-gradient(135deg, #E8967D 0%, #D4847A 100%);
+    color: white;
+    border-color: transparent;
+}
+
+/* ============================================
+   LIGHTBOX
+   ============================================ */
+
+.lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.lightbox.active {
+    display: flex;
+}
+
+.lightbox img {
+    max-width: 90%;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 16px;
+}
+
+/* ============================================
+   CARDS & HOVER EFFECTS
+   ============================================ */
+
+.cake-card {
+    transition: all 0.3s ease;
+}
+
+.cake-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px rgba(232, 150, 125, 0.15);
+}
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+
+/* Mobile menu animation */
+.mobile-menu {
+    transform: translateX(100%);
+    transition: transform 0.3s ease-out;
+}
+
+.mobile-menu.open {
+    transform: translateX(0);
+}
+
+/* Navbar background transition on scroll */
+.navbar-scrolled {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 20px rgba(232, 150, 125, 0.1);
+}
+
+/* ============================================
+   TEXT EFFECTS
+   ============================================ */
+
+/* Gradient text - coral tones matching logo */
+.gradient-text {
+    background: linear-gradient(135deg, #E8967D 0%, #F5B5AC 50%, #D4847A 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ============================================
+   PLACEHOLDERS & LOADING
+   ============================================ */
+
+.img-placeholder {
+    background: linear-gradient(135deg, #FFF0E8 0%, #E8A095 100%);
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+    .mobile-menu,
+    .lightbox,
+    #cookie-banner,
+    nav button {
+        display: none !important;
+    }
+
+    .animate-on-scroll {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}

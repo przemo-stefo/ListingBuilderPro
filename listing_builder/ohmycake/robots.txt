@@ -1,0 +1,21 @@
+# robots.txt for Oh My Cake by Kasia Pyzik
+# https://ohmycake.pl
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://ohmycake.pl/sitemap.xml
+
+# Disallow admin/private areas (none currently)
+# Disallow: /admin/
+
+# Allow all crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Host directive for Yandex
+Host: https://ohmycake.pl
