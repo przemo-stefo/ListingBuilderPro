@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="pl">
+<!--
+  location: ohmycake/index.html
+  Purpose: Complete landing page for "Oh My Cake by Kasia Pyzik" - custom cake bakery in Kraśnik
+  NOT for: E-commerce transactions, online payments, user accounts
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Oh My Cake by Kasia Pyzik - Pyszne torty, ciasta i desery na zamówienie w Kraśniku. Serniki, torty weselne, urodzinowe, słodkie stoły. ✓ Świeże składniki ✓ Odbiór Kraśnik. Tel: 726 760 700">
+    <meta name="keywords" content="torty Kraśnik, ciasta na zamówienie Kraśnik, cukiernia Kraśnik, torty weselne Kraśnik, sernik na zamówienie, słodki stół Kraśnik, Oh My Cake, Kasia Pyzik, torty urodzinowe Kraśnik, tort komunijny Kraśnik">
+    <meta name="author" content="Oh My Cake by Kasia Pyzik">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="geo.region" content="PL-LU">
+    <meta name="geo.placename" content="Kraśnik">
+    <meta name="geo.position" content="50.9247;22.2267">
+    <meta name="ICBM" content="50.9247, 22.2267">
+    <meta name="theme-color" content="#E8967D">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="format-detection" content="telephone=yes">
+
+    <!--
+        Content Security Policy - Security hardening
+        NOTE: 'unsafe-inline' required for Tailwind CDN config.
+        For production: use Tailwind CLI build to eliminate this.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com;
+        font-src 'self' https://fonts.gstatic.com;
+        img-src 'self' data: https://images.unsplash.com;
+        frame-src https://www.google.com;
+        connect-src 'self';
+        base-uri 'self';
+        form-action 'self';
+    ">
+
+    <!-- Preload critical assets for performance -->
+    <link rel="preload" href="https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=600&fit=crop&fm=webp&q=80" as="image" type="image/webp">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ohmycake.pl/">
+    <meta property="og:title" content="Oh My Cake Kraśnik | Torty i Ciasta na Zamówienie 🎂">
+    <meta property="og:description" content="Wypieki z miłości! Pyszne torty, ciasta i desery na zamówienie w Kraśniku. Serniki, torty weselne, urodzinowe. Zadzwoń: 726 760 700">
+    <meta property="og:image" content="logo.jpeg">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="1024">
+    <meta property="og:image:alt" content="Oh My Cake - logo cukierni z różowym tortem i truskawkami">
+    <meta property="og:locale" content="pl_PL">
+    <meta property="og:site_name" content="Oh My Cake by Kasia Pyzik">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Oh My Cake Kraśnik | Torty i Ciasta na Zamówienie 🎂">
+    <meta name="twitter:description" content="Wypieki z miłości! Pyszne torty, ciasta i desery na zamówienie w Kraśniku. Tel: 726 760 700">
+    <meta name="twitter:image" content="logo.jpeg">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://ohmycake.pl/">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>">
+
+    <title>Oh My Cake Kraśnik | Torty i Ciasta na Zamówienie | Kasia Pyzik ☎️ 726 760 700</title>
+
+    <!-- Google Fonts - Poppins with Polish characters (optimized) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap&subset=latin-ext" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Updated to match Oh My Cake logo colors
+                        cream: '#FFF8F3',
+                        'cream-dark': '#FFF0E8',
+                        'pastel-pink': '#F5B5AC',
+                        'pastel-pink-dark': '#EFAAA0',
+                        'accent-pink': '#E8967D',
+                        'accent-pink-dark': '#D4847A',
+                        'soft-rose': '#FFF5F0',
+                        'warm-white': '#FFFBF8',
+                        'coral': {
+                            100: '#FFF0E8',
+                            200: '#FDDCD2',
+                            300: '#F5B5AC',
+                            400: '#E8A095',
+                            500: '#E8967D',
+                            600: '#D4847A',
+                            700: '#C07068',
+                        },
+                    },
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s ease-out forwards',
+                        'scale-in': 'scaleIn 0.4s ease-out forwards',
+                        'float': 'float 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(30px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- Schema.org Bakery structured data (Enhanced for Local SEO) -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Bakery",
+        "@id": "https://ohmycake.pl/#bakery",
+        "name": "Oh My Cake by Kasia Pyzik",
+        "alternateName": "Oh My Cake Kraśnik",
+        "description": "Wypieki z miłości! Pyszne torty, ciasta i desery na zamówienie w Kraśniku. Serniki, torty weselne, urodzinowe, komunijne, słodkie stoły. Wszystko z najlepszych składników.",
+        "slogan": "Wypieki z miłości",
+        "url": "https://ohmycake.pl",
+        "telephone": "+48726760700",
+        "email": "kontakt@ohmycake.pl",
+        "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Kraśnik",
+            "addressRegion": "lubelskie",
+            "postalCode": "23-200",
+            "addressCountry": "PL"
+        },
+        "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 50.9247,
+            "longitude": 22.2267
+        },
+        "areaServed": {
+            "@type": "GeoCircle",
+            "geoMidpoint": {
+                "@type": "GeoCoordinates",
+                "latitude": 50.9247,
+                "longitude": 22.2267
+            },
+            "geoRadius": "30000"
+        },
+        "openingHoursSpecification": [
+            {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                "opens": "08:00",
+                "closes": "18:00"
+            },
+            {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": "Saturday",
+                "opens": "09:00",
+                "closes": "14:00"
+            }
+        ],
+        "priceRange": "130-200 PLN",
+        "currenciesAccepted": "PLN",
+        "paymentAccepted": "Cash, Bank Transfer, BLIK",
+        "servesCuisine": "Polish",
+        "hasMenu": {
+            "@type": "Menu",
+            "name": "Menu Oh My Cake",
+            "hasMenuSection": [
+                {
+                    "@type": "MenuSection",
+                    "name": "Blacha Prostokątna 24×40 cm",
+                    "description": "20 smaków do wyboru, ok. 20-25 porcji",
+                    "hasMenuItem": [
+                        {"@type": "MenuItem", "name": "Sernik Tradycyjny", "offers": {"@type": "Offer", "price": "140", "priceCurrency": "PLN"}},
+                        {"@type": "MenuItem", "name": "Sernik Papieski", "offers": {"@type": "Offer", "price": "140", "priceCurrency": "PLN"}},
+                        {"@type": "MenuItem", "name": "Snickers", "offers": {"@type": "Offer", "price": "140", "priceCurrency": "PLN"}},
+                        {"@type": "MenuItem", "name": "Makowiec", "offers": {"@type": "Offer", "price": "140", "priceCurrency": "PLN"}},
+                        {"@type": "MenuItem", "name": "Filadelfia", "offers": {"@type": "Offer", "price": "140", "priceCurrency": "PLN"}}
+                    ]
+                },
+                {
+                    "@type": "MenuSection",
+                    "name": "Tortownica 26cm",
+                    "description": "3 wyjątkowe smaki, ok. 12-14 porcji",
+                    "hasMenuItem": [
+                        {"@type": "MenuItem", "name": "Sernik Pistacjowy", "offers": {"@type": "Offer", "price": "130", "priceCurrency": "PLN"}},
+                        {"@type": "MenuItem", "name": "Biała Czekolada z Maliną", "offers": {"@type": "Offer", "price": "130", "priceCurrency": "PLN"}},
+                        {"@type": "MenuItem", "name": "Biała Czekolada z Borówką", "offers": {"@type": "Offer", "price": "130", "priceCurrency": "PLN"}}
+                    ]
+                }
+            ]
+        },
+        "image": [
+            "logo.jpeg"
+        ],
+        "logo": "logo.jpeg",
+        "founder": {
+            "@type": "Person",
+            "name": "Katarzyna Pyzik",
+            "alternateName": "Kasia Pyzik"
+        },
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+48726760700",
+            "contactType": "customer service",
+            "availableLanguage": "Polish"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5",
+            "bestRating": "5",
+            "worstRating": "1",
+            "ratingCount": "50"
+        },
+        "sameAs": [
+            "https://www.facebook.com/profile.php?id=100063763497083",
+            "https://www.instagram.com/ohmycake_krasnik/"
+        ]
+    }
+    </script>
+
+    <!-- Schema.org WebSite for search box -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Oh My Cake by Kasia Pyzik",
+        "url": "https://ohmycake.pl",
+        "description": "Cukiernia w Kraśniku - torty i ciasta na zamówienie"
+    }
+    </script>
+
+    <!-- Schema.org LocalBusiness breadcrumb -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Strona główna",
+                "item": "https://ohmycake.pl"
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Oferta",
+                "item": "https://ohmycake.pl/#oferta"
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Cennik",
+                "item": "https://ohmycake.pl/#cennik"
+            },
+            {
+                "@type": "ListItem",
+                "position": 4,
+                "name": "Kontakt",
+                "item": "https://ohmycake.pl/#kontakt"
+            }
+        ]
+    }
+    </script>
+</head>
+
+<body class="font-poppins bg-cream text-gray-800 antialiased">
+
+    <!-- Skip link for keyboard users (accessibility) -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:bg-accent-pink focus:text-white focus:px-4 focus:py-2 focus:rounded-lg">
+        Przejdź do treści głównej
+    </a>
+
+    <!-- ============================================
+         NAVIGATION BAR (Fixed, Mobile Hamburger)
+    ============================================= -->
+    <nav id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-transparent" role="navigation" aria-label="Główna nawigacja">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <!-- Logo -->
+                <a href="#home" class="flex items-center space-x-3 group" aria-label="Oh My Cake - Strona główna">
+                    <img src="logo.jpeg" alt="Oh My Cake logo" class="h-12 md:h-14 w-auto rounded-lg shadow-sm group-hover:scale-105 transition-transform" width="56" height="56">
+                    <div class="hidden sm:block">
+                        <span class="text-lg md:text-xl font-bold text-gray-800 group-hover:text-accent-pink transition-colors block leading-tight">
+                            Oh! My Cake
+                        </span>
+                        <span class="text-xs text-coral-500 italic">Wypieki z miłości</span>
+                    </div>
+                </a>
+
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="text-gray-700 hover:text-accent-pink transition-colors font-medium">Home</a>
+                    <a href="#oferta" class="text-gray-700 hover:text-accent-pink transition-colors font-medium">Oferta</a>
+                    <a href="#cennik" class="text-gray-700 hover:text-accent-pink transition-colors font-medium">Cennik</a>
+                    <a href="#galeria" class="text-gray-700 hover:text-accent-pink transition-colors font-medium">Galeria</a>
+                    <a href="#konfigurator" class="text-gray-700 hover:text-accent-pink transition-colors font-medium">Konfigurator</a>
+                    <a href="#kontakt" class="bg-accent-pink text-white px-6 py-2.5 rounded-full hover:bg-accent-pink-dark transition-all font-medium shadow-lg hover:shadow-xl">
+                        Kontakt
+                    </a>
+                </div>
+
+                <!-- Mobile Hamburger Button -->
+                <button
+                    id="mobile-menu-btn"
+                    class="md:hidden p-2 rounded-lg hover:bg-pastel-pink/20 transition-colors"
+                    aria-label="Otwórz menu"
+                    aria-expanded="false"
+                >
+                    <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path id="hamburger-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        <path id="close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Menu (Slide-in) -->
+        <div id="mobile-menu" class="mobile-menu fixed top-0 right-0 h-full w-72 bg-white shadow-2xl md:hidden z-50">
+            <div class="flex flex-col h-full p-6">
+                <div class="flex justify-between items-center mb-8">
+                    <span class="text-xl font-bold text-gray-800">Menu</span>
+                    <button id="close-mobile-menu" class="p-2 hover:bg-gray-100 rounded-lg" aria-label="Zamknij menu">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <nav class="flex flex-col space-y-4">
+                    <a href="#home" class="mobile-link py-3 px-4 text-gray-700 hover:bg-soft-rose hover:text-accent-pink rounded-xl transition-all font-medium">🏠 Home</a>
+                    <a href="#oferta" class="mobile-link py-3 px-4 text-gray-700 hover:bg-soft-rose hover:text-accent-pink rounded-xl transition-all font-medium">🍰 Oferta</a>
+                    <a href="#cennik" class="mobile-link py-3 px-4 text-gray-700 hover:bg-soft-rose hover:text-accent-pink rounded-xl transition-all font-medium">💰 Cennik</a>
+                    <a href="#galeria" class="mobile-link py-3 px-4 text-gray-700 hover:bg-soft-rose hover:text-accent-pink rounded-xl transition-all font-medium">📸 Galeria</a>
+                    <a href="#konfigurator" class="mobile-link py-3 px-4 text-gray-700 hover:bg-soft-rose hover:text-accent-pink rounded-xl transition-all font-medium">✨ Konfigurator</a>
+                    <a href="#kontakt" class="mobile-link mt-4 py-4 px-4 bg-accent-pink text-white text-center rounded-xl font-medium shadow-lg">
+                        📞 Kontakt
+                    </a>
+                </nav>
+                <div class="mt-auto pt-6 border-t border-gray-100">
+                    <div class="flex items-center justify-center gap-2 mb-2">
+                        <img src="logo.jpeg" alt="Logo" class="h-8 w-auto rounded" width="32" height="32">
+                        <p class="text-sm text-gray-700 font-medium">Oh! My Cake</p>
+                    </div>
+                    <p class="text-xs text-gray-400 text-center italic">Wypieki z miłości</p>
+                    <a href="tel:+48726760700" class="block mt-2 text-center text-coral-600 font-medium">+48 726 760 700</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu Overlay -->
+        <div id="mobile-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden" aria-hidden="true"></div>
+    </nav>
+
+    <!-- ============================================
+         HERO SECTION (main content landmark)
+    ============================================= -->
+    <main id="main-content">
+    <section id="home" class="relative min-h-screen flex items-center bg-gradient-to-br from-warm-white via-cream to-soft-rose overflow-hidden">
+        <!-- Decorative elements -->
+        <div class="absolute top-20 left-10 w-32 h-32 bg-pastel-pink/20 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-20 right-10 w-48 h-48 bg-accent-pink/10 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/2 left-1/4 w-24 h-24 bg-pastel-pink/30 rounded-full blur-2xl"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 md:pt-32 md:pb-24">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Text Content -->
+                <div class="text-center lg:text-left animate-on-scroll">
+                    <span class="inline-block px-4 py-2 bg-coral-200/50 text-coral-700 rounded-full text-sm font-medium mb-4">
+                        🍓 Cukiernia w Kraśniku
+                    </span>
+                    <p class="text-coral-500 italic text-lg mb-2 font-medium">Wypieki z miłości 💕</p>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 leading-tight mb-6">
+                        Pyszne <span class="gradient-text">torty</span>, ciasta i desery na
+                        <span class="gradient-text">każdą okazję</span>
+                    </h1>
+                    <p class="text-lg sm:text-xl text-gray-600 mb-8 max-w-xl mx-auto lg:mx-0">
+                        Witam w mojej cukierni! Tworzę wyjątkowe słodkości z najlepszych składników,
+                        które zachwycą Twoich gości na każdym przyjęciu.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                        <a href="#konfigurator" class="pulse-cta inline-flex items-center justify-center px-8 py-4 bg-accent-pink text-white rounded-full font-semibold text-lg hover:bg-accent-pink-dark transition-all shadow-xl hover:shadow-2xl hover:scale-105">
+                            <span class="mr-2">✨</span>
+                            Zamów tort
+                        </a>
+                        <a href="#oferta" class="inline-flex items-center justify-center px-8 py-4 bg-white text-accent-pink border-2 border-pastel-pink rounded-full font-semibold text-lg hover:bg-soft-rose transition-all shadow-lg">
+                            <span class="mr-2">🍰</span>
+                            Zobacz ofertę
+                        </a>
+                    </div>
+
+                    <!-- Trust badges -->
+                    <div class="flex flex-wrap items-center justify-center lg:justify-start gap-6 mt-10 text-sm text-gray-500">
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            <span>Świeże składniki</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            <span>Indywidualne projekty</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            <span>Kraśnik i okolice</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hero Image -->
+                <div class="relative animate-on-scroll">
+                    <div class="relative z-10">
+                        <!-- Placeholder for main cake image - responsive srcset -->
+                        <img
+                            src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=600&fit=crop&fm=webp&q=80"
+                            srcset="
+                                https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=300&fit=crop&fm=webp&q=80 400w,
+                                https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=450&fit=crop&fm=webp&q=80 600w,
+                                https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=600&fit=crop&fm=webp&q=80 800w,
+                                https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1200&h=900&fit=crop&fm=webp&q=80 1200w
+                            "
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
+                            alt="Piękny tort okolicznościowy od Oh My Cake - cukiernia w Kraśniku"
+                            class="w-full h-auto rounded-3xl shadow-2xl object-cover"
+                            loading="eager"
+                            fetchpriority="high"
+                            width="800"
+                            height="600"
+                        >
+                        <!-- Floating badge -->
+                        <div class="absolute -bottom-4 -left-4 bg-white px-6 py-4 rounded-2xl shadow-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 bg-soft-rose rounded-full flex items-center justify-center text-2xl">
+                                    ⭐
+                                </div>
+                                <div>
+                                    <p class="font-bold text-gray-800">100+ tortów</p>
+                                    <p class="text-sm text-gray-500">rocznie</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Floating badge 2 -->
+                        <div class="absolute -top-4 -right-4 bg-accent-pink text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium">
+                            🎂 Torty na zamówienie
+                        </div>
+                    </div>
+                    <!-- Background decoration -->
+                    <div class="absolute -z-10 top-8 left-8 w-full h-full bg-pastel-pink/30 rounded-3xl"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scroll indicator -->
+        <a href="#about" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-2 text-gray-400 hover:text-accent-pink transition-colors" aria-label="Przewiń w dół">
+            <span class="text-sm">Przewiń</span>
+            <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+            </svg>
+        </a>
+    </section>
+
+    <!-- ============================================
+         ABOUT SECTION
+    ============================================= -->
+    <section id="about" class="py-20 md:py-28 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Image Grid -->
+                <div class="grid grid-cols-2 gap-4 animate-on-scroll">
+                    <img
+                        src="https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=400&h=500&fit=crop&fm=webp&q=80"
+                        alt="Tort weselny z kwiatami"
+                        class="rounded-2xl shadow-lg object-cover h-64 w-full"
+                        loading="lazy"
+                    >
+                    <img
+                        src="https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=400&h=500&fit=crop&fm=webp&q=80"
+                        alt="Sernik z owocami"
+                        class="rounded-2xl shadow-lg object-cover h-64 w-full mt-8"
+                        loading="lazy"
+                    >
+                    <img
+                        src="https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=400&h=500&fit=crop&fm=webp&q=80"
+                        alt="Tort urodzinowy"
+                        class="rounded-2xl shadow-lg object-cover h-64 w-full"
+                        loading="lazy"
+                    >
+                    <img
+                        src="https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=400&h=500&fit=crop&fm=webp&q=80"
+                        alt="Deser czekoladowy"
+                        class="rounded-2xl shadow-lg object-cover h-64 w-full mt-8"
+                        loading="lazy"
+                    >
+                </div>
+
+                <!-- Text Content -->
+                <div class="animate-on-scroll">
+                    <span class="inline-block px-4 py-2 bg-soft-rose text-accent-pink rounded-full text-sm font-medium mb-6">
+                        👋 O mnie
+                    </span>
+                    <h2 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-6">
+                        Cześć, jestem <span class="gradient-text">Kasia Pyzik</span>
+                    </h2>
+                    <p class="text-lg text-gray-600 mb-6 leading-relaxed">
+                        Oferuję piękne ciasta i torty oraz deserki na każdą imprezę: <strong>urodziny, wesela,
+                        spotkania firmowe, śluby</strong> i inne przyjęcia.
+                    </p>
+                    <p class="text-lg text-gray-600 mb-8 leading-relaxed">
+                        Wszystkie wyroby przygotowuję z <strong>najlepszych składników</strong> i <strong>świeżych
+                        produktów</strong>. Każde zamówienie traktuję indywidualnie, bo wiem, że Twoje święto
+                        zasługuje na wyjątkowe słodkości!
+                    </p>
+
+                    <!-- Features -->
+                    <div class="grid sm:grid-cols-2 gap-4 mb-8">
+                        <div class="flex items-start gap-3 p-4 bg-soft-rose rounded-xl">
+                            <span class="text-2xl">🥚</span>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">Świeże składniki</h4>
+                                <p class="text-sm text-gray-500">Tylko naturalne produkty</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 p-4 bg-soft-rose rounded-xl">
+                            <span class="text-2xl">🎨</span>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">Autorskie projekty</h4>
+                                <p class="text-sm text-gray-500">Każdy tort jest unikalny</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 p-4 bg-soft-rose rounded-xl">
+                            <span class="text-2xl">💝</span>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">Z pasją</h4>
+                                <p class="text-sm text-gray-500">Cukiernictwo to moja pasja</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 p-4 bg-soft-rose rounded-xl">
+                            <span class="text-2xl">🚗</span>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">Kraśnik i okolice</h4>
+                                <p class="text-sm text-gray-500">Możliwość dostawy</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="#kontakt" class="inline-flex items-center text-accent-pink font-semibold hover:text-accent-pink-dark transition-colors">
+                        Skontaktuj się ze mną
+                        <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         OFFER SECTION
+    ============================================= -->
+    <section id="oferta" class="py-20 md:py-28 bg-gradient-to-b from-cream to-soft-rose">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Section Header -->
+            <div class="text-center mb-16 animate-on-scroll">
+                <span class="inline-block px-4 py-2 bg-white text-accent-pink rounded-full text-sm font-medium mb-6 shadow-sm">
+                    🍰 Nasza oferta
+                </span>
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-6">
+                    Wybierz swój <span class="gradient-text">ulubiony smak</span>
+                </h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Każde ciasto przygotowuję z miłością i dbałością o każdy detal.
+                    Wybierz kategorię i znajdź swój idealny deser!
+                </p>
+            </div>
+
+            <!-- Category 1: Blacha Prostokątna -->
+            <div class="mb-16 animate-on-scroll">
+                <div class="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
+                    <div>
+                        <h3 class="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-3">
+                            <span class="text-3xl">📐</span>
+                            Blacha Prostokątna 24×40 cm
+                        </h3>
+                        <p class="text-gray-500 mt-1">Idealne na większe przyjęcia</p>
+                    </div>
+                    <div class="bg-white px-6 py-3 rounded-full shadow-lg">
+                        <span class="text-2xl font-bold text-accent-pink">140 zł</span>
+                        <span class="text-gray-500 ml-1">/sztuka</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <!-- Cake cards - Blacha -->
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Sernik Tradycyjny')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🧀</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Sernik Tradycyjny</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Sernik Papieski')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">👑</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Sernik Papieski</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Snickers')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🥜</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Snickers</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Makowiec')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🌑</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Makowiec</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Filadelfia')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍓</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Filadelfia</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Czekoladowy z Wiśnią')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍫</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Czekoladowy z Wiśnią</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Łącki przekładaniec')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🎂</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Łącki przekładaniec</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Malinowa Chmurka')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">☁️</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Malinowa Chmurka</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Kora Orzechowa')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🌰</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Kora Orzechowa</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Pani Walewska')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">👸</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Pani Walewska</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Sękaczek')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🪵</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Sękaczek</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Góra Lodowa')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🏔️</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Góra Lodowa</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', '3 Bit')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍪</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">3 Bit</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Szarlotka Królewska')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍎</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Szarlotka Królewska</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Marysieńka')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">💐</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Marysieńka</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Ananasowiec')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍍</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Ananasowiec</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Leśny Mech')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🌲</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Leśny Mech</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Porzeczkowiec')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🫐</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Porzeczkowiec</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Gruszka z Bezą')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍐</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Gruszka z Bezą</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('blacha', 'Shrek')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🟢</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Shrek</h4>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Category 2: Tortownica -->
+            <div class="animate-on-scroll">
+                <div class="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
+                    <div>
+                        <h3 class="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-3">
+                            <span class="text-3xl">⭕</span>
+                            Tortownica 26cm
+                        </h3>
+                        <p class="text-gray-500 mt-1">Klasyczny okrągły format</p>
+                    </div>
+                    <div class="bg-white px-6 py-3 rounded-full shadow-lg">
+                        <span class="text-2xl font-bold text-accent-pink">130 zł</span>
+                        <span class="text-gray-500 ml-1">/sztuka</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <!-- Cake cards - Tortownica -->
+                    <a href="#konfigurator" onclick="preselectCake('tortownica', 'Sernik Pistacjowy')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🟢</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Sernik Pistacjowy</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('tortownica', 'Biała Czekolada z Maliną')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🍫</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Biała Czekolada z Maliną</h4>
+                    </a>
+                    <a href="#konfigurator" onclick="preselectCake('tortownica', 'Biała Czekolada z Borówką')" class="cake-card bg-white p-4 rounded-2xl shadow-md hover:shadow-xl cursor-pointer group">
+                        <div class="text-4xl mb-3 group-hover:scale-110 transition-transform">🫐</div>
+                        <h4 class="font-semibold text-gray-800 group-hover:text-accent-pink transition-colors">Biała Czekolada z Borówką</h4>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Special Services Note -->
+            <div class="mt-16 text-center animate-on-scroll">
+                <div class="inline-block bg-white px-8 py-6 rounded-2xl shadow-lg">
+                    <p class="text-lg text-gray-700">
+                        <span class="text-2xl mr-2">✨</span>
+                        Wykonuję również <strong class="text-accent-pink">torty okolicznościowe</strong> oraz
+                        <strong class="text-accent-pink">słodkie stoły</strong> na wesela i imprezy!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         PRICING SECTION
+    ============================================= -->
+    <section id="cennik" class="py-20 md:py-28 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Section Header -->
+            <div class="text-center mb-16 animate-on-scroll">
+                <span class="inline-block px-4 py-2 bg-soft-rose text-accent-pink rounded-full text-sm font-medium mb-6">
+                    💰 Cennik
+                </span>
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-6">
+                    Przejrzyste <span class="gradient-text">ceny</span>
+                </h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Proste i uczciwe ceny. Żadnych ukrytych kosztów!
+                </p>
+            </div>
+
+            <!-- Pricing Cards -->
+            <div class="grid md:grid-cols-2 gap-8 mb-12 animate-on-scroll">
+                <!-- Blacha Card -->
+                <div class="bg-gradient-to-br from-soft-rose to-white p-8 rounded-3xl shadow-xl border-2 border-pastel-pink/30 hover:border-accent-pink/50 transition-colors">
+                    <div class="text-center">
+                        <span class="text-5xl mb-4 block">📐</span>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Blacha Prostokątna</h3>
+                        <p class="text-gray-500 mb-6">24 × 40 cm</p>
+                        <div class="mb-6">
+                            <span class="text-5xl font-bold text-accent-pink">140</span>
+                            <span class="text-xl text-gray-600"> zł</span>
+                        </div>
+                        <ul class="text-left space-y-3 mb-8">
+                            <li class="flex items-center gap-2 text-gray-600">
+                                <span class="text-green-500">✓</span>
+                                20 smaków do wyboru
+                            </li>
+                            <li class="flex items-center gap-2 text-gray-600">
+                                <span class="text-green-500">✓</span>
+                                ~20-25 porcji
+                            </li>
+                            <li class="flex items-center gap-2 text-gray-600">
+                                <span class="text-green-500">✓</span>
+                                Idealne na większe imprezy
+                            </li>
+                        </ul>
+                        <a href="#konfigurator" class="block w-full py-3 bg-accent-pink text-white rounded-full font-semibold hover:bg-accent-pink-dark transition-colors">
+                            Zamów teraz
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Tortownica Card -->
+                <div class="bg-gradient-to-br from-soft-rose to-white p-8 rounded-3xl shadow-xl border-2 border-pastel-pink/30 hover:border-accent-pink/50 transition-colors">
+                    <div class="text-center">
+                        <span class="text-5xl mb-4 block">⭕</span>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Tortownica</h3>
+                        <p class="text-gray-500 mb-6">Ø 26 cm</p>
+                        <div class="mb-6">
+                            <span class="text-5xl font-bold text-accent-pink">130</span>
+                            <span class="text-xl text-gray-600"> zł</span>
+                        </div>
+                        <ul class="text-left space-y-3 mb-8">
+                            <li class="flex items-center gap-2 text-gray-600">
+                                <span class="text-green-500">✓</span>
+                                3 wyjątkowe smaki
+                            </li>
+                            <li class="flex items-center gap-2 text-gray-600">
+                                <span class="text-green-500">✓</span>
+                                ~12-14 porcji
+                            </li>
+                            <li class="flex items-center gap-2 text-gray-600">
+                                <span class="text-green-500">✓</span>
+                                Klasyczny okrągły format
+                            </li>
+                        </ul>
+                        <a href="#konfigurator" class="block w-full py-3 bg-accent-pink text-white rounded-full font-semibold hover:bg-accent-pink-dark transition-colors">
+                            Zamów teraz
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Services -->
+            <div class="bg-gradient-to-r from-pastel-pink/20 via-white to-pastel-pink/20 p-8 rounded-3xl text-center animate-on-scroll">
+                <h4 class="text-xl font-bold text-gray-800 mb-4">Dodatkowe usługi</h4>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <span class="px-4 py-2 bg-white rounded-full text-gray-700 shadow-sm">🎂 Torty okolicznościowe - wycena indywidualna</span>
+                    <span class="px-4 py-2 bg-white rounded-full text-gray-700 shadow-sm">🍬 Słodkie stoły - od 15 zł/os</span>
+                    <span class="px-4 py-2 bg-white rounded-full text-gray-700 shadow-sm">🚗 Dostawa - do uzgodnienia</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         GALLERY SECTION
+    ============================================= -->
+    <section id="galeria" class="py-20 md:py-28 bg-gradient-to-b from-cream to-soft-rose">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Section Header -->
+            <div class="text-center mb-16 animate-on-scroll">
+                <span class="inline-block px-4 py-2 bg-white text-accent-pink rounded-full text-sm font-medium mb-6 shadow-sm">
+                    📸 Galeria
+                </span>
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-6">
+                    Moje <span class="gradient-text">realizacje</span>
+                </h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Zobacz przykłady moich prac. Każdy tort to osobna historia i wyjątkowy projekt!
+                </p>
+            </div>
+
+            <!-- Gallery Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 animate-on-scroll">
+                <button
+                    class="gallery-item relative group overflow-hidden rounded-2xl shadow-lg aspect-square cursor-pointer focus:outline-none focus:ring-4 focus:ring-accent-pink/50"
+                    onclick="openLightbox('https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1200')"
+                    aria-label="Otwórz zdjęcie tortu weselnego"
+                >
+                    <img
+                        src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&h=600&fit=crop&fm=webp&q=80"
+                        alt="Elegancki tort weselny z kwiatami"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span class="text-white font-medium">Tort weselny</span>
+                    </div>
+                </button>
+
+                <button
+                    class="gallery-item relative group overflow-hidden rounded-2xl shadow-lg aspect-square cursor-pointer focus:outline-none focus:ring-4 focus:ring-accent-pink/50"
+                    onclick="openLightbox('https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=1200')"
+                    aria-label="Otwórz zdjęcie tortu urodzinowego"
+                >
+                    <img
+                        src="https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=600&h=600&fit=crop&fm=webp&q=80"
+                        alt="Tort urodzinowy z dekoracjami"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span class="text-white font-medium">Tort urodzinowy</span>
+                    </div>
+                </button>
+
+                <button
+                    class="gallery-item relative group overflow-hidden rounded-2xl shadow-lg aspect-square cursor-pointer focus:outline-none focus:ring-4 focus:ring-accent-pink/50"
+                    onclick="openLightbox('https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=1200')"
+                    aria-label="Otwórz zdjęcie sernika"
+                >
+                    <img
+                        src="https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?w=600&h=600&fit=crop&fm=webp&q=80"
+                        alt="Sernik z owocami"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span class="text-white font-medium">Sernik</span>
+                    </div>
+                </button>
+
+                <button
+                    class="gallery-item relative group overflow-hidden rounded-2xl shadow-lg aspect-square cursor-pointer focus:outline-none focus:ring-4 focus:ring-accent-pink/50"
+                    onclick="openLightbox('https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=1200')"
+                    aria-label="Otwórz zdjęcie tortu czekoladowego"
+                >
+                    <img
+                        src="https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=600&h=600&fit=crop&fm=webp&q=80"
+                        alt="Tort czekoladowy z dekoracjami"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span class="text-white font-medium">Tort czekoladowy</span>
+                    </div>
+                </button>
+
+                <button
+                    class="gallery-item relative group overflow-hidden rounded-2xl shadow-lg aspect-square cursor-pointer focus:outline-none focus:ring-4 focus:ring-accent-pink/50"
+                    onclick="openLightbox('https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=1200')"
+                    aria-label="Otwórz zdjęcie deseru"
+                >
+                    <img
+                        src="https://images.unsplash.com/photo-1621303837174-89787a7d4729?w=600&h=600&fit=crop&fm=webp&q=80"
+                        alt="Deser z kremem i owocami"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span class="text-white font-medium">Deser kremowy</span>
+                    </div>
+                </button>
+
+                <button
+                    class="gallery-item relative group overflow-hidden rounded-2xl shadow-lg aspect-square cursor-pointer focus:outline-none focus:ring-4 focus:ring-accent-pink/50"
+                    onclick="openLightbox('https://images.unsplash.com/photo-1535141192574-5d4897c12f1d?w=1200')"
+                    aria-label="Otwórz zdjęcie słodkiego stołu"
+                >
+                    <img
+                        src="https://images.unsplash.com/photo-1535141192574-5d4897c12f1d?w=600&h=600&fit=crop&fm=webp&q=80"
+                        alt="Słodki stół z różnymi deserami"
+                        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                        <span class="text-white font-medium">Słodki stół</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- CTA -->
+            <div class="text-center mt-12 animate-on-scroll">
+                <p class="text-gray-600 mb-4">Chcesz zobaczyć więcej? Śledź moje media społecznościowe!</p>
+                <div class="flex justify-center gap-4">
+                    <a href="https://www.facebook.com/profile.php?id=100063763497083" class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all" aria-label="Facebook Oh My Cake" rel="noopener noreferrer" target="_blank">
+                        <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.77 7.46H14.5v-1.9c0-.9.6-1.1 1-1.1h3V.5h-4.33C10.24.5 9.5 3.44 9.5 5.32v2.15h-3v4h3v12h5v-12h3.85l.42-4z"/></svg>
+                    </a>
+                    <a href="https://www.instagram.com/ohmycake_krasnik/" class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all" aria-label="Instagram Oh My Cake" rel="noopener noreferrer" target="_blank">
+                        <svg class="w-6 h-6 text-pink-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Powiększone zdjęcie">
+        <button
+            id="close-lightbox"
+            class="absolute top-4 right-4 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors z-10"
+            aria-label="Zamknij galerię"
+        >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+        <img id="lightbox-img" src="" alt="Powiększone zdjęcie" class="max-w-full max-h-full">
+    </div>
+
+    <!-- ============================================
+         CONFIGURATOR SECTION
+    ============================================= -->
+    <section id="konfigurator" class="py-20 md:py-28 bg-white">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Section Header -->
+            <div class="text-center mb-12 animate-on-scroll">
+                <span class="inline-block px-4 py-2 bg-soft-rose text-accent-pink rounded-full text-sm font-medium mb-6">
+                    ✨ Konfigurator
+                </span>
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-6">
+                    Zamów swój <span class="gradient-text">idealny tort</span>
+                </h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Wypełnij prosty formularz, a skontaktuję się z Tobą w ciągu 24 godzin!
+                </p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-8 animate-on-scroll">
+                <div class="flex justify-between text-sm text-gray-500 mb-2">
+                    <span id="step-label">Krok 1 z 4</span>
+                    <span id="step-percent">25%</span>
+                </div>
+                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="progress-fill h-full bg-gradient-to-r from-pastel-pink to-accent-pink rounded-full" style="width: 25%"></div>
+                </div>
+                <div class="flex justify-between mt-3">
+                    <span class="step-indicator text-xs px-3 py-1 bg-accent-pink text-white rounded-full" data-step="1">Typ</span>
+                    <span class="step-indicator text-xs px-3 py-1 bg-gray-200 text-gray-500 rounded-full" data-step="2">Smak</span>
+                    <span class="step-indicator text-xs px-3 py-1 bg-gray-200 text-gray-500 rounded-full" data-step="3">Personalizacja</span>
+                    <span class="step-indicator text-xs px-3 py-1 bg-gray-200 text-gray-500 rounded-full" data-step="4">Kontakt</span>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <form id="cake-form" class="bg-gradient-to-br from-soft-rose to-white p-6 md:p-10 rounded-3xl shadow-xl animate-on-scroll" data-netlify="true" name="cake-order" method="POST">
+                <input type="hidden" name="form-name" value="cake-order">
+
+                <!-- Step 1: Rodzaj zamówienia -->
+                <div id="step-1" class="form-step active">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="text-2xl">1️⃣</span> Wybierz rodzaj zamówienia
+                    </h3>
+                    <div class="grid sm:grid-cols-3 gap-4">
+                        <div>
+                            <input type="radio" id="type-blacha" name="type" value="blacha" class="custom-radio hidden peer" required>
+                            <label for="type-blacha" class="block p-6 bg-white rounded-2xl border-2 border-gray-200 cursor-pointer text-center hover:border-pastel-pink transition-all peer-checked:border-accent-pink peer-checked:bg-soft-rose">
+                                <span class="text-4xl block mb-3">📐</span>
+                                <span class="font-semibold text-gray-800">Blacha Prostokątna</span>
+                                <span class="block text-sm text-gray-500 mt-1">24×40 cm | 140 zł</span>
+                            </label>
+                        </div>
+                        <div>
+                            <input type="radio" id="type-tortownica" name="type" value="tortownica" class="custom-radio hidden peer">
+                            <label for="type-tortownica" class="block p-6 bg-white rounded-2xl border-2 border-gray-200 cursor-pointer text-center hover:border-pastel-pink transition-all peer-checked:border-accent-pink peer-checked:bg-soft-rose">
+                                <span class="text-4xl block mb-3">⭕</span>
+                                <span class="font-semibold text-gray-800">Tortownica</span>
+                                <span class="block text-sm text-gray-500 mt-1">Ø 26 cm | 130 zł</span>
+                            </label>
+                        </div>
+                        <div>
+                            <input type="radio" id="type-tort" name="type" value="tort" class="custom-radio hidden peer">
+                            <label for="type-tort" class="block p-6 bg-white rounded-2xl border-2 border-gray-200 cursor-pointer text-center hover:border-pastel-pink transition-all peer-checked:border-accent-pink peer-checked:bg-soft-rose">
+                                <span class="text-4xl block mb-3">🎂</span>
+                                <span class="font-semibold text-gray-800">Tort Okolicznościowy</span>
+                                <span class="block text-sm text-gray-500 mt-1">Wycena indywidualna</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Smak -->
+                <div id="step-2" class="form-step">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="text-2xl">2️⃣</span> Wybierz smak
+                    </h3>
+                    <div id="flavor-container">
+                        <select name="flavor" id="flavor-select" class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all text-gray-700" required>
+                            <option value="">-- Wybierz smak --</option>
+                        </select>
+                    </div>
+                    <p id="flavor-description" class="mt-4 text-gray-500 text-sm hidden"></p>
+                </div>
+
+                <!-- Step 3: Personalizacja -->
+                <div id="step-3" class="form-step">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="text-2xl">3️⃣</span> Personalizacja
+                    </h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label for="portions" class="block text-sm font-medium text-gray-700 mb-2">Liczba porcji (orientacyjnie)</label>
+                            <input type="number" id="portions" name="portions" min="1" max="100" placeholder="np. 20"
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label for="date" class="block text-sm font-medium text-gray-700 mb-2">Data odbioru *</label>
+                            <input type="date" id="date" name="date" required
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label for="inscription" class="block text-sm font-medium text-gray-700 mb-2">Napis na torcie</label>
+                            <input type="text" id="inscription" name="inscription" placeholder="np. Wszystkiego najlepszego Aniu!" maxlength="50"
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                        </div>
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="color" class="block text-sm font-medium text-gray-700 mb-2">Kolor dekoracji</label>
+                                <select id="color" name="color" class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                                    <option value="">-- Wybierz kolor --</option>
+                                    <option value="rozowy">Różowy</option>
+                                    <option value="bialy">Biały</option>
+                                    <option value="niebieski">Niebieski</option>
+                                    <option value="zloty">Złoty</option>
+                                    <option value="czekoladowy">Czekoladowy</option>
+                                    <option value="kolorowy">Kolorowy mix</option>
+                                    <option value="inny">Inny (opisz w uwagach)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="theme" class="block text-sm font-medium text-gray-700 mb-2">Motyw/styl</label>
+                                <select id="theme" name="theme" class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                                    <option value="">-- Wybierz motyw --</option>
+                                    <option value="dzieciecy">Dla dziecka</option>
+                                    <option value="elegancki">Elegancki</option>
+                                    <option value="rustykalny">Rustykalny</option>
+                                    <option value="kwiatowy">Kwiatowy</option>
+                                    <option value="minimalistyczny">Minimalistyczny</option>
+                                    <option value="weselny">Weselny</option>
+                                    <option value="inny">Inny (opisz w uwagach)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Dane kontaktowe -->
+                <div id="step-4" class="form-step">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="text-2xl">4️⃣</span> Dane kontaktowe
+                    </h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Imię i nazwisko *</label>
+                            <input type="text" id="name" name="name" required placeholder="np. Anna Kowalska"
+                                aria-describedby="validation-error"
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">Telefon *</label>
+                            <div class="flex">
+                                <span class="inline-flex items-center px-4 bg-gray-100 border-2 border-r-0 border-gray-200 rounded-l-xl text-gray-500">+48</span>
+                                <input type="tel" id="phone" name="phone" required placeholder="726 760 700" pattern="[0-9]{9}"
+                                    aria-describedby="validation-error"
+                                    class="w-full p-4 bg-white border-2 border-gray-200 rounded-r-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input type="email" id="email" name="email" placeholder="twoj@email.pl"
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label for="city" class="block text-sm font-medium text-gray-700 mb-2">Miasto</label>
+                            <input type="text" id="city" name="city" placeholder="np. Kraśnik"
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">Dodatkowe uwagi</label>
+                            <textarea id="notes" name="notes" rows="3" placeholder="Dodatkowe informacje, życzenia, alergie..."
+                                class="w-full p-4 bg-white border-2 border-gray-200 rounded-xl focus:border-accent-pink focus:ring-2 focus:ring-accent-pink/20 outline-none transition-all resize-none"></textarea>
+                        </div>
+
+                        <!-- Summary -->
+                        <div id="order-summary" class="bg-white p-6 rounded-xl border-2 border-pastel-pink">
+                            <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <span>📋</span> Podsumowanie zamówienia
+                            </h4>
+                            <div id="summary-content" class="space-y-2 text-sm text-gray-600">
+                                <!-- Will be filled by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inline validation error message with ARIA live region for screen readers -->
+                <div id="validation-error" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm" role="alert" aria-live="assertive" aria-atomic="true">
+                    <span class="font-medium">⚠️ Uwaga:</span> <span id="validation-message"></span>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="flex justify-between mt-8">
+                    <button type="button" id="prev-btn" class="hidden px-6 py-3 bg-gray-200 text-gray-700 rounded-full font-medium hover:bg-gray-300 transition-colors">
+                        ← Wstecz
+                    </button>
+                    <button type="button" id="next-btn" class="ml-auto px-8 py-3 bg-accent-pink text-white rounded-full font-semibold hover:bg-accent-pink-dark transition-colors shadow-lg">
+                        Dalej →
+                    </button>
+                    <button type="submit" id="submit-btn" class="hidden ml-auto px-8 py-3 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span id="submit-text">✨ Wyślij zapytanie</span>
+                        <span id="submit-loading" class="hidden">
+                            <svg class="animate-spin inline w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Wysyłam...
+                        </span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Noscript fallback -->
+            <noscript>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+                    <p class="text-yellow-800 mb-4">⚠️ Formularz wymaga JavaScript. Zadzwoń bezpośrednio:</p>
+                    <a href="tel:+48726760700" class="text-xl font-bold text-accent-pink">+48 726 760 700</a>
+                </div>
+            </noscript>
+
+            <!-- Success Message (hidden by default) -->
+            <div id="success-message" class="hidden text-center py-12 px-6 bg-green-50 rounded-3xl">
+                <span class="text-6xl block mb-4">🎉</span>
+                <h3 class="text-2xl font-bold text-green-700 mb-2">Dziękuję za zamówienie!</h3>
+                <p class="text-green-600 mb-6">Skontaktuję się z Tobą w ciągu 24 godzin, aby potwierdzić szczegóły.</p>
+                <a href="#home" class="inline-block px-6 py-3 bg-green-500 text-white rounded-full font-medium hover:bg-green-600 transition-colors">
+                    Wróć na stronę główną
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         CONTACT SECTION
+    ============================================= -->
+    <section id="kontakt" class="py-20 md:py-28 bg-gradient-to-b from-soft-rose to-cream">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Contact Info -->
+                <div class="animate-on-scroll">
+                    <span class="inline-block px-4 py-2 bg-white text-accent-pink rounded-full text-sm font-medium mb-6 shadow-sm">
+                        📞 Kontakt
+                    </span>
+                    <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-6">
+                        Zainteresowała Cię <span class="gradient-text">oferta?</span>
+                    </h2>
+                    <p class="text-lg text-gray-600 mb-8">
+                        Skontaktuj się ze mną! Chętnie odpowiem na wszystkie pytania i pomogę
+                        wybrać idealny tort na Twoją okazję.
+                    </p>
+
+                    <!-- Contact Cards -->
+                    <div class="space-y-4 mb-8">
+                        <a href="tel:+48726760700" class="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow group">
+                            <div class="w-14 h-14 bg-soft-rose rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                                📱
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Zadzwoń do mnie</p>
+                                <p class="text-xl font-bold text-gray-800 group-hover:text-accent-pink transition-colors">+48 726 760 700</p>
+                            </div>
+                        </a>
+
+                        <a href="https://wa.me/48726760700?text=Cześć! Chciałbym zamówić tort z Oh My Cake 🎂" target="_blank" rel="noopener" class="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow group">
+                            <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                                💬
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Napisz na WhatsApp</p>
+                                <p class="text-xl font-bold text-green-600 group-hover:text-green-700 transition-colors">WhatsApp</p>
+                            </div>
+                        </a>
+
+                        <div class="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-md">
+                            <div class="w-14 h-14 bg-soft-rose rounded-full flex items-center justify-center text-2xl">
+                                📍
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Lokalizacja</p>
+                                <p class="text-xl font-bold text-gray-800">Kraśnik, woj. lubelskie</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Business Info -->
+                    <div class="p-4 bg-white/50 rounded-xl text-sm text-gray-500">
+                        <p><strong>Oh My Cake by Katarzyna Pyzik</strong></p>
+                        <p>Zarejestrowana działalność gospodarcza</p>
+                    </div>
+                </div>
+
+                <!-- Map Placeholder -->
+                <div class="animate-on-scroll">
+                    <div class="bg-white p-4 rounded-3xl shadow-xl">
+                        <div class="aspect-video rounded-2xl overflow-hidden bg-gray-100">
+                            <!-- Google Maps Embed - Kraśnik -->
+                            <iframe
+                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d79858.70376640784!2d22.17225534863281!3d50.92472689999999!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4722f00f2c9dc4a3%3A0x9d39e3c8ce3a841a!2zS3JhxZtuaWs!5e0!3m2!1spl!2spl!4v1706000000000!5m2!1spl!2spl"
+                                width="100%"
+                                height="100%"
+                                style="border:0; min-height: 300px;"
+                                allowfullscreen=""
+                                loading="lazy"
+                                referrerpolicy="no-referrer-when-downgrade"
+                                title="Mapa - Kraśnik"
+                            ></iframe>
+                        </div>
+                        <div class="mt-4 text-center">
+                            <p class="text-gray-600">Obsługuję Kraśnik i okolice</p>
+                            <p class="text-sm text-gray-400 mt-1">Możliwość dostawy do ustalenia</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    </main>
+    <!-- End of main content -->
+
+    <!-- ============================================
+         FOOTER
+    ============================================= -->
+    <footer class="bg-gray-900 text-white py-12" role="contentinfo">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <!-- Logo -->
+                <div class="flex items-center gap-3">
+                    <img src="logo.jpeg" alt="Oh My Cake logo" class="h-12 w-auto rounded-lg" width="48" height="48">
+                    <div>
+                        <span class="text-xl font-bold">Oh! My <span class="text-coral-400">Cake</span></span>
+                        <span class="block text-xs text-gray-400 italic">Wypieki z miłości</span>
+                    </div>
+                </div>
+
+                <!-- Links -->
+                <nav class="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
+                    <a href="#home" class="hover:text-white transition-colors">Home</a>
+                    <a href="#oferta" class="hover:text-white transition-colors">Oferta</a>
+                    <a href="#cennik" class="hover:text-white transition-colors">Cennik</a>
+                    <a href="#galeria" class="hover:text-white transition-colors">Galeria</a>
+                    <a href="#konfigurator" class="hover:text-white transition-colors">Zamów</a>
+                    <a href="#kontakt" class="hover:text-white transition-colors">Kontakt</a>
+                </nav>
+
+                <!-- Contact -->
+                <a href="tel:+48726760700" class="text-accent-pink hover:text-pastel-pink transition-colors font-medium">
+                    +48 726 760 700
+                </a>
+            </div>
+
+            <hr class="border-gray-800 my-8">
+
+            <!-- Legal Links -->
+            <div class="flex flex-wrap justify-center gap-6 mb-6 text-sm">
+                <a href="polityka-prywatnosci.html" class="text-gray-400 hover:text-white transition-colors">Polityka Prywatności</a>
+                <a href="regulamin.html" class="text-gray-400 hover:text-white transition-colors">Regulamin</a>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+                <p>© 2026 Oh My Cake by Kasia Pyzik. Wszelkie prawa zastrzeżone.</p>
+                <p>Cukiernia w Kraśniku 🎂</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ============================================
+         COOKIE BANNER (GDPR Compliant)
+    ============================================= -->
+    <div id="cookie-banner" class="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm text-white p-4 z-[100] transform translate-y-full transition-transform duration-500" role="dialog" aria-labelledby="cookie-title" aria-describedby="cookie-desc">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex-1">
+                <h3 id="cookie-title" class="font-semibold mb-1">🍪 Ta strona używa plików cookies</h3>
+                <p id="cookie-desc" class="text-sm text-gray-300">
+                    Używamy cookies, aby zapewnić prawidłowe działanie strony i zapisać Twoje preferencje.
+                    <a href="polityka-prywatnosci.html#cookies" class="text-coral-400 hover:underline">Dowiedz się więcej</a>
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button id="cookie-accept" class="px-6 py-2 bg-coral-500 text-white rounded-full font-medium hover:bg-coral-600 transition-colors">
+                    Akceptuję
+                </button>
+                <button id="cookie-reject" class="px-6 py-2 bg-gray-700 text-white rounded-full font-medium hover:bg-gray-600 transition-colors">
+                    Tylko niezbędne
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application JavaScript -->
+    <script src="app.js" defer></script>
+</body>
+</html>
