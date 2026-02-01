@@ -1,0 +1,68 @@
+/* src/app/globals.css */
+/* Purpose: Global styles for Compliance Guard dashboard */
+/* NOT for: Component-specific styles */
+
+@import "tailwindcss";
+
+/* Custom theme variables */
+@theme {
+  --color-background: #121212;
+  --color-foreground: #ffffff;
+  --color-card: #1A1A1A;
+  --color-card-foreground: #ffffff;
+  --color-border: #333333;
+  --color-border-secondary: #2C2C2C;
+  --color-muted: #262626;
+  --color-muted-foreground: #a3a3a3;
+
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
+}
+
+/* Health score gradient animation */
+@keyframes pulse-health {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.health-pulse {
+  animation: pulse-health 2s ease-in-out infinite;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  border-color: #444444;
+  transform: translateY(-2px);
+}
