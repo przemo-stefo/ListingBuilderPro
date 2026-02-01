@@ -16,7 +16,8 @@ import type {
   AlertStatus,
 } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Default to empty string = relative URLs served by Next.js API routes
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'test-api-key';
 
 // Generic fetch wrapper with error handling

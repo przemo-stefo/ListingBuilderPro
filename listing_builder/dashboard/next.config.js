@@ -3,7 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   // API backend URL
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    // Empty string = use Next.js API routes; set env var to point to external backend
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
   },
 }
 
