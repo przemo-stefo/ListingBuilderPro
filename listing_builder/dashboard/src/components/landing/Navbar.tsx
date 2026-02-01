@@ -39,13 +39,13 @@ export function Navbar() {
         {/* Desktop CTAs */}
         <div className="hidden items-center gap-3 md:flex">
           <a href="/dashboard" className="text-sm text-neutral-400 hover:text-white">
-            Zaloguj się
+            Sign In
           </a>
           <a
             href="#pricing"
             className="rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-green-400"
           >
-            Wypróbuj za darmo
+            Start Free Trial
           </a>
         </div>
 
@@ -78,13 +78,13 @@ export function Navbar() {
               </a>
             ))}
             <a href="/dashboard" className="text-sm text-neutral-400 hover:text-white">
-              Zaloguj się
+              Sign In
             </a>
             <a
               href="#pricing"
               className="rounded-lg bg-green-500 px-4 py-2 text-center text-sm font-medium text-black"
             >
-              Wypróbuj za darmo
+              Start Free Trial
             </a>
           </div>
         </motion.div>
