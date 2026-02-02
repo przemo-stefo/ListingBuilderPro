@@ -304,6 +304,48 @@ export interface GetAnalyticsParams {
   period?: '7d' | '30d' | '90d' | '12m'
 }
 
+// Settings types
+export type MarketplaceId = 'amazon' | 'ebay' | 'walmart' | 'shopify' | 'allegro'
+
+export interface MarketplaceConnection {
+  id: MarketplaceId
+  name: string
+  connected: boolean
+  api_key: string
+  last_synced: string | null
+}
+
+export interface NotificationSettings {
+  email_alerts: boolean
+  low_stock_alerts: boolean
+  competitor_price_changes: boolean
+  compliance_warnings: boolean
+}
+
+export type ExportFormat = 'csv' | 'json' | 'excel'
+export type SyncFrequency = 'manual' | '1h' | '6h' | '12h' | '24h'
+
+export interface GeneralSettings {
+  store_name: string
+  default_marketplace: MarketplaceId
+  timezone: string
+}
+
+export interface DataExportSettings {
+  default_export_format: ExportFormat
+  auto_sync_frequency: SyncFrequency
+}
+
+export interface SettingsResponse {
+  general: GeneralSettings
+  marketplace_connections: MarketplaceConnection[]
+  notifications: NotificationSettings
+  data_export: DataExportSettings
+}
+
+// WHY: Partial so each section can be saved independently
+export type UpdateSettingsPayload = Partial<SettingsResponse>
+
 // Error types
 export interface ApiError {
   message: string

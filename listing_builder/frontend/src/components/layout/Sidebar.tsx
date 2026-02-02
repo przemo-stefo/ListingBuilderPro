@@ -17,7 +17,8 @@ import {
   BarChart3,
   Upload,
   Sparkles,
-  Send
+  Send,
+  Settings
 } from 'lucide-react'
 
 const navItems = [
@@ -70,6 +71,11 @@ const navItems = [
     title: 'Publish',
     href: '/publish',
     icon: Send,
+  },
+  {
+    title: 'Settings',
+    href: '/settings',
+    icon: Settings,
   },
 ]
 
