@@ -7,6 +7,7 @@ import type {
   DashboardHistoryResponse,
   InventoryResponse,
   BuyBoxResponse,
+  MetricsResponse,
   AlertsResponse,
   AlertCounts,
   Alert,
@@ -98,6 +99,23 @@ export async function getBuyBox(params: GetBuyBoxParams = {}): Promise<BuyBoxRes
 
   const query = searchParams.toString();
   return fetchAPI<BuyBoxResponse>(`/api/buy-box${query ? `?${query}` : ''}`);
+}
+
+// =============================================================================
+// METRICS
+// =============================================================================
+
+export interface GetMetricsParams {
+  marketplace?: Marketplace;
+}
+
+export async function getMetrics(params: GetMetricsParams = {}): Promise<MetricsResponse> {
+  const searchParams = new URLSearchParams();
+
+  if (params.marketplace) searchParams.set('marketplace', params.marketplace);
+
+  const query = searchParams.toString();
+  return fetchAPI<MetricsResponse>(`/api/metrics${query ? `?${query}` : ''}`);
 }
 
 // =============================================================================
