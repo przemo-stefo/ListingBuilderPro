@@ -2,30 +2,26 @@
 // Purpose: Listings API calls for compliance-focused listing data
 // NOT for: Product CRUD or optimization (separate files)
 
+import { apiRequest } from './client'
 import type { ListingsResponse, GetListingsParams } from '../types'
 
-// Fetch listings from the mock API route
-// WHY: Uses Next.js API route instead of backend - will swap to real backend later
+// Fetch listings from backend API
 export async function getListings(
   params?: GetListingsParams
 ): Promise<ListingsResponse> {
-  const searchParams = new URLSearchParams()
+  const response = await apiRequest<ListingsResponse>(
+    'get',
+    '/api/listings',
+    undefined,
+    {
+      marketplace: params?.marketplace,
+      compliance_status: params?.compliance_status,
+    }
+  )
 
-  if (params?.marketplace) {
-    searchParams.set('marketplace', params.marketplace)
-  }
-  if (params?.compliance_status) {
-    searchParams.set('compliance_status', params.compliance_status)
-  }
-
-  const query = searchParams.toString()
-  const url = `/api/listings${query ? `?${query}` : ''}`
-
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch listings')
+  if (response.error) {
+    throw new Error(response.error)
   }
 
-  return response.json()
+  return response.data!
 }

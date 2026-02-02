@@ -2,30 +2,26 @@
 // Purpose: Analytics API calls for sales performance and revenue data
 // NOT for: Product CRUD or inventory tracking (separate files)
 
+import { apiRequest } from './client'
 import type { AnalyticsResponse, GetAnalyticsParams } from '../types'
 
-// Fetch analytics from the mock API route
-// WHY: Uses Next.js API route instead of backend - will swap to real backend later
+// Fetch analytics from backend API
 export async function getAnalytics(
   params?: GetAnalyticsParams
 ): Promise<AnalyticsResponse> {
-  const searchParams = new URLSearchParams()
+  const response = await apiRequest<AnalyticsResponse>(
+    'get',
+    '/api/analytics',
+    undefined,
+    {
+      marketplace: params?.marketplace,
+      period: params?.period,
+    }
+  )
 
-  if (params?.marketplace) {
-    searchParams.set('marketplace', params.marketplace)
-  }
-  if (params?.period) {
-    searchParams.set('period', params.period)
-  }
-
-  const query = searchParams.toString()
-  const url = `/api/analytics${query ? `?${query}` : ''}`
-
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch analytics')
+  if (response.error) {
+    throw new Error(response.error)
   }
 
-  return response.json()
+  return response.data!
 }

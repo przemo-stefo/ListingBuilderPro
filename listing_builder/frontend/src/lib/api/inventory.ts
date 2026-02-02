@@ -2,33 +2,27 @@
 // Purpose: Inventory API calls for stock level tracking data
 // NOT for: Product CRUD or competitor tracking (separate files)
 
+import { apiRequest } from './client'
 import type { InventoryResponse, GetInventoryParams } from '../types'
 
-// Fetch inventory from the mock API route
-// WHY: Uses Next.js API route instead of backend - will swap to real backend later
+// Fetch inventory from backend API
 export async function getInventory(
   params?: GetInventoryParams
 ): Promise<InventoryResponse> {
-  const searchParams = new URLSearchParams()
+  const response = await apiRequest<InventoryResponse>(
+    'get',
+    '/api/inventory',
+    undefined,
+    {
+      marketplace: params?.marketplace,
+      status: params?.status,
+      search: params?.search,
+    }
+  )
 
-  if (params?.marketplace) {
-    searchParams.set('marketplace', params.marketplace)
-  }
-  if (params?.status) {
-    searchParams.set('status', params.status)
-  }
-  if (params?.search) {
-    searchParams.set('search', params.search)
-  }
-
-  const query = searchParams.toString()
-  const url = `/api/inventory${query ? `?${query}` : ''}`
-
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch inventory')
+  if (response.error) {
+    throw new Error(response.error)
   }
 
-  return response.json()
+  return response.data!
 }
