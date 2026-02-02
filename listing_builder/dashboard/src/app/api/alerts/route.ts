@@ -63,10 +63,18 @@ const alerts = [
   },
 ];
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const severity = searchParams.get('severity');
+  const status = searchParams.get('status');
+
+  let filtered = alerts;
+  if (severity) filtered = filtered.filter(a => a.severity === severity);
+  if (status) filtered = filtered.filter(a => a.status === status);
+
   return NextResponse.json({
-    alerts,
-    total: alerts.length,
+    alerts: filtered,
+    total: filtered.length,
     limit: 10,
     offset: 0,
   });

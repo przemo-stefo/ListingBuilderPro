@@ -18,12 +18,12 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Alerts', href: '/alerts', icon: Bell },
-  { name: 'Inventory', href: '/inventory', icon: Package },
-  { name: 'Buy Box', href: '/buy-box', icon: ShoppingCart },
-  { name: 'Metrics', href: '/metrics', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
+  { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
+  { name: 'Buy Box', href: '/dashboard/buy-box', icon: ShoppingCart },
+  { name: 'Metrics', href: '/dashboard/metrics', icon: BarChart3 },
+  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -44,7 +44,10 @@ export function Sidebar() {
       <nav className="mt-6 px-4">
         <ul className="space-y-1">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
+            // Exact match for Dashboard, prefix match for sub-pages
+            const isActive = item.href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.href);
             return (
               <li key={item.name}>
                 <Link
