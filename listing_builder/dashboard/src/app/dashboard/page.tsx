@@ -171,7 +171,7 @@ export default function DashboardPage() {
                 Recent Alerts
               </CardTitle>
               <a
-                href="/alerts"
+                href="/dashboard/alerts"
                 className="text-sm text-muted-foreground hover:text-white"
               >
                 View all →
