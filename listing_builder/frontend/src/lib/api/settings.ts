@@ -2,31 +2,31 @@
 // Purpose: Settings API calls (get and update)
 // NOT for: React hooks or UI logic (those are in hooks/useSettings.ts)
 
+import { apiRequest } from './client'
 import type { SettingsResponse, UpdateSettingsPayload } from '../types'
 
-// WHY: Uses Next.js API route (fetch) instead of apiClient — same pattern as analytics.ts
 export async function getSettings(): Promise<SettingsResponse> {
-  const response = await fetch('/api/settings')
+  const response = await apiRequest<SettingsResponse>('get', '/api/settings')
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch settings')
+  if (response.error) {
+    throw new Error(response.error)
   }
 
-  return response.json()
+  return response.data!
 }
 
 export async function updateSettings(
   payload: UpdateSettingsPayload
 ): Promise<SettingsResponse> {
-  const response = await fetch('/api/settings', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
+  const response = await apiRequest<SettingsResponse>(
+    'put',
+    '/api/settings',
+    payload
+  )
 
-  if (!response.ok) {
-    throw new Error('Failed to save settings')
+  if (response.error) {
+    throw new Error(response.error)
   }
 
-  return response.json()
+  return response.data!
 }
