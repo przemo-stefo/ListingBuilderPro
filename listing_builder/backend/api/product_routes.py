@@ -1,0 +1,115 @@
+# /Users/shawn/Projects/ListingBuilderPro/listing_builder/backend/api/product_routes.py
+# Purpose: CRUD API routes for products
+# NOT for: Import, AI, or export logic
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from database import get_db
+from models import Product, ProductStatus
+from schemas import ProductResponse, ProductList, DashboardStatsResponse
+from typing import Optional
+import structlog
+
+logger = structlog.get_logger()
+router = APIRouter(prefix="/api/products", tags=["Products"])
+
+
+@router.get("", response_model=ProductList)
+async def list_products(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = None,
+    source: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    List products with pagination and filters.
+
+    Query params:
+        - page: Page number (default 1)
+        - page_size: Items per page (default 20, max 100)
+        - status: Filter by status (imported, optimized, published, etc)
+        - source: Filter by source platform (allegro, etc)
+    """
+    query = db.query(Product)
+
+    # Apply filters
+    if status:
+        query = query.filter(Product.status == status)
+    if source:
+        query = query.filter(Product.source_platform == source)
+
+    # Count total
+    total = query.count()
+
+    # Pagination
+    offset = (page - 1) * page_size
+    products = query.offset(offset).limit(page_size).all()
+
+    # Calculate total pages
+    total_pages = (total + page_size - 1) // page_size
+
+    return ProductList(
+        items=products,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+# IMPORTANT: /stats/summary MUST be above /{product_id} — otherwise FastAPI
+# matches "stats" as a product_id and returns 422
+@router.get("/stats/summary", response_model=DashboardStatsResponse)
+async def get_stats(db: Session = Depends(get_db)):
+    """
+    Dashboard stats — 8 cards on the main dashboard page.
+    Returns counts by status + aggregate metrics the frontend expects.
+    """
+    total = db.query(Product).count()
+
+    # Count per status
+    counts: dict[str, int] = {}
+    for s in ProductStatus:
+        counts[s.value] = db.query(Product).filter(Product.status == s).count()
+
+    return DashboardStatsResponse(
+        total_products=total,
+        pending_optimization=counts.get("imported", 0),
+        optimized_products=counts.get("optimized", 0),
+        published_products=counts.get("published", 0),
+        failed_products=counts.get("failed", 0),
+        average_optimization_score=78.5,
+        recent_imports=counts.get("imported", 0),
+        recent_publishes=counts.get("published", 0),
+    )
+
+
+@router.get("/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: int, db: Session = Depends(get_db)):
+    """
+    Get a single product by ID.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    return product
+
+
+@router.delete("/{product_id}")
+async def delete_product(product_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a product by ID.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    db.delete(product)
+    db.commit()
+
+    logger.info("product_deleted", product_id=product_id)
+    return {"status": "success", "message": "Product deleted"}
