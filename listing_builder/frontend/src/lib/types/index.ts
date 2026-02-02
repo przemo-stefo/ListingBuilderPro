@@ -266,6 +266,44 @@ export interface GetInventoryParams {
   search?: string
 }
 
+// Analytics types
+export interface MarketplaceRevenue {
+  marketplace: string
+  revenue: number
+  orders: number
+  percentage: number
+}
+
+export interface MonthlyRevenue {
+  month: string
+  revenue: number
+  orders: number
+}
+
+export interface TopProduct {
+  id: string
+  title: string
+  marketplace: string
+  revenue: number
+  units_sold: number
+  conversion_rate: number
+}
+
+export interface AnalyticsResponse {
+  total_revenue: number
+  total_orders: number
+  conversion_rate: number
+  avg_order_value: number
+  revenue_by_marketplace: MarketplaceRevenue[]
+  monthly_revenue: MonthlyRevenue[]
+  top_products: TopProduct[]
+}
+
+export interface GetAnalyticsParams {
+  marketplace?: string
+  period?: '7d' | '30d' | '90d' | '12m'
+}
+
 // Error types
 export interface ApiError {
   message: string
