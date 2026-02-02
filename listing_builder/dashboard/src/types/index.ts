@@ -145,3 +145,9 @@ export interface SellerMetrics {
   revenue_30d: number;
   last_updated: string;
 }
+
+export interface MetricsResponse {
+  metrics: SellerMetrics[];
+  total_orders_30d: number;
+  total_revenue_30d: number;
+}
