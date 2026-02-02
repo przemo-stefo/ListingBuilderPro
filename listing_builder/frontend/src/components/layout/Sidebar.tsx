@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Package,
   ClipboardList,
+  Hash,
   Upload,
   Sparkles,
   Send
@@ -31,6 +32,11 @@ const navItems = [
     title: 'Listings',
     href: '/listings',
     icon: ClipboardList,
+  },
+  {
+    title: 'Keywords',
+    href: '/keywords',
+    icon: Hash,
   },
   {
     title: 'Import',
