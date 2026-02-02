@@ -14,6 +14,7 @@ import {
   Hash,
   Users,
   Warehouse,
+  BarChart3,
   Upload,
   Sparkles,
   Send
@@ -49,6 +50,11 @@ const navItems = [
     title: 'Inventory',
     href: '/inventory',
     icon: Warehouse,
+  },
+  {
+    title: 'Analytics',
+    href: '/analytics',
+    icon: BarChart3,
   },
   {
     title: 'Import',
