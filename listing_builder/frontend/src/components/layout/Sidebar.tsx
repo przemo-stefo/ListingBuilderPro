@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Hash,
   Users,
+  Warehouse,
   Upload,
   Sparkles,
   Send
@@ -43,6 +44,11 @@ const navItems = [
     title: 'Competitors',
     href: '/competitors',
     icon: Users,
+  },
+  {
+    title: 'Inventory',
+    href: '/inventory',
+    icon: Warehouse,
   },
   {
     title: 'Import',
