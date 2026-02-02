@@ -234,6 +234,38 @@ export interface GetCompetitorsParams {
   search?: string
 }
 
+// Inventory tracking types
+export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock' | 'overstock'
+
+export interface InventoryItem {
+  id: string
+  sku: string
+  product_title: string
+  marketplace: string
+  quantity: number
+  reorder_point: number
+  days_of_supply: number
+  status: StockStatus
+  unit_cost: number
+  total_value: number
+  last_restocked: string
+}
+
+export interface InventoryResponse {
+  items: InventoryItem[]
+  total: number
+  in_stock_count: number
+  low_stock_count: number
+  out_of_stock_count: number
+  total_value: number
+}
+
+export interface GetInventoryParams {
+  marketplace?: string
+  status?: StockStatus
+  search?: string
+}
+
 // Error types
 export interface ApiError {
   message: string
