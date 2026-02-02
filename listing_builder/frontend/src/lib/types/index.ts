@@ -176,6 +176,33 @@ export interface GetListingsParams {
   compliance_status?: ComplianceStatus
 }
 
+// Keyword tracking types
+export type KeywordTrend = 'up' | 'down' | 'stable'
+
+export interface KeywordItem {
+  id: string
+  keyword: string
+  search_volume: number
+  current_rank: number | null
+  marketplace: string
+  trend: KeywordTrend
+  relevance_score: number
+  last_updated: string
+}
+
+export interface KeywordsResponse {
+  keywords: KeywordItem[]
+  total: number
+  tracked_count: number
+  top_10_count: number
+  avg_relevance: number
+}
+
+export interface GetKeywordsParams {
+  marketplace?: string
+  search?: string
+}
+
 // Error types
 export interface ApiError {
   message: string
