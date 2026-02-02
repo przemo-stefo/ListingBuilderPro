@@ -12,6 +12,7 @@ import {
   Package,
   ClipboardList,
   Hash,
+  Users,
   Upload,
   Sparkles,
   Send
@@ -37,6 +38,11 @@ const navItems = [
     title: 'Keywords',
     href: '/keywords',
     icon: Hash,
+  },
+  {
+    title: 'Competitors',
+    href: '/competitors',
+    icon: Users,
   },
   {
     title: 'Import',

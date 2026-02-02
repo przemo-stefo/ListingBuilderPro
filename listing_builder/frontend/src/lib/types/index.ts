@@ -203,6 +203,37 @@ export interface GetKeywordsParams {
   search?: string
 }
 
+// Competitor tracking types
+export type CompetitorStatus = 'winning' | 'losing' | 'tied'
+
+export interface CompetitorItem {
+  id: string
+  competitor_name: string
+  asin: string
+  product_title: string
+  marketplace: string
+  their_price: number
+  our_price: number
+  price_difference: number
+  their_rating: number
+  their_reviews_count: number
+  status: CompetitorStatus
+  last_checked: string
+}
+
+export interface CompetitorsResponse {
+  competitors: CompetitorItem[]
+  total: number
+  winning_count: number
+  losing_count: number
+  avg_price_gap: number
+}
+
+export interface GetCompetitorsParams {
+  marketplace?: string
+  search?: string
+}
+
 // Error types
 export interface ApiError {
   message: string
