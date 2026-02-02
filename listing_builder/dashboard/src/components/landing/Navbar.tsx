@@ -38,7 +38,7 @@ export function Navbar() {
 
         {/* Desktop CTAs */}
         <div className="hidden items-center gap-3 md:flex">
-          <a href="/dashboard" className="text-sm text-neutral-400 hover:text-white">
+          <a href="/login" className="text-sm text-neutral-400 hover:text-white">
             Sign In
           </a>
           <a
@@ -77,7 +77,7 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
-            <a href="/dashboard" className="text-sm text-neutral-400 hover:text-white">
+            <a href="/login" className="text-sm text-neutral-400 hover:text-white">
               Sign In
             </a>
             <a
