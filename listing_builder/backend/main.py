@@ -14,6 +14,7 @@ from database import init_db, check_db_connection
 from api import import_routes, ai_routes, export_routes, product_routes
 from api import listings_routes, keywords_routes, competitors_routes
 from api import inventory_routes, analytics_routes, settings_routes
+from api import compliance_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -100,6 +101,7 @@ app.include_router(competitors_routes.router)
 app.include_router(inventory_routes.router)
 app.include_router(analytics_routes.router)
 app.include_router(settings_routes.router)
+app.include_router(compliance_routes.router)
 
 
 @app.get("/")
@@ -121,6 +123,7 @@ async def root():
             "inventory": "/api/inventory",
             "analytics": "/api/analytics",
             "settings": "/api/settings",
+            "compliance": "/api/compliance",
             "docs": "/docs",
         }
     }

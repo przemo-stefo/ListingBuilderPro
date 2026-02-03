@@ -6,7 +6,7 @@ import { apiRequest } from './client'
 import type { SettingsResponse, UpdateSettingsPayload } from '../types'
 
 export async function getSettings(): Promise<SettingsResponse> {
-  const response = await apiRequest<SettingsResponse>('get', '/api/settings')
+  const response = await apiRequest<SettingsResponse>('get', '/settings')
 
   if (response.error) {
     throw new Error(response.error)
@@ -20,7 +20,7 @@ export async function updateSettings(
 ): Promise<SettingsResponse> {
   const response = await apiRequest<SettingsResponse>(
     'put',
-    '/api/settings',
+    '/settings',
     payload
   )
 
