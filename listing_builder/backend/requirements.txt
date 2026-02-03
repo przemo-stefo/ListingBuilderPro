@@ -37,6 +37,10 @@ pytz==2023.3
 # Template Parsing (Amazon XLSM / eBay XLSX)
 openpyxl==3.1.2
 
+# Web Scraping (Allegro product pages)
+playwright==1.41.0
+# After pip install: run `playwright install chromium`
+
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
