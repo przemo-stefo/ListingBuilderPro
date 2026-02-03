@@ -3,7 +3,13 @@
 // NOT for: React hooks or UI logic (those are in hooks/useOptimizer.ts)
 
 import { apiRequest } from './client'
-import type { OptimizerRequest, OptimizerResponse } from '../types'
+import type {
+  OptimizerRequest,
+  OptimizerResponse,
+  BatchOptimizerRequest,
+  BatchOptimizerResponse,
+  ScrapeResponse,
+} from '../types'
 
 // WHY: n8n runs 3 sequential LLM calls — can take 10-20s total
 const OPTIMIZER_TIMEOUT = 60_000
@@ -15,6 +21,40 @@ export async function generateListing(
     'post',
     '/optimizer/generate',
     payload
+  )
+
+  if (response.error) {
+    throw new Error(response.error)
+  }
+
+  return response.data!
+}
+
+// WHY: Batch can take 5s per product × up to 50 products
+export async function generateBatch(
+  payload: BatchOptimizerRequest
+): Promise<BatchOptimizerResponse> {
+  const response = await apiRequest<BatchOptimizerResponse>(
+    'post',
+    '/optimizer/generate-batch',
+    payload
+  )
+
+  if (response.error) {
+    throw new Error(response.error)
+  }
+
+  return response.data!
+}
+
+// WHY: Reuse existing scrape endpoint to pull product data from Allegro URLs
+export async function scrapeForOptimizer(
+  urls: string[]
+): Promise<ScrapeResponse> {
+  const response = await apiRequest<ScrapeResponse>(
+    'post',
+    '/converter/scrape',
+    { urls, delay: 2.0 }
   )
 
   if (response.error) {
