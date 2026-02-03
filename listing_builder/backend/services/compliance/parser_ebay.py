@@ -23,6 +23,13 @@ def parse_ebay_xlsx(file_bytes: bytes) -> List[Dict[str, str]]:
     Keys are the original eBay header names (as-is, no normalization — rules reference them directly).
     """
     import openpyxl
+    from openpyxl.styles.fonts import Font
+
+    # WHY this patch: eBay-generated XLSX files sometimes contain font family values > 14,
+    # which openpyxl rejects (its validator caps at 14). We relax the limit since we only
+    # need the cell data, not the styling.
+    if hasattr(Font.family, 'max') and Font.family.max == 14:
+        Font.family.max = 100
 
     from io import BytesIO
     wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)

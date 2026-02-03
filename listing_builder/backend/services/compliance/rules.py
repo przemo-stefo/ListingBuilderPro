@@ -51,15 +51,17 @@ AMAZON_RULES = [
         "message": "GPSR manufacturer reference email recommended",
     },
     # ── Batteries (required_if batteries_required is set) ──
+    # WHY battery_type1: Amazon templates use numbered suffixes (battery_type1, battery_type2, etc.)
+    # We check the "1" variant since at least the primary battery must be declared.
     {
-        "field": "battery_type",
+        "field": "battery_type1",
         "check_type": "required_if",
         "trigger_field": "batteries_required",
         "severity": "error",
         "message": "Battery type required when batteries_required is set",
     },
     {
-        "field": "number_of_batteries",
+        "field": "number_of_batteries1",
         "check_type": "required_if",
         "trigger_field": "batteries_required",
         "severity": "error",
@@ -72,47 +74,50 @@ AMAZON_RULES = [
         "severity": "error",
         "message": "Lithium battery packaging info required when batteries_required is set",
     },
-    # ── Hazmat / GHS (required_if ghs_classification_class is set) ──
+    # ── Hazmat / GHS (required_if ghs_classification_class1 is set) ──
+    # WHY ghs_classification_class1: Amazon uses numbered GHS fields.
+    # Some category templates omit signal_word/hazard_statements entirely —
+    # the rule gracefully skips when neither field nor trigger exist.
     {
         "field": "ghs_signal_word",
         "check_type": "required_if",
-        "trigger_field": "ghs_classification_class",
+        "trigger_field": "ghs_classification_class1",
         "severity": "error",
         "message": "GHS signal word required when GHS classification is set",
     },
     {
         "field": "hazard_statements",
         "check_type": "required_if",
-        "trigger_field": "ghs_classification_class",
+        "trigger_field": "ghs_classification_class1",
         "severity": "error",
         "message": "Hazard statements required when GHS classification is set",
     },
     {
         "field": "precautionary_statements",
         "check_type": "required_if",
-        "trigger_field": "ghs_classification_class",
+        "trigger_field": "ghs_classification_class1",
         "severity": "error",
         "message": "Precautionary statements required when GHS classification is set",
     },
     {
         "field": "ghs_pictogram",
         "check_type": "required_if",
-        "trigger_field": "ghs_classification_class",
+        "trigger_field": "ghs_classification_class1",
         "severity": "error",
         "message": "GHS pictogram required when GHS classification is set",
     },
-    # ── Dangerous goods (required_if supplier_declared_dg_hz_regulation is set) ──
+    # ── Dangerous goods (required_if supplier_declared_dg_hz_regulation1 is set) ──
     {
         "field": "un_number",
         "check_type": "required_if",
-        "trigger_field": "supplier_declared_dg_hz_regulation",
+        "trigger_field": "supplier_declared_dg_hz_regulation1",
         "severity": "error",
         "message": "UN number required when DG/HZ regulation is declared",
     },
     {
         "field": "safety_data_sheet_url",
         "check_type": "required_if",
-        "trigger_field": "supplier_declared_dg_hz_regulation",
+        "trigger_field": "supplier_declared_dg_hz_regulation1",
         "severity": "error",
         "message": "Safety data sheet URL required when DG/HZ regulation is declared",
     },
@@ -128,7 +133,8 @@ EBAY_RULES = [
         "message": "Manufacturer name is required for EU product safety",
     },
     {
-        "field": "Manufacturer Address Line 1",
+        # WHY "AddressLine1" not "Address Line 1": eBay templates use no space before "Line"
+        "field": "Manufacturer AddressLine1",
         "check_type": "required",
         "severity": "error",
         "message": "Manufacturer address is required",
@@ -153,7 +159,8 @@ EBAY_RULES = [
         "message": "Responsible Person type is required for GPSR",
     },
     {
-        "field": "Responsible Person 1 Address Line 1",
+        # WHY "AddressLine1": Same eBay naming convention as Manufacturer AddressLine1
+        "field": "Responsible Person 1 AddressLine1",
         "check_type": "required",
         "severity": "error",
         "message": "Responsible Person address is required for GPSR",
@@ -187,8 +194,9 @@ EBAY_RULES = [
         "message": "Take-back policy ID recommended for electronics/WEEE compliance",
     },
     # ── Safety pictograms ──
+    # WHY "Product Safety Pictograms": eBay template header name (not "SafetyPictogramID")
     {
-        "field": "SafetyPictogramID",
+        "field": "Product Safety Pictograms",
         "check_type": "not_empty",
         "severity": "warning",
         "message": "Safety pictogram recommended when product has safety concerns",
