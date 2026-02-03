@@ -16,6 +16,7 @@ from api import listings_routes, keywords_routes, competitors_routes
 from api import inventory_routes, analytics_routes, settings_routes
 from api import compliance_routes
 from api import converter_routes
+from api import optimizer_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -104,6 +105,7 @@ app.include_router(analytics_routes.router)
 app.include_router(settings_routes.router)
 app.include_router(compliance_routes.router)
 app.include_router(converter_routes.router)
+app.include_router(optimizer_routes.router)
 
 
 @app.get("/")
@@ -127,6 +129,7 @@ async def root():
             "settings": "/api/settings",
             "compliance": "/api/compliance",
             "converter": "/api/converter",
+            "optimizer": "/api/optimizer",
             "docs": "/docs",
         }
     }

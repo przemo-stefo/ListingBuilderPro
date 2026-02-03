@@ -457,6 +457,70 @@ export interface ComplianceReportsListResponse {
   offset: number
 }
 
+// Listing Optimizer types (n8n workflow)
+export interface OptimizerKeyword {
+  phrase: string
+  search_volume: number
+}
+
+export interface OptimizerRequest {
+  product_title: string
+  brand: string
+  product_line?: string
+  keywords: OptimizerKeyword[]
+  marketplace: string
+  mode: 'aggressive' | 'standard'
+  language?: string
+  asin?: string
+  category?: string
+}
+
+export interface OptimizerListing {
+  title: string
+  bullet_points: string[]
+  description: string
+  backend_keywords: string
+}
+
+export interface OptimizerScores {
+  coverage_pct: number
+  coverage_mode: string
+  exact_matches_in_title: number
+  title_coverage_pct: number
+  backend_utilization_pct: number
+  backend_byte_size: number
+  compliance_status: string
+}
+
+export interface OptimizerCompliance {
+  status: string
+  errors: string[]
+  warnings: string[]
+  error_count: number
+  warning_count: number
+}
+
+export interface OptimizerKeywordIntel {
+  total_analyzed: number
+  tier1_title: number
+  tier2_bullets: number
+  tier3_backend: number
+  missing_keywords: string[]
+  root_words: Array<{ word: string; frequency: number }>
+}
+
+export interface OptimizerResponse {
+  status: string
+  marketplace: string
+  brand: string
+  mode: string
+  language: string
+  listing: OptimizerListing
+  scores: OptimizerScores
+  compliance: OptimizerCompliance
+  keyword_intel: OptimizerKeywordIntel
+}
+
 // Error types
 export interface ApiError {
   message: string
