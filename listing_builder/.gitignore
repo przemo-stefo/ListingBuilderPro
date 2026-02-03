@@ -71,6 +71,7 @@ tmp/
 *.key
 *.pem
 secrets/
+linkedin_cookies.json
 
 # Deploy artifacts
 *.tar.gz
