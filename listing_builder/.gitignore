@@ -1,0 +1,142 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment (secrets — NEVER commit)
+.env
+.env.*
+!.env.template
+!.env.local.example
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Testing
+.pytest_cache/
+.tox/
+.nox/
+
+# MyPy
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Docker
+docker-compose.override.yml
+
+# Temporary
+*.tmp
+*.temp
+.tmp/
+tmp/
+
+# Security
+*.key
+*.pem
+secrets/
+
+# Deploy artifacts
+*.tar.gz
+listing-builder-deploy*
+
+# Generated optimized listings
+optimized_listing_*.txt
+
+# ===== UNRELATED FILES (not part of Listing Builder Pro) =====
+
+# BTS / Data Center docs
+BTS-Data-Center-*
+
+# PyroxAI (separate project)
+pyroxai/
+PYROX_*.md
+PYROX_*.html
+
+# Compliance Guard (separate project)
+compliance_guard/
+n8n_compliance_guard/
+
+# Oh My Cake (separate project)
+ohmycake/
+
+# Fashion generator (separate project)
+n8n-fashion-generator/
+n8n-fashion-security/
+
+# Dashboard (old/separate)
+dashboard/
+
+# Carousel / LinkedIn (marketing assets)
+carousel_slides/
+linkedin_carousel.html
+
+# Personal emails / correspondence
+EMAIL_*.txt
+WIADOMOSC_*.txt
+WIADOMOSC_*.md
+ODPOWIEDZ_*.md
+ODPOWIEDZ_*.txt
+PILNE_*.md
+
+# Unrelated guides
+CPP_MASTERY_GUIDE.md
+NETWORKCHUCK_*.md
+AI_SALES_AGENT.md
+EMAIL_MANAGER_AI_STATUS.md
+MVP_ANALIZA_WYKONALNOSC.md
+
+# Security scripts (one-time use)
+security-fix-scripts/
+security-assessment-report.md
+
+# Monitoring configs (deploy separately)
+monitoring/
+
+# Legacy Python scripts at root (superseded by backend/)
+amazon_sp_api_connector.py
+amazon_sp_api_connector_refactored.py
+ebay_api_connector.py
+export_carousel.py
+
+# Legacy HTML frontend (superseded by frontend/)
+frontend.html
+
+# Test data (generate fresh)
+test_data/
