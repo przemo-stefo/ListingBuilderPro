@@ -1,0 +1,240 @@
+{
+  "n8n_id": "sPf8XmLkw2UNPCOI",
+  "name": "[ECOM] Listing Optimizer - v2",
+  "synced_at": "2026-02-03T16:30:00.000Z",
+  "version": 44,
+  "active": true,
+  "notes": "17-node pipeline: Webhook → Validate → Parse Keywords → LLM Title → Extract → LLM Bullets → Extract → LLM Description → Extract → Backend Optimizer → Coverage Calculator → Compliance Check → Assemble Output → Respond. Compliance uses word-boundary regex to avoid false positives. headerAuth enabled.",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "listing-optimizer",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "listing-optimizer",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      }
+    },
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 520],
+      "parameters": {}
+    },
+    {
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "jsCode": "// listing_optimizer_v2 / Validate Input\n// Purpose: Validate incoming payload and normalize structure\n// NOT for: Keyword analysis or content generation\n\nconst input = $input.first().json;\nconst data = input.body || input;\n\nconst errors = [];\nif (!data.product_title && !data.url) errors.push('Missing: product_title or url');\nif (!data.keywords && !data.keywords_csv) errors.push('Missing: keywords (array) or keywords_csv (string)');\nif (!data.brand) errors.push('Missing: brand name');\n\nif (errors.length > 0) throw new Error('Validation failed: ' + errors.join('; '));\n\nconst marketplace = (data.marketplace || 'amazon_de').toLowerCase();\n\nconst LIMITS = {\n  amazon_de: { title_max: 200, bullet_max: 500, bullets_count: 5, desc_max: 2000, backend_bytes: 249 },\n  amazon_us: { title_max: 200, bullet_max: 500, bullets_count: 5, desc_max: 2000, backend_bytes: 249 },\n  amazon_pl: { title_max: 200, bullet_max: 500, bullets_count: 5, desc_max: 2000, backend_bytes: 249 },\n  ebay_de:   { title_max: 80,  bullet_max: 300, bullets_count: 5, desc_max: 4000, backend_bytes: 0 },\n  kaufland:  { title_max: 150, bullet_max: 400, bullets_count: 5, desc_max: 4000, backend_bytes: 0 }\n};\nconst limits = LIMITS[marketplace] || LIMITS.amazon_de;\nconst mode = (data.mode || 'aggressive').toLowerCase();\n\nconst LANG = { amazon_de: 'de', amazon_us: 'en', amazon_pl: 'pl', ebay_de: 'de', kaufland: 'de' };\nconst language = data.language || LANG[marketplace] || 'en';\n\nreturn [{ json: {\n  product_title: data.product_title || '',\n  product_description: data.product_description || '',\n  product_features: data.product_features || [],\n  brand: data.brand,\n  product_line: data.product_line || '',\n  keywords: data.keywords || [],\n  keywords_csv: data.keywords_csv || '',\n  marketplace, limits, mode, language,\n  url: data.url || '', asin: data.asin || '', category: data.category || ''\n}}];"
+      }
+    },
+    {
+      "id": "parse-keywords",
+      "name": "Parse Keywords",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "// listing_optimizer_v2 / Parse & Analyze Keywords\n// Purpose: Parse CSV/JSON keywords, calculate tiers and root words\n// WHY: Ported from keyword_analyzer.py + csv_parser.py\n\nconst input = $input.first().json;\nlet keywords = [];\n\nif (input.keywords_csv && input.keywords_csv.length > 0) {\n  const lines = input.keywords_csv.split('\\n');\n  const header = lines[0].toLowerCase();\n  const hasHeader = header.includes('keyword') || header.includes('phrase');\n  const dataLines = hasHeader ? lines.slice(1) : lines;\n  for (const line of dataLines) {\n    if (!line.trim()) continue;\n    const parts = line.replace(/\"/g, '').split(',');\n    if (parts.length >= 2) {\n      keywords.push({ phrase: parts[0].trim().toLowerCase(), search_volume: parseInt(parts[1]) || 0, word_count: parts[0].trim().split(/\\s+/).length });\n    }\n  }\n} else if (input.keywords && input.keywords.length > 0) {\n  keywords = input.keywords.map(k => {\n    if (typeof k === 'string') return { phrase: k.toLowerCase(), search_volume: 0, word_count: k.split(/\\s+/).length };\n    return { phrase: (k.phrase || k.keyword || '').toLowerCase(), search_volume: k.search_volume || k.sv || k.volume || 0, word_count: (k.phrase || k.keyword || '').split(/\\s+/).length };\n  });\n}\n\nkeywords.sort((a, b) => b.search_volume - a.search_volume);\n\nconst maxSV = keywords[0]?.search_volume || 1;\nkeywords = keywords.map((k, i) => ({\n  ...k,\n  relevancy: k.search_volume > 0\n    ? Math.round((k.search_volume / maxSV) * 100) / 100\n    : Math.round(Math.max(0.1, 1 - (i / keywords.length)) * 100) / 100\n}));\n\nconst tier1 = keywords.filter(k => k.relevancy >= 0.4);\nconst tier2 = keywords.filter(k => k.relevancy >= 0.3 && k.relevancy < 0.4);\nconst tier3 = keywords.filter(k => k.relevancy >= 0.15 && k.relevancy < 0.3);\n\nconst wordFreq = {};\nfor (const k of keywords.slice(0, 100)) {\n  for (const word of k.phrase.split(/\\s+/)) {\n    if (word.length > 2) wordFreq[word] = (wordFreq[word] || 0) + 1;\n  }\n}\nconst rootWords = Object.entries(wordFreq).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([word, count]) => ({ word, frequency: count }));\n\nconst titlePhrases = keywords.filter(k => k.word_count >= 2 && k.word_count <= 4 && k.relevancy >= 0.35).slice(0, 15);\n\nconst FORBIDDEN = ['best', 'cheapest', '#1', 'top rated', 'guarantee', 'free shipping', 'limited time', 'sale', 'discount', 'buy now', 'act now', 'hurry'];\nconst cleanKeywords = keywords.filter(k => !FORBIDDEN.some(f => k.phrase.includes(f)));\n\nreturn [{ json: {\n  ...input, keywords: cleanKeywords,\n  keyword_stats: { total: cleanKeywords.length, tier1_count: tier1.length, tier2_count: tier2.length, tier3_count: tier3.length },\n  tier1_keywords: tier1.slice(0, 20), tier2_keywords: tier2.slice(0, 20), tier3_keywords: tier3.slice(0, 30),\n  title_phrases: titlePhrases, root_words: rootWords,\n  top_keywords_str: cleanKeywords.slice(0, 30).map(k => k.phrase).join(', ')\n}}];"
+      }
+    },
+    {
+      "id": "llm-title",
+      "name": "LLM Title",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300],
+      "credentials": { "httpHeaderAuth": { "id": "exSdHfVO8pFFR5sy", "name": "Groq LLM API" } },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LLM_BASE_URL || 'https://api.groq.com/openai' }}/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $env.LLM_MODEL || 'llama-3.3-70b-versatile' }}\",\n  \"temperature\": 0.4,\n  \"max_tokens\": 512,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an Amazon SEO title engineer. Pack MAXIMUM exact keyword phrases into a natural title. Use dash-separated segments. Output ONLY the title.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Create a {{ $json.marketplace }} title. MAX {{ $json.limits.title_max }} chars. Start with {{ $json.brand }}{{ $json.product_line ? ' ' + $json.product_line : '' }}. Dash-separated format. Target {{ $json.mode === 'aggressive' ? '7-9' : '4-5' }} EXACT phrases. Language: {{ $json.language === 'de' ? 'German' : $json.language === 'pl' ? 'Polish' : 'English' }}. NO ALL CAPS except brand. NO promo words. NO special chars. First 80 chars most important. PHRASES (include ALL as exact substrings): {{ $json.tier1_keywords.slice(0, 15).map(k => k.phrase).join(', ') }}. PRODUCT: {{ $json.product_title }}. Output ONLY the title.\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
+      "id": "extract-title",
+      "name": "Extract Title",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 300],
+      "parameters": {
+        "jsCode": "// Extract title from LLM response, merge with keyword data from Parse Keywords\nconst llmResponse = $input.first().json;\nconst kwData = $('Parse Keywords').first().json;\n\nconst title = (llmResponse.choices?.[0]?.message?.content || '').trim();\n\nreturn [{ json: { ...kwData, title } }];"
+      }
+    },
+    {
+      "id": "llm-bullets",
+      "name": "LLM Bullets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 300],
+      "credentials": { "httpHeaderAuth": { "id": "exSdHfVO8pFFR5sy", "name": "Groq LLM API" } },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LLM_BASE_URL || 'https://api.groq.com/openai' }}/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $env.LLM_MODEL || 'llama-3.3-70b-versatile' }}\",\n  \"temperature\": 0.5,\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an Amazon bullet copywriter. Each bullet MUST contain 2-3 exact keyword phrases woven into benefit copy. Output ONLY 5 bullets, one per line.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Write {{ $json.limits.bullets_count }} bullets for {{ $json.marketplace }}. Max {{ $json.limits.bullet_max }} chars each. Format: CAPS HEADER then benefit text with keywords. Each bullet MUST contain 2-3 EXACT phrases from this list. Spread ALL keywords. NO promo words, NO emojis. Language: {{ $json.language === 'de' ? 'German' : $json.language === 'pl' ? 'Polish' : 'English' }}. KEYWORD PHRASES TO USE: {{ $json.tier2_keywords.concat($json.tier1_keywords.filter(k => !$json.title.toLowerCase().includes(k.phrase))).slice(0, 20).map(k => k.phrase).join(', ') }}. PRODUCT: {{ $json.product_title }}. BRAND: {{ $json.brand }}. TITLE: {{ $json.title }}. Output ONLY 5 bullets.\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
+      "id": "extract-bullets",
+      "name": "Extract Bullets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 300],
+      "parameters": {
+        "jsCode": "// Extract bullets, merge with previous data\nconst llmResponse = $input.first().json;\nconst prevData = $('Extract Title').first().json;\n\nconst bullets = (llmResponse.choices?.[0]?.message?.content || '').trim();\n\nreturn [{ json: { ...prevData, bullets } }];"
+      }
+    },
+    {
+      "id": "llm-description",
+      "name": "LLM Description",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1820, 300],
+      "credentials": { "httpHeaderAuth": { "id": "exSdHfVO8pFFR5sy", "name": "Groq LLM API" } },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LLM_BASE_URL || 'https://api.groq.com/openai' }}/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $env.LLM_MODEL || 'llama-3.3-70b-versatile' }}\",\n  \"temperature\": 0.5,\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an Amazon description writer. EVERY keyword phrase from the list MUST appear as an exact substring in your description. Weave them naturally into problem-solution paragraphs. Output ONLY the description.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a {{ $json.marketplace }} description (max {{ $json.limits.desc_max }} chars). 3-4 paragraphs, problem then solution. EVERY phrase below MUST appear verbatim. NO HTML, NO promo words. Language: {{ $json.language === 'de' ? 'German' : $json.language === 'pl' ? 'Polish' : 'English' }}. KEYWORD PHRASES (ALL must appear in description): {{ $json.tier3_keywords.concat($json.tier2_keywords).concat($json.tier1_keywords).slice(0, 25).map(k => k.phrase).join(', ') }}. PRODUCT: {{ $json.product_title }}. BRAND: {{ $json.brand }}. Output ONLY the description.\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
+      "id": "extract-desc",
+      "name": "Extract Description",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2040, 300],
+      "parameters": {
+        "jsCode": "// Extract description, merge with previous data\nconst llmResponse = $input.first().json;\nconst prevData = $('Extract Bullets').first().json;\n\nconst description = (llmResponse.choices?.[0]?.message?.content || '').trim();\n\nreturn [{ json: { ...prevData, description } }];"
+      }
+    },
+    {
+      "id": "backend-optimizer",
+      "name": "Backend Optimizer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2260, 300],
+      "parameters": {
+        "jsCode": "// listing_optimizer_v2 / Backend Keyword Optimizer\n// WHY: Greedy byte-packing for 249 bytes - ported from backend_optimizer.py\n// TUNED: Pack to 248 bytes, add individual word packing pass\n\nconst input = $input.first().json;\nconst title = (input.title || '').toLowerCase();\nconst bullets = (input.bullets || '').toLowerCase();\nconst description = (input.description || '').toLowerCase();\nconst backendLimit = input.limits?.backend_bytes || 249;\n\nif (backendLimit === 0) {\n  return [{ json: { ...input, backend_keywords: '', backend_stats: { byte_size: 0, utilization: 0, keyword_count: 0, note: 'Not supported for ' + input.marketplace } } }];\n}\n\nconst usedWords = new Set();\nfor (const word of (title + ' ' + bullets + ' ' + description).replace(/[^a-z0-9äöüß\\s]/g, ' ').split(/\\s+/)) {\n  if (word.length > 1) usedWords.add(word);\n}\n\nconst candidates = [];\nfor (const kw of (input.keywords || [])) {\n  const phraseWords = kw.phrase.split(/\\s+/);\n  const newWords = phraseWords.filter(w => !usedWords.has(w) && w.length > 1);\n  if (newWords.length > 0) {\n    candidates.push({ phrase: kw.phrase, newWords, valueScore: newWords.length * (kw.relevancy || 0.1), bytes: Buffer.byteLength(kw.phrase, 'utf8') });\n  }\n}\ncandidates.sort((a, b) => (b.valueScore / b.bytes) - (a.valueScore / a.bytes));\n\nconst packed = [];\nlet currentBytes = 0;\nconst wordCounts = {};\nconst packedWords = new Set();\n\nfor (const c of candidates) {\n  const sep = packed.length > 0 ? 1 : 0;\n  if (currentBytes + c.bytes + sep > backendLimit) continue;\n  const words = c.phrase.split(/\\s+/);\n  if (words.some(w => w.length > 2 && (wordCounts[w] || 0) >= 5)) continue;\n  packed.push(c.phrase);\n  currentBytes += c.bytes + sep;\n  for (const w of words) {\n    if (w.length > 2) wordCounts[w] = (wordCounts[w] || 0) + 1;\n    packedWords.add(w);\n  }\n}\n\nconst allNewWords = [];\nfor (const kw of (input.keywords || [])) {\n  for (const w of kw.phrase.split(/\\s+/)) {\n    if (w.length > 2 && !usedWords.has(w) && !packedWords.has(w) && (wordCounts[w] || 0) < 5) {\n      allNewWords.push({ word: w, relevancy: kw.relevancy || 0.1 });\n    }\n  }\n}\nconst uniqueNewWords = [...new Map(allNewWords.map(w => [w.word, w])).values()];\nuniqueNewWords.sort((a, b) => b.relevancy - a.relevancy);\n\nfor (const w of uniqueNewWords) {\n  const wBytes = Buffer.byteLength(w.word, 'utf8');\n  const sep = packed.length > 0 ? 1 : 0;\n  if (currentBytes + wBytes + sep > backendLimit) continue;\n  packed.push(w.word);\n  currentBytes += wBytes + sep;\n  packedWords.add(w.word);\n  if (currentBytes >= backendLimit - 2) break;\n}\n\nconst backendString = packed.join(' ');\nconst byteSize = Buffer.byteLength(backendString, 'utf8');\n\nreturn [{ json: { ...input, backend_keywords: backendString, backend_stats: { byte_size: byteSize, utilization: Math.round((byteSize / backendLimit) * 1000) / 10, keyword_count: packed.length, unique_words: new Set(backendString.split(/\\s+/)).size } } }];"
+      }
+    },
+    {
+      "id": "coverage-calc",
+      "name": "Coverage Calculator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2480, 300],
+      "parameters": {
+        "jsCode": "// listing_optimizer_v2 / Coverage Calculator\n// WHY: Ported from coverage_calculator.py - target 82% standard, 96-98% aggressive\n\nconst input = $input.first().json;\nconst keywords = input.keywords || [];\nconst title = (input.title || '').toLowerCase();\nconst bullets = (input.bullets || '').toLowerCase();\nconst description = (input.description || '').toLowerCase();\nconst backend = (input.backend_keywords || '').toLowerCase();\n\nconst allWords = new Set((title + ' ' + bullets + ' ' + description + ' ' + backend).split(/\\s+/));\nconst top200 = keywords.slice(0, 200);\nlet coveredCount = 0;\nconst coveredKws = [], missingKws = [];\n\nfor (const kw of top200) {\n  const phraseWords = kw.phrase.split(/\\s+/);\n  const matched = phraseWords.filter(w => allWords.has(w)).length;\n  if (matched / phraseWords.length >= 0.7) {\n    coveredCount++;\n    if (coveredKws.length < 10) coveredKws.push(kw.phrase);\n  } else {\n    if (missingKws.length < 10) missingKws.push(kw.phrase);\n  }\n}\n\nconst coveragePct = top200.length > 0 ? Math.round((coveredCount / top200.length) * 1000) / 10 : 0;\nconst titleWords = new Set(title.split(/\\s+/));\nconst titleCov = top200.length > 0 ? Math.round(top200.filter(k => k.phrase.split(/\\s+/).some(w => titleWords.has(w))).length / top200.length * 1000) / 10 : 0;\nconst exactMatches = top200.filter(k => title.includes(k.phrase)).length;\n\nlet modeAchieved = coveragePct >= 96 ? 'AGGRESSIVE' : coveragePct >= 82 ? 'STANDARD' : 'UNDEROPTIMIZED';\n\nreturn [{ json: { ...input, coverage: { total_pct: coveragePct, covered_count: coveredCount, total_keywords: top200.length, mode_achieved: modeAchieved, title_coverage_pct: titleCov, exact_matches_in_title: exactMatches, sample_covered: coveredKws, sample_missing: missingKws } } }];"
+      }
+    },
+    {
+      "id": "compliance-check",
+      "name": "Compliance Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2700, 300],
+      "parameters": {
+        "jsCode": "// listing_optimizer_v2 / Compliance Check\n// WHY: Ported from compliance/rules.py\n// FIX: Use word boundary matching to avoid false positives (e.g. 'besten' matching 'best')\n\nconst input = $input.first().json;\nconst title = input.title || '';\nconst bullets = input.bullets || '';\nconst description = input.description || '';\nconst limits = input.limits || {};\n\nconst warnings = [], errors = [];\n\nif (title.length > limits.title_max) errors.push(`Title exceeds ${limits.title_max} chars (${title.length})`);\nelse if (title.length < 80) warnings.push(`Title short (${title.length} chars)`);\n\nif (input.brand && !title.toLowerCase().startsWith(input.brand.toLowerCase())) warnings.push('Title should start with brand');\n\nfor (const char of ['|', '!', '$', '?', '_']) {\n  if (title.includes(char)) errors.push(`Forbidden char in title: ${char}`);\n}\n\nconst PROMO = ['best', 'cheapest', '#1', 'top rated', 'guarantee', 'guaranteed', 'free shipping', 'limited time', 'sale', 'discount', 'buy now'];\nconst allText = (title + ' ' + bullets + ' ' + description).toLowerCase();\nfor (const p of PROMO) {\n  // WHY: Word boundary check — 'besten' should NOT match 'best'\n  const regex = new RegExp('\\\\b' + p.replace(/[.*+?^${}()|[\\\\]\\\\]/g, '\\\\$&') + '\\\\b');\n  if (regex.test(allText)) errors.push(`Promo word: \"${p}\"`);\n}\n\nconst capsWords = title.split(/\\s+/).filter(w => w.length > 3 && w === w.toUpperCase() && w !== input.brand?.toUpperCase());\nif (capsWords.length > 0) warnings.push(`ALL CAPS: ${capsWords.join(', ')}`);\n\nconst bulletLines = bullets.split('\\n').filter(l => l.trim().length > 0);\nif (bulletLines.length < limits.bullets_count) warnings.push(`${bulletLines.length}/${limits.bullets_count} bullets`);\n\nif (description.length > limits.desc_max) errors.push(`Description exceeds ${limits.desc_max} chars`);\n\nif (input.backend_keywords && Buffer.byteLength(input.backend_keywords, 'utf8') > 250) errors.push('Backend > 250 bytes');\n\nconst status = errors.length > 0 ? 'FAIL' : warnings.length > 0 ? 'WARNING' : 'PASS';\n\nreturn [{ json: { ...input, compliance: { status, errors, warnings, error_count: errors.length, warning_count: warnings.length } } }];"
+      }
+    },
+    {
+      "id": "assemble-output",
+      "name": "Assemble Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2920, 300],
+      "parameters": {
+        "jsCode": "// listing_optimizer_v2 / Assemble Final Output\n\nconst input = $input.first().json;\nconst bulletArray = (input.bullets || '').split('\\n').map(b => b.trim()).filter(b => b.length > 0);\n\nreturn [{ json: {\n  status: 'completed',\n  timestamp: new Date().toISOString(),\n  marketplace: input.marketplace,\n  brand: input.brand,\n  mode: input.mode,\n  language: input.language,\n  listing: {\n    title: input.title || '',\n    bullet_points: bulletArray,\n    description: input.description || '',\n    backend_keywords: input.backend_keywords || ''\n  },\n  scores: {\n    coverage_pct: input.coverage?.total_pct || 0,\n    coverage_mode: input.coverage?.mode_achieved || 'UNKNOWN',\n    exact_matches_in_title: input.coverage?.exact_matches_in_title || 0,\n    title_coverage_pct: input.coverage?.title_coverage_pct || 0,\n    backend_utilization_pct: input.backend_stats?.utilization || 0,\n    backend_byte_size: input.backend_stats?.byte_size || 0,\n    compliance_status: input.compliance?.status || 'UNKNOWN'\n  },\n  compliance: input.compliance || {},\n  keyword_intel: {\n    total_analyzed: input.keyword_stats?.total || 0,\n    tier1_title: input.keyword_stats?.tier1_count || 0,\n    tier2_bullets: input.keyword_stats?.tier2_count || 0,\n    tier3_backend: input.keyword_stats?.tier3_count || 0,\n    missing_keywords: input.coverage?.sample_missing || [],\n    root_words: (input.root_words || []).slice(0, 10)\n  }\n} }];"
+      }
+    },
+    {
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3140, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": { "responseCode": 200 }
+      }
+    },
+    {
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [200, 760],
+      "parameters": {}
+    },
+    {
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 760],
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nreturn [{ json: {\n  status: 'error', timestamp: new Date().toISOString(),\n  error: { message: error.message || error.execution?.error?.message || 'Unknown', node: error.execution?.lastNodeExecuted || 'unknown', workflow: 'Listing Optimizer v2' }\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": { "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]] },
+    "Manual Trigger": { "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]] },
+    "Validate Input": { "main": [[{ "node": "Parse Keywords", "type": "main", "index": 0 }]] },
+    "Parse Keywords": { "main": [[{ "node": "LLM Title", "type": "main", "index": 0 }]] },
+    "LLM Title": { "main": [[{ "node": "Extract Title", "type": "main", "index": 0 }]] },
+    "Extract Title": { "main": [[{ "node": "LLM Bullets", "type": "main", "index": 0 }]] },
+    "LLM Bullets": { "main": [[{ "node": "Extract Bullets", "type": "main", "index": 0 }]] },
+    "Extract Bullets": { "main": [[{ "node": "LLM Description", "type": "main", "index": 0 }]] },
+    "LLM Description": { "main": [[{ "node": "Extract Description", "type": "main", "index": 0 }]] },
+    "Extract Description": { "main": [[{ "node": "Backend Optimizer", "type": "main", "index": 0 }]] },
+    "Backend Optimizer": { "main": [[{ "node": "Coverage Calculator", "type": "main", "index": 0 }]] },
+    "Coverage Calculator": { "main": [[{ "node": "Compliance Check", "type": "main", "index": 0 }]] },
+    "Compliance Check": { "main": [[{ "node": "Assemble Output", "type": "main", "index": 0 }]] },
+    "Assemble Output": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] },
+    "Error Trigger": { "main": [[{ "node": "Error Handler", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  }
+}
