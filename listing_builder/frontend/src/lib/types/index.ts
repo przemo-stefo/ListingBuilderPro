@@ -521,6 +521,35 @@ export interface OptimizerResponse {
   keyword_intel: OptimizerKeywordIntel
 }
 
+// Batch Optimizer types — multiple products in one request
+export interface BatchOptimizerRequest {
+  products: OptimizerRequest[]
+}
+
+export interface BatchOptimizerResult {
+  product_title: string
+  status: 'completed' | 'error'
+  error?: string
+  result?: OptimizerResponse
+}
+
+export interface BatchOptimizerResponse {
+  total: number
+  succeeded: number
+  failed: number
+  results: BatchOptimizerResult[]
+}
+
+// WHY: Parsed product from CSV/paste before it becomes an OptimizerRequest
+export interface ParsedBatchProduct {
+  product_title: string
+  brand: string
+  keywords: string[]
+  product_line?: string
+  asin?: string
+  category?: string
+}
+
 // Error types
 export interface ApiError {
   message: string

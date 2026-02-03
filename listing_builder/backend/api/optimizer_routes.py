@@ -168,6 +168,135 @@ async def generate_listing(request: OptimizerRequest):
         )
 
 
+# WHY: Batch endpoint processes multiple products sequentially
+# Each product goes through the same n8n workflow, results are aggregated
+BATCH_MAX_PRODUCTS = 50
+BATCH_TIMEOUT = 300.0
+
+
+class BatchOptimizerRequest(BaseModel):
+    """Batch of products to optimize"""
+    products: List[OptimizerRequest] = Field(..., min_length=1, max_length=BATCH_MAX_PRODUCTS)
+
+
+class BatchOptimizerResult(BaseModel):
+    """Single product result within a batch — includes error field for failures"""
+    product_title: str
+    status: str  # "completed" or "error"
+    error: Optional[str] = None
+    result: Optional[OptimizerResponse] = None
+
+
+class BatchOptimizerResponse(BaseModel):
+    """Aggregated batch response"""
+    total: int
+    succeeded: int
+    failed: int
+    results: List[BatchOptimizerResult]
+
+
+@router.post("/generate-batch", response_model=BatchOptimizerResponse)
+async def generate_batch(request: BatchOptimizerRequest):
+    """
+    Generate optimized listings for multiple products via n8n.
+
+    WHY: Processes sequentially because n8n workflow runs 3 LLM calls per product.
+    Per-product error handling ensures one failure doesn't abort the whole batch.
+    """
+    results: List[BatchOptimizerResult] = []
+    succeeded = 0
+    failed = 0
+
+    logger.info(
+        "batch_optimizer_start",
+        total_products=len(request.products),
+    )
+
+    async with httpx.AsyncClient(timeout=N8N_TIMEOUT) as client:
+        for i, product in enumerate(request.products):
+            payload = {
+                "product_title": product.product_title,
+                "brand": product.brand,
+                "product_line": product.product_line or "",
+                "keywords": [
+                    {"phrase": k.phrase, "search_volume": k.search_volume}
+                    for k in product.keywords
+                ],
+                "marketplace": product.marketplace,
+                "mode": product.mode,
+                "asin": product.asin or "",
+                "category": product.category or "",
+            }
+
+            if product.language:
+                payload["language"] = product.language
+
+            try:
+                response = await client.post(N8N_WEBHOOK_URL, json=payload)
+
+                if response.status_code != 200:
+                    logger.error(
+                        "batch_item_n8n_error",
+                        index=i,
+                        product=product.product_title[:50],
+                        status=response.status_code,
+                    )
+                    results.append(BatchOptimizerResult(
+                        product_title=product.product_title,
+                        status="error",
+                        error=f"n8n returned {response.status_code}",
+                    ))
+                    failed += 1
+                    continue
+
+                data = response.json()
+                results.append(BatchOptimizerResult(
+                    product_title=product.product_title,
+                    status="completed",
+                    result=OptimizerResponse(**data),
+                ))
+                succeeded += 1
+
+                logger.info(
+                    "batch_item_success",
+                    index=i,
+                    product=product.product_title[:50],
+                    coverage=data.get("scores", {}).get("coverage_pct", 0),
+                )
+
+            except httpx.TimeoutException:
+                logger.error("batch_item_timeout", index=i, product=product.product_title[:50])
+                results.append(BatchOptimizerResult(
+                    product_title=product.product_title,
+                    status="error",
+                    error="Timed out waiting for n8n",
+                ))
+                failed += 1
+
+            except Exception as e:
+                logger.error("batch_item_error", index=i, error=str(e))
+                results.append(BatchOptimizerResult(
+                    product_title=product.product_title,
+                    status="error",
+                    error=str(e),
+                ))
+                failed += 1
+
+    logger.info(
+        "batch_optimizer_done",
+        total=len(request.products),
+        succeeded=succeeded,
+        failed=failed,
+    )
+
+    return BatchOptimizerResponse(
+        total=len(request.products),
+        succeeded=succeeded,
+        failed=failed,
+        results=results,
+    )
+
+
 @router.get("/health")
 async def optimizer_health():
     """Check if n8n workflow is reachable"""
