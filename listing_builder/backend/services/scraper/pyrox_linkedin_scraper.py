@@ -1077,16 +1077,17 @@ class LinkedInEmployeeFinder:
         """
         Search LinkedIn people search for a query.
 
-        Safety: uses human-like scrolling, longer wait times, session checks.
+        Uses JavaScript DOM extraction instead of CSS selectors because
+        LinkedIn frequently changes their class names. JS approach is
+        resilient to UI changes.
+
+        Safety: human-like scrolling, longer wait times, session checks.
         Debug: saves screenshot on failure for troubleshooting.
 
         Returns list of: {name, designation, link, verified}
-        Same format as Apify LinkedIn employees scraper output.
         """
-        prospects = []
-
-        # URL-encode the query properly
         from urllib.parse import quote
+
         search_url = (
             f"https://www.linkedin.com/search/results/people/"
             f"?keywords={quote(query)}"
@@ -1101,33 +1102,95 @@ class LinkedInEmployeeFinder:
         # Safety: check if LinkedIn redirected us (login/checkpoint)
         if not await self._check_session_health(page):
             logger.warning("Session lost during search, aborting.")
-            return prospects
+            return []
 
         # Safety: scroll like a human before parsing
         await self._human_scroll(page)
 
-        # Try multiple CSS selectors (LinkedIn updates these periodically)
-        selectors = [
-            '.reusable-search__result-container',
-            'li.reusable-search__result-container',
-            '.search-results-container li',
-            '[data-chameleon-result-urn]',
-            '.entity-result',
-        ]
+        # Extract results via JavaScript (resilient to CSS class changes)
+        # WHY JS: LinkedIn changes class names often. Finding all <a> tags
+        # with /in/ hrefs and extracting nearby text is more stable.
+        prospects = await page.evaluate(f"""
+            (() => {{
+                const results = [];
+                // Find all profile links on the search results page
+                const links = document.querySelectorAll('a[href*="/in/"]');
+                const seen = new Set();
 
-        results = []
-        for sel in selectors:
-            try:
-                await page.wait_for_selector(sel, timeout=8000)
-                results = await page.query_selector_all(sel)
-                if results:
-                    logger.info(f"  Found {len(results)} results with selector: {sel}")
-                    break
-            except Exception:
-                continue
+                for (const link of links) {{
+                    const href = link.href.split('?')[0];
+                    if (!href || seen.has(href)) continue;
+                    if (href.includes('/search/') || href.includes('/feed/')) continue;
 
-        if not results:
-            # Debug: save screenshot to understand what went wrong
+                    // Get the name from the link or its parent
+                    let name = '';
+                    // Try: span inside the link with aria-hidden
+                    const nameSpan = link.querySelector('span[aria-hidden="true"]');
+                    if (nameSpan) {{
+                        name = nameSpan.textContent.trim();
+                    }} else {{
+                        // Fallback: link text itself
+                        name = link.textContent.trim().split('\\n')[0].trim();
+                    }}
+
+                    // Skip private/empty profiles
+                    if (!name || name.includes('LinkedIn Member') || name.length < 2) continue;
+                    // Skip nav links (short names are usually menu items)
+                    if (name.length > 60) continue;
+
+                    // Find the headline/designation near this link
+                    // Walk up to the result container and look for subtitle text
+                    let headline = '';
+                    let container = link.closest('li') || link.parentElement?.parentElement?.parentElement;
+                    if (container) {{
+                        // Look for subtitle elements
+                        const subtitleEl = container.querySelector(
+                            '.entity-result__primary-subtitle, ' +
+                            '[class*="subtitle"], ' +
+                            '[class*="headline"]'
+                        );
+                        if (subtitleEl) {{
+                            headline = subtitleEl.textContent.trim();
+                        }} else {{
+                            // Fallback: find text after the name that looks like a title
+                            const allText = container.textContent;
+                            const nameIdx = allText.indexOf(name);
+                            if (nameIdx >= 0) {{
+                                const after = allText.substring(nameIdx + name.length).trim();
+                                // Take first line of text after name (usually the headline)
+                                const firstLine = after.split('\\n').map(s => s.trim()).filter(s => s.length > 5)[0] || '';
+                                if (firstLine.length < 120) headline = firstLine;
+                            }}
+                        }}
+                    }}
+
+                    // Clean designation: remove junk from LinkedIn UI
+                    // Raw example: "• 3rd+Chief Technology Officer @ FreshfieldsFleet, EnglandMessage"
+                    headline = headline
+                        .replace(/^[\\s•·\\-]+/, '')           // leading bullets/dots
+                        .replace(/^\\d+(st|nd|rd|th)\\+?/i, '') // "3rd+" connection degree
+                        .replace(/Message$/i, '')              // trailing "Message" button text
+                        .replace(/Connect$/i, '')              // trailing "Connect" button text
+                        .replace(/Follow$/i, '')               // trailing "Follow" button text
+                        .trim();
+
+                    seen.add(href);
+                    results.push({{
+                        name: name,
+                        designation: headline.substring(0, 100),
+                        link: href,
+                        verified: ''
+                    }});
+
+                    if (results.length >= {max_results}) break;
+                }}
+
+                return results;
+            }})()
+        """)
+
+        if not prospects:
+            # Debug: save screenshot for troubleshooting
             debug_path = os.path.join(
                 os.path.dirname(__file__), "debug_search.png"
             )
@@ -1137,65 +1200,9 @@ class LinkedInEmployeeFinder:
             except Exception:
                 pass
             logger.info(f"No results for: {query}")
-            return prospects
-
-        for result in results[:max_results]:
-            try:
-                # Try multiple link selectors
-                link_elem = (
-                    await result.query_selector('a.app-aware-link[href*="/in/"]')
-                    or await result.query_selector('a[href*="/in/"]')
-                )
-                if not link_elem:
-                    continue
-
-                href = await link_elem.get_attribute('href')
-                if not href or '/in/' not in href:
-                    continue
-
-                profile_url = href.split('?')[0]
-
-                # Get name - try multiple selectors
-                name = ""
-                for name_sel in [
-                    'span[aria-hidden="true"]',
-                    '.entity-result__title-text a span',
-                    '.entity-result__title-text span',
-                ]:
-                    name_elem = await result.query_selector(name_sel)
-                    if name_elem:
-                        name = await name_elem.inner_text()
-                        if name and "LinkedIn Member" not in name:
-                            break
-
-                # Skip private profiles
-                if not name or "LinkedIn Member" in name:
-                    continue
-
-                # Get headline (becomes designation)
-                headline = ""
-                for hl_sel in [
-                    '.entity-result__primary-subtitle',
-                    '.entity-result__summary',
-                    '.search-result__truncate',
-                ]:
-                    headline_elem = await result.query_selector(hl_sel)
-                    if headline_elem:
-                        headline = await headline_elem.inner_text()
-                        if headline:
-                            break
-
-                prospects.append({
-                    "name": name.strip(),
-                    "designation": headline.strip()[:100],
-                    "link": profile_url,
-                    "verified": "",
-                })
-
-                logger.info(f"  Found: {name.strip()[:30]} - {headline.strip()[:40]}")
-
-            except Exception:
-                continue
+        else:
+            for p in prospects:
+                logger.info(f"  Found: {p['name'][:30]} - {p['designation'][:40]}")
 
         return prospects
 
