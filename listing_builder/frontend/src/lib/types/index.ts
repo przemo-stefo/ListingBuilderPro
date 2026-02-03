@@ -346,6 +346,117 @@ export interface SettingsResponse {
 // WHY: Partial so each section can be saved independently
 export type UpdateSettingsPayload = Partial<SettingsResponse>
 
+// Converter types
+export interface ConverterMarketplace {
+  id: string
+  name: string
+  format: string
+  extension: string
+  description: string
+}
+
+export interface GPSRData {
+  manufacturer_contact: string
+  manufacturer_address: string
+  manufacturer_city: string
+  manufacturer_country: string
+  country_of_origin: string
+  safety_attestation: string
+  responsible_person_type: string
+  responsible_person_name: string
+  responsible_person_address: string
+  responsible_person_country: string
+  amazon_browse_node: string
+  amazon_product_type: string
+  ebay_category_id: string
+  kaufland_category: string
+}
+
+export interface ConvertRequest {
+  urls: string[]
+  marketplace: string
+  gpsr_data: GPSRData
+  eur_rate: number
+  delay: number
+}
+
+export interface ConvertedProductResult {
+  source_url: string
+  source_id: string
+  fields: Record<string, string>
+  warnings: string[]
+  error: string | null
+}
+
+export interface ConvertResponse {
+  total: number
+  succeeded: number
+  failed: number
+  marketplace: string
+  products: ConvertedProductResult[]
+  warnings: string[]
+}
+
+export interface ScrapeResponse {
+  total: number
+  succeeded: number
+  failed: number
+  products: Record<string, unknown>[]
+}
+
+// Compliance Guard types — file upload → per-product validation report
+export type ComplianceSeverity = 'error' | 'warning' | 'info'
+export type ComplianceItemStatus = 'compliant' | 'warning' | 'error'
+
+export interface ComplianceIssue {
+  field: string
+  rule: string
+  severity: ComplianceSeverity
+  message: string
+}
+
+export interface ComplianceItemResult {
+  row_number: number
+  sku: string
+  product_title: string
+  status: ComplianceItemStatus
+  issues: ComplianceIssue[]
+}
+
+// WHY: Full report includes items array — used for detail view
+export interface ComplianceReportResponse {
+  id: string
+  marketplace: string
+  filename: string
+  total_products: number
+  compliant_count: number
+  warning_count: number
+  error_count: number
+  overall_score: number
+  created_at: string
+  items: ComplianceItemResult[]
+}
+
+// WHY: Summary omits items — lighter payload for the reports list table
+export interface ComplianceReportSummary {
+  id: string
+  marketplace: string
+  filename: string
+  total_products: number
+  compliant_count: number
+  warning_count: number
+  error_count: number
+  overall_score: number
+  created_at: string
+}
+
+export interface ComplianceReportsListResponse {
+  items: ComplianceReportSummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
 // Error types
 export interface ApiError {
   message: string
