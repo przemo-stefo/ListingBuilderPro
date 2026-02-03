@@ -1051,6 +1051,24 @@ class LinkedInEmployeeFinder:
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         person['company'] = company_name
+                        # Clean designation: strip location glued after company name
+                        # WHY: LinkedIn renders title+location in separate divs but
+                        # textContent concatenates them (e.g. "CTO @ FreshfieldsNew York")
+                        desig = person.get('designation', '')
+                        lower = desig.lower()
+                        cn_lower = company_name.lower()
+                        idx = lower.rfind(cn_lower)
+                        if idx >= 0:
+                            desig = desig[:idx + len(cn_lower)].strip()
+                        else:
+                            # Fallback: find glue point where lowercase meets uppercase
+                            # with no space (e.g. "OfficerNew York" → "Officer")
+                            # WHY: LinkedIn renders separate divs that concatenate
+                            import re
+                            m = re.search(r'([a-z])([A-Z])', desig)
+                            if m and m.start() > 4:
+                                desig = desig[:m.start() + 1].strip()
+                        person['designation'] = desig
                         employees.append(person)
 
                 # Safety: stop early if we found enough (don't search all roles)
@@ -1164,14 +1182,13 @@ class LinkedInEmployeeFinder:
                         }}
                     }}
 
-                    // Clean designation: remove junk from LinkedIn UI
-                    // Raw example: "• 3rd+Chief Technology Officer @ FreshfieldsFleet, EnglandMessage"
+                    // Basic cleanup only - Python does full cleaning with company name
                     headline = headline
                         .replace(/^[\\s•·\\-]+/, '')           // leading bullets/dots
                         .replace(/^\\d+(st|nd|rd|th)\\+?/i, '') // "3rd+" connection degree
-                        .replace(/Message$/i, '')              // trailing "Message" button text
-                        .replace(/Connect$/i, '')              // trailing "Connect" button text
-                        .replace(/Follow$/i, '')               // trailing "Follow" button text
+                        .replace(/Message$/i, '')              // trailing button text
+                        .replace(/Connect$/i, '')
+                        .replace(/Follow$/i, '')
                         .trim();
 
                     seen.add(href);
