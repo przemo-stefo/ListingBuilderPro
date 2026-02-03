@@ -845,13 +845,37 @@ class LinkedInEmployeeFinder:
     - Searches by role+company so we get targeted results
     - Returns data in same format as Apify (name, designation, link)
 
+    Safety measures (from proven linkedin_find_prospects.py):
+    - Conservative daily search limit (max 30 searches/day)
+    - Human-like delays (5-15s between searches, not 2-4s)
+    - Random scrolling before parsing results
+    - Checkpoint/2FA detection during searches
+    - Session health monitoring between searches
+    - Debug screenshots on search failures
+
     Requires one-time setup: run --setup-cookies to login and save session.
     """
+
+    # Safety: max searches per day to avoid LinkedIn ban
+    DAILY_SEARCH_LIMIT = 30
+    # Safety: max roles to search per company (subset of EMPLOYEE_SEARCH_ROLES)
+    MAX_ROLES_PER_COMPANY = 5
 
     def __init__(self, headless: bool = True):
         self.headless = headless
         self._playwright = None
         self._browser = None
+        self._searches_today = 0
+        self._search_date = None
+
+    def _check_daily_limit(self) -> bool:
+        """Check if we've exceeded daily search limit (safety)"""
+        from datetime import date
+        today = date.today()
+        if self._search_date != today:
+            self._search_date = today
+            self._searches_today = 0
+        return self._searches_today < self.DAILY_SEARCH_LIMIT
 
     async def _init_browser(self):
         """Initialize Playwright browser with anti-detection"""
@@ -867,47 +891,95 @@ class LinkedInEmployeeFinder:
                 '--disable-blink-features=AutomationControlled',
                 '--no-sandbox',
                 '--disable-dev-shm-usage',
+                '--disable-infobars',
+                '--window-size=1280,900',
             ]
         )
 
     async def _create_context(self):
         """Browser context with LinkedIn-appropriate settings"""
+        # Rotate user agents for more natural fingerprint
+        user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ]
+
         context = await self._browser.new_context(
             viewport={'width': 1280, 'height': 900},
-            user_agent=(
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
-                'AppleWebKit/537.36 (KHTML, like Gecko) '
-                'Chrome/131.0.0.0 Safari/537.36'
-            ),
+            user_agent=random.choice(user_agents),
             locale='en-US',
             timezone_id='Europe/Berlin',
         )
 
-        # Anti-detection overrides
+        # Anti-detection overrides (comprehensive)
         await context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-            window.chrome = {runtime: {}};
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en', 'de']});
+            window.chrome = {runtime: {}, loadTimes: function(){}, csi: function(){}};
+            // Hide automation indicators
+            delete window.__playwright;
+            delete window.__pw_manual;
         """)
 
         return context
 
+    async def _human_scroll(self, page):
+        """Simulate human-like scrolling (safety measure)"""
+        # Scroll down slowly like a human reading results
+        for _ in range(random.randint(2, 4)):
+            await page.evaluate(f"window.scrollBy(0, {random.randint(200, 400)})")
+            await asyncio.sleep(random.uniform(0.5, 1.5))
+        # Small pause after scrolling
+        await asyncio.sleep(random.uniform(1, 2))
+
+    async def _check_session_health(self, page) -> bool:
+        """Detect if LinkedIn challenged us (checkpoint, login, captcha)"""
+        url = page.url
+        if any(x in url for x in ['login', 'checkpoint', 'challenge', 'captcha']):
+            logger.warning(f"LinkedIn session issue detected: {url}")
+            return False
+        return True
+
     async def _login(self, page, context) -> bool:
-        """Login to LinkedIn using saved cookies"""
-        # Load cookies if available
+        """Login to LinkedIn using saved cookies or env variable"""
+        cookies_loaded = False
+
+        # Try cookies file first
         if os.path.exists(COOKIES_FILE):
             with open(COOKIES_FILE) as f:
                 cookies = json.load(f)
             await context.add_cookies(cookies)
-            logger.info("Loaded LinkedIn session cookies")
+            cookies_loaded = True
+            logger.info("Loaded LinkedIn cookies from file")
+
+        # Fallback: build cookie from env variable LINKEDIN_LI_AT
+        if not cookies_loaded:
+            li_at = os.environ.get('LINKEDIN_LI_AT', '')
+            if li_at:
+                await context.add_cookies([{
+                    "name": "li_at",
+                    "value": li_at,
+                    "domain": ".linkedin.com",
+                    "path": "/",
+                    "secure": True,
+                    "httpOnly": True,
+                    "sameSite": "None",
+                }])
+                cookies_loaded = True
+                logger.info("Loaded LinkedIn cookie from LINKEDIN_LI_AT env")
 
         await page.goto("https://www.linkedin.com/feed/")
         await asyncio.sleep(3)
 
         if "login" in page.url:
-            logger.warning(
-                "LinkedIn login required. Run: python pyrox_linkedin_scraper.py --setup-cookies"
-            )
+            if not cookies_loaded:
+                logger.warning(
+                    "LinkedIn login required. Set LINKEDIN_LI_AT env or run --setup-cookies"
+                )
+            else:
+                logger.warning("LinkedIn cookies expired. Get fresh li_at cookie.")
             return False
 
         # Refresh cookies for next time
@@ -926,6 +998,9 @@ class LinkedInEmployeeFinder:
         """
         Search LinkedIn for decision makers at a specific company.
 
+        Safety: respects daily search limit, uses human-like delays (5-15s),
+        monitors session health between searches, stops early if enough found.
+
         Args:
             company_name: Company name to search for
             max_per_role: Max results per role search (default 2)
@@ -934,6 +1009,14 @@ class LinkedInEmployeeFinder:
             List of employee dicts compatible with Apify format:
             [{"name": "...", "designation": "...", "link": "...", "company": "..."}]
         """
+        # Safety: check daily search limit
+        if not self._check_daily_limit():
+            logger.warning(
+                f"Daily search limit reached ({self.DAILY_SEARCH_LIMIT}). "
+                "Try again tomorrow to keep LinkedIn account safe."
+            )
+            return []
+
         await self._init_browser()
         context = await self._create_context()
         page = await context.new_page()
@@ -945,9 +1028,23 @@ class LinkedInEmployeeFinder:
             employees = []
             seen_urls = set()
 
-            for role in EMPLOYEE_SEARCH_ROLES:
+            # Safety: only search a subset of roles per company (not all 10)
+            roles_to_search = EMPLOYEE_SEARCH_ROLES[:self.MAX_ROLES_PER_COMPANY]
+
+            for i, role in enumerate(roles_to_search):
+                # Safety: recheck daily limit each iteration
+                if not self._check_daily_limit():
+                    logger.warning("Daily limit hit mid-search, stopping early.")
+                    break
+
+                # Safety: check session health before each search
+                if not await self._check_session_health(page):
+                    logger.warning("Session compromised, stopping search.")
+                    break
+
                 query = f"{role} {company_name}"
                 results = await self._search_people(page, query, max_results=max_per_role)
+                self._searches_today += 1
 
                 for person in results:
                     url = person.get('link', '')
@@ -956,10 +1053,19 @@ class LinkedInEmployeeFinder:
                         person['company'] = company_name
                         employees.append(person)
 
-                # Rate limiting between searches (avoid LinkedIn blocks)
-                await asyncio.sleep(random.uniform(2, 4))
+                # Safety: stop early if we found enough (don't search all roles)
+                if len(employees) >= 5:
+                    logger.info(f"Found {len(employees)} employees, stopping early.")
+                    break
 
-            logger.info(f"Found {len(employees)} employees at {company_name}")
+                # Safety: human-like delay between searches (5-15s, not 2-4s)
+                if i < len(roles_to_search) - 1:
+                    delay = random.uniform(5, 15)
+                    logger.info(f"  Safety delay: {delay:.1f}s before next search")
+                    await asyncio.sleep(delay)
+
+            logger.info(f"Found {len(employees)} employees at {company_name} "
+                        f"(searches today: {self._searches_today}/{self.DAILY_SEARCH_LIMIT})")
             return employees
 
         finally:
@@ -971,36 +1077,75 @@ class LinkedInEmployeeFinder:
         """
         Search LinkedIn people search for a query.
 
+        Safety: uses human-like scrolling, longer wait times, session checks.
+        Debug: saves screenshot on failure for troubleshooting.
+
         Returns list of: {name, designation, link, verified}
         Same format as Apify LinkedIn employees scraper output.
         """
         prospects = []
 
+        # URL-encode the query properly
+        from urllib.parse import quote
         search_url = (
             f"https://www.linkedin.com/search/results/people/"
-            f"?keywords={query.replace(' ', '%20')}"
+            f"?keywords={quote(query)}"
             f"&origin=GLOBAL_SEARCH_HEADER"
         )
 
         logger.info(f"Searching: {query}")
-        await page.goto(search_url)
-        await asyncio.sleep(random.uniform(3, 5))
+        await page.goto(search_url, wait_until='domcontentloaded')
+        # Safety: wait for page to fully render (human-like)
+        await asyncio.sleep(random.uniform(4, 7))
 
-        # Wait for results to load
-        try:
-            await page.wait_for_selector(
-                '.reusable-search__result-container', timeout=10000
+        # Safety: check if LinkedIn redirected us (login/checkpoint)
+        if not await self._check_session_health(page):
+            logger.warning("Session lost during search, aborting.")
+            return prospects
+
+        # Safety: scroll like a human before parsing
+        await self._human_scroll(page)
+
+        # Try multiple CSS selectors (LinkedIn updates these periodically)
+        selectors = [
+            '.reusable-search__result-container',
+            'li.reusable-search__result-container',
+            '.search-results-container li',
+            '[data-chameleon-result-urn]',
+            '.entity-result',
+        ]
+
+        results = []
+        for sel in selectors:
+            try:
+                await page.wait_for_selector(sel, timeout=8000)
+                results = await page.query_selector_all(sel)
+                if results:
+                    logger.info(f"  Found {len(results)} results with selector: {sel}")
+                    break
+            except Exception:
+                continue
+
+        if not results:
+            # Debug: save screenshot to understand what went wrong
+            debug_path = os.path.join(
+                os.path.dirname(__file__), "debug_search.png"
             )
-        except Exception:
+            try:
+                await page.screenshot(path=debug_path)
+                logger.info(f"  Debug screenshot saved: {debug_path}")
+            except Exception:
+                pass
             logger.info(f"No results for: {query}")
             return prospects
 
-        results = await page.query_selector_all('.reusable-search__result-container')
-
         for result in results[:max_results]:
             try:
-                # Get profile link
-                link_elem = await result.query_selector('a.app-aware-link')
+                # Try multiple link selectors
+                link_elem = (
+                    await result.query_selector('a.app-aware-link[href*="/in/"]')
+                    or await result.query_selector('a[href*="/in/"]')
+                )
                 if not link_elem:
                     continue
 
@@ -1010,19 +1155,35 @@ class LinkedInEmployeeFinder:
 
                 profile_url = href.split('?')[0]
 
-                # Get name
-                name_elem = await result.query_selector('span[aria-hidden="true"]')
-                name = await name_elem.inner_text() if name_elem else ""
+                # Get name - try multiple selectors
+                name = ""
+                for name_sel in [
+                    'span[aria-hidden="true"]',
+                    '.entity-result__title-text a span',
+                    '.entity-result__title-text span',
+                ]:
+                    name_elem = await result.query_selector(name_sel)
+                    if name_elem:
+                        name = await name_elem.inner_text()
+                        if name and "LinkedIn Member" not in name:
+                            break
 
                 # Skip private profiles
                 if not name or "LinkedIn Member" in name:
                     continue
 
                 # Get headline (becomes designation)
-                headline_elem = await result.query_selector(
-                    '.entity-result__primary-subtitle'
-                )
-                headline = await headline_elem.inner_text() if headline_elem else ""
+                headline = ""
+                for hl_sel in [
+                    '.entity-result__primary-subtitle',
+                    '.entity-result__summary',
+                    '.search-result__truncate',
+                ]:
+                    headline_elem = await result.query_selector(hl_sel)
+                    if headline_elem:
+                        headline = await headline_elem.inner_text()
+                        if headline:
+                            break
 
                 prospects.append({
                     "name": name.strip(),
@@ -1174,11 +1335,12 @@ async def run_webhook_server(host: str = "0.0.0.0", port: int = 8765):
                     {"error": "company_name required"}, status=400
                 )
 
-            # Check if cookies exist (required for LinkedIn login)
-            if not os.path.exists(COOKIES_FILE):
+            # Check if cookies exist (file or env)
+            has_cookies = os.path.exists(COOKIES_FILE) or bool(os.environ.get('LINKEDIN_LI_AT'))
+            if not has_cookies:
                 return web.json_response({
                     "error": "LinkedIn cookies not configured. "
-                             "Run: python pyrox_linkedin_scraper.py --setup-cookies"
+                             "Set LINKEDIN_LI_AT env or run --setup-cookies"
                 }, status=503)
 
             employees = await employee_finder.find_employees(company_name)
@@ -1190,7 +1352,7 @@ async def run_webhook_server(host: str = "0.0.0.0", port: int = 8765):
             return web.json_response({"error": str(e)}, status=500)
 
     async def handle_health(request):
-        has_cookies = os.path.exists(COOKIES_FILE)
+        has_cookies = os.path.exists(COOKIES_FILE) or bool(os.environ.get('LINKEDIN_LI_AT'))
         return web.json_response({
             "status": "ok",
             "service": "pyrox-linkedin-scraper",
