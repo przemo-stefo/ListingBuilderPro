@@ -90,18 +90,91 @@ class AITranslator:
         self.model = "llama-3.3-70b-versatile"
 
     def _call_groq(self, prompt: str, max_tokens: int = 500, temperature: float = 0.3) -> str:
-        """Make a single Groq API call. Returns stripped text."""
+        """Make a single Groq API call. Returns stripped text.
+
+        WHY fallback model: Groq free tier has 100K TPD per model.
+        If the primary 70b model hits rate limit, we try the 8b model
+        which has its own separate limit.
+        """
+        models = [self.model, "llama-3.1-8b-instant"]
+        for model in models:
+            try:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str and model != models[-1]:
+                    logger.warning("groq_rate_limit_trying_fallback", model=model)
+                    continue
+                logger.error("groq_call_failed", error=error_str, model=model)
+                return ""
+        return ""
+
+    def _parse_json_response(self, text: str) -> Optional[Dict]:
+        """Extract and parse JSON from AI response.
+
+        WHY: Groq sometimes wraps JSON in markdown code blocks or adds text around it.
+        """
+        if not text:
+            return None
+
+        cleaned = text.strip()
+
+        # Strip markdown code block if present
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r'^```\w*\n?', '', cleaned)
+            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+            cleaned = cleaned.strip()
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            logger.error("groq_call_failed", error=str(e))
-            return ""
+            data = json.loads(cleaned)
+            if isinstance(data, dict) and data.get("title_de"):
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        # WHY: Model sometimes adds explanation text before/after the JSON
+        brace_start = cleaned.find("{")
+        brace_end = cleaned.rfind("}")
+        if brace_start != -1 and brace_end > brace_start:
+            try:
+                data = json.loads(cleaned[brace_start:brace_end + 1])
+                if isinstance(data, dict) and data.get("title_de"):
+                    return data
+            except json.JSONDecodeError:
+                pass
+
+        return None
+
+    def _fallback_individual(
+        self, title: str, description: str, parameters: Dict, marketplace: str
+    ) -> Dict:
+        """Fall back to individual API calls when batch JSON parsing fails.
+
+        WHY: Individual methods have simpler prompts that are more reliable,
+        at the cost of multiple API calls instead of one.
+        """
+        output = {
+            "title_de": self.translate_title(title, marketplace, parameters.get("Marka", "")),
+            "description_de": self.translate_description(description, marketplace),
+            "short_description_de": "",
+        }
+
+        if marketplace == "amazon":
+            output["bullet_points"] = self.generate_bullet_points(title, description, parameters)
+            output["search_keywords"] = self.generate_search_keywords(title, description, parameters)
+
+        color_de = translate_color(parameters.get("Kolor", ""))
+        material_de = translate_material(parameters.get("Materiał", ""))
+        output["color_de"] = color_de or self.translate_value(parameters.get("Kolor", ""), "color")
+        output["material_de"] = material_de or self.translate_value(parameters.get("Materiał", ""), "material")
+
+        return output
 
     def translate_title(
         self, title_pl: str, marketplace: str, brand: str = "", category: str = ""
@@ -260,104 +333,82 @@ Return ONLY the German translation, one word or short phrase."""
         parameters: Dict,
         marketplace: str,
     ) -> Dict:
-        """Translate all AI-dependent fields for one product in a single batch.
+        """Translate all AI-dependent fields in a single batch call.
 
-        Combines multiple translations into fewer API calls by sending
-        one comprehensive prompt. More efficient than calling translate_title,
-        translate_description, etc. separately.
+        WHY JSON format: The old numbered format ("1. TITLE:") caused Groq to
+        return German label translations ("Titel:") instead of actual content.
+        JSON keys are unambiguous — the model fills in values, not translates labels.
 
-        Returns dict with all translated fields ready for template insertion.
+        Falls back to individual API calls if JSON parsing fails.
         """
         plain_desc = strip_html(description) if description else ""
         params_text = json.dumps(parameters, ensure_ascii=False) if parameters else "{}"
 
-        # Try static lookups first
+        # Static lookups first (zero latency, zero cost)
         color_de = translate_color(parameters.get("Kolor", ""))
         material_de = translate_material(parameters.get("Materiał", ""))
 
         limits = {"amazon": 200, "ebay": 80, "kaufland": 120}
         max_title = limits.get(marketplace, 150)
 
-        # Build batch prompt — one API call for title + description + keywords
-        sections = f"""Translate this Polish product listing to German for {marketplace.upper()}.
+        # Build JSON template showing expected output structure
+        json_keys = {
+            "title_de": f"German SEO title, max {max_title} chars",
+            "description_de": f"German description, max 2000 chars, {'plaintext only' if marketplace == 'amazon' else 'HTML allowed'}",
+            "short_description_de": "German one-sentence summary, max 200 chars",
+        }
 
-=== PRODUCT DATA (Polish) ===
+        if marketplace == "amazon":
+            for i in range(1, 6):
+                json_keys[f"bullet_{i}"] = f"German bullet point {i}, key feature, max 500 chars"
+            json_keys["search_keywords"] = "German keywords, lowercase, space-separated, max 250 bytes"
+
+        if not color_de and parameters.get("Kolor"):
+            json_keys["color_de"] = f"German translation of '{parameters['Kolor']}'"
+        if not material_de and parameters.get("Materiał"):
+            json_keys["material_de"] = f"German translation of '{parameters['Materiał']}'"
+
+        prompt = f"""You are a professional Polish-to-German e-commerce translator.
+
+TASK: Translate the Polish product below into German for {marketplace.upper()}.
+Return ONLY a valid JSON object. No markdown, no explanation, no code blocks.
+
+=== PRODUCT (Polish) ===
 Title: {title}
 Description: {plain_desc[:2000]}
 Parameters: {params_text[:500]}
 
-=== GENERATE (in German) ===
+=== REQUIRED OUTPUT ===
+Replace each placeholder with actual German product content:
+{json.dumps(json_keys, indent=2, ensure_ascii=False)}
 
-1. TITLE (max {max_title} chars, SEO-optimized for {marketplace}):
-2. DESCRIPTION (max 2000 chars, {'plaintext for Amazon' if marketplace == 'amazon' else 'HTML ok'}):
-3. SHORT_DESCRIPTION (max 200 chars, one-sentence summary):"""
+CRITICAL: Fill every value with REAL German content about THIS specific product. Do NOT return the placeholder descriptions."""
 
-        if marketplace == "amazon":
-            sections += """
-4. BULLET_1:
-5. BULLET_2:
-6. BULLET_3:
-7. BULLET_4:
-8. BULLET_5:
-9. SEARCH_KEYWORDS (max 250 bytes, lowercase, spaces between words):"""
+        raw = self._call_groq(prompt, max_tokens=1500, temperature=0.3)
+        parsed = self._parse_json_response(raw)
 
-        if not color_de and parameters.get("Kolor"):
-            sections += f"\n10. COLOR_DE (translate '{parameters['Kolor']}'):"
-        if not material_de and parameters.get("Materiał"):
-            sections += f"\n11. MATERIAL_DE (translate '{parameters['Materiał']}'):"
-
-        sections += "\n\nReturn ONLY the numbered answers. No explanations."
-
-        result = self._call_groq(sections, max_tokens=1500, temperature=0.3)
-
-        # Parse the numbered response
-        parsed = self._parse_batch_response(result)
+        if not parsed:
+            logger.warning("batch_json_failed_using_fallback", marketplace=marketplace)
+            return self._fallback_individual(title, description, parameters, marketplace)
 
         output = {
-            "title_de": (parsed.get("1", "") or "")[:max_title],
-            "description_de": parsed.get("2", ""),
-            "short_description_de": parsed.get("3", ""),
+            "title_de": (parsed.get("title_de", "") or "")[:max_title],
+            "description_de": parsed.get("description_de", ""),
+            "short_description_de": parsed.get("short_description_de", ""),
         }
 
         if marketplace == "amazon":
             output["bullet_points"] = [
-                parsed.get("4", ""),
-                parsed.get("5", ""),
-                parsed.get("6", ""),
-                parsed.get("7", ""),
-                parsed.get("8", ""),
+                parsed.get("bullet_1", ""),
+                parsed.get("bullet_2", ""),
+                parsed.get("bullet_3", ""),
+                parsed.get("bullet_4", ""),
+                parsed.get("bullet_5", ""),
             ]
-            output["search_keywords"] = parsed.get("9", "")
+            output["search_keywords"] = parsed.get("search_keywords", "")
 
-        # Use static lookup or AI result for color/material
-        output["color_de"] = color_de or parsed.get("10", parameters.get("Kolor", ""))
-        output["material_de"] = material_de or parsed.get("11", parameters.get("Materiał", ""))
+        output["color_de"] = color_de or parsed.get("color_de", parameters.get("Kolor", ""))
+        output["material_de"] = material_de or parsed.get("material_de", parameters.get("Materiał", ""))
 
         return output
 
-    def _parse_batch_response(self, text: str) -> Dict[str, str]:
-        """Parse numbered response from batch translation prompt."""
-        result = {}
-        if not text:
-            return result
-
-        # Match patterns like "1. content" or "1: content"
-        current_num = None
-        current_lines = []
-
-        for line in text.split("\n"):
-            match = re.match(r'^(\d+)[.):]\s*(.*)', line)
-            if match:
-                # Save previous section
-                if current_num is not None:
-                    result[current_num] = "\n".join(current_lines).strip()
-                current_num = match.group(1)
-                current_lines = [match.group(2)]
-            elif current_num is not None:
-                current_lines.append(line)
-
-        # Save last section
-        if current_num is not None:
-            result[current_num] = "\n".join(current_lines).strip()
-
-        return result
