@@ -16,8 +16,10 @@ import {
   Warehouse,
   BarChart3,
   Upload,
+  ArrowRightLeft,
   Sparkles,
   Send,
+  Shield,
   Settings
 } from 'lucide-react'
 
@@ -63,6 +65,11 @@ const navItems = [
     icon: Upload,
   },
   {
+    title: 'Converter',
+    href: '/converter',
+    icon: ArrowRightLeft,
+  },
+  {
     title: 'Optimize',
     href: '/optimize',
     icon: Sparkles,
@@ -71,6 +78,11 @@ const navItems = [
     title: 'Publish',
     href: '/publish',
     icon: Send,
+  },
+  {
+    title: 'Compliance',
+    href: '/compliance',
+    icon: Shield,
   },
   {
     title: 'Settings',

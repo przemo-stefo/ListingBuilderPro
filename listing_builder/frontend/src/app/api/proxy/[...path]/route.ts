@@ -17,9 +17,13 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
     if (key !== '_t') url.searchParams.set(key, value)
   })
 
+  // WHY: Multipart requests (file uploads) need the original Content-Type with boundary string
+  const incomingContentType = request.headers.get('Content-Type') || ''
+  const isMultipart = incomingContentType.startsWith('multipart/form-data')
+
   // Build headers — inject API key server-side
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    'Content-Type': isMultipart ? incomingContentType : 'application/json',
     'X-API-Key': API_KEY,
   }
 
@@ -30,10 +34,13 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   }
 
   // Forward request body for non-GET methods
-  let body: string | undefined
+  // WHY: Multipart bodies must stay as raw bytes — text() would corrupt binary file data
+  let body: BodyInit | undefined
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
-      body = await request.text()
+      body = isMultipart
+        ? new Uint8Array(await request.arrayBuffer())
+        : await request.text()
     } catch {
       // No body — that's fine
     }
@@ -46,13 +53,22 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
       body,
     })
 
-    const data = await response.text()
+    // WHY: Use arrayBuffer for binary responses (file downloads), text for JSON
+    const contentDisposition = response.headers.get('Content-Disposition')
+    const responseHeaders: Record<string, string> = {
+      'Content-Type': response.headers.get('Content-Type') || 'application/json',
+    }
+    if (contentDisposition) {
+      responseHeaders['Content-Disposition'] = contentDisposition
+    }
+
+    const data = contentDisposition
+      ? Buffer.from(await response.arrayBuffer())
+      : await response.text()
 
     return new NextResponse(data, {
       status: response.status,
-      headers: {
-        'Content-Type': response.headers.get('Content-Type') || 'application/json',
-      },
+      headers: responseHeaders,
     })
   } catch (error) {
     return NextResponse.json(
