@@ -1,0 +1,2133 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listing Builder Pro | Multi-Marketplace Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #1f2937;
+            min-height: 100vh;
+        }
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 28px 20px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            color: #111827;
+        }
+        .header h1 span { color: #2563eb; }
+        .header p { color: #6b7280; font-size: 15px; }
+
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 24px;
+        }
+        @media (max-width: 1000px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .panel-title {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 24px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .panel-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #2563eb;
+            border-radius: 2px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            font-size: 12px;
+            color: #374151;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            color: #111827;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            background: #ffffff;
+        }
+        input::placeholder, textarea::placeholder {
+            color: #9ca3af;
+        }
+        textarea {
+            min-height: 100px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 13px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        @media (max-width: 500px) {
+            .checkbox-group { grid-template-columns: repeat(2, 1fr); }
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .checkbox-item:hover {
+            border-color: #9ca3af;
+            background: #f3f4f6;
+        }
+        .checkbox-item.selected {
+            background: rgba(37, 99, 235, 0.08);
+            border-color: #2563eb;
+        }
+        .checkbox-item input { display: none; }
+        .checkbox-item span { font-size: 13px; font-weight: 500; color: #374151; }
+
+        .btn {
+            width: 100%;
+            padding: 16px 24px;
+            background: #2563eb;
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .btn:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        .btn.loading .spinner { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-bar {
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-bar::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-bar.loading {
+            display: flex;
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .status-bar.loading::before {
+            background: #fbbf24;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .status-bar.success {
+            display: flex;
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .status-bar.success::before { background: #4ade80; }
+        .status-bar.error {
+            display: flex;
+            background: rgba(248, 113, 113, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+        .status-bar.error::before { background: #f87171; }
+
+        .results-container { display: none; }
+        .results-container.visible { display: block; }
+
+        .marketplace-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 6px;
+            background: #f3f4f6;
+            border-radius: 12px;
+        }
+        .tab-btn {
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: #374151; background: #e5e7eb; }
+        .tab-btn.active {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .result-section {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            background: #f3f4f6;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .result-header h3 {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 600;
+        }
+        .result-header .badge {
+            font-size: 11px;
+            padding: 5px 10px;
+            background: #e5e7eb;
+            border-radius: 6px;
+            color: #6b7280;
+            margin-right: 10px;
+        }
+        .result-content {
+            padding: 18px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 320px;
+            overflow-y: auto;
+            color: #1f2937;
+            background: #ffffff;
+        }
+        .result-content.bullets { white-space: normal; }
+        .result-content .bullet {
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+            position: relative;
+            padding-left: 18px;
+        }
+        .result-content .bullet::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background: #2563eb;
+            border-radius: 50%;
+        }
+        .result-content .bullet:last-child { border-bottom: none; }
+
+        .copy-btn {
+            padding: 7px 14px;
+            background: transparent;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+        .copy-btn.copied {
+            background: #10b981;
+            border-color: #10b981;
+            color: #fff;
+        }
+
+        .coverage-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .coverage-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .coverage-badge.high {
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .coverage-badge.high::before { background: #4ade80; }
+        .coverage-badge.medium {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .coverage-badge.medium::before { background: #fbbf24; }
+        .coverage-badge.low {
+            background: rgba(248, 113, 113, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+        .coverage-badge.low::before { background: #f87171; }
+
+        .endpoint-info {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f3f4f6; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state-text { font-size: 14px; }
+
+        /* Main Navigation */
+        .main-nav {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .main-nav-btn {
+            padding: 12px 24px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .main-nav-btn:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .main-nav-btn.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+
+        /* View containers */
+        .view-container { display: none; }
+        .view-container.active { display: block; }
+
+        /* Review Analyzer specific styles */
+        .health-score {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 24px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .health-score-value {
+            font-size: 48px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .health-score-value.good { color: #10b981; }
+        .health-score-value.medium { color: #fbbf24; }
+        .health-score-value.bad { color: #ef4444; }
+        .health-score-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .health-details {
+            flex: 1;
+        }
+        .health-details-row {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+        .health-stat {
+            font-size: 13px;
+            color: #374151;
+        }
+        .health-stat span {
+            font-weight: 600;
+        }
+
+        .sentiment-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .sentiment-positive { background: #10b981; }
+        .sentiment-neutral { background: #6b7280; }
+        .sentiment-negative { background: #ef4444; }
+
+        /* V3: Authenticity Score */
+        .authenticity-section {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .authenticity-score {
+            text-align: center;
+            min-width: 80px;
+        }
+        .authenticity-value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+        .authenticity-value.high { color: #10b981; }
+        .authenticity-value.medium { color: #f59e0b; }
+        .authenticity-value.low { color: #ef4444; }
+        .authenticity-label {
+            font-size: 10px;
+            color: #0369a1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .authenticity-details {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+        }
+        .authenticity-stat {
+            font-size: 12px;
+            color: #374151;
+        }
+        .authenticity-stat span { font-weight: 600; }
+        .suspicious-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #fef2f2;
+            color: #dc2626;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+        .verified-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #d1fae5;
+            color: #059669;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+
+        /* V3: Competitor Intelligence */
+        .competitors-section {
+            padding: 16px;
+            background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);
+            border: 1px solid #e879f9;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .competitors-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #86198f;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .competitor-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .competitor-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9d5ff;
+        }
+        .competitor-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #7c3aed;
+            text-transform: capitalize;
+        }
+        .competitor-mentions {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        /* V3: Trend Analysis */
+        .trends-section {
+            padding: 16px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .trends-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .trends-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 60px;
+            padding: 8px 0;
+        }
+        .trend-bar {
+            flex: 1;
+            min-width: 30px;
+            background: linear-gradient(to top, #3b82f6, #60a5fa);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .trend-bar:hover {
+            background: linear-gradient(to top, #2563eb, #3b82f6);
+        }
+        .trend-bar::after {
+            content: attr(data-label);
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: #9ca3af;
+            white-space: nowrap;
+        }
+        .trend-bar.negative {
+            background: linear-gradient(to top, #ef4444, #f87171);
+        }
+
+        /* V3: Priority badges on insights */
+        .insight-priority {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 9px;
+            font-weight: 600;
+            border-radius: 3px;
+            margin-left: 8px;
+            text-transform: uppercase;
+        }
+        .insight-priority.p1 { background: #fef2f2; color: #dc2626; }
+        .insight-priority.p2 { background: #fff7ed; color: #ea580c; }
+        .insight-priority.p3 { background: #fefce8; color: #ca8a04; }
+        .insight-priority.p4 { background: #f0fdf4; color: #16a34a; }
+        .insight-priority.p5 { background: #f0f9ff; color: #0284c7; }
+
+        /* V3: Review authenticity indicator */
+        .review-auth-score {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .review-auth-score.suspicious {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        .review-auth-score.trusted {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .issues-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .issue-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+        .issue-name {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+        .issue-count {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+        }
+        .issue-pct {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .alerts-container {
+            margin-bottom: 20px;
+        }
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            color: #dc2626;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .alert-item::before {
+            content: '⚠️';
+        }
+
+        .reviews-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .review-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .review-rating {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .review-sentiment {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .review-sentiment.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+        .review-sentiment.neutral {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+        }
+        .review-sentiment.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+        .review-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #111827;
+        }
+        .review-excerpt {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+        .review-issues {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .review-issue-tag {
+            font-size: 10px;
+            padding: 3px 8px;
+            background: #fee2e2;
+            color: #dc2626;
+            border-radius: 4px;
+        }
+
+        /* Insights */
+        .insights-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .insight-item.warning {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            color: #b45309;
+        }
+        .insight-item.action {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            color: #1d4ed8;
+        }
+        .insight-item.critical {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #dc2626;
+        }
+        .insight-item.opportunity {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #059669;
+        }
+        .insight-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .insight-category {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        /* Issue priority */
+        .issue-priority {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+        .issue-priority.critical { background: #fee2e2; color: #dc2626; }
+        .issue-priority.high { background: #fef3c7; color: #b45309; }
+        .issue-priority.medium { background: #e0e7ff; color: #4338ca; }
+
+        /* Positive card */
+        .positive-card {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .positive-card .issue-count { color: #059669; }
+
+        /* Severity badge */
+        .severity-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .severity-badge.critical { background: #fee2e2; color: #dc2626; }
+        .severity-badge.moderate { background: #fef3c7; color: #b45309; }
+        .severity-badge.minor { background: #d1fae5; color: #059669; }
+
+        @media (max-width: 800px) {
+            #reviewResultsContainer > div[style*="grid-template-columns: 1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        /* Description & FAQ Sections */
+        .info-section {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            padding: 20px 24px;
+            font-weight: 600;
+            color: #1f2937;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .faq-question:hover {
+            background: #f9fafb;
+        }
+
+        .faq-question::after {
+            content: '+';
+            font-size: 24px;
+            color: #3b82f6;
+            font-weight: 300;
+            transition: transform 0.2s;
+        }
+
+        .faq-item.active .faq-question::after {
+            transform: rotate(45deg);
+        }
+
+        .faq-answer {
+            padding: 0 24px;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .faq-item.active .faq-answer {
+            padding: 0 24px 20px;
+            max-height: 500px;
+        }
+
+        .faq-answer p {
+            color: #6b7280;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .faq-answer ul {
+            margin: 10px 0;
+            padding-left: 20px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .faq-answer li {
+            margin-bottom: 6px;
+        }
+
+        .tools-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        @media (max-width: 700px) {
+            .tools-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tool-box {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
+            padding: 28px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .tool-box h3 {
+            font-size: 20px;
+            color: #1e40af;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tool-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tool-box li {
+            padding: 8px 0;
+            color: #475569;
+            font-size: 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .tool-box li::before {
+            content: '✓';
+            color: #22c55e;
+            font-weight: bold;
+        }
+
+        .footer-info {
+            text-align: center;
+            padding: 40px 20px;
+            color: #9ca3af;
+            font-size: 13px;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Listing<span>Builder</span>Pro</h1>
+        <p>Generate optimized listings for 9 marketplaces in seconds</p>
+        <div class="main-nav" style="margin-top: 20px;">
+            <button class="main-nav-btn active" data-view="listing" onclick="switchView('listing')">📝 Listing Generator</button>
+            <button class="main-nav-btn" data-view="reviews" onclick="switchView('reviews')">⭐ Review Analyzer</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- LISTING GENERATOR VIEW -->
+        <div id="listingView" class="view-container active">
+        <div class="grid">
+            <!-- Input Panel -->
+            <div class="panel">
+                <div class="panel-title">Dane produktu</div>
+
+                <div class="form-group">
+                    <label>Nazwa produktu / Tytuł</label>
+                    <input type="text" id="title" placeholder="np. Bamboo Cutting Board Set with Juice Groove">
+                </div>
+
+                <div class="form-group">
+                    <label>Marka</label>
+                    <input type="text" id="brand" placeholder="np. PREMIUM HOME">
+                </div>
+
+                <div class="form-group">
+                    <label>Kategoria</label>
+                    <input type="text" id="category" placeholder="np. Kitchen & Dining">
+                </div>
+
+                <div class="form-group">
+                    <label>Opis produktu / Cechy</label>
+                    <textarea id="description" placeholder="Opisz produkt, jego cechy, materiały, wymiary..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Słowa kluczowe (wklej CSV lub jedno na linię)</label>
+                    <textarea id="keywords" placeholder="Wklej eksport z Helium 10, Jungle Scout lub Data Dive
+lub wpisz słowa kluczowe, każde w nowej linii:
+
+bamboo cutting board
+cutting board set
+wood chopping board"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Marketplaces</label>
+                    <div class="checkbox-group" id="marketplaces">
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="amazon_us" checked>
+                            <span>🇺🇸 Amazon US</span>
+                        </label>
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="amazon_de" checked>
+                            <span>🇩🇪 Amazon DE</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_uk">
+                            <span>🇬🇧 Amazon UK</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_fr">
+                            <span>🇫🇷 Amazon FR</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_it">
+                            <span>🇮🇹 Amazon IT</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="amazon_es">
+                            <span>🇪🇸 Amazon ES</span>
+                        </label>
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="ebay" checked>
+                            <span>🛒 eBay</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="etsy">
+                            <span>🎨 Etsy</span>
+                        </label>
+                        <label class="checkbox-item selected">
+                            <input type="checkbox" value="allegro" checked>
+                            <span>🇵🇱 Allegro</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn" id="generateBtn" onclick="generate()">
+                    <span id="btnText">Generate Listings</span>
+                    <div class="spinner"></div>
+                </button>
+
+                <div class="endpoint-info">
+                    API: n8n-listing.automatyzacja-ai.pl
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="panel">
+                <div class="panel-title">Wyniki</div>
+
+                <div id="status" class="status-bar"></div>
+
+                <div id="resultsContainer" class="results-container">
+                    <div id="coverage" class="coverage-badge"></div>
+
+                    <div class="marketplace-tabs" id="tabs"></div>
+
+                    <div id="results"></div>
+                </div>
+            </div>
+        </div>
+        </div><!-- END LISTING VIEW -->
+
+        <!-- REVIEW ANALYZER VIEW -->
+        <div id="reviewsView" class="view-container">
+        <div class="grid">
+            <!-- Review Input Panel -->
+            <div class="panel">
+                <div class="panel-title">Review Analyzer</div>
+
+                <div class="form-group">
+                    <label>ASIN (opcjonalne)</label>
+                    <input type="text" id="reviewAsin" placeholder="np. B0XXXXXXXXX">
+                </div>
+
+                <div class="form-group">
+                    <label>Nazwa produktu (opcjonalne)</label>
+                    <input type="text" id="reviewProductName" placeholder="np. Wireless Bluetooth Headphones">
+                </div>
+
+                <div class="form-group">
+                    <label>Recenzje (JSON lub tekst)</label>
+                    <textarea id="reviewsInput" style="min-height: 200px;" placeholder='Wklej recenzje w formacie JSON:
+[
+  {"rating": 5, "title": "Great product!", "text": "Love this item..."},
+  {"rating": 2, "title": "Disappointed", "text": "Quality was poor..."}
+]
+
+Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
+                </div>
+
+                <button class="btn" id="analyzeBtn" onclick="analyzeReviews()">
+                    <span id="analyzeBtnText">Analyze Reviews</span>
+                    <div class="spinner"></div>
+                </button>
+
+                <div class="endpoint-info">
+                    API: n8n-listing.automatyzacja-ai.pl (v3)
+                </div>
+            </div>
+
+            <!-- Review Results Panel -->
+            <div class="panel">
+                <div class="panel-title">Analiza <span style="font-size:10px;background:#3b82f6;color:white;padding:2px 6px;border-radius:4px;margin-left:8px;">v3</span></div>
+
+                <div id="reviewStatus" class="status-bar"></div>
+
+                <div id="reviewResultsContainer" class="results-container">
+                    <!-- Health Score -->
+                    <div id="healthScore" class="health-score"></div>
+
+                    <!-- Sentiment Bar -->
+                    <div id="sentimentBar" class="sentiment-bar"></div>
+
+                    <!-- V3: Authenticity Section -->
+                    <div id="authenticitySection" class="authenticity-section" style="display:none;">
+                        <div class="authenticity-score">
+                            <div id="authValue" class="authenticity-value">-</div>
+                            <div class="authenticity-label">Verified %</div>
+                        </div>
+                        <div class="authenticity-details">
+                            <div class="authenticity-stat">Verified Purchases: <span id="verifiedCount">-</span></div>
+                            <div class="authenticity-stat">Suspicious Reviews: <span id="suspiciousCount">-</span></div>
+                        </div>
+                    </div>
+
+                    <!-- V3: Competitor Intelligence -->
+                    <div id="competitorSection" class="competitors-section" style="display:none;">
+                        <div class="competitors-title">🎯 Competitor Intelligence</div>
+                        <div id="competitorList" class="competitor-list"></div>
+                    </div>
+
+                    <!-- V3: Trend Analysis -->
+                    <div id="trendsSection" class="trends-section" style="display:none;">
+                        <div class="trends-title">📈 Review Trends (Last 6 months)</div>
+                        <div id="trendsChart" class="trends-chart"></div>
+                    </div>
+
+                    <!-- Actionable Insights -->
+                    <div id="insightsContainer" class="insights-container" style="margin-bottom: 20px;"></div>
+
+                    <!-- Top Issues & Positives Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <div class="panel-title" style="margin-bottom: 12px;">Top Issues</div>
+                            <div id="issuesGrid" class="issues-grid" style="grid-template-columns: 1fr;"></div>
+                        </div>
+                        <div>
+                            <div class="panel-title" style="margin-bottom: 12px;">Strengths</div>
+                            <div id="positivesGrid" class="issues-grid" style="grid-template-columns: 1fr;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Critical Reviews -->
+                    <div id="criticalSection" style="margin-bottom: 20px;">
+                        <div class="panel-title" style="margin-bottom: 12px;">Critical Reviews (Need Attention)</div>
+                        <div id="criticalList" class="reviews-list"></div>
+                    </div>
+
+                    <!-- All Reviews -->
+                    <div>
+                        <div class="panel-title" style="margin-bottom: 12px;">All Analyzed Reviews</div>
+                        <div id="reviewsList" class="reviews-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div><!-- END REVIEW VIEW -->
+    </div>
+
+    <!-- DESCRIPTION SECTION -->
+    <div class="info-section">
+        <h2 class="section-title">Jak to działa?</h2>
+
+        <div class="tools-comparison">
+            <div class="tool-box">
+                <h3>📝 Listing Generator</h3>
+                <ul>
+                    <li>Wpisz dane produktu (tytuł, marka, opis, słowa kluczowe)</li>
+                    <li>Wybierz marketplace'y (Amazon US/DE/UK/FR/IT/ES, eBay, Etsy, Allegro)</li>
+                    <li>Kliknij "Generate Listings"</li>
+                    <li>AI wygeneruje zoptymalizowane listingi z tłumaczeniami</li>
+                    <li>Skopiuj tytuł, bullets i opis jednym kliknięciem</li>
+                </ul>
+            </div>
+            <div class="tool-box">
+                <h3>⭐ Review Analyzer v3</h3>
+                <ul>
+                    <li>Wklej recenzje w formacie JSON lub tekst</li>
+                    <li>Kliknij "Analyze Reviews"</li>
+                    <li>Otrzymasz Health Score, analizę sentymentu i priorytety</li>
+                    <li>Zobacz Competitor Intelligence - z czym klienci porównują</li>
+                    <li>Sprawdź Trend Analysis - jak zmieniają się recenzje w czasie</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2 class="section-title">Główne funkcje</h2>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <div class="feature-title">9 Marketplace'ów</div>
+                <div class="feature-desc">Generuj listingi dla Amazon (6 rynków), eBay, Etsy i Allegro. Automatyczne tłumaczenia na język docelowy.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <div class="feature-title">AI-Powered</div>
+                <div class="feature-desc">Wykorzystujemy Groq AI do generowania tytułów, bullet pointów i opisów zoptymalizowanych pod SEO.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Health Score</div>
+                <div class="feature-desc">Natychmiastowa ocena kondycji produktu na podstawie recenzji. Skala 0-100 z kolorowym wskaźnikiem.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <div class="feature-title">Competitor Intelligence</div>
+                <div class="feature-desc">Dowiedz się z jakimi produktami klienci porównują Twój produkt. Analizuj przewagi konkurencyjne.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <div class="feature-title">Trend Analysis</div>
+                <div class="feature-desc">Śledź jak zmieniają się recenzje w czasie. Wykrywaj problemy zanim wpłyną na sprzedaż.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚠️</div>
+                <div class="feature-title">Safety Alerts</div>
+                <div class="feature-desc">Automatyczne wykrywanie problemów bezpieczeństwa. Ochrona przed zawieszeniem ASIN.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ SECTION -->
+    <div class="info-section">
+        <h2 class="section-title">FAQ - Często zadawane pytania</h2>
+
+        <div class="faq-container">
+            <div class="faq-item">
+                <div class="faq-question">Jak wprowadzić słowa kluczowe?</div>
+                <div class="faq-answer">
+                    <p><strong>Obsługujemy eksport CSV!</strong> Możesz bezpośrednio wkleić eksport z:</p>
+                    <ul>
+                        <li><strong>Helium 10</strong> (Cerebro, Magnet) - skopiuj całą tabelę</li>
+                        <li><strong>Jungle Scout</strong> (Keyword Scout) - eksportuj CSV i wklej</li>
+                        <li><strong>Data Dive</strong> - eksportuj keywords i wklej</li>
+                    </ul>
+                    <p>System automatycznie:</p>
+                    <ul>
+                        <li>Rozpoznaje format CSV (nagłówki, kolumny)</li>
+                        <li>Wyciąga tylko słowa kluczowe (pomija Search Volume itp.)</li>
+                        <li>Usuwa duplikaty</li>
+                    </ul>
+                    <p>Możesz też wpisać ręcznie - jedno słowo kluczowe na linię. Najważniejsze na górze, max 50-100 słów.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Jak wybrać marketplace?</div>
+                <div class="faq-answer">
+                    <p>W sekcji "MARKETPLACES" kliknij na przyciski, aby wybrać lub odznaczyć marketplace'y. Niebieskie tło = wybrany. Możesz wybrać wiele naraz.</p>
+                    <ul>
+                        <li>🇺🇸 Amazon US - angielski</li>
+                        <li>🇩🇪 Amazon DE - niemiecki</li>
+                        <li>🇬🇧 Amazon UK - angielski (British)</li>
+                        <li>🇫🇷 Amazon FR - francuski</li>
+                        <li>🇮🇹 Amazon IT - włoski</li>
+                        <li>🇪🇸 Amazon ES - hiszpański</li>
+                        <li>🛒 eBay - angielski</li>
+                        <li>🎨 Etsy - angielski (kreatywny styl)</li>
+                        <li>🇵🇱 Allegro - polski</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">W jakim formacie wkleić recenzje?</div>
+                <div class="faq-answer">
+                    <p>Review Analyzer akceptuje format JSON. Każda recenzja powinna zawierać rating i text:</p>
+                    <ul>
+                        <li><strong>rating</strong> - ocena 1-5 (wymagane)</li>
+                        <li><strong>text</strong> - treść recenzji (wymagane)</li>
+                        <li><strong>title</strong> - tytuł recenzji (opcjonalnie)</li>
+                        <li><strong>verified_purchase</strong> - true/false (opcjonalnie)</li>
+                        <li><strong>date</strong> - data w formacie YYYY-MM-DD (opcjonalnie)</li>
+                    </ul>
+                    <p>Przykład: <code>[{"rating": 5, "text": "Great product!"}, {"rating": 2, "text": "Poor quality"}]</code></p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Co oznacza Health Score?</div>
+                <div class="faq-answer">
+                    <p>Health Score to ogólna ocena kondycji produktu na podstawie recenzji:</p>
+                    <ul>
+                        <li><strong>80-100</strong> - Doskonały produkt, niskie ryzyko</li>
+                        <li><strong>60-79</strong> - Dobry produkt, wymaga uwagi</li>
+                        <li><strong>40-59</strong> - Problematyczny, pilne działanie</li>
+                        <li><strong>0-39</strong> - Krytyczny, ryzyko zawieszenia</li>
+                    </ul>
+                    <p>Score uwzględnia: średnią ocenę, % negatywnych recenzji, problemy bezpieczeństwa, autentyczność recenzji.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Co to jest Competitor Intelligence?</div>
+                <div class="faq-answer">
+                    <p>Competitor Intelligence automatycznie wykrywa nazwy konkurencyjnych produktów w recenzjach. Gdy klienci piszą "lepszy niż AirPods" lub "gorszy od Sony", system to wyłapuje.</p>
+                    <ul>
+                        <li>Zobacz z czym klienci porównują Twój produkt</li>
+                        <li>Zidentyfikuj głównych konkurentów</li>
+                        <li>Wykorzystaj to w strategii marketingowej</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Jak działa Trend Analysis?</div>
+                <div class="faq-answer">
+                    <p>Trend Analysis pokazuje jak zmieniają się recenzje w czasie (ostatnie 6 miesięcy). Wymaga pola "date" w recenzjach.</p>
+                    <ul>
+                        <li>Wykres pokazuje liczbę recenzji i średnią ocenę miesięcznie</li>
+                        <li>Czerwone słupki = miesiące z problemami</li>
+                        <li>Zielone słupki = dobre miesiące</li>
+                        <li>Wykrywaj spadki jakości zanim wpłyną na ranking</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Co oznaczają priorytety URGENT/MEDIUM/LOW?</div>
+                <div class="faq-answer">
+                    <p>Insights są posortowane według priorytetu działania:</p>
+                    <ul>
+                        <li><strong>URGENT (czerwony)</strong> - Natychmiastowe działanie! Problemy bezpieczeństwa, wysoki % negatywnych, ryzyko zawieszenia</li>
+                        <li><strong>MEDIUM (żółty)</strong> - Ważne ale nie krytyczne. Okazje marketingowe, problemy jakościowe</li>
+                        <li><strong>LOW (szary)</strong> - Informacyjne. Intelligence o konkurencji, sugestie</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Czy mogę skopiować wygenerowany listing?</div>
+                <div class="faq-answer">
+                    <p>Tak! Przy każdej sekcji jest przycisk "Copy":</p>
+                    <ul>
+                        <li><strong>Copy (przy tytule)</strong> - kopiuje tytuł</li>
+                        <li><strong>Copy All (przy bullets)</strong> - kopiuje wszystkie bullet points</li>
+                        <li><strong>Copy (przy opisie)</strong> - kopiuje opis</li>
+                    </ul>
+                    <p>Po kliknięciu przycisk zmieni się na "Copied!" na chwilę.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-info">
+        ListingBuilderPro v3.0 | Powered by Groq AI | © 2026
+    </div>
+
+    <script>
+        // API Configuration
+        const WEBHOOK_URL = 'https://n8n-listing.automatyzacja-ai.pl/webhook/v2/product';
+        const API_KEY = 'REDACTED_N8N_WEBHOOK_API_KEY';
+
+        let currentData = null;
+        let currentMarketplace = null;
+
+        // Marketplace display names
+        const MARKETPLACE_NAMES = {
+            'amazon_us': '🇺🇸 Amazon US',
+            'amazon_uk': '🇬🇧 Amazon UK',
+            'amazon_de': '🇩🇪 Amazon DE',
+            'amazon_fr': '🇫🇷 Amazon FR',
+            'amazon_it': '🇮🇹 Amazon IT',
+            'amazon_es': '🇪🇸 Amazon ES',
+            'ebay': '🛒 eBay',
+            'etsy': '🎨 Etsy',
+            'allegro': '🇵🇱 Allegro'
+        };
+
+        // Checkbox toggle
+        document.querySelectorAll('.checkbox-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const checkbox = item.querySelector('input');
+                checkbox.checked = !checkbox.checked;
+                item.classList.toggle('selected', checkbox.checked);
+            });
+        });
+
+        function getSelectedMarketplaces() {
+            return Array.from(document.querySelectorAll('#marketplaces input:checked'))
+                .map(cb => cb.value);
+        }
+
+        function parseKeywords(text) {
+            // Detect CSV format (Helium 10, Jungle Scout, Data Dive)
+            const lines = text.trim().split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+            if (lines.length === 0) return [];
+
+            // Check if first line looks like CSV header
+            const firstLine = lines[0].toLowerCase();
+            const isCSV = firstLine.includes(',') || firstLine.includes('\t');
+            const hasHeader = firstLine.includes('keyword') || firstLine.includes('search volume') ||
+                             firstLine.includes('phrase') || firstLine.includes('cerebro') ||
+                             firstLine.includes('exact') || firstLine.includes('broad');
+
+            let keywords = [];
+            const startIndex = hasHeader ? 1 : 0;
+
+            for (let i = startIndex; i < lines.length; i++) {
+                let keyword = lines[i];
+
+                if (isCSV) {
+                    // Handle CSV: extract first column (keyword)
+                    // Support both comma and tab separators
+                    const separator = lines[i].includes('\t') ? '\t' : ',';
+                    const parts = lines[i].split(separator);
+
+                    // First column is usually the keyword
+                    keyword = parts[0].trim();
+
+                    // Remove quotes if present (CSV format)
+                    keyword = keyword.replace(/^["']|["']$/g, '');
+                }
+
+                // Clean and validate keyword
+                keyword = keyword.trim();
+                if (keyword.length > 0 && keyword.length < 200) {
+                    keywords.push(keyword);
+                }
+            }
+
+            // Remove duplicates while preserving order
+            keywords = [...new Set(keywords)];
+
+            return keywords;
+        }
+
+        async function generate() {
+            const btn = document.getElementById('generateBtn');
+            const btnText = document.getElementById('btnText');
+            const status = document.getElementById('status');
+            const resultsContainer = document.getElementById('resultsContainer');
+
+            const selectedMarketplaces = getSelectedMarketplaces();
+            if (selectedMarketplaces.length === 0) {
+                alert('Please select at least one marketplace');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btnText.textContent = 'Generating...';
+            status.className = 'status-bar loading';
+            status.textContent = 'Generating listings with AI... This may take 1-2 minutes for translations.';
+            resultsContainer.classList.remove('visible');
+
+            const payload = {
+                title: document.getElementById('title').value,
+                brand: document.getElementById('brand').value || 'Brand',
+                category: document.getElementById('category').value || 'General',
+                specs: {},
+                marketplaces: selectedMarketplaces
+            };
+
+            // Parse description as specs if provided
+            const description = document.getElementById('description').value;
+            if (description) {
+                payload.specs.description = description;
+            }
+
+            // Parse keywords
+            const keywords = parseKeywords(document.getElementById('keywords').value);
+            if (keywords.length > 0) {
+                payload.keywords = keywords;
+            }
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                currentData = data;
+
+                if (data.listings) {
+                    const count = Object.keys(data.listings).length;
+                    status.className = 'status-bar success';
+                    status.textContent = `Generated ${count} marketplace listings successfully!`;
+                    displayResults(data);
+                } else {
+                    throw new Error(data.error || data.message || 'No listings in response');
+                }
+            } catch (error) {
+                status.className = 'status-bar error';
+                status.textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btnText.textContent = 'Generate Listings';
+        }
+
+        function displayResults(data) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const tabsContainer = document.getElementById('tabs');
+            const resultsDiv = document.getElementById('results');
+            const coverageDiv = document.getElementById('coverage');
+
+            resultsContainer.classList.add('visible');
+
+            // Quality Score
+            if (data.quality_score) {
+                coverageDiv.className = 'coverage-badge high';
+                coverageDiv.textContent = 'Quality Score: ' + data.quality_score;
+            } else if (data.coverage) {
+                const pct = parseFloat(data.coverage.percentage || data.coverage);
+                coverageDiv.className = 'coverage-badge ' + (pct >= 80 ? 'high' : pct >= 50 ? 'medium' : 'low');
+                coverageDiv.textContent = pct + '% Keyword Coverage';
+            } else {
+                coverageDiv.style.display = 'none';
+            }
+
+            // Tabs
+            const listings = data.listings;
+            const marketplaces = Object.keys(listings);
+
+            tabsContainer.innerHTML = marketplaces.map((mp, idx) =>
+                `<button class="tab-btn ${idx === 0 ? 'active' : ''}" data-mp="${mp}" onclick="showMarketplace('${mp}')">${MARKETPLACE_NAMES[mp] || mp}</button>`
+            ).join('');
+
+            if (marketplaces.length > 0) {
+                currentMarketplace = marketplaces[0];
+                renderMarketplaceListing(listings[currentMarketplace], currentMarketplace);
+            }
+        }
+
+        function showMarketplace(mp) {
+            currentMarketplace = mp;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mp === mp);
+            });
+            const listings = currentData.listings;
+            renderMarketplaceListing(listings[mp], mp);
+        }
+
+        function renderMarketplaceListing(listing, marketplace) {
+            const resultsDiv = document.getElementById('results');
+
+            if (!listing) {
+                resultsDiv.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><p class="empty-state-text">No data for this marketplace</p></div>';
+                return;
+            }
+
+            let html = '';
+
+            // Title
+            if (listing.title) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Title</h3>
+                            <div>
+                                <span class="badge">${listing.title.length} chars</span>
+                                <button class="copy-btn" onclick="copyText(this, '${escapeQuotes(listing.title)}')">Copy</button>
+                            </div>
+                        </div>
+                        <div class="result-content">${escapeHtml(listing.title)}</div>
+                    </div>
+                `;
+            }
+
+            // Bullets
+            if (listing.bullets && listing.bullets.length) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Bullet Points (${listing.bullets.length})</h3>
+                            <button class="copy-btn" onclick="copyBullets(this)">Copy All</button>
+                        </div>
+                        <div class="result-content bullets">
+                            ${listing.bullets.map(b => `<div class="bullet">${escapeHtml(b)}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Description
+            if (listing.description) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Description</h3>
+                            <button class="copy-btn" onclick="copyText(this, \`${escapeQuotes(listing.description)}\`)">Copy</button>
+                        </div>
+                        <div class="result-content">${escapeHtml(listing.description)}</div>
+                    </div>
+                `;
+            }
+
+            // Tags (Etsy)
+            if (listing.tags && listing.tags.length) {
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Tags (${listing.tags.length})</h3>
+                            <button class="copy-btn" onclick="copyText(this, '${listing.tags.join(', ')}')">Copy</button>
+                        </div>
+                        <div class="result-content">${listing.tags.map(t => `<span style="display:inline-block;padding:4px 10px;background:#1a1a1a;border-radius:4px;margin:3px;font-size:12px;">${escapeHtml(t)}</span>`).join('')}</div>
+                    </div>
+                `;
+            }
+
+            // Item Specifics (eBay)
+            if (listing.item_specifics) {
+                const specs = Object.entries(listing.item_specifics);
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Item Specifics</h3>
+                        </div>
+                        <div class="result-content bullets">
+                            ${specs.map(([k, v]) => `<div class="bullet"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Backend Keywords
+            if (listing.backend_keywords || listing.searchTerms) {
+                const keywords = listing.backend_keywords || listing.searchTerms;
+                const keywordsText = Array.isArray(keywords) ? keywords.join(', ') : keywords;
+                html += `
+                    <div class="result-section">
+                        <div class="result-header">
+                            <h3>Backend Keywords</h3>
+                            <div>
+                                <span class="badge">${keywordsText.length} bytes</span>
+                                <button class="copy-btn" onclick="copyText(this, \`${escapeQuotes(keywordsText)}\`)">Copy</button>
+                            </div>
+                        </div>
+                        <div class="result-content">${escapeHtml(keywordsText)}</div>
+                    </div>
+                `;
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function escapeQuotes(text) {
+            if (!text) return '';
+            return text.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/'/g, "\\'");
+        }
+
+        // Sanitize CSS class names - only allow alphanumeric, hyphen, underscore
+        function safeCssClass(text) {
+            if (!text) return '';
+            return text.replace(/[^a-zA-Z0-9_-]/g, '');
+        }
+
+        function copyText(btn, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                btn.classList.add('copied');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
+        function copyBullets(btn) {
+            const listings = currentData.listings;
+            const bullets = listings[currentMarketplace]?.bullets || [];
+            navigator.clipboard.writeText(bullets.join('\n')).then(() => {
+                btn.classList.add('copied');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.textContent = 'Copy All';
+                }, 2000);
+            });
+        }
+
+        // ========== REVIEW ANALYZER ==========
+        const REVIEWS_URL = 'https://n8n-listing.automatyzacja-ai.pl/webhook/review-analyzer';
+
+        function switchView(view) {
+            document.querySelectorAll('.main-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
+            document.querySelectorAll('.view-container').forEach(container => {
+                container.classList.toggle('active', container.id === view + 'View');
+            });
+        }
+
+        function parseReviewsInput(text) {
+            text = text.trim();
+            // Try JSON first
+            if (text.startsWith('[')) {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.log('Not valid JSON, parsing as text');
+                }
+            }
+            // Parse as plain text - one review per line
+            const lines = text.split('\n').filter(l => l.trim());
+            return lines.map((line, i) => ({
+                text: line.trim(),
+                rating: 3 // default rating
+            }));
+        }
+
+        async function analyzeReviews() {
+            const btn = document.getElementById('analyzeBtn');
+            const btnText = document.getElementById('analyzeBtnText');
+            const status = document.getElementById('reviewStatus');
+            const resultsContainer = document.getElementById('reviewResultsContainer');
+
+            const reviewsText = document.getElementById('reviewsInput').value;
+            if (!reviewsText.trim()) {
+                alert('Please enter some reviews to analyze');
+                return;
+            }
+
+            const reviews = parseReviewsInput(reviewsText);
+            if (reviews.length === 0) {
+                alert('No valid reviews found');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btnText.textContent = 'Analyzing...';
+            status.className = 'status-bar loading';
+            status.textContent = 'Analyzing ' + reviews.length + ' reviews...';
+            resultsContainer.classList.remove('visible');
+
+            const payload = {
+                reviews: reviews,
+                asin: document.getElementById('reviewAsin').value || 'unknown',
+                product_name: document.getElementById('reviewProductName').value || ''
+            };
+
+            try {
+                const response = await fetch(REVIEWS_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.className = 'status-bar success';
+                    status.textContent = 'Analyzed ' + (data.summary?.total || reviews.length) + ' reviews successfully!';
+                    displayReviewResults(data);
+                } else {
+                    throw new Error(data.error || data.message || 'Analysis failed');
+                }
+            } catch (error) {
+                status.className = 'status-bar error';
+                status.textContent = 'Error: ' + error.message;
+                console.error('Error:', error);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btnText.textContent = 'Analyze Reviews';
+        }
+
+        function displayReviewResults(data) {
+            const resultsContainer = document.getElementById('reviewResultsContainer');
+            resultsContainer.classList.add('visible');
+
+            // Health Score
+            const healthDiv = document.getElementById('healthScore');
+            const health = data.summary?.health_score || data.summary?.health || 50;
+            const avgRating = data.summary?.avg_rating || 0;
+            const total = data.summary?.total || 0;
+            const positive = data.summary?.sentiment?.positive || 0;
+            const negative = data.summary?.sentiment?.negative || 0;
+            const neutral = data.summary?.sentiment?.neutral || 0;
+            const severity = data.summary?.severity || {};
+
+            const healthClass = health >= 70 ? 'good' : health >= 40 ? 'medium' : 'bad';
+            healthDiv.innerHTML = `
+                <div>
+                    <div class="health-score-value ${healthClass}">${health}</div>
+                    <div class="health-score-label">Health Score</div>
+                </div>
+                <div class="health-details">
+                    <div class="health-details-row">
+                        <div class="health-stat">Avg Rating: <span>${avgRating}/5</span></div>
+                        <div class="health-stat">Total: <span>${total} reviews</span></div>
+                    </div>
+                    <div class="health-details-row">
+                        <div class="health-stat" style="color:#10b981">Positive: <span>${positive}</span></div>
+                        <div class="health-stat" style="color:#6b7280">Neutral: <span>${neutral}</span></div>
+                        <div class="health-stat" style="color:#ef4444">Negative: <span>${negative}</span></div>
+                    </div>
+                    ${severity.critical ? `
+                    <div class="health-details-row" style="margin-top:8px;">
+                        <div class="health-stat"><span class="severity-badge critical">${severity.critical} Critical</span></div>
+                        <div class="health-stat"><span class="severity-badge moderate">${severity.moderate || 0} Moderate</span></div>
+                        <div class="health-stat"><span class="severity-badge minor">${severity.minor || 0} Minor</span></div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Sentiment Bar
+            const sentimentBar = document.getElementById('sentimentBar');
+            const posPct = data.summary?.sentiment?.positive_pct || (total > 0 ? Math.round((positive / total) * 100) : 0);
+            const negPct = data.summary?.sentiment?.negative_pct || (total > 0 ? Math.round((negative / total) * 100) : 0);
+            const neuPct = 100 - posPct - negPct;
+            sentimentBar.innerHTML = `
+                <div class="sentiment-positive" style="width:${posPct}%" title="${posPct}% positive"></div>
+                <div class="sentiment-neutral" style="width:${neuPct}%" title="${neuPct}% neutral"></div>
+                <div class="sentiment-negative" style="width:${negPct}%" title="${negPct}% negative"></div>
+            `;
+
+            // V3: Authenticity Section
+            const authSection = document.getElementById('authenticitySection');
+            const authenticity = data.summary?.authenticity;
+            if (authenticity) {
+                authSection.style.display = 'flex';
+                const verifiedPct = authenticity.verified_pct || 0;
+                const suspiciousPct = authenticity.suspicious_pct || 0;
+                const suspiciousCount = authenticity.suspicious_count || 0;
+                const authClass = verifiedPct >= 70 ? 'high' : verifiedPct >= 40 ? 'medium' : 'low';
+                document.getElementById('authValue').className = 'authenticity-value ' + authClass;
+                document.getElementById('authValue').textContent = verifiedPct + '%';
+                document.getElementById('verifiedCount').textContent = verifiedPct + '% of reviews';
+                document.getElementById('suspiciousCount').innerHTML = suspiciousCount > 0
+                    ? `<span class="suspicious-badge">⚠️ ${suspiciousCount} suspicious (${suspiciousPct}%)</span>`
+                    : '<span class="verified-badge">✓ No suspicious reviews</span>';
+            } else {
+                authSection.style.display = 'none';
+            }
+
+            // V3: Competitor Intelligence
+            const compSection = document.getElementById('competitorSection');
+            const compList = document.getElementById('competitorList');
+            const competitors = data.competitor_intelligence || [];
+            if (competitors.length > 0) {
+                compSection.style.display = 'block';
+                compList.innerHTML = competitors.map(c => `
+                    <div class="competitor-item">
+                        <span class="competitor-name">${escapeHtml(c.name)}</span>
+                        <span class="competitor-mentions">${c.mentions} mentions (${c.comparison_rate}%)</span>
+                    </div>
+                `).join('');
+            } else {
+                compSection.style.display = 'none';
+            }
+
+            // V3: Trend Analysis
+            const trendsSection = document.getElementById('trendsSection');
+            const trendsChart = document.getElementById('trendsChart');
+            const trends = data.trends || [];
+            if (trends.length > 1) {
+                trendsSection.style.display = 'block';
+                const maxReviews = Math.max(...trends.map(t => t.reviews));
+                trendsChart.innerHTML = trends.map(t => {
+                    const height = maxReviews > 0 ? Math.max(10, (t.reviews / maxReviews) * 100) : 10;
+                    const isNegative = t.avg_rating < 3.5;
+                    return `<div class="trend-bar ${isNegative ? 'negative' : ''}"
+                        style="height:${height}%"
+                        data-label="${t.month.substring(5)}"
+                        title="${t.month}: ${t.reviews} reviews, ${t.avg_rating}★ avg"></div>`;
+                }).join('');
+            } else {
+                trendsSection.style.display = 'none';
+            }
+
+            // Actionable Insights with V3 priority badges
+            const insightsDiv = document.getElementById('insightsContainer');
+            if (data.insights && data.insights.length > 0) {
+                const icons = {warning:'⚠️',action:'💡',critical:'🚨',opportunity:'✨',alert:'🔔',info:'ℹ️',intelligence:'🎯'};
+                insightsDiv.innerHTML = data.insights.map(ins => {
+                    const priority = ins.priority || 5;
+                    const priorityLabel = priority <= 2 ? 'URGENT' : priority <= 3 ? 'HIGH' : priority <= 4 ? 'MEDIUM' : 'LOW';
+                    return `<div class="insight-item ${safeCssClass(ins.type)}">
+                        <span class="insight-icon">${icons[ins.type] || '📌'}</span>
+                        <div style="flex:1;">
+                            <div>${escapeHtml(ins.text)}<span class="insight-priority p${priority}">${priorityLabel}</span></div>
+                            <div class="insight-category">${escapeHtml(ins.category)}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } else {
+                insightsDiv.innerHTML = '';
+            }
+
+            // Top Issues with V3 weighted scoring
+            const issuesGrid = document.getElementById('issuesGrid');
+            if (data.top_issues && data.top_issues.length > 0) {
+                issuesGrid.innerHTML = data.top_issues.map(issue =>
+                    `<div class="issue-card">
+                        <div class="issue-name">${escapeHtml(issue.issue)}</div>
+                        <div class="issue-count">${issue.count}</div>
+                        <div class="issue-pct">${issue.pct}% of reviews</div>
+                        ${issue.weighted_score ? `<div style="font-size:10px;color:#6b7280;margin-top:4px;">Impact: ${issue.weighted_score}</div>` : ''}
+                        ${issue.priority ? `<div class="issue-priority ${safeCssClass(issue.priority)}">${escapeHtml(issue.priority)}</div>` : ''}
+                    </div>`
+                ).join('');
+            } else {
+                issuesGrid.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No issues detected</p>';
+            }
+
+            // Top Positives (Strengths) with V3 impact scoring
+            const positivesGrid = document.getElementById('positivesGrid');
+            if (data.top_positives && data.top_positives.length > 0) {
+                positivesGrid.innerHTML = data.top_positives.map(pos =>
+                    `<div class="issue-card positive-card">
+                        <div class="issue-name">${escapeHtml(pos.aspect)}</div>
+                        <div class="issue-count">${pos.count}</div>
+                        <div class="issue-pct">${pos.pct}% of reviews</div>
+                        ${pos.impact_score ? `<div style="font-size:10px;color:#059669;margin-top:4px;">Impact: ${pos.impact_score}</div>` : ''}
+                    </div>`
+                ).join('');
+            } else {
+                positivesGrid.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No strengths detected</p>';
+            }
+
+            // Critical Reviews with V3 features
+            const criticalSection = document.getElementById('criticalSection');
+            const criticalList = document.getElementById('criticalList');
+            const criticals = data.critical_reviews || [];
+            if (criticals.length > 0) {
+                criticalSection.style.display = 'block';
+                criticalList.innerHTML = criticals.map(r => {
+                    const authScore = r.authenticity_score !== undefined ? r.authenticity_score : null;
+                    return `<div class="review-item" style="border-left:3px solid #ef4444;">
+                        <div class="review-header">
+                            <div class="review-rating">${'⭐'.repeat(r.rating || 1)}</div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <span class="severity-badge critical">CRITICAL</span>
+                                ${r.verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                                ${authScore !== null && authScore >= 7 ? '<span class="review-auth-score trusted">✓ Trusted</span>' : ''}
+                            </div>
+                        </div>
+                        ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
+                        <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
+                        <div class="review-issues" style="margin-top:8px;">
+                            ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('') : ''}
+                            ${r.issue_weight ? `<span style="font-size:10px;color:#9ca3af;margin-left:8px;">Impact: ${r.issue_weight}</span>` : ''}
+                        </div>
+                        ${r.date ? `<div style="font-size:11px;color:#9ca3af;margin-top:6px;">📅 ${escapeHtml(r.date)}</div>` : ''}
+                    </div>`;
+                }).join('');
+            } else {
+                criticalSection.style.display = 'none';
+            }
+
+            // All Reviews List with V3 authenticity features
+            const reviewsList = document.getElementById('reviewsList');
+            const reviews = data.reviews || [];
+            if (reviews.length > 0) {
+                reviewsList.innerHTML = reviews.slice(0, 20).map(r => {
+                    const authScore = r.authenticity_score !== undefined ? r.authenticity_score : null;
+                    const authClass = authScore !== null ? (authScore >= 7 ? 'trusted' : authScore <= 3 ? 'suspicious' : '') : '';
+                    const authLabel = authScore !== null ? (authScore >= 7 ? '✓ Trusted' : authScore <= 3 ? '⚠ Suspicious' : `Auth: ${authScore}/10`) : '';
+                    return `<div class="review-item">
+                        <div class="review-header">
+                            <div class="review-rating">${'⭐'.repeat(r.rating || 3)}</div>
+                            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                <span class="review-sentiment ${safeCssClass(r.sentiment) || 'neutral'}">${escapeHtml(r.sentiment) || 'neutral'}</span>
+                                ${r.severity ? `<span class="severity-badge ${safeCssClass(r.severity)}">${escapeHtml(r.severity)}</span>` : ''}
+                                ${r.verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                                ${authScore !== null ? `<span class="review-auth-score ${authClass}">${authLabel}</span>` : ''}
+                            </div>
+                        </div>
+                        ${r.title ? `<div class="review-title">${escapeHtml(r.title)}</div>` : ''}
+                        <div class="review-excerpt">${escapeHtml(r.excerpt || '')}</div>
+                        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                            ${r.issues && r.issues.length > 0 ? r.issues.map(i => `<span class="review-issue-tag">${escapeHtml(i)}</span>`).join('') : ''}
+                            ${r.positives && r.positives.length > 0 ? r.positives.map(p => `<span class="review-issue-tag" style="background:#d1fae5;color:#059669;">${escapeHtml(p)}</span>`).join('') : ''}
+                            ${r.competitors && r.competitors.length > 0 ? r.competitors.map(c => `<span class="review-issue-tag" style="background:#e9d5ff;color:#7c3aed;">vs ${escapeHtml(c)}</span>`).join('') : ''}
+                        </div>
+                        ${r.date ? `<div style="font-size:11px;color:#9ca3af;margin-top:6px;">📅 ${escapeHtml(r.date)}</div>` : ''}
+                    </div>`;
+                }).join('');
+            } else {
+                reviewsList.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No reviews to display</p>';
+            }
+        }
+
+        // FAQ Accordion functionality
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const faqItem = question.parentElement;
+                const wasActive = faqItem.classList.contains('active');
+
+                // Close all other FAQ items
+                document.querySelectorAll('.faq-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                // Toggle current item
+                if (!wasActive) {
+                    faqItem.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
