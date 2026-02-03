@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # WHY: Don't crash on unknown env vars (e.g. linkedin_li_at)
 
     @field_validator("api_secret_key", "webhook_secret")
     @classmethod
