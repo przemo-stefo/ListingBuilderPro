@@ -39,6 +39,7 @@ openpyxl==3.1.2
 
 # Web Scraping (Allegro product pages)
 playwright==1.41.0
+playwright-stealth==1.0.6
 # After pip install: run `playwright install chromium`
 
 # Testing
