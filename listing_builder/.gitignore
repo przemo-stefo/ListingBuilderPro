@@ -72,6 +72,7 @@ tmp/
 *.pem
 secrets/
 linkedin_cookies.json
+debug_search.png
 
 # Deploy artifacts
 *.tar.gz
