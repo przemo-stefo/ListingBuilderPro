@@ -1,5 +1,5 @@
 # backend/services/scraper/allegro_scraper.py
-# Purpose: Scrape product data from Allegro.pl product pages using Playwright
+# Purpose: Scrape product data from Allegro.pl product pages
 # NOT for: Data conversion, template generation, or AI translation
 
 import asyncio
@@ -7,41 +7,38 @@ import json
 import os
 import random
 import re
+from html.parser import HTMLParser
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field, asdict
+from urllib.parse import quote
 
+import httpx
 import structlog
 
 logger = structlog.get_logger()
 
 # WHY pool: Same UA across all requests is a fingerprinting signal.
-# Allegro's DataDome checks this. Rotate per session.
 _USER_AGENTS = [
-    # Chrome 131 on Windows 11
     (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/131.0.0.0 Safari/537.36"
     ),
-    # Chrome 131 on macOS Sonoma
     (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/131.0.0.0 Safari/537.36"
     ),
-    # Chrome 130 on Windows 11
     (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/130.0.0.0 Safari/537.36"
     ),
-    # Edge 131 on Windows 11
     (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
     ),
-    # Chrome 131 on macOS Ventura
     (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -49,27 +46,14 @@ _USER_AGENTS = [
     ),
 ]
 
-# WHY init_script: Allegro uses DataDome which checks navigator.webdriver,
-# window.chrome, plugins, and languages to detect headless browsers.
-# These overrides make the browser look like a real user session.
+# Stealth init script for Playwright fallback path
 _STEALTH_INIT_SCRIPT = """
-    // Hide webdriver flag (primary detection vector)
     Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-
-    // Spoof chrome runtime (headless Chrome lacks this)
     window.chrome = {runtime: {}, loadTimes: function(){}, csi: function(){}};
-
-    // Spoof plugins (headless has empty array)
-    Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5]
-    });
-
-    // Spoof languages (must match locale)
+    Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
     Object.defineProperty(navigator, 'languages', {
         get: () => ['pl-PL', 'pl', 'en-US', 'en']
     });
-
-    // Remove automation indicators
     delete window.__playwright;
     delete window.__pw_manual;
 """
@@ -91,7 +75,6 @@ class AllegroProduct:
     quantity: str = ""
     condition: str = ""
     parameters: Dict[str, str] = field(default_factory=dict)
-    # Convenience accessors for common parameters
     brand: str = ""
     manufacturer: str = ""
     error: Optional[str] = None
@@ -101,29 +84,36 @@ class AllegroProduct:
 
 
 def extract_offer_id(url: str) -> str:
-    """Extract numeric offer ID from Allegro URL.
-
-    Allegro URLs end with the offer ID after the last dash:
-    https://allegro.pl/oferta/some-product-name-12345678 → 12345678
-    Also handles query params: ...12345678?utm=abc → 12345678
-    """
-    # Strip query string and fragment first
+    """Extract numeric offer ID from Allegro URL."""
     clean_url = url.split("?")[0].split("#")[0].rstrip("/")
     match = re.search(r'-(\d{8,12})$', clean_url)
     if match:
         return match.group(1)
-    # Fallback: try to find any large number at end of path
     match = re.search(r'/(\d{8,12})$', clean_url)
     if match:
         return match.group(1)
     return ""
 
 
+def _get_scrape_do_token() -> str:
+    """Get Scrape.do API token from env or config."""
+    token = os.environ.get("SCRAPE_DO_TOKEN", "")
+    if not token:
+        try:
+            from backend.config import settings
+            token = settings.scrape_do_token
+        except Exception:
+            pass
+    return token
+
+
 def _get_proxy_config() -> Optional[dict]:
-    """Read proxy URL from env. Returns Playwright proxy dict or None."""
+    """Build Playwright proxy config from SCRAPER_PROXY_URL env var.
+
+    Only used for the Playwright fallback path (when no Scrape.do token).
+    """
     proxy_url = os.environ.get("SCRAPER_PROXY_URL", "")
     if not proxy_url:
-        # Also try config if imported
         try:
             from backend.config import settings
             proxy_url = settings.scraper_proxy_url
@@ -134,14 +124,251 @@ def _get_proxy_config() -> Optional[dict]:
     return None
 
 
-async def _handle_cookie_consent(page) -> None:
-    """Click Allegro's GDPR consent button if it appears.
+# ═══════════════════════════════════════════════════════════════════════
+# STRATEGY 1: Scrape.do API mode (recommended)
+# Scrape.do handles DataDome bypass, Polish residential IPs, everything.
+# We just parse the returned HTML. No browser needed.
+# ═══════════════════════════════════════════════════════════════════════
 
-    WHY: Without accepting cookies, Allegro may not fully render product data.
-    Non-blocking — if the banner doesn't show up, we just continue.
+def _parse_html_product(html: str, product: AllegroProduct) -> None:
+    """Parse product data from Allegro static HTML (no browser needed).
+
+    WHY not BeautifulSoup: avoid adding a dependency just for parsing.
+    Allegro's static HTML (render=false) embeds product data in:
+    - <h1> for title
+    - <title> tag for EAN (in parentheses)
+    - <table> inside Parameters section for specs
+    - <script> tags with JSON for price (meta tags are JS-rendered)
+    - <img> tags for product images
     """
+    # ── Block detection ──
+    html_lower = html.lower()
+    if "zablokowany" in html_lower or ("enable js" in html_lower and len(html) < 2000):
+        product.error = (
+            "Allegro blocked this request even through Scrape.do. "
+            "Try again later or contact support@scrape.do."
+        )
+        return
+
+    # ── Title from <h1> ──
+    h1_match = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL)
+    if h1_match:
+        product.title = re.sub(r'<[^>]+>', '', h1_match.group(1)).strip()
+
+    # ── EAN from <title> tag ──
+    # WHY: Allegro puts EAN in parentheses in <title>, e.g.:
+    # "Product Name (5905525375211) • Cena, Opinie • Kawa ziarnista"
+    title_tag = re.search(r'<title[^>]*>(.*?)</title>', html, re.DOTALL)
+    if title_tag:
+        ean_in_title = re.search(r'\((\d{8,14})\)', title_tag.group(1))
+        if ean_in_title:
+            product.ean = ean_in_title.group(1)
+
+    # ── Price from embedded script JSON ──
+    # WHY not meta tags: price meta tags are JS-rendered (not in static HTML).
+    # But Allegro embeds price in analytics/config scripts as JSON.
+    # Try three patterns, most specific first:
+    #   1. "offerId":"...","price":"67.90","currency":"PLN" (product data)
+    #   2. "price":67.9,"currency":"PLN" (analytics tracking)
+    #   3. "formattedPrice":"67,90 zł" (UI component)
+    if not product.price:
+        m = re.search(r'"price":"(\d+[\.,]\d+)","currency":"(\w+)"', html)
+        if m:
+            product.price = m.group(1)
+            product.currency = m.group(2)
+
+    if not product.price:
+        m = re.search(r'"price":(\d+\.?\d*),"currency":"(\w+)"', html)
+        if m:
+            product.price = m.group(1)
+            product.currency = m.group(2)
+
+    if not product.price:
+        m = re.search(r'"formattedPrice":"([\d,]+(?:\.\d+)?)\s*(?:zł|PLN)"', html)
+        if m:
+            product.price = m.group(1).replace(",", ".")
+
+    # ── JSON-LD structured data (present in rendered HTML, rare in static) ──
+    json_ld_blocks = re.findall(
+        r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+        html, re.DOTALL
+    )
+    for block in json_ld_blocks:
+        try:
+            ld = json.loads(block)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+        if not isinstance(ld, dict):
+            continue
+
+        for key in ("gtin13", "gtin", "gtin8", "gtin12", "gtin14"):
+            if ld.get(key) and not product.ean:
+                product.ean = str(ld[key])
+
+        if ld.get("@type") == "BreadcrumbList" and ld.get("itemListElement"):
+            items = ld["itemListElement"]
+            product.category = " > ".join(
+                item.get("item", {}).get("name", "")
+                for item in items
+                if item.get("item", {}).get("name")
+            )
+
+    # ── Images ──
+    # WHY filter for /original/: Allegro serves thumbnails at /s128/, /s400/ etc.
+    # We want the highest resolution version.
+    # WHY skip "action-": Allegro UI icons (action-common-information, etc.)
+    # are hosted on allegroimg too but aren't product photos.
+    _ICON_PATTERNS = ("action-", "icon-", "logo-", "badge-", "flag-")
+    img_urls = set()
+    for match in re.finditer(
+        r'"(https?://a\.allegroimg\.com/original/[^"]+)"', html
+    ):
+        src = match.group(1)
+        filename = src.rsplit("/", 1)[-1] if "/" in src else src
+        if not any(filename.startswith(p) for p in _ICON_PATTERNS):
+            img_urls.add(src)
+
+    if not img_urls:
+        # Fallback: collect any allegro product images and upscale to /original/
+        for match in re.finditer(r'<img[^>]+src="([^"]*allegroimg[^"]*)"', html):
+            src = match.group(1)
+            filename = src.rsplit("/", 1)[-1] if "/" in src else src
+            if not any(filename.startswith(p) for p in _ICON_PATTERNS):
+                full_size = re.sub(r'/s\d+/', '/original/', src)
+                img_urls.add(full_size)
+    product.images = list(img_urls)
+
+    # ── Parameters from <table> ──
+    # WHY table not li: Allegro's static HTML uses <table> with <tr> rows,
+    # first <td> = key, second <td> = value.
+    params_section = re.search(
+        r'data-box-name="Parameters"(.*?)(?:data-box-name=|</section)',
+        html, re.DOTALL
+    )
+    if params_section:
+        rows = re.findall(r'<tr[^>]*>(.*?)</tr>', params_section.group(1), re.DOTALL)
+        for row in rows:
+            tds = re.findall(r'<td[^>]*>(.*?)</td>', row, re.DOTALL)
+            if len(tds) >= 2:
+                key = re.sub(r'<[^>]+>', '', tds[0]).strip()
+                # WHY remove tooltip: Allegro nests a role="tooltip" div
+                # inside the value <td> with explanatory text like
+                # "Nowy oznacza..." which pollutes the extracted value.
+                val_html = re.sub(
+                    r'<div[^>]*role="tooltip"[^>]*>.*?</div>',
+                    '', tds[1], flags=re.DOTALL
+                )
+                val = re.sub(r'<[^>]+>', '', val_html).strip()
+                key = re.sub(r'\s+', ' ', key).strip()
+                val = re.sub(r'\s+', ' ', val).strip()
+                if key and val:
+                    product.parameters[key] = val
+
+    # ── EAN from parameters (if not found in title tag) ──
+    if not product.ean:
+        for key, val in product.parameters.items():
+            if key.upper() in ("EAN", "GTIN", "EAN (GTIN)", "KOD EAN"):
+                product.ean = val.strip()
+                break
+
+    # ── Brand / Manufacturer shortcuts ──
+    for param_key, param_val in product.parameters.items():
+        if "marka" in param_key.lower() and not product.brand:
+            product.brand = param_val
+        if "producent" in param_key.lower() and not product.manufacturer:
+            product.manufacturer = param_val
+
+    # ── Description HTML ──
+    desc_match = re.search(
+        r'data-box-name="Description"[^>]*>(.*?)(?:data-box-name=|$)',
+        html, re.DOTALL
+    )
+    if desc_match:
+        product.description = desc_match.group(1).strip()[:5000]
+
+    # ── Condition (from "Stan" parameter) ──
+    for key, val in product.parameters.items():
+        if "Stan" in key:
+            product.condition = val
+            break
+
+
+async def _scrape_via_scrape_do(url: str, token: str) -> AllegroProduct:
+    """Scrape Allegro via Scrape.do API mode (static HTML, no render).
+
+    WHY API mode not proxy mode: DataDome blocks proxy-mode connections
+    because the browser fingerprint still comes from our local Playwright.
+    API mode means Scrape.do's servers handle the full request from their
+    residential Polish IPs.
+
+    WHY no render: Scrape.do render=true returns 502 for Allegro (DataDome
+    blocks their headless browser too). Static HTML (no render) works and
+    contains all product data: title in <h1>, price in embedded script JSON,
+    parameters in <table>, EAN in <title> tag, images in <img> tags.
+    """
+    product = AllegroProduct(source_url=url, source_id=extract_offer_id(url))
+
+    # Build Scrape.do API URL — static HTML, Polish residential IP
+    encoded_url = quote(url, safe="")
+    api_url = (
+        f"https://api.scrape.do/"
+        f"?token={token}"
+        f"&url={encoded_url}"
+        f"&super=true"
+        f"&geoCode=pl"
+    )
+
+    logger.info("scrape_do_request", url=url, offer_id=product.source_id)
+
     try:
-        # Allegro uses data-role="accept-consent" on their cookie banner
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.get(api_url)
+
+            if resp.status_code != 200:
+                # Check if Scrape.do returned a JSON error
+                try:
+                    err_data = resp.json()
+                    msg = err_data.get("Message", [str(resp.status_code)])
+                    product.error = f"Scrape.do error: {'; '.join(msg) if isinstance(msg, list) else msg}"
+                except Exception:
+                    product.error = f"Scrape.do returned HTTP {resp.status_code}"
+                logger.error("scrape_do_failed", status=resp.status_code, url=url)
+                return product
+
+            html = resp.text
+
+            # Parse product data from HTML
+            _parse_html_product(html, product)
+
+            logger.info(
+                "scrape_do_complete",
+                offer_id=product.source_id,
+                title=product.title[:60] if product.title else "(empty)",
+                price=product.price or "(none)",
+                params_count=len(product.parameters),
+                images_count=len(product.images),
+                has_ean=bool(product.ean),
+            )
+
+    except httpx.TimeoutException:
+        product.error = "Scrape.do request timed out (90s). Allegro may be slow or blocking."
+        logger.error("scrape_do_timeout", url=url)
+    except Exception as e:
+        product.error = f"Scrape.do request failed: {str(e)}"
+        logger.error("scrape_do_error", url=url, error=str(e))
+
+    return product
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# STRATEGY 2: Playwright fallback (direct or with raw proxy)
+# Used when no Scrape.do token is configured.
+# ═══════════════════════════════════════════════════════════════════════
+
+async def _handle_cookie_consent(page) -> None:
+    """Click Allegro's GDPR consent button if it appears."""
+    try:
         consent_btn = await page.query_selector('[data-role="accept-consent"]')
         if consent_btn:
             await consent_btn.click()
@@ -149,7 +376,6 @@ async def _handle_cookie_consent(page) -> None:
             await asyncio.sleep(0.5)
             return
 
-        # Fallback: look for button with Polish text "Akceptuję"
         buttons = await page.query_selector_all("button")
         for btn in buttons:
             text = await btn.inner_text()
@@ -161,40 +387,29 @@ async def _handle_cookie_consent(page) -> None:
 
         logger.debug("no_cookie_consent_banner")
     except Exception:
-        # Non-blocking — cookie consent is best-effort
         logger.debug("cookie_consent_skipped")
 
 
 async def _detect_block(page) -> Optional[str]:
-    """Check if Allegro blocked us. Returns error message or None.
-
-    WHY: Without this, the scraper silently returns empty data when blocked.
-    Now it reports WHY scraping failed so the user can take action (use proxy, etc).
-    """
+    """Check if Allegro blocked us. Returns error message or None."""
     try:
         title = await page.title()
-        body_text = await page.evaluate("() => document.body?.innerText?.substring(0, 500) || ''")
+        body_text = await page.evaluate(
+            "() => document.body?.innerText?.substring(0, 500) || ''"
+        )
         combined = (title + " " + body_text).lower()
 
         if "zablokowany" in combined or "blocked" in combined:
             return (
-                "Allegro blocked this IP (anti-bot protection). "
-                "Set SCRAPER_PROXY_URL in .env to use a residential proxy, "
-                "or wait and retry later."
+                "Allegro blocked this IP. Set SCRAPE_DO_TOKEN in .env "
+                "(free at scrape.do) or use SCRAPER_PROXY_URL."
             )
         if "captcha" in combined or "datadome" in combined:
-            return (
-                "Allegro triggered CAPTCHA/DataDome challenge. "
-                "Use a residential proxy (SCRAPER_PROXY_URL) to bypass."
-            )
-        # WHY: DataDome serves a 403 page with just "Please enable JS and
-        # disable any ad blocker" — it means the JS challenge failed to
-        # resolve, which happens when DataDome fingerprints the browser.
+            return "Allegro CAPTCHA/DataDome challenge. Use SCRAPE_DO_TOKEN."
         if "enable js" in combined and len(body_text.strip()) < 100:
             return (
-                "Allegro DataDome anti-bot blocked this request (JS challenge failed). "
-                "A residential proxy is required. Set SCRAPER_PROXY_URL in .env "
-                "(e.g. http://user:pass@proxy:port)."
+                "Allegro DataDome JS challenge failed. "
+                "Set SCRAPE_DO_TOKEN in .env (free at scrape.do)."
             )
     except Exception:
         pass
@@ -202,17 +417,11 @@ async def _detect_block(page) -> Optional[str]:
 
 
 async def _extract_product_data(page, product: AllegroProduct) -> None:
-    """Extract all product fields from a loaded Allegro page.
-
-    Separated from browser management so both single and batch
-    scraping can share this logic.
-    """
-    # ── Title ──
+    """Extract all product fields from a loaded Allegro page (Playwright)."""
     title_el = await page.query_selector("h1")
     if title_el:
         product.title = (await title_el.inner_text()).strip()
 
-    # ── Price from meta tag (most reliable) ──
     price_el = await page.query_selector('meta[itemprop="price"]')
     if price_el:
         product.price = await price_el.get_attribute("content") or ""
@@ -221,7 +430,6 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
     if currency_el:
         product.currency = await currency_el.get_attribute("content") or "PLN"
 
-    # ── JSON-LD structured data ──
     json_ld_data = await page.evaluate("""
         () => {
             const scripts = document.querySelectorAll('script[type="application/ld+json"]');
@@ -231,15 +439,12 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
             }).filter(Boolean);
         }
     """)
-
-    # Extract EAN from JSON-LD
     for ld in (json_ld_data or []):
         if isinstance(ld, dict):
             for key in ("gtin13", "gtin", "gtin8", "gtin12", "gtin14"):
                 if ld.get(key):
                     product.ean = str(ld[key])
                     break
-            # Also grab category from breadcrumb
             if ld.get("@type") == "BreadcrumbList" and ld.get("itemListElement"):
                 items = ld["itemListElement"]
                 if items:
@@ -249,15 +454,12 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
                         if item.get("item", {}).get("name")
                     )
 
-    # ── Images ──
     images = await page.evaluate("""
         () => {
             const urls = new Set();
-            // Gallery thumbnails
             document.querySelectorAll('img[src*="allegro"]').forEach(img => {
                 const src = img.src || img.dataset?.src || '';
                 if (src.includes('allegro.pl') || src.includes('a.allegroimg')) {
-                    // Get full-size version by replacing size suffix
                     const fullSize = src.replace(/\\/s\\d+\\//, '/original/');
                     urls.add(fullSize);
                 }
@@ -267,11 +469,9 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
     """)
     product.images = images or []
 
-    # ── Parameters table ──
     parameters = await page.evaluate("""
         () => {
             const params = {};
-            // Multiple selector strategies because Allegro changes class names
             const selectors = [
                 'div[data-box-name="Parameters"] li',
                 '[data-testid="product-parameter"]',
@@ -288,7 +488,7 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
                             if (key && val) params[key] = val;
                         }
                     });
-                    break;  // Use first selector that works
+                    break;
                 }
             }
             return params;
@@ -296,28 +496,20 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
     """)
     product.parameters = parameters or {}
 
-    # Extract EAN from parameters if not found in JSON-LD
     if not product.ean:
         for key, val in product.parameters.items():
             if key.upper() in ("EAN", "GTIN", "EAN (GTIN)", "KOD EAN"):
                 product.ean = val.strip()
                 break
 
-    # Extract common parameter shortcuts
-    param_map = {
-        "Marka": "brand",
-        "Producent": "manufacturer",
-    }
-    for pl_key, attr_name in param_map.items():
-        for param_key, param_val in product.parameters.items():
-            if pl_key.lower() in param_key.lower():
-                setattr(product, attr_name, param_val)
-                break
+    for param_key, param_val in product.parameters.items():
+        if "marka" in param_key.lower() and not product.brand:
+            product.brand = param_val
+        if "producent" in param_key.lower() and not product.manufacturer:
+            product.manufacturer = param_val
 
-    # ── Description HTML ──
     description = await page.evaluate("""
         () => {
-            // Allegro loads description in a separate section
             const descSection = document.querySelector(
                 '[data-box-name="Description"] div[class*="description"]'
             ) || document.querySelector('[data-testid="description"]');
@@ -326,55 +518,42 @@ async def _extract_product_data(page, product: AllegroProduct) -> None:
     """)
     product.description = description or ""
 
-    # ── Condition ──
     for key, val in product.parameters.items():
         if "Stan" in key:
             product.condition = val
             break
 
 
-async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
-    """Scrape full product data from a single Allegro product URL.
-
-    Uses Playwright (headless Chromium) with stealth anti-detection
-    because Allegro uses DataDome-level bot protection.
-
-    Args:
-        url: Full Allegro product URL
-        _browser: Optional shared browser instance (used by batch scraping).
-                  If None, creates and closes its own browser.
-
-    Returns:
-        AllegroProduct with all extracted fields
-    """
+async def _scrape_via_playwright(url: str, _browser=None) -> AllegroProduct:
+    """Fallback: scrape with Playwright + stealth when no Scrape.do token."""
     product = AllegroProduct(source_url=url, source_id=extract_offer_id(url))
     owns_browser = _browser is None
 
     try:
         from playwright.async_api import async_playwright
     except ImportError:
-        product.error = "playwright not installed. Run: pip install playwright && playwright install chromium"
-        logger.error("playwright_not_installed")
+        product.error = (
+            "playwright not installed. Run: pip install playwright && "
+            "playwright install chromium"
+        )
         return product
 
     pw_instance = None
 
     try:
-        # WHY reuse: batch scraping passes a shared browser so we don't
-        # launch/close a new browser for every product (suspicious + slow)
+        proxy = _get_proxy_config()
+        using_proxy = proxy is not None
+
         if owns_browser:
             pw_instance = await async_playwright().start()
-
-            proxy = _get_proxy_config()
-            launch_args = [
-                "--disable-blink-features=AutomationControlled",
-                "--disable-dev-shm-usage",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-            ]
             _browser = await pw_instance.chromium.launch(
                 headless=True,
-                args=launch_args,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                ],
                 proxy=proxy,
             )
 
@@ -383,12 +562,10 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
             locale="pl-PL",
             timezone_id="Europe/Warsaw",
             viewport={"width": 1920, "height": 1080},
+            ignore_https_errors=using_proxy,
         )
-
-        # WHY stealth: navigator.webdriver=true is the #1 detection signal
         await context.add_init_script(_STEALTH_INIT_SCRIPT)
 
-        # Also try playwright-stealth for deeper patches (CDP-level)
         try:
             from playwright_stealth import stealth_async
             page = await context.new_page()
@@ -398,21 +575,12 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
             page = await context.new_page()
             logger.info("stealth_applied", method="init_script_only")
 
-        # WHY no resource blocking: the old code blocked images/fonts/analytics.
-        # Blocking resources is a major bot detection signal — real browsers load
-        # everything. Removed to reduce fingerprint.
-
-        logger.info("scraping_allegro", url=url, offer_id=product.source_id)
+        logger.info("scraping_allegro_playwright", url=url)
 
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-
-        # Handle GDPR cookie consent (may block page rendering)
         await _handle_cookie_consent(page)
-
-        # WHY random: fixed sleep(3) is a bot pattern. Randomize render wait.
         await asyncio.sleep(random.uniform(2.0, 5.0))
 
-        # Check if Allegro blocked us BEFORE trying to extract data
         block_msg = await _detect_block(page)
         if block_msg:
             product.error = block_msg
@@ -420,9 +588,7 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
             await context.close()
             return product
 
-        # Extract all product data from the loaded page
         await _extract_product_data(page, product)
-
         await context.close()
 
         logger.info(
@@ -431,7 +597,6 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
             title=product.title[:60],
             params_count=len(product.parameters),
             images_count=len(product.images),
-            has_ean=bool(product.ean),
         )
 
     except Exception as e:
@@ -439,7 +604,6 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
         logger.error("scrape_failed", url=url, error=str(e))
 
     finally:
-        # Only close browser if we created it (not shared from batch)
         if owns_browser:
             if _browser:
                 await _browser.close()
@@ -449,12 +613,40 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
     return product
 
 
-async def scrape_allegro_batch(urls: List[str], delay: float = 3.0) -> List[AllegroProduct]:
-    """Scrape multiple Allegro products with a shared browser.
+# ═══════════════════════════════════════════════════════════════════════
+# PUBLIC API (unchanged interface)
+# ═══════════════════════════════════════════════════════════════════════
 
-    WHY shared browser: real users don't open/close the browser for every page.
-    One browser instance, new tab (page) per URL. Sequential to avoid
-    triggering Allegro's anti-bot rate limits.
+async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
+    """Scrape full product data from a single Allegro product URL.
+
+    Strategy:
+    1. Scrape.do API mode (if SCRAPE_DO_TOKEN is set) — handles DataDome
+    2. Playwright with stealth (fallback) — may be blocked without proxy
+
+    Args:
+        url: Full Allegro product URL
+        _browser: Optional shared Playwright browser (for batch fallback)
+
+    Returns:
+        AllegroProduct with all extracted fields
+    """
+    # Strategy 1: Scrape.do API (recommended, handles DataDome)
+    token = _get_scrape_do_token()
+    if token:
+        return await _scrape_via_scrape_do(url, token)
+
+    # Strategy 2: Playwright fallback
+    return await _scrape_via_playwright(url, _browser)
+
+
+async def scrape_allegro_batch(
+    urls: List[str], delay: float = 3.0
+) -> List[AllegroProduct]:
+    """Scrape multiple Allegro products sequentially.
+
+    Uses Scrape.do API if token is set (no browser needed),
+    otherwise falls back to shared Playwright browser.
 
     Args:
         urls: List of Allegro product URLs
@@ -465,46 +657,59 @@ async def scrape_allegro_batch(urls: List[str], delay: float = 3.0) -> List[Alle
     """
     results = []
     total = len(urls)
+    token = _get_scrape_do_token()
 
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        error_msg = "playwright not installed. Run: pip install playwright && playwright install chromium"
-        return [AllegroProduct(source_url=u, error=error_msg) for u in urls]
-
-    pw_instance = await async_playwright().start()
-
-    try:
-        proxy = _get_proxy_config()
-        launch_args = [
-            "--disable-blink-features=AutomationControlled",
-            "--disable-dev-shm-usage",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-        ]
-        browser = await pw_instance.chromium.launch(
-            headless=True,
-            args=launch_args,
-            proxy=proxy,
-        )
-
+    if token:
+        # Scrape.do path — simple HTTP calls, no browser
         for i, url in enumerate(urls):
             logger.info("batch_scraping", progress=f"{i+1}/{total}", url=url[:80])
-            product = await scrape_allegro_product(url, _browser=browser)
+            product = await _scrape_via_scrape_do(url, token)
             results.append(product)
 
-            # WHY randomize: fixed delays are a bot pattern.
-            # ±30% variance makes timing look human.
             if i < total - 1:
-                jittered_delay = random.uniform(delay * 0.7, delay * 1.3)
-                await asyncio.sleep(jittered_delay)
+                jittered = random.uniform(delay * 0.7, delay * 1.3)
+                await asyncio.sleep(jittered)
+    else:
+        # Playwright fallback — shared browser instance
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            error_msg = (
+                "playwright not installed. Run: pip install playwright && "
+                "playwright install chromium"
+            )
+            return [AllegroProduct(source_url=u, error=error_msg) for u in urls]
 
-        await browser.close()
+        pw_instance = await async_playwright().start()
+        try:
+            proxy = _get_proxy_config()
+            browser = await pw_instance.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                ],
+                proxy=proxy,
+            )
 
-    finally:
-        await pw_instance.stop()
+            for i, url in enumerate(urls):
+                logger.info("batch_scraping", progress=f"{i+1}/{total}", url=url[:80])
+                product = await _scrape_via_playwright(url, _browser=browser)
+                results.append(product)
+
+                if i < total - 1:
+                    jittered = random.uniform(delay * 0.7, delay * 1.3)
+                    await asyncio.sleep(jittered)
+
+            await browser.close()
+        finally:
+            await pw_instance.stop()
 
     succeeded = sum(1 for r in results if not r.error)
-    logger.info("batch_complete", total=total, succeeded=succeeded, failed=total - succeeded)
-
+    logger.info(
+        "batch_complete", total=total, succeeded=succeeded,
+        failed=total - succeeded,
+    )
     return results
