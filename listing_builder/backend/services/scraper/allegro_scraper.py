@@ -187,6 +187,15 @@ async def _detect_block(page) -> Optional[str]:
                 "Allegro triggered CAPTCHA/DataDome challenge. "
                 "Use a residential proxy (SCRAPER_PROXY_URL) to bypass."
             )
+        # WHY: DataDome serves a 403 page with just "Please enable JS and
+        # disable any ad blocker" — it means the JS challenge failed to
+        # resolve, which happens when DataDome fingerprints the browser.
+        if "enable js" in combined and len(body_text.strip()) < 100:
+            return (
+                "Allegro DataDome anti-bot blocked this request (JS challenge failed). "
+                "A residential proxy is required. Set SCRAPER_PROXY_URL in .env "
+                "(e.g. http://user:pass@proxy:port)."
+            )
     except Exception:
         pass
     return None
