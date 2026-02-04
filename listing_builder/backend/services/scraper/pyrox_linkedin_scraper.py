@@ -372,6 +372,154 @@ class PlaywrightLinkedInScraper:
         finally:
             await context.close()
 
+    async def scrape_profile(self, profile_url: str) -> Dict:
+        """
+        Scrape personal LinkedIn profile via Voyager API.
+        Returns structured data for n8n personalization workflow.
+
+        Uses LinkedIn's internal API (same as the web app) for reliable data.
+        Requires linkedin_cookies.json or LINKEDIN_LI_AT env var.
+        """
+        import urllib.request
+        import urllib.error
+
+        result = {
+            "profileUrl": profile_url,
+            "name": "",
+            "headline": "",
+            "about": "",
+            "location": "",
+            "experience": [],
+            "recentPosts": [],
+            "scraperUsed": "pyrox-voyager-api",
+            "authenticated": False,
+        }
+
+        # Extract public identifier from URL (e.g. "satyanadella" from linkedin.com/in/satyanadella/)
+        public_id = profile_url.rstrip('/').split('/in/')[-1].split('?')[0]
+        if not public_id:
+            result["error"] = "Could not extract public identifier from URL"
+            return result
+
+        # Load auth cookies
+        li_at = None
+        jsessionid = "ajax:0000000000000000000"
+
+        if os.path.exists(COOKIES_FILE):
+            with open(COOKIES_FILE) as f:
+                cookies = json.load(f)
+            for c in cookies:
+                if c['name'] == 'li_at':
+                    li_at = c['value']
+                elif c['name'] == 'JSESSIONID':
+                    jsessionid = c['value'].strip('"')
+        elif os.environ.get('LINKEDIN_LI_AT'):
+            li_at = os.environ['LINKEDIN_LI_AT']
+
+        if not li_at:
+            result["error"] = "No LinkedIn cookies found. Need linkedin_cookies.json or LINKEDIN_LI_AT env var."
+            return result
+
+        result["authenticated"] = True
+
+        try:
+            logger.info(f"[Profile] Voyager API for: {public_id}")
+
+            # Voyager API returns full profile data as JSON — bypasses React rendering
+            # and all anti-bot skeleton loading issues
+            api_url = (
+                "https://www.linkedin.com/voyager/api/identity/dash/profiles"
+                f"?q=memberIdentity&memberIdentity={public_id}"
+                "&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-93"
+            )
+
+            headers = {
+                "Cookie": f'li_at={li_at}; JSESSIONID="{jsessionid}"',
+                "csrf-token": jsessionid,
+                "Accept": "application/vnd.linkedin.normalized+json+2.1",
+                "x-restli-protocol-version": "2.0.0",
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/131.0.0.0 Safari/537.36"
+                ),
+            }
+
+            req = urllib.request.Request(api_url, headers=headers)
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = json.loads(resp.read())
+
+            included = data.get('included', [])
+
+            # Extract profile entity (skip viewer's own profile)
+            for item in included:
+                if item.get('$type') == 'com.linkedin.voyager.dash.identity.profile.Profile':
+                    fn = item.get('firstName', '')
+                    ln = item.get('lastName', '')
+                    pid = item.get('publicIdentifier', '')
+                    # Match by publicIdentifier to avoid picking up viewer's profile
+                    if pid == public_id or (fn and not pid):
+                        result["name"] = f"{fn} {ln}".strip()
+                        result["headline"] = item.get('headline', '')
+                        result["about"] = (item.get('summary', '') or '')[:3000]
+                        result["location"] = item.get('locationName', '')
+                        # Store geoLocationUrn so we can resolve it from included
+                        geo_urn = (item.get('geoLocation', {}) or {}).get('*geo', '')
+                        if not result["location"] and geo_urn:
+                            result["_geoUrn"] = geo_urn
+                        break
+
+            # Resolve location from geo entities if not in profile directly
+            if not result["location"]:
+                geo_urn = result.pop("_geoUrn", "")
+                for item in included:
+                    if item.get('$type', '').endswith('.Geo') and item.get('entityUrn') == geo_urn:
+                        result["location"] = item.get('defaultLocalizedName', '')
+                        break
+                # Fallback: grab any Geo with country in name
+                if not result["location"]:
+                    for item in included:
+                        if item.get('$type', '').endswith('.Geo'):
+                            name = item.get('defaultLocalizedName', '')
+                            if ',' in name:
+                                result["location"] = name
+                                break
+            else:
+                result.pop("_geoUrn", None)
+
+            # Extract positions (experience)
+            for item in included:
+                if item.get('$type') == 'com.linkedin.voyager.dash.identity.profile.Position':
+                    result["experience"].append({
+                        "position": item.get('title', ''),
+                        "company": item.get('companyName', ''),
+                        "duration": "",
+                        "description": (item.get('description', '') or '')[:500],
+                        "location": item.get('locationName', ''),
+                    })
+
+            # Limit to top 5 positions
+            result["experience"] = result["experience"][:5]
+
+            logger.info(
+                f"[Profile] Got: {result['name']} | "
+                f"headline={'yes' if result['headline'] else 'no'} | "
+                f"about={'yes' if result['about'] else 'no'} | "
+                f"exp={len(result['experience'])}"
+            )
+            return result
+
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode()[:200]
+            logger.error(f"[Profile] Voyager API HTTP {e.code}: {error_body}")
+            result["error"] = f"Voyager API error {e.code}"
+            return result
+
+        except Exception as e:
+            logger.error(f"[Profile] Error: {e}")
+            result["error"] = str(e)
+            return result
+
     async def scrape_about_page(self, linkedin_url: str) -> str:
         """Scrape the /about page for more company details"""
         about_url = linkedin_url.rstrip('/') + '/about/'
@@ -1375,6 +1523,66 @@ async def run_webhook_server(host: str = "0.0.0.0", port: int = 8765):
             logger.error(f"Employee scrape error: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
+    async def handle_scrape_profile(request):
+        """
+        Scrape personal LinkedIn profile using Playwright + cookies.
+        Replaces Apify LinkedIn Profile Scraper in n8n workflows.
+
+        POST /scrape-profile
+        {"linkedin_url": "https://www.linkedin.com/in/someone"}
+
+        Returns structured profile data:
+        {"name", "headline", "about", "location", "experience", "recentPosts"}
+        """
+        try:
+            data = await request.json()
+            url = data.get('linkedin_url', '')
+
+            if not url:
+                return web.json_response(
+                    {"error": "linkedin_url required"}, status=400
+                )
+
+            # Uses Voyager API (no Playwright needed for profiles)
+            pw_scraper = PlaywrightLinkedInScraper(headless=True)
+            profile = await pw_scraper.scrape_profile(url)
+            return web.json_response(profile)
+
+        except Exception as e:
+            logger.error(f"Profile scrape error: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_scrape_company(request):
+        """
+        Lightweight company scrape - structured data only, no employee search.
+        Faster than /scrape (skips lead generation pipeline).
+
+        POST /scrape-company
+        {"linkedin_url": "https://www.linkedin.com/company/example"}
+
+        Returns: {"company": {name, website, industry, location, ...}, "score": N}
+        """
+        try:
+            data = await request.json()
+            url = data.get('linkedin_url', '')
+
+            if not url:
+                return web.json_response(
+                    {"error": "linkedin_url required"}, status=400
+                )
+
+            company = await scraper.scrape_company(url)
+            score = calculate_pyrox_score(company)
+
+            return web.json_response({
+                "company": asdict(company),
+                "score": score,
+            })
+
+        except Exception as e:
+            logger.error(f"Company scrape error: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
     async def handle_health(request):
         has_cookies = os.path.exists(COOKIES_FILE) or bool(os.environ.get('LINKEDIN_LI_AT'))
         return web.json_response({
@@ -1385,6 +1593,8 @@ async def run_webhook_server(host: str = "0.0.0.0", port: int = 8765):
 
     app = web.Application()
     app.router.add_post('/scrape', handle_scrape)
+    app.router.add_post('/scrape-profile', handle_scrape_profile)
+    app.router.add_post('/scrape-company', handle_scrape_company)
     app.router.add_post('/scrape-employees', handle_scrape_employees)
     app.router.add_get('/health', handle_health)
 
@@ -1394,8 +1604,10 @@ async def run_webhook_server(host: str = "0.0.0.0", port: int = 8765):
     await site.start()
 
     logger.info(f"PYROX LinkedIn Scraper running on http://{host}:{port}")
-    logger.info(f"  POST /scrape            - Scrape a LinkedIn company")
-    logger.info(f"  POST /scrape-employees  - Find decision makers (replaces Apify)")
+    logger.info(f"  POST /scrape            - Full pipeline: company + leads")
+    logger.info(f"  POST /scrape-company    - Company data only (fast)")
+    logger.info(f"  POST /scrape-profile    - Personal profile (replaces Apify)")
+    logger.info(f"  POST /scrape-employees  - Find decision makers")
     logger.info(f"  GET  /health            - Health check")
     logger.info(f"  LinkedIn cookies: {'READY' if os.path.exists(COOKIES_FILE) else 'NOT SET (run --setup-cookies)'}")
 
