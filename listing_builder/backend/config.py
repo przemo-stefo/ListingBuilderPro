@@ -48,7 +48,8 @@ class Settings(BaseSettings):
     kaufland_secret_key: str = ""
 
     # Scraping
-    scraper_proxy_url: str = ""  # Optional: residential proxy for Allegro scraper
+    scrape_do_token: str = ""  # Scrape.do API token (recommended for Allegro)
+    scraper_proxy_url: str = ""  # Fallback: raw residential proxy URL
 
     # Webhook Security
     webhook_secret: str  # REQUIRED - no default value
