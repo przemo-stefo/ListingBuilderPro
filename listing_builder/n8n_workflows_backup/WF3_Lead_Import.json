@@ -1,0 +1,117 @@
+{
+  "id": "2vyQRQI9HWl3FeHp",
+  "name": "[OUTREACH] Lead Import - v1",
+  "active": true,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Import Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "parameters": {
+        "path": "lead-import",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "lead-import-webhook-001"
+    },
+    {
+      "id": "n2",
+      "name": "Parse Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "parameters": {
+        "jsCode": "// Parse incoming leads array, normalize fields\nconst body = $input.first().json.body || $input.first().json;\nconst leads = body.leads || [];\n\nif (!leads.length) {\n  return [{ json: { error: 'No leads in payload', created: 0, skipped: 0 } }];\n}\n\n// Normalize each lead to match Airtable field names\nconst normalized = leads.map(lead => ({\n  json: {\n    'First Name': lead.first_name || lead.firstName || '',\n    'Full Name': lead.full_name || lead.fullName || '',\n    'Email Address': lead.email || lead.emailAddress || '',\n    'Company Name': lead.company_name || lead.companyName || '',\n    'LinkedIn URL': lead.linkedin_url || lead.linkedinUrl || '',\n    'LinkedIn Organization URL': lead.linkedin_org_url || lead.linkedinOrgUrl || '',\n    'Company Website': lead.company_website || lead.companyWebsite || '',\n    'Location': lead.location || '',\n    'Title': lead.title || '',\n    '_totalLeads': leads.length\n  }\n}));\n\nreturn normalized;"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [640, 300],
+      "parameters": {"batchSize": 1, "options": {}}
+    },
+    {
+      "id": "n4",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.airtable.com/v0/app5WsWRsNy7LPpjk/Leads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "filterByFormula", "value": "={LinkedIn URL}='{{ $json[\"LinkedIn URL\"] }}'"},
+            {"name": "maxRecords", "value": "1"}
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {"httpHeaderAuth": {"id": "AY4rmZFlyRN1obOA", "name": "Airtable SSS"}}
+    },
+    {
+      "id": "n5",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1080, 300],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "dup-check", "leftValue": "={{ $json.records.length }}", "rightValue": "0", "operator": {"type": "number", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Create Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.airtable.com/v0/app5WsWRsNy7LPpjk/Leads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ fields: { 'First Name': $('Split Into Batches').item.json['First Name'], 'Full Name': $('Split Into Batches').item.json['Full Name'], 'Email Address': $('Split Into Batches').item.json['Email Address'], 'Company Name': $('Split Into Batches').item.json['Company Name'], 'LinkedIn URL': $('Split Into Batches').item.json['LinkedIn URL'], 'LinkedIn Organization URL': $('Split Into Batches').item.json['LinkedIn Organization URL'], 'Company Website': $('Split Into Batches').item.json['Company Website'], 'Location': $('Split Into Batches').item.json['Location'], 'Title': $('Split Into Batches').item.json['Title'], 'Status': 'New' } }) }}",
+        "options": {}
+      },
+      "credentials": {"httpHeaderAuth": {"id": "AY4rmZFlyRN1obOA", "name": "Airtable SSS"}}
+    },
+    {
+      "id": "n7",
+      "name": "Wait 250ms",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1520, 300],
+      "parameters": {"amount": 0.25, "unit": "seconds"}
+    }
+  ],
+  "connections": {
+    "Import Webhook": {"main": [[{"node": "Parse Input", "type": "main", "index": 0}]]},
+    "Parse Input": {"main": [[{"node": "Split Into Batches", "type": "main", "index": 0}]]},
+    "Split Into Batches": {"main": [[], [{"node": "Check Duplicate", "type": "main", "index": 0}]]},
+    "Check Duplicate": {"main": [[{"node": "Is Duplicate?", "type": "main", "index": 0}]]},
+    "Is Duplicate?": {"main": [[{"node": "Create Record", "type": "main", "index": 0}], [{"node": "Wait 250ms", "type": "main", "index": 0}]]},
+    "Create Record": {"main": [[{"node": "Wait 250ms", "type": "main", "index": 0}]]},
+    "Wait 250ms": {"main": [[{"node": "Split Into Batches", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "meta": {
+    "exportedAt": "2026-02-05T09:45:00.000Z",
+    "version": 43,
+    "nodeCount": 7
+  }
+}
