@@ -1,0 +1,16 @@
+# backend/.dockerignore
+# Purpose: Exclude files from Docker build context
+# NOT for: Git ignoring (that's .gitignore)
+
+.env
+.env.*
+*.pyc
+__pycache__
+.pytest_cache
+tests/
+.git
+.gitignore
+*.md
+venv/
+.venv/
+screenshots/

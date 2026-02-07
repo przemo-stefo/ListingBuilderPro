@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 
+import os
+
 from config import settings
 from database import init_db, check_db_connection
 
@@ -158,7 +160,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=int(os.getenv("PORT", 8000)),  # WHY: Render injects PORT env var
         reload=settings.app_debug,
         log_level="info",
     )
