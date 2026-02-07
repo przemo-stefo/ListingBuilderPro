@@ -300,7 +300,7 @@ export default function SingleTab() {
       </div>
 
       {/* Results */}
-      {results && results.status === 'completed' && (
+      {results && (results.status === 'success' || results.status === 'completed') && (
         <div className="space-y-4">
           <ScoresCard scores={results.scores} intel={results.keyword_intel} />
           <ListingCard
