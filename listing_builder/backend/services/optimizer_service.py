@@ -196,10 +196,10 @@ def _check_compliance(
     if brand and brand.lower() not in title[:50].lower():
         warnings.append("Brand not found in first 50 chars of title")
 
-    # Promo words
+    # WHY: Use word-boundary regex to avoid false positives (e.g. "deal" inside "ideal")
     full_text = (title + " " + " ".join(bullets)).lower()
     for pw in PROMO_WORDS:
-        if pw in full_text:
+        if re.search(rf"\b{re.escape(pw)}\b", full_text):
             errors.append(f"Promotional word found: '{pw}'")
 
     # Forbidden characters
