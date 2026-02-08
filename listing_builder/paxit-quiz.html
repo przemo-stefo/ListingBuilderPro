@@ -576,6 +576,105 @@ body {
   z-index: 9999;
 }
 
+/* ========== LEAD GATE ========== */
+.lead-gate {
+  display: none;
+  animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+
+.lead-gate.active { display: block; }
+
+.lead-gate-icon {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+}
+
+.lead-gate h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.lead-gate p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 28px;
+}
+
+.lead-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.lead-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: var(--card-bg);
+  color: var(--text);
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.lead-input:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-glow);
+}
+
+.lead-input::placeholder {
+  color: var(--text-muted);
+}
+
+.lead-submit {
+  padding: 16px;
+  background: var(--orange);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(237, 110, 44, 0.3);
+  margin-top: 4px;
+}
+
+.lead-submit:hover {
+  background: var(--orange-hover);
+  box-shadow: 0 4px 16px rgba(237, 110, 44, 0.35);
+}
+
+.lead-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lead-skip {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.lead-skip:hover { color: var(--text); }
+
+.lead-privacy {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
 /* ========== FOOTER ========== */
 .quiz-footer {
   text-align: center;
@@ -829,7 +928,22 @@ body {
     </div>
     <div class="nav-buttons">
       <button class="btn btn-back" onclick="prevStep()">← Wstecz</button>
-      <button class="btn btn-next" disabled onclick="showResult()">Zobacz rekomendację →</button>
+      <button class="btn btn-next" disabled onclick="showLeadGate()">Zobacz rekomendację →</button>
+    </div>
+  </div>
+
+  <!-- LEAD GATE -->
+  <div class="lead-gate" id="lead-gate">
+    <div class="lead-gate-icon">📬</div>
+    <h2>Wyślemy Ci rekomendację mailem!</h2>
+    <p>Podaj email, a otrzymasz spersonalizowaną rekomendację kartonu z linkami do produktów.</p>
+    <div class="lead-form">
+      <input type="text" class="lead-input" id="lead-name" placeholder="Imię / Firma" autocomplete="organization">
+      <input type="email" class="lead-input" id="lead-email" placeholder="Adres email *" required autocomplete="email">
+      <input type="tel" class="lead-input" id="lead-phone" placeholder="Telefon (opcjonalnie)" autocomplete="tel">
+      <button class="lead-submit" id="lead-submit-btn" onclick="submitLead()">Wyślij rekomendację →</button>
+      <button class="lead-skip" onclick="skipLead()">Pomiń — pokaż wyniki</button>
+      <div class="lead-privacy">Nie wysyłamy spamu. Dane wykorzystamy tylko do kontaktu ws. opakowań.</div>
     </div>
   </div>
 
@@ -945,8 +1059,15 @@ function restartQuiz() {
   document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.btn-next').forEach(b => b.disabled = true);
   document.getElementById('result-screen').classList.remove('active');
+  document.getElementById('lead-gate').classList.remove('active');
   document.getElementById('progress-container').style.display = '';
   document.getElementById('quiz-footer').style.display = '';
+  // WHY: reset lead form for next use
+  document.getElementById('lead-name').value = '';
+  document.getElementById('lead-email').value = '';
+  document.getElementById('lead-phone').value = '';
+  document.getElementById('lead-submit-btn').disabled = false;
+  document.getElementById('lead-submit-btn').textContent = 'Wyślij rekomendację →';
   showStep(1);
 }
 
@@ -1073,6 +1194,71 @@ function getRecommendation() {
   }
 
   return { boxType, boxDesc, shopUrl, material, materialDesc, dims, dimsNote, extras, priceRange, priceNote };
+}
+
+// ========== WEBHOOK CONFIG ==========
+// WHY: change this URL after importing workflow to n8n
+const WEBHOOK_URL = 'https://n8n.feedmasters.org/webhook/paxit-quiz';
+
+// ========== LEAD GATE ==========
+function showLeadGate() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('progress-container').style.display = 'none';
+  document.getElementById('lead-gate').classList.add('active');
+}
+
+function skipLead() {
+  document.getElementById('lead-gate').classList.remove('active');
+  showResult();
+}
+
+function submitLead() {
+  const name = document.getElementById('lead-name').value.trim();
+  const email = document.getElementById('lead-email').value.trim();
+  const phone = document.getElementById('lead-phone').value.trim();
+
+  if (!email || !email.includes('@')) {
+    document.getElementById('lead-email').style.borderColor = '#e53e3e';
+    document.getElementById('lead-email').focus();
+    return;
+  }
+
+  const btn = document.getElementById('lead-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Wysyłam...';
+
+  const r = getRecommendation();
+
+  // WHY: send lead + recommendation data to n8n webhook
+  const payload = {
+    lead: { name, email, phone },
+    answers,
+    recommendation: {
+      boxType: r.boxType,
+      boxDesc: r.boxDesc,
+      material: r.material,
+      dims: r.dims,
+      extras: r.extras.map(e => e.name),
+      priceRange: r.priceRange,
+      shopUrl: r.shopUrl
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(() => {
+    document.getElementById('lead-gate').classList.remove('active');
+    showResult();
+  })
+  .catch(() => {
+    // WHY: show results even if webhook fails — don't block the user
+    document.getElementById('lead-gate').classList.remove('active');
+    showResult();
+  });
 }
 
 // ========== 3D BOX RENDERER ==========

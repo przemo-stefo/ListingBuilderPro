@@ -1,0 +1,148 @@
+{
+  "name": "Paxit Quiz — Lead Machine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "paxit-quiz",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-1",
+      "name": "Quiz Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "paxit-quiz"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\", \"message\": \"Lead saved\"}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-1",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format recommendation into readable text for email\nconst input = $input.first().json;\nconst lead = input.body.lead;\nconst rec = input.body.recommendation;\nconst answers = input.body.answers;\n\n// Category labels\nconst catLabels = {\n  odziez: 'Odzież / Tekstylia',\n  elektronika: 'Elektronika',\n  kosmetyki: 'Kosmetyki',\n  ksiazki: 'Książki / Dokumenty',\n  zywnosc: 'Żywność',\n  szklo: 'Szkło / Ceramika',\n  bizuteria: 'Biżuteria / Akcesoria',\n  inne: 'Inne'\n};\n\nconst sizeLabels = {\n  maly: 'Mały (do 15cm)',\n  sredni: 'Średni (15-40cm)',\n  duzy: 'Duży (40-80cm)',\n  bardzo_duzy: 'Bardzo duży (80cm+)'\n};\n\nconst name = lead.name || 'Klient';\nconst firstName = name.split(' ')[0];\n\nreturn [{\n  json: {\n    leadName: lead.name || '',\n    leadEmail: lead.email,\n    leadPhone: lead.phone || '',\n    firstName,\n    category: catLabels[answers.category] || answers.category,\n    size: sizeLabels[answers.size] || answers.size,\n    boxType: rec.boxType,\n    boxDesc: rec.boxDesc,\n    material: rec.material,\n    dims: rec.dims,\n    extras: rec.extras.join(', '),\n    priceRange: rec.priceRange,\n    shopUrl: rec.shopUrl,\n    timestamp: input.body.timestamp,\n    // Pre-built HTML email\n    emailHtml: `\n      <div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;color:#1e1e1e\">\n        <div style=\"background:#ED6E2C;padding:24px;text-align:center;border-radius:12px 12px 0 0\">\n          <h1 style=\"color:white;margin:0;font-size:1.4rem\">Twoja rekomendacja kartonów</h1>\n          <p style=\"color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:0.9rem\">Przygotowana specjalnie dla Ciebie przez Paxit.pl</p>\n        </div>\n        <div style=\"background:white;padding:32px;border:1px solid #e4e7eb;border-top:none\">\n          <p style=\"font-size:1rem;margin-bottom:24px\">Cześć <strong>${firstName}</strong>,</p>\n          <p style=\"margin-bottom:24px\">Na podstawie Twoich odpowiedzi w quizie dobraliśmy idealne opakowanie:</p>\n          \n          <div style=\"background:#fef7f2;border-left:4px solid #ED6E2C;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:16px\">\n            <div style=\"font-size:0.75rem;text-transform:uppercase;color:#9ca3ab;font-weight:700;letter-spacing:0.05em;margin-bottom:4px\">Rekomendowany karton</div>\n            <div style=\"font-size:1.1rem;font-weight:700\">${rec.boxType}</div>\n            <div style=\"color:#64696e;font-size:0.9rem;margin-top:2px\">${rec.boxDesc}</div>\n          </div>\n          \n          <div style=\"background:#f5f6f8;padding:16px 20px;border-radius:8px;margin-bottom:16px\">\n            <div style=\"font-size:0.75rem;text-transform:uppercase;color:#9ca3ab;font-weight:700;letter-spacing:0.05em;margin-bottom:4px\">Materiał</div>\n            <div style=\"font-weight:700\">${rec.material}</div>\n          </div>\n          \n          <div style=\"background:#f5f6f8;padding:16px 20px;border-radius:8px;margin-bottom:16px\">\n            <div style=\"font-size:0.75rem;text-transform:uppercase;color:#9ca3ab;font-weight:700;letter-spacing:0.05em;margin-bottom:4px\">Wymiary</div>\n            <div style=\"font-weight:700\">${rec.dims}</div>\n          </div>\n          \n          <div style=\"background:#f5f6f8;padding:16px 20px;border-radius:8px;margin-bottom:16px\">\n            <div style=\"font-size:0.75rem;text-transform:uppercase;color:#9ca3ab;font-weight:700;letter-spacing:0.05em;margin-bottom:4px\">Dodatkowe materiały</div>\n            <div>${rec.extras.join(' &bull; ')}</div>\n          </div>\n          \n          <div style=\"background:#fef7f2;padding:16px 20px;border-radius:8px;margin-bottom:28px;text-align:center\">\n            <div style=\"font-size:0.75rem;text-transform:uppercase;color:#9ca3ab;font-weight:700;letter-spacing:0.05em;margin-bottom:4px\">Szacunkowa cena</div>\n            <div style=\"font-size:1.2rem;font-weight:700;color:#ED6E2C\">${rec.priceRange}</div>\n          </div>\n          \n          <div style=\"text-align:center\">\n            <a href=\"${rec.shopUrl}\" style=\"display:inline-block;background:#ED6E2C;color:white;padding:16px 40px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem\">Zobacz w sklepie Paxit →</a>\n          </div>\n          \n          <p style=\"margin-top:28px;color:#64696e;font-size:0.9rem\">Masz pytania? Zadzwoń do naszego doradcy: <strong>455 455 016</strong></p>\n        </div>\n        <div style=\"text-align:center;padding:20px;color:#9ca3ab;font-size:0.75rem;border:1px solid #e4e7eb;border-top:none;border-radius:0 0 12px 12px;background:#f5f6f8\">\n          Paxit.pl — Producent kartonów i opakowań kartonowych\n        </div>\n      </div>\n    `\n  }\n}];"
+      },
+      "id": "code-1",
+      "name": "Format Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data": "={{ $json.timestamp }}",
+            "Imię / Firma": "={{ $json.leadName }}",
+            "Email": "={{ $json.leadEmail }}",
+            "Telefon": "={{ $json.leadPhone }}",
+            "Kategoria": "={{ $json.category }}",
+            "Rozmiar": "={{ $json.size }}",
+            "Karton": "={{ $json.boxType }}",
+            "Materiał": "={{ $json.material }}",
+            "Wymiary": "={{ $json.dims }}",
+            "Cena": "={{ $json.priceRange }}",
+            "Dodatkowe": "={{ $json.extras }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-1",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [720, 400],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.leadEmail }}",
+        "subject": "Twoja rekomendacja kartonów — Paxit.pl",
+        "emailType": "html",
+        "html": "={{ $json.emailHtml }}",
+        "options": {
+          "replyTo": "biuro@paxit.pl"
+        }
+      },
+      "id": "email-customer",
+      "name": "Email do klienta",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [720, 560],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "sendTo": "biuro@paxit.pl",
+        "subject": "Nowy lead z quizu: {{ $json.leadName || $json.leadEmail }}",
+        "emailType": "html",
+        "html": "=<h2>Nowy lead z quizu Paxit</h2>\n<table style=\"border-collapse:collapse;font-family:sans-serif;font-size:14px\">\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Imię / Firma</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.leadName || '—' }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Email</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.leadEmail }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Telefon</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.leadPhone || '—' }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Kategoria</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.category }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Karton</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.boxType }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Materiał</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.material }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Wymiary</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.dims }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Cena szt.</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.priceRange }}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd;font-weight:bold\">Dodatkowe</td><td style=\"padding:8px;border:1px solid #ddd\">{{ $json.extras }}</td></tr>\n</table>\n<p style=\"margin-top:16px\"><a href=\"{{ $json.shopUrl }}\">Link do kategorii w sklepie</a></p>",
+        "options": {}
+      },
+      "id": "email-sales",
+      "name": "Powiadomienie handlowca",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [720, 720],
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Quiz Webhook": {
+      "main": [
+        [
+          { "node": "Respond OK", "type": "main", "index": 0 },
+          { "node": "Format Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Data": {
+      "main": [
+        [
+          { "node": "Save to Google Sheets", "type": "main", "index": 0 },
+          { "node": "Email do klienta", "type": "main", "index": 0 },
+          { "node": "Powiadomienie handlowca", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "paxit" },
+    { "name": "lead-gen" }
+  ]
+}
