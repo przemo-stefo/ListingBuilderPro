@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<!-- paxit-quiz.html -->
+<!-- Purpose: Interactive quiz "Jaki karton wybrać?" for Paxit.pl customers -->
+<!-- NOT for: E-commerce checkout, product catalog browsing -->
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaki karton wybrać? | Paxit.pl</title>
+<style>
+/* ========== RESET & BASE ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --orange: #ED6E2C;
+  --orange-hover: #d45e20;
+  --orange-light: #fef7f2;
+  --orange-glow: rgba(237, 110, 44, 0.12);
+  --text: #1e1e1e;
+  --text-secondary: #64696e;
+  --text-muted: #9ca3ab;
+  --bg: #f5f6f8;
+  --card-bg: #ffffff;
+  --card-border: #e4e7eb;
+  --card-hover-border: #c8cdd3;
+  --progress-bg: #e4e7eb;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.1);
+  --radius: 14px;
+  --radius-sm: 10px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ========== LAYOUT ========== */
+.quiz-wrapper {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+/* ========== HEADER WITH LOGO ========== */
+.quiz-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.logo-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 8px 20px;
+  background: var(--card-bg);
+  border-radius: 40px;
+  box-shadow: var(--shadow-sm);
+}
+
+.logo-bar span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.quiz-header h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.quiz-header p {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+/* ========== PROGRESS BAR ========== */
+.progress-container {
+  margin-bottom: 36px;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progress-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progress-pct {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.progress-track {
+  height: 5px;
+  background: var(--progress-bg);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), #f59e4f);
+  border-radius: 10px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 0%;
+}
+
+/* ========== STEP SCREENS ========== */
+.step {
+  display: none;
+  animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.step.active { display: block; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step-number {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--orange);
+  margin-bottom: 8px;
+}
+
+.step-question {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.step-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 28px;
+}
+
+/* ========== OPTION CARDS ========== */
+.options-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.options-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.options-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.options-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+
+@media (min-width: 540px) {
+  .options-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+.option-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 22px 14px 18px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+  position: relative;
+}
+
+.option-card:hover {
+  border-color: var(--card-hover-border);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.option-card.selected {
+  border-color: var(--orange);
+  background: var(--orange-light);
+  box-shadow: 0 0 0 3px var(--orange-glow), var(--shadow-md);
+}
+
+/* WHY: checkmark gives clear visual confirmation of selection */
+.option-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  background: var(--orange);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.option-icon {
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.option-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
+  color: var(--text);
+}
+
+.option-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ========== NAVIGATION ========== */
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 36px;
+  gap: 12px;
+}
+
+.btn {
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  letter-spacing: 0.01em;
+}
+
+.btn-back {
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--card-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-back:hover {
+  border-color: var(--card-hover-border);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-next {
+  background: var(--orange);
+  color: #fff;
+  margin-left: auto;
+  box-shadow: 0 2px 8px rgba(237, 110, 44, 0.3);
+}
+
+.btn-next:hover {
+  background: var(--orange-hover);
+  box-shadow: 0 4px 16px rgba(237, 110, 44, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-next:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ========== RESULT SCREEN ========== */
+.result-section {
+  display: none;
+  animation: slideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.result-section.active { display: block; }
+
+.result-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.result-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, var(--orange), #f59e4f);
+  color: white;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.result-header h2 {
+  font-size: 1.7rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.result-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.result-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  margin-bottom: 12px;
+  border: 1px solid var(--card-border);
+  position: relative;
+  overflow: hidden;
+}
+
+/* WHY: subtle accent stripe on left edge for visual hierarchy */
+.result-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--orange);
+  border-radius: 0 2px 2px 0;
+}
+
+.result-card h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.result-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.result-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.price-badge {
+  display: inline-block;
+  background: var(--orange-light);
+  color: var(--orange);
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* ========== CTA BUTTONS ========== */
+.cta-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.cta-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--orange);
+  color: #fff;
+  padding: 18px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(237, 110, 44, 0.3);
+  letter-spacing: 0.01em;
+}
+
+.cta-primary:hover {
+  background: var(--orange-hover);
+  box-shadow: 0 6px 24px rgba(237, 110, 44, 0.35);
+  transform: translateY(-1px);
+}
+
+.cta-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  color: var(--text);
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+
+.cta-secondary:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: var(--shadow-md);
+}
+
+.restart-btn {
+  display: block;
+  margin: 28px auto 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.restart-btn:hover { color: var(--text); }
+
+/* ========== CROSSSELL TAGS ========== */
+.extras-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.crosssell-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.crosssell-tag .tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  flex-shrink: 0;
+}
+
+/* ========== 3D BOX VISUALIZATION ========== */
+.box-scene {
+  perspective: 600px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 220px;
+  margin-bottom: 28px;
+}
+
+.box-3d {
+  position: relative;
+  transform-style: preserve-3d;
+  animation: boxSpin 12s ease-in-out infinite;
+  transform: rotateX(-20deg) rotateY(-30deg);
+}
+
+@keyframes boxSpin {
+  0%, 100% { transform: rotateX(-20deg) rotateY(-30deg); }
+  50% { transform: rotateX(-25deg) rotateY(30deg); }
+}
+
+.box-face {
+  position: absolute;
+  border: 2px solid #a0724a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6b4226;
+  backface-visibility: visible;
+}
+
+/* WHY: gradient mimics corrugated cardboard texture */
+.box-front, .box-back {
+  background: linear-gradient(180deg, #d4a574 0%, #c4915e 40%, #d4a574 42%, #c4915e 80%, #d4a574 100%);
+}
+.box-left, .box-right {
+  background: linear-gradient(180deg, #c9985a 0%, #b88548 40%, #c9985a 42%, #b88548 80%, #c9985a 100%);
+}
+.box-top {
+  background: linear-gradient(135deg, #e0b888 0%, #d4a574 50%, #c9985a 100%);
+}
+.box-bottom {
+  background: #b07840;
+}
+
+/* WHY: dimension labels on box edges show actual mm values */
+.box-label {
+  position: absolute;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--orange);
+  background: rgba(255,255,255,0.92);
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  z-index: 10;
+  letter-spacing: 0.02em;
+}
+
+/* WHY: flap triangles on top face create open-box effect */
+.box-flap {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+.box-flap-left {
+  top: -18px; left: 0;
+  border-width: 0 0 18px 40px;
+  border-color: transparent transparent #c9985a transparent;
+  transform-origin: bottom left;
+  transform: rotate(0deg);
+}
+.box-flap-right {
+  top: -18px; right: 0;
+  border-width: 0 40px 18px 0;
+  border-color: transparent #c9985a transparent transparent;
+}
+
+/* ========== CONFETTI CANVAS ========== */
+#confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ========== FOOTER ========== */
+.quiz-footer {
+  text-align: center;
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--card-border);
+}
+
+.quiz-footer p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.quiz-footer a {
+  color: var(--orange);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* ========== MOBILE ========== */
+@media (max-width: 480px) {
+  .quiz-wrapper { padding: 20px 16px 48px; }
+  .quiz-header h1 { font-size: 1.5rem; }
+  .step-question { font-size: 1.2rem; }
+  .option-card { padding: 18px 10px 14px; }
+  .option-icon { font-size: 1.5rem; }
+  .options-grid.cols-3 { grid-template-columns: repeat(2, 1fr); }
+  .result-header h2 { font-size: 1.35rem; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+<div class="quiz-wrapper">
+  <!-- Header with Paxit branding -->
+  <div class="quiz-header">
+    <div class="logo-bar">
+      <strong style="color:#ED6E2C;font-size:1.15rem;letter-spacing:-0.02em">PAXIT.pl</strong>
+      <span>Doradca opakowań</span>
+    </div>
+    <h1>Jaki karton wybrać?</h1>
+    <p>Odpowiedz na 6 pytań, a dobierzemy idealny karton dla Ciebie.</p>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-container" id="progress-container">
+    <div class="progress-meta">
+      <span class="progress-label" id="progress-label">Pytanie 1 z 6</span>
+      <span class="progress-pct" id="progress-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- STEP 1: Co wysyłasz? -->
+  <div class="step active" data-step="1">
+    <div class="step-number">Krok 1 z 6</div>
+    <div class="step-question">Co wysyłasz?</div>
+    <div class="step-hint">Wybierz kategorię produktu</div>
+    <div class="options-grid cols-4" data-key="category">
+      <div class="option-card" data-value="odziez">
+        <span class="option-icon">👕</span>
+        <div class="option-label">Odzież / Tekstylia</div>
+      </div>
+      <div class="option-card" data-value="elektronika">
+        <span class="option-icon">📱</span>
+        <div class="option-label">Elektronika</div>
+      </div>
+      <div class="option-card" data-value="kosmetyki">
+        <span class="option-icon">💄</span>
+        <div class="option-label">Kosmetyki</div>
+      </div>
+      <div class="option-card" data-value="ksiazki">
+        <span class="option-icon">📚</span>
+        <div class="option-label">Książki / Dokumenty</div>
+      </div>
+      <div class="option-card" data-value="zywnosc">
+        <span class="option-icon">🍎</span>
+        <div class="option-label">Żywność</div>
+      </div>
+      <div class="option-card" data-value="szklo">
+        <span class="option-icon">🏺</span>
+        <div class="option-label">Szkło / Ceramika</div>
+      </div>
+      <div class="option-card" data-value="bizuteria">
+        <span class="option-icon">💍</span>
+        <div class="option-label">Biżuteria / Akcesoria</div>
+      </div>
+      <div class="option-card" data-value="inne">
+        <span class="option-icon">📦</span>
+        <div class="option-label">Inne</div>
+      </div>
+    </div>
+    <div class="nav-buttons">
+      <div></div>
+      <button class="btn btn-next" disabled onclick="nextStep()">Dalej →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Rozmiar -->
+  <div class="step" data-step="2">
+    <div class="step-number">Krok 2 z 6</div>
+    <div class="step-question">Jak duży jest Twój produkt?</div>
+    <div class="step-hint">Przybliżony rozmiar najdłuższego boku</div>
+    <div class="options-grid cols-4" data-key="size">
+      <div class="option-card" data-value="maly">
+        <span class="option-icon">🔹</span>
+        <div class="option-label">Mały</div>
+        <div class="option-desc">do 15 cm</div>
+      </div>
+      <div class="option-card" data-value="sredni">
+        <span class="option-icon">🔷</span>
+        <div class="option-label">Średni</div>
+        <div class="option-desc">15–40 cm</div>
+      </div>
+      <div class="option-card" data-value="duzy">
+        <span class="option-icon">📐</span>
+        <div class="option-label">Duży</div>
+        <div class="option-desc">40–80 cm</div>
+      </div>
+      <div class="option-card" data-value="bardzo_duzy">
+        <span class="option-icon">📏</span>
+        <div class="option-label">Bardzo duży</div>
+        <div class="option-desc">80 cm+</div>
+      </div>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-back" onclick="prevStep()">← Wstecz</button>
+      <button class="btn btn-next" disabled onclick="nextStep()">Dalej →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Waga -->
+  <div class="step" data-step="3">
+    <div class="step-number">Krok 3 z 6</div>
+    <div class="step-question">Ile waży Twój produkt?</div>
+    <div class="step-hint">Przybliżona waga pojedynczej sztuki</div>
+    <div class="options-grid cols-4" data-key="weight">
+      <div class="option-card" data-value="do1">
+        <span class="option-icon">🪶</span>
+        <div class="option-label">Do 1 kg</div>
+      </div>
+      <div class="option-card" data-value="1_5">
+        <span class="option-icon">⚖️</span>
+        <div class="option-label">1–5 kg</div>
+      </div>
+      <div class="option-card" data-value="5_15">
+        <span class="option-icon">🏋️</span>
+        <div class="option-label">5–15 kg</div>
+      </div>
+      <div class="option-card" data-value="15plus">
+        <span class="option-icon">🪨</span>
+        <div class="option-label">15+ kg</div>
+      </div>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-back" onclick="prevStep()">← Wstecz</button>
+      <button class="btn btn-next" disabled onclick="nextStep()">Dalej →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Delikatność -->
+  <div class="step" data-step="4">
+    <div class="step-number">Krok 4 z 6</div>
+    <div class="step-question">Czy produkt jest delikatny?</div>
+    <div class="step-hint">Jak bardzo wymaga ochrony podczas transportu</div>
+    <div class="options-grid cols-3" data-key="fragile">
+      <div class="option-card" data-value="bardzo">
+        <span class="option-icon">⚠️</span>
+        <div class="option-label">Bardzo delikatny</div>
+        <div class="option-desc">Szkło, elektronika, ceramika</div>
+      </div>
+      <div class="option-card" data-value="umiarkowanie">
+        <span class="option-icon">🛡️</span>
+        <div class="option-label">Umiarkowanie</div>
+        <div class="option-desc">Standardowa ochrona</div>
+      </div>
+      <div class="option-card" data-value="odporny">
+        <span class="option-icon">💪</span>
+        <div class="option-label">Odporny</div>
+        <div class="option-desc">Tekstylia, książki, narzędzia</div>
+      </div>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-back" onclick="prevStep()">← Wstecz</button>
+      <button class="btn btn-next" disabled onclick="nextStep()">Dalej →</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: Sposób wysyłki -->
+  <div class="step" data-step="5">
+    <div class="step-number">Krok 5 z 6</div>
+    <div class="step-question">Jak wysyłasz?</div>
+    <div class="step-hint">Główny sposób dostawy do klienta</div>
+    <div class="options-grid cols-2" data-key="shipping">
+      <div class="option-card" data-value="paczkomat">
+        <span class="option-icon">🏧</span>
+        <div class="option-label">Paczkomat InPost</div>
+        <div class="option-desc">Gabaryt A / B / C</div>
+      </div>
+      <div class="option-card" data-value="kurier">
+        <span class="option-icon">🚚</span>
+        <div class="option-label">Kurier</div>
+        <div class="option-desc">DPD, DHL, InPost kurier</div>
+      </div>
+      <div class="option-card" data-value="poczta">
+        <span class="option-icon">📮</span>
+        <div class="option-label">Poczta Polska</div>
+        <div class="option-desc">Paczka pocztowa / Pocztex</div>
+      </div>
+      <div class="option-card" data-value="odbior">
+        <span class="option-icon">🏪</span>
+        <div class="option-label">Odbiór osobisty</div>
+        <div class="option-desc">Punkt odbioru / sklep</div>
+      </div>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-back" onclick="prevStep()">← Wstecz</button>
+      <button class="btn btn-next" disabled onclick="nextStep()">Dalej →</button>
+    </div>
+  </div>
+
+  <!-- STEP 6: Wolumen -->
+  <div class="step" data-step="6">
+    <div class="step-number">Krok 6 z 6</div>
+    <div class="step-question">Ile paczek wysyłasz miesięcznie?</div>
+    <div class="step-hint">Pomaga dobrać najlepszą cenę</div>
+    <div class="options-grid cols-4" data-key="volume">
+      <div class="option-card" data-value="1_50">
+        <span class="option-icon">📦</span>
+        <div class="option-label">1–50</div>
+        <div class="option-desc">Początkujący</div>
+      </div>
+      <div class="option-card" data-value="50_200">
+        <span class="option-icon">📦📦</span>
+        <div class="option-label">50–200</div>
+        <div class="option-desc">Rosnący biznes</div>
+      </div>
+      <div class="option-card" data-value="200_1000">
+        <span class="option-icon">🏭</span>
+        <div class="option-label">200–1000</div>
+        <div class="option-desc">E-commerce pro</div>
+      </div>
+      <div class="option-card" data-value="1000plus">
+        <span class="option-icon">🚀</span>
+        <div class="option-label">1000+</div>
+        <div class="option-desc">Duża skala</div>
+      </div>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-back" onclick="prevStep()">← Wstecz</button>
+      <button class="btn btn-next" disabled onclick="showResult()">Zobacz rekomendację →</button>
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div class="result-section" id="result-screen">
+    <div class="result-header">
+      <div class="result-badge">✓ Gotowe</div>
+      <h2>Twoja rekomendacja</h2>
+      <p>Na podstawie Twoich odpowiedzi dobraliśmy idealne opakowanie.</p>
+    </div>
+
+    <!-- 3D Box Visualization -->
+    <div class="box-scene" id="box-scene"></div>
+
+    <div class="result-card">
+      <h3>Rekomendowany karton</h3>
+      <div class="result-value" id="result-box-type"></div>
+      <div class="result-desc" id="result-box-desc"></div>
+    </div>
+
+    <div class="result-card">
+      <h3>Materiał i wytrzymałość</h3>
+      <div class="result-value" id="result-material-value"></div>
+      <div class="result-desc" id="result-material-desc"></div>
+    </div>
+
+    <div class="result-card">
+      <h3>Sugerowane wymiary</h3>
+      <div class="result-value" id="result-dims-value"></div>
+      <div class="result-desc" id="result-dims-desc"></div>
+    </div>
+
+    <div class="result-card">
+      <h3>Dodatkowe materiały</h3>
+      <div class="extras-grid" id="result-extras-tags"></div>
+    </div>
+
+    <div class="result-card">
+      <h3>Szacunkowa cena</h3>
+      <div style="margin-bottom:6px"><span class="price-badge" id="result-price-value"></span></div>
+      <div class="result-desc" id="result-price-note"></div>
+    </div>
+
+    <div class="cta-buttons">
+      <a class="cta-primary" id="cta-shop" href="https://paxit.pl" target="_blank" rel="noopener">
+        Zobacz w sklepie Paxit →
+      </a>
+      <a class="cta-secondary" href="tel:+48455455016">
+        📞 Zadzwoń do doradcy — 455 455 016
+      </a>
+    </div>
+
+    <button class="restart-btn" onclick="restartQuiz()">← Rozpocznij quiz od nowa</button>
+  </div>
+
+  <!-- Footer -->
+  <div class="quiz-footer" id="quiz-footer">
+    <p>Doradca opakowań by <a href="https://paxit.pl" target="_blank" rel="noopener">Paxit.pl</a> — producent kartonów i opakowań</p>
+  </div>
+</div>
+
+<script>
+// ========== STATE ==========
+let currentStep = 1;
+const totalSteps = 6;
+const answers = {};
+
+// ========== CARD SELECTION ==========
+document.querySelectorAll('.option-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const grid = card.closest('.options-grid');
+    const key = grid.dataset.key;
+    const value = card.dataset.value;
+
+    // WHY: deselect siblings so only one option is active per question
+    grid.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    answers[key] = value;
+
+    // WHY: enable next button only after user makes a selection
+    const step = card.closest('.step');
+    const nextBtn = step.querySelector('.btn-next');
+    if (nextBtn) nextBtn.disabled = false;
+  });
+});
+
+// ========== NAVIGATION ==========
+function updateProgress() {
+  const pct = Math.round(((currentStep - 1) / totalSteps) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `Pytanie ${currentStep} z ${totalSteps}`;
+  document.getElementById('progress-pct').textContent = pct + '%';
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const target = document.querySelector(`.step[data-step="${n}"]`);
+  if (target) target.classList.add('active');
+  currentStep = n;
+  updateProgress();
+}
+
+function nextStep() {
+  if (currentStep < totalSteps) showStep(currentStep + 1);
+}
+
+function prevStep() {
+  if (currentStep > 1) showStep(currentStep - 1);
+}
+
+function restartQuiz() {
+  Object.keys(answers).forEach(k => delete answers[k]);
+  document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.btn-next').forEach(b => b.disabled = true);
+  document.getElementById('result-screen').classList.remove('active');
+  document.getElementById('progress-container').style.display = '';
+  document.getElementById('quiz-footer').style.display = '';
+  showStep(1);
+}
+
+// ========== RECOMMENDATION ENGINE ==========
+function getRecommendation() {
+  const { category, size, weight, fragile, shipping, volume } = answers;
+
+  // --- BOX TYPE ---
+  let boxType, boxDesc, shopUrl = 'https://paxit.pl';
+
+  if (shipping === 'paczkomat') {
+    boxType = 'Karton paczkomatowy (fasonowy)';
+    boxDesc = 'Dopasowany do gabarytów InPost A/B/C — oszczędzasz na kosztach wysyłki.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-do-paczkomatow/89';
+  } else if (category === 'kosmetyki' || category === 'bizuteria') {
+    boxType = 'Pudełko fasonowe / ozdobne';
+    boxDesc = 'Elegancki wygląd z możliwością brandowania. Idealne do kosmetyków i biżuterii.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-fasonowe/90';
+  } else if (category === 'szklo' && size === 'sredni') {
+    boxType = 'Karton na butelki';
+    boxDesc = 'Przegrody wewnętrzne chronią szklane produkty.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-na-butelki/88';
+  } else if (size === 'maly' && (weight === 'do1' || weight === '1_5')) {
+    boxType = 'Karton fasonowy (tight-fit)';
+    boxDesc = 'Mniejsze opakowanie = niższy koszt wysyłki i lepsza prezentacja.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-fasonowe/90';
+  } else if (size === 'bardzo_duzy' || weight === '15plus') {
+    boxType = 'Karton klapowy wielkogabarytowy';
+    boxDesc = 'Wytrzymały karton na duże i ciężkie przesyłki. FEFCO 0201.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-klapowe/91';
+  } else if (size === 'duzy') {
+    boxType = 'Karton klapowy duży (FEFCO 0201)';
+    boxDesc = 'Uniwersalny karton klapowy — standard branżowy dla większych produktów.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-klapowe/91';
+  } else {
+    boxType = 'Karton klapowy (FEFCO 0201)';
+    boxDesc = 'Najbardziej popularny typ kartonu. Uniwersalny i łatwy w składaniu.';
+    shopUrl = 'https://paxit.pl/pl/c/Kartony-klapowe/91';
+  }
+
+  // --- MATERIAL ---
+  let material, materialDesc;
+
+  if (weight === '15plus' && fragile === 'bardzo') {
+    material = '5-warstwowa, fala BC (6,2 mm)';
+    materialDesc = 'Maksymalna ochrona — podwójna fala dla ciężkich i delikatnych produktów.';
+  } else if (weight === '5_15' || weight === '15plus' || fragile === 'bardzo') {
+    material = '5-warstwowa, fala EB (4,2 mm)';
+    materialDesc = 'Wzmocniona tektura — odporna na naciski i wibracje.';
+  } else if (weight === '1_5' || fragile === 'umiarkowanie') {
+    material = '3-warstwowa, fala C (3,7 mm)';
+    materialDesc = 'Dobry kompromis wytrzymałości i ceny. Standard e-commerce.';
+  } else {
+    material = '3-warstwowa, fala B (2,7 mm)';
+    materialDesc = 'Lekka i ekonomiczna — idealna do produktów odpornych.';
+  }
+
+  // --- DIMENSIONS ---
+  let dims, dimsNote;
+
+  if (shipping === 'paczkomat') {
+    if (size === 'maly') {
+      dims = '80 × 380 × 640 mm (gabaryt A)';
+      dimsNote = 'Mieści się w najmniejszej skrytce paczkomatu.';
+    } else if (size === 'sredni') {
+      dims = '190 × 380 × 640 mm (gabaryt B)';
+      dimsNote = 'Średni gabaryt InPost — najpopularniejszy.';
+    } else {
+      dims = '410 × 380 × 640 mm (gabaryt C)';
+      dimsNote = 'Największa skrytka paczkomatu.';
+    }
+  } else if (size === 'maly') {
+    dims = '150 × 100 × 100 mm';
+    dimsNote = 'Kompaktowy rozmiar — oszczędza na wypełniaczu.';
+  } else if (size === 'sredni') {
+    dims = '350 × 250 × 150 mm';
+    dimsNote = 'Uniwersalny wymiar dla średnich produktów.';
+  } else if (size === 'duzy') {
+    dims = '600 × 400 × 300 mm';
+    dimsNote = 'Standardowy duży karton kurierski.';
+  } else {
+    dims = '800 × 600 × 400 mm';
+    dimsNote = 'Wielkogabarytowy — sprawdź limit wagi u przewoźnika.';
+  }
+
+  // --- EXTRAS (cross-sell) ---
+  const extras = [];
+  extras.push({ name: 'Taśma pakowa', why: 'Niezbędna do zamknięcia kartonu' });
+
+  if (fragile === 'bardzo') {
+    extras.push({ name: 'Wypełniacz ekologiczny', why: 'Amortyzuje wstrząsy' });
+    extras.push({ name: 'Folia bąbelkowa', why: 'Dodatkowa warstwa ochrony' });
+  } else if (fragile === 'umiarkowanie') {
+    extras.push({ name: 'Wypełniacz papierowy', why: 'Chroni przed przesuwaniem' });
+  }
+
+  if (category === 'kosmetyki' || category === 'bizuteria') {
+    extras.push({ name: 'Bibułka tissue', why: 'Elegancki unboxing' });
+    extras.push({ name: 'Sznurek ozdobny', why: 'Efekt premium' });
+  }
+
+  if (category === 'zywnosc') {
+    extras.push({ name: 'Papier parafinowy', why: 'Izolacja od wilgoci' });
+  }
+
+  if (volume === '200_1000' || volume === '1000plus') {
+    extras.push({ name: 'Stretch folia', why: 'Do paletyzacji' });
+  }
+
+  // --- PRICE ESTIMATE ---
+  const sizeMultiplier = { maly: 1, sredni: 1.8, duzy: 3, bardzo_duzy: 5 };
+  const materialMultiplier = material.includes('5-warstwowa') ? 2.2 : 1;
+  const basePrice = 0.8;
+  const sm = sizeMultiplier[size] || 2;
+  const low = (basePrice * sm * materialMultiplier).toFixed(2);
+  const high = (basePrice * sm * materialMultiplier * 1.6).toFixed(2);
+  const priceRange = `${low} – ${high} zł / szt.`;
+
+  let priceNote;
+  if (volume === '200_1000' || volume === '1000plus') {
+    priceNote = 'Przy większych zamówieniach cena niższa — zapytaj o rabat hurtowy.';
+  } else {
+    priceNote = 'Cena orientacyjna. Dokładna zależy od wymiarów i zamówionej ilości.';
+  }
+
+  return { boxType, boxDesc, shopUrl, material, materialDesc, dims, dimsNote, extras, priceRange, priceNote };
+}
+
+// ========== 3D BOX RENDERER ==========
+function renderBox3D(dimsStr) {
+  // WHY: parse "350 × 250 × 150 mm" into numeric W, H, D
+  const nums = dimsStr.replace(/[^0-9×x,.\s]/gi, '').split(/[×x,]+/).map(s => parseInt(s.trim()));
+  if (nums.length < 3) return;
+
+  const [rawW, rawD, rawH] = [nums[0], nums[1], nums[2] || nums[1]];
+  const maxDim = Math.max(rawW, rawD, rawH);
+  const scale = 120 / maxDim;
+  const w = Math.max(40, Math.round(rawW * scale));
+  const d = Math.max(25, Math.round(rawD * scale));
+  const h = Math.max(25, Math.round(rawH * scale));
+
+  const hw = w / 2, hd = d / 2, hh = h / 2;
+
+  const scene = document.getElementById('box-scene');
+  scene.innerHTML = `
+    <div class="box-3d" style="width:${w}px;height:${h}px">
+      <!-- Front -->
+      <div class="box-face box-front" style="width:${w}px;height:${h}px;transform:translateZ(${hd}px)">
+        <span style="opacity:0.4">${rawW}mm</span>
+      </div>
+      <!-- Back -->
+      <div class="box-face box-back" style="width:${w}px;height:${h}px;transform:rotateY(180deg) translateZ(${hd}px)"></div>
+      <!-- Right -->
+      <div class="box-face box-right" style="width:${d}px;height:${h}px;transform:rotateY(90deg) translateZ(${hw}px)">
+        <span style="opacity:0.4">${rawD}mm</span>
+      </div>
+      <!-- Left -->
+      <div class="box-face box-left" style="width:${d}px;height:${h}px;transform:rotateY(-90deg) translateZ(${hw}px)"></div>
+      <!-- Top (open flaps) -->
+      <div class="box-face box-top" style="width:${w}px;height:${d}px;transform:rotateX(90deg) translateZ(${hh}px)">
+        <div class="box-flap box-flap-left" style="border-width:0 0 ${Math.min(18, d*0.3)}px ${w*0.5}px"></div>
+        <div class="box-flap box-flap-right" style="border-width:0 ${w*0.5}px ${Math.min(18, d*0.3)}px 0"></div>
+      </div>
+      <!-- Bottom -->
+      <div class="box-face box-bottom" style="width:${w}px;height:${d}px;transform:rotateX(-90deg) translateZ(${hh}px)"></div>
+      <!-- Dimension labels -->
+      <div class="box-label" style="bottom:${-22}px;left:50%;transform:translateX(-50%)">${rawW} × ${rawD} × ${rawH} mm</div>
+    </div>
+  `;
+}
+
+// ========== CONFETTI ==========
+function fireConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  // WHY: Paxit brand colors + neutral party colors
+  const colors = ['#ED6E2C', '#f59e4f', '#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa'];
+  const particles = [];
+  const count = 120;
+
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: canvas.width * 0.5 + (Math.random() - 0.5) * 200,
+      y: canvas.height * 0.3,
+      vx: (Math.random() - 0.5) * 12,
+      vy: Math.random() * -14 - 4,
+      w: Math.random() * 8 + 4,
+      h: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 12,
+      gravity: 0.18 + Math.random() * 0.08,
+      opacity: 1,
+      decay: 0.008 + Math.random() * 0.006
+    });
+  }
+
+  let animId;
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+
+    particles.forEach(p => {
+      if (p.opacity <= 0) return;
+      alive = true;
+      p.x += p.vx;
+      p.vy += p.gravity;
+      p.y += p.vy;
+      p.rotation += p.rotSpeed;
+      p.opacity -= p.decay;
+      p.vx *= 0.99;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.globalAlpha = Math.max(0, p.opacity);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+
+    if (alive) {
+      animId = requestAnimationFrame(animate);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      cancelAnimationFrame(animId);
+    }
+  }
+  animate();
+}
+
+// ========== SHOW RESULT ==========
+function showResult() {
+  const r = getRecommendation();
+
+  // WHY: hide quiz UI to show only results
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('progress-container').style.display = 'none';
+
+  document.getElementById('result-box-type').textContent = r.boxType;
+  document.getElementById('result-box-desc').textContent = r.boxDesc;
+  document.getElementById('result-material-value').textContent = r.material;
+  document.getElementById('result-material-desc').textContent = r.materialDesc;
+  document.getElementById('result-dims-value').textContent = r.dims;
+  document.getElementById('result-dims-desc').textContent = r.dimsNote;
+
+  document.getElementById('result-extras-tags').innerHTML = r.extras.map(e =>
+    `<span class="crosssell-tag"><span class="tag-dot"></span>${e.name}</span>`
+  ).join('');
+
+  document.getElementById('result-price-value').textContent = r.priceRange;
+  document.getElementById('result-price-note').textContent = r.priceNote;
+  document.getElementById('cta-shop').href = r.shopUrl;
+
+  // WHY: render 3D box with actual recommended dimensions
+  renderBox3D(r.dims);
+
+  document.getElementById('result-screen').classList.add('active');
+
+  // WHY: confetti celebration makes the result feel rewarding
+  setTimeout(fireConfetti, 300);
+}
+
+updateProgress();
+
+</script>
+</body>
+</html>
