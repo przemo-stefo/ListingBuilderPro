@@ -5,6 +5,7 @@
 from .product import Product, ProductStatus
 from .jobs import ImportJob, BulkJob, SyncLog, Webhook, JobStatus
 from .compliance import ComplianceReport, ComplianceReportItem
+from .optimization import OptimizationRun
 
 __all__ = [
     "Product",
@@ -16,4 +17,5 @@ __all__ = [
     "JobStatus",
     "ComplianceReport",
     "ComplianceReportItem",
+    "OptimizationRun",
 ]

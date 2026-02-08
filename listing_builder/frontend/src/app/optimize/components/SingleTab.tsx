@@ -33,7 +33,11 @@ const MARKETPLACES = [
   { id: 'kaufland', name: 'Kaufland', flag: 'DE' },
 ]
 
-export default function SingleTab() {
+interface SingleTabProps {
+  loadedResult?: OptimizerResponse | null
+}
+
+export default function SingleTab({ loadedResult }: SingleTabProps) {
   // Form state
   const [productTitle, setProductTitle] = useState('')
   const [brand, setBrand] = useState('')
@@ -42,8 +46,9 @@ export default function SingleTab() {
   const [marketplace, setMarketplace] = useState('amazon_de')
   const [mode, setMode] = useState<'aggressive' | 'standard'>('aggressive')
 
-  // Results
+  // Results — use loaded result from history if provided
   const [results, setResults] = useState<OptimizerResponse | null>(null)
+  const displayResults = loadedResult ?? results
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Collapsible sections
@@ -300,20 +305,21 @@ export default function SingleTab() {
       </div>
 
       {/* Results */}
-      {results && (results.status === 'success' || results.status === 'completed') && (
+      {displayResults && (displayResults.status === 'success' || displayResults.status === 'completed') && (
         <div className="space-y-4">
-          <ScoresCard scores={results.scores} intel={results.keyword_intel} />
+          <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} />
           <ListingCard
-            listing={results.listing}
-            compliance={results.compliance}
+            listing={displayResults.listing}
+            compliance={displayResults.compliance}
             copiedField={copiedField}
             onCopy={copyToClipboard}
+            fullResponse={displayResults}
           />
-          <KeywordIntelCard intel={results.keyword_intel} />
+          <KeywordIntelCard intel={displayResults.keyword_intel} />
         </div>
       )}
 
-      {results && results.status === 'error' && (
+      {displayResults && displayResults.status === 'error' && (
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-red-400">
