@@ -310,6 +310,20 @@ def _call_groq(prompt: str, temperature: float, max_tokens: int) -> str:
     return response.choices[0].message.content.strip()
 
 
+# --- Post-processing: strip promo words LLM may have slipped in ---
+
+def _strip_promo_words(text: str) -> str:
+    """Remove promotional words from LLM output, clean up leftover whitespace."""
+    result = text
+    for pw in PROMO_WORDS:
+        # WHY: word-boundary match to avoid stripping partial words (e.g. "ideal" from "ideally")
+        result = re.sub(rf"\b{re.escape(pw)}\b", "", result, flags=re.IGNORECASE)
+    # Clean up double spaces / leading commas left after removal
+    result = re.sub(r"\s{2,}", " ", result)
+    result = re.sub(r"\s,", ",", result)
+    return result.strip()
+
+
 # --- Main entry point ---
 
 async def optimize_listing(
@@ -368,6 +382,11 @@ async def optimize_listing(
         for line in bullets_raw.split("\n")
         if line.strip() and len(line.strip()) > 10
     ][:5]
+
+    # WHY: LLM sometimes ignores "no promotional words" instruction — strip them
+    title_text = _strip_promo_words(title_text)
+    bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
+    desc_text = _strip_promo_words(desc_text)
 
     # 3. Backend keyword packing
     full_listing_text = title_text + " " + " ".join(bullet_lines) + " " + desc_text
