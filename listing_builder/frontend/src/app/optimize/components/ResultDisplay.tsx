@@ -13,12 +13,31 @@ import {
   XCircle,
   Copy,
   Check,
+  Download,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { OptimizerResponse } from '@/lib/types'
+
+// WHY: Client-side CSV export — no backend needed, data already in memory
+export function downloadCSV(response: OptimizerResponse) {
+  const { listing, scores, compliance, marketplace, brand } = response
+  const headers = ['Title', 'Bullet 1', 'Bullet 2', 'Bullet 3', 'Bullet 4', 'Bullet 5', 'Description', 'Backend Keywords', 'Coverage %', 'Compliance', 'Marketplace', 'Brand']
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const bullets = [...listing.bullet_points]
+  while (bullets.length < 5) bullets.push('')
+  const row = [listing.title, ...bullets.slice(0, 5), listing.description, listing.backend_keywords, String(scores.coverage_pct), compliance.status, marketplace, brand].map(esc)
+  const csv = [headers.join(','), row.join(',')].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `listing_${brand}_${marketplace}_${Date.now()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // WHY: Separate component for scores to keep result display clean
 export function ScoresCard({
@@ -104,37 +123,47 @@ export function ListingCard({
   compliance,
   copiedField,
   onCopy,
+  fullResponse,
 }: {
   listing: OptimizerResponse['listing']
   compliance: OptimizerResponse['compliance']
   copiedField: string | null
   onCopy: (text: string, field: string) => void
+  fullResponse?: OptimizerResponse
 }) {
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Generated Listing</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const full = [
-                `TITLE:\n${listing.title}`,
-                `\nBULLET POINTS:\n${listing.bullet_points.join('\n')}`,
-                `\nDESCRIPTION:\n${listing.description}`,
-                `\nBACKEND KEYWORDS:\n${listing.backend_keywords}`,
-              ].join('\n')
-              onCopy(full, 'all')
-            }}
-          >
-            {copiedField === 'all' ? (
-              <Check className="mr-1 h-3 w-3" />
-            ) : (
-              <Copy className="mr-1 h-3 w-3" />
+          <div className="flex items-center gap-2">
+            {fullResponse && (
+              <Button variant="outline" size="sm" onClick={() => downloadCSV(fullResponse)}>
+                <Download className="mr-1 h-3 w-3" />
+                CSV
+              </Button>
             )}
-            Copy All
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const full = [
+                  `TITLE:\n${listing.title}`,
+                  `\nBULLET POINTS:\n${listing.bullet_points.join('\n')}`,
+                  `\nDESCRIPTION:\n${listing.description}`,
+                  `\nBACKEND KEYWORDS:\n${listing.backend_keywords}`,
+                ].join('\n')
+                onCopy(full, 'all')
+              }}
+            >
+              {copiedField === 'all' ? (
+                <Check className="mr-1 h-3 w-3" />
+              ) : (
+                <Copy className="mr-1 h-3 w-3" />
+              )}
+              Copy All
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

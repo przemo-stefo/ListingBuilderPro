@@ -2,12 +2,15 @@
 # Purpose: API endpoints for listing optimization via direct Groq service
 # NOT for: LLM prompts or keyword logic (that's in services/optimizer_service.py)
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from sqlalchemy.orm import Session
 import structlog
 
 from services.optimizer_service import optimize_listing
+from database import get_db
+from models.optimization import OptimizationRun
 
 logger = structlog.get_logger()
 
@@ -80,7 +83,7 @@ class OptimizerResponse(BaseModel):
 
 
 @router.post("/generate", response_model=OptimizerResponse)
-async def generate_listing(request: OptimizerRequest):
+async def generate_listing(request: OptimizerRequest, db: Session = Depends(get_db)):
     """
     Generate an optimized listing using Groq LLM + keyword analysis.
 
@@ -114,6 +117,23 @@ async def generate_listing(request: OptimizerRequest):
             coverage=result.get("scores", {}).get("coverage_pct", 0),
             compliance=result.get("compliance", {}).get("status", "UNKNOWN"),
         )
+
+        # WHY: Auto-save to history — non-blocking, don't fail the response if DB save fails
+        try:
+            run = OptimizationRun(
+                product_title=request.product_title,
+                brand=request.brand,
+                marketplace=request.marketplace,
+                mode=request.mode,
+                coverage_pct=result.get("scores", {}).get("coverage_pct", 0),
+                compliance_status=result.get("compliance", {}).get("status", "UNKNOWN"),
+                request_data=request.model_dump(),
+                response_data=result,
+            )
+            db.add(run)
+            db.commit()
+        except Exception as save_err:
+            logger.warning("optimizer_history_save_failed", error=str(save_err))
 
         return result
 
@@ -212,6 +232,74 @@ async def generate_batch(request: BatchOptimizerRequest):
         failed=failed,
         results=results,
     )
+
+
+# --- History endpoints ---
+
+@router.get("/history")
+async def list_history(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """List optimization runs, newest first."""
+    offset = (page - 1) * page_size
+    total = db.query(OptimizationRun).count()
+    runs = (
+        db.query(OptimizationRun)
+        .order_by(OptimizationRun.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "product_title": r.product_title,
+                "brand": r.brand,
+                "marketplace": r.marketplace,
+                "mode": r.mode,
+                "coverage_pct": r.coverage_pct,
+                "compliance_status": r.compliance_status,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in runs
+        ],
+        "total": total,
+        "page": page,
+    }
+
+
+@router.get("/history/{run_id}")
+async def get_history_detail(run_id: int, db: Session = Depends(get_db)):
+    """Get a single run with full response_data for reload."""
+    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return {
+        "id": run.id,
+        "product_title": run.product_title,
+        "brand": run.brand,
+        "marketplace": run.marketplace,
+        "mode": run.mode,
+        "coverage_pct": run.coverage_pct,
+        "compliance_status": run.compliance_status,
+        "request_data": run.request_data,
+        "response_data": run.response_data,
+        "created_at": run.created_at.isoformat() if run.created_at else None,
+    }
+
+
+@router.delete("/history/{run_id}")
+async def delete_history(run_id: int, db: Session = Depends(get_db)):
+    """Delete a single optimization run."""
+    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    db.delete(run)
+    db.commit()
+    return {"status": "deleted", "id": run_id}
 
 
 @router.get("/health")

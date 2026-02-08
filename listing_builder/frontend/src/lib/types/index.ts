@@ -550,6 +550,30 @@ export interface ParsedBatchProduct {
   category?: string
 }
 
+// Optimization History types
+export interface OptimizationHistoryItem {
+  id: number
+  product_title: string
+  brand: string
+  marketplace: string
+  mode: string
+  coverage_pct: number
+  compliance_status: string
+  created_at: string
+}
+
+export interface OptimizationHistoryList {
+  items: OptimizationHistoryItem[]
+  total: number
+  page: number
+}
+
+// WHY: Detail includes full response for reload
+export interface OptimizationHistoryDetail extends OptimizationHistoryItem {
+  request_data: OptimizerRequest
+  response_data: OptimizerResponse
+}
+
 // Error types
 export interface ApiError {
   message: string
