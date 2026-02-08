@@ -140,6 +140,43 @@ def _pack_backend_keywords(
             continue
         _try_add(word)
 
+    # Pass 3: plural/singular variants to catch alternate searches
+    # WHY: Amazon treats "bottle" and "bottles" as different search terms —
+    # adding the missing variant catches more customer queries
+    # Skip short words, abbreviations, numbers — they don't have useful variants
+    # WHY: Adjectives, prepositions, abbreviations don't have useful plural forms
+    skip_variant = {
+        "bpa", "ml", "cm", "kg", "oz", "mm", "xl", "xxl",
+        "free", "steel", "stainless", "insulated", "vacuum",
+        "safe", "portable", "durable", "large", "small",
+        "cold", "warm", "with", "from", "pour", "pour",
+    }
+    combined = listing_lower + " " + " ".join(packed).lower()
+    variants: List[str] = []
+    for word in list(all_roots.keys()):
+        if len(word) < 4 or word in skip_variant or any(c.isdigit() for c in word):
+            continue
+        # WHY: Only generate variants that are real words shoppers search for
+        if word.endswith("s") and len(word) > 4 and len(word) <= 9:
+            # Plural → singular (bottles→bottle)
+            singular = word[:-1]
+            if singular not in combined and singular not in packed_words:
+                variants.append(singular)
+        elif not word.endswith("s") and len(word) <= 8:
+            # Singular → plural (bottle→bottles, flask→flasks)
+            plural = word + "s"
+            if plural not in combined and plural not in packed_words:
+                variants.append(plural)
+        # German: -e endings → -en plural (Flasche→Flaschen, Kanne→Kannen)
+        # WHY: German compound nouns are long (>8 chars), so this won't clash with English
+        if word.endswith("e") and len(word) >= 8:
+            de_plural = word + "n"
+            if de_plural not in combined and de_plural not in packed_words:
+                variants.append(de_plural)
+
+    for v in variants:
+        _try_add(v)
+
     return " ".join(packed)
 
 
