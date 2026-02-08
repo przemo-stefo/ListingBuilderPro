@@ -27,9 +27,6 @@ class Settings(BaseSettings):
     supabase_service_key: str
     database_url: str
 
-    # Redis Queue
-    redis_url: str = "redis://localhost:6379/0"
-
     # AI/LLM - Groq (PRIMARY, NOT OpenAI)
     groq_api_key: str
 

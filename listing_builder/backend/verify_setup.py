@@ -24,8 +24,6 @@ def check_dependencies():
         "sqlalchemy",
         "supabase",
         "groq",
-        "redis",
-        "dramatiq",
         "pydantic",
         "structlog",
     ]

@@ -13,11 +13,6 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 alembic==1.13.1
 
-# Background Jobs
-redis==5.0.1
-dramatiq==1.16.0
-dramatiq[redis,watch]==1.16.0
-
 # AI/LLM (Groq - NOT OpenAI!)
 groq==0.4.1
 

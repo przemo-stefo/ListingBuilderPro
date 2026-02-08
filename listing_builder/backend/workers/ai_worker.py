@@ -1,69 +1,84 @@
 # /Users/shawn/Projects/ListingBuilderPro/listing_builder/backend/workers/ai_worker.py
-# Purpose: Background worker for AI optimization tasks
-# NOT for: Synchronous API operations
+# Purpose: Background task functions for AI optimization (FastAPI BackgroundTasks)
+# NOT for: Dramatiq/Redis — we use in-process background tasks to stay on free tier
 
-import dramatiq
-from dramatiq.brokers.redis import RedisBroker
 from services.ai_service import AIService
+from models import BulkJob, JobStatus
 from database import SessionLocal
-from config import settings
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
 
-# Setup Redis broker
-redis_broker = RedisBroker(url=settings.redis_url)
-dramatiq.set_broker(redis_broker)
 
-
-@dramatiq.actor(max_retries=3, time_limit=300000)  # 5 min timeout
-def optimize_product_task(product_id: int, target_marketplace: str = "amazon"):
+def run_batch_optimize(job_id: int, product_ids: list, target_marketplace: str):
     """
-    Background task to optimize a product listing.
-    This runs in a separate worker process.
+    Background function for batch AI optimization.
+    Called by FastAPI BackgroundTasks — runs in same process, no Redis needed.
 
-    Usage:
-        optimize_product_task.send(product_id=123, target_marketplace="amazon")
+    WHY not Dramatiq: Saves $7/mo Render Background Worker cost.
+    Tradeoff: No retries, no persistence across restarts. Good enough for now.
     """
-    logger.info("ai_worker_started", product_id=product_id, marketplace=target_marketplace)
-
     db = SessionLocal()
     try:
+        # Mark job as running
+        job = db.query(BulkJob).filter(BulkJob.id == job_id).first()
+        if not job:
+            logger.error("batch_job_not_found", job_id=job_id)
+            return
+        job.status = JobStatus.RUNNING
+        db.commit()
+
+        logger.info("batch_optimize_started", job_id=job_id, count=len(product_ids))
+
+        results = []
         service = AIService(db)
-        product = service.optimize_product(product_id, target_marketplace)
-        logger.info("ai_worker_completed", product_id=product_id, score=product.optimization_score)
-        return {"status": "success", "product_id": product_id, "score": product.optimization_score}
+
+        for product_id in product_ids:
+            try:
+                product = service.optimize_product(product_id, target_marketplace)
+                results.append({
+                    "product_id": product_id,
+                    "status": "success",
+                    "score": product.optimization_score,
+                })
+                job.success_count += 1
+            except Exception as e:
+                results.append({
+                    "product_id": product_id,
+                    "status": "failed",
+                    "error": str(e),
+                })
+                job.failed_count += 1
+                logger.warning("batch_item_failed", product_id=product_id, error=str(e))
+
+            # Update progress after each product
+            job.results = results
+            db.commit()
+
+        # Mark completed
+        job.status = JobStatus.COMPLETED
+        job.completed_at = datetime.now(timezone.utc)
+        job.results = results
+        db.commit()
+
+        logger.info(
+            "batch_optimize_completed",
+            job_id=job_id,
+            success=job.success_count,
+            failed=job.failed_count,
+        )
+
     except Exception as e:
-        logger.error("ai_worker_failed", error=str(e), product_id=product_id)
-        raise
+        logger.error("batch_optimize_crashed", job_id=job_id, error=str(e))
+        try:
+            job = db.query(BulkJob).filter(BulkJob.id == job_id).first()
+            if job:
+                job.status = JobStatus.FAILED
+                job.error_log = [{"error": str(e)}]
+                job.completed_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
     finally:
         db.close()
-
-
-@dramatiq.actor(max_retries=3)
-def batch_optimize_task(product_ids: list, target_marketplace: str = "amazon"):
-    """
-    Background task to optimize multiple products.
-    Can be slow for large batches - consider splitting.
-    """
-    logger.info("batch_ai_worker_started", count=len(product_ids))
-
-    results = []
-    for product_id in product_ids:
-        try:
-            # Call the single product optimization task
-            result = optimize_product_task(product_id, target_marketplace)
-            results.append(result)
-        except Exception as e:
-            results.append({"status": "failed", "product_id": product_id, "error": str(e)})
-
-    success_count = sum(1 for r in results if r.get("status") == "success")
-    logger.info("batch_ai_worker_completed", total=len(product_ids), success=success_count)
-
-    return results
-
-
-if __name__ == "__main__":
-    # Run worker with: python -m workers.ai_worker
-    # Or use dramatiq CLI: dramatiq workers.ai_worker
-    logger.info("ai_worker_ready")
