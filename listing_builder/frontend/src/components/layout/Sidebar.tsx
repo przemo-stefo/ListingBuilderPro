@@ -10,17 +10,11 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
   Package,
-  ClipboardList,
-  Hash,
-  Users,
-  Warehouse,
-  BarChart3,
   Upload,
   ArrowRightLeft,
   Sparkles,
   Send,
   Shield,
-  Settings
 } from 'lucide-react'
 
 const navItems = [
@@ -35,39 +29,9 @@ const navItems = [
     icon: Package,
   },
   {
-    title: 'Listings',
-    href: '/listings',
-    icon: ClipboardList,
-  },
-  {
-    title: 'Keywords',
-    href: '/keywords',
-    icon: Hash,
-  },
-  {
-    title: 'Competitors',
-    href: '/competitors',
-    icon: Users,
-  },
-  {
-    title: 'Inventory',
-    href: '/inventory',
-    icon: Warehouse,
-  },
-  {
-    title: 'Analytics',
-    href: '/analytics',
-    icon: BarChart3,
-  },
-  {
     title: 'Import',
     href: '/products/import',
     icon: Upload,
-  },
-  {
-    title: 'Converter',
-    href: '/converter',
-    icon: ArrowRightLeft,
   },
   {
     title: 'Optimize',
@@ -75,9 +39,9 @@ const navItems = [
     icon: Sparkles,
   },
   {
-    title: 'Publish',
-    href: '/publish',
-    icon: Send,
+    title: 'Converter',
+    href: '/converter',
+    icon: ArrowRightLeft,
   },
   {
     title: 'Compliance',
@@ -85,9 +49,9 @@ const navItems = [
     icon: Shield,
   },
   {
-    title: 'Settings',
-    href: '/settings',
-    icon: Settings,
+    title: 'Publish',
+    href: '/publish',
+    icon: Send,
   },
 ]
 

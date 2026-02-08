@@ -13,7 +13,7 @@ from config import settings
 from database import init_db, check_db_connection
 
 # Import routers
-from api import import_routes, ai_routes, export_routes, product_routes
+from api import import_routes, export_routes, product_routes
 from api import listings_routes, keywords_routes, competitors_routes
 from api import inventory_routes, analytics_routes, settings_routes
 from api import compliance_routes
@@ -96,7 +96,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(import_routes.router)
-app.include_router(ai_routes.router)
 app.include_router(export_routes.router)
 app.include_router(product_routes.router)
 app.include_router(listings_routes.router)
@@ -120,7 +119,6 @@ async def root():
         "environment": settings.app_env,
         "endpoints": {
             "import": "/api/import",
-            "ai": "/api/ai",
             "export": "/api/export",
             "products": "/api/products",
             "listings": "/api/listings",
