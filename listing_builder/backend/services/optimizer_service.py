@@ -17,11 +17,13 @@ logger = structlog.get_logger()
 MARKETPLACE_LIMITS = {
     "amazon_de": {"title": 200, "bullet": 500, "backend": 249, "lang": "de"},
     "amazon_com": {"title": 200, "bullet": 500, "backend": 249, "lang": "en"},
-    "amazon_fr": {"title": 200, "bullet": 500, "backend": 249, "lang": "fr"},
-    "amazon_it": {"title": 200, "bullet": 500, "backend": 249, "lang": "it"},
-    "amazon_es": {"title": 200, "bullet": 500, "backend": 249, "lang": "es"},
-    "ebay_de":   {"title": 80,  "bullet": 300, "backend": 0,   "lang": "de"},
-    "kaufland":  {"title": 150, "bullet": 400, "backend": 0,   "lang": "de"},
+    "amazon_us":  {"title": 200, "bullet": 500, "backend": 249, "lang": "en"},  # WHY: Frontend sends amazon_us
+    "amazon_pl":  {"title": 200, "bullet": 500, "backend": 249, "lang": "pl"},
+    "amazon_fr":  {"title": 200, "bullet": 500, "backend": 249, "lang": "fr"},
+    "amazon_it":  {"title": 200, "bullet": 500, "backend": 249, "lang": "it"},
+    "amazon_es":  {"title": 200, "bullet": 500, "backend": 249, "lang": "es"},
+    "ebay_de":    {"title": 80,  "bullet": 300, "backend": 0,   "lang": "de"},
+    "kaufland":   {"title": 150, "bullet": 400, "backend": 0,   "lang": "de"},
 }
 
 MODEL = "llama-3.3-70b-versatile"
