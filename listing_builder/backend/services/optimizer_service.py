@@ -93,26 +93,50 @@ def _pack_backend_keywords(
     """
     Greedy byte-packing: add keywords not already in the listing text,
     separated by spaces, up to max_bytes (249 for Amazon).
+    WHY: Two passes — first unused full phrases, then individual root words
+    that didn't appear in visible listing. This maximizes search coverage.
     """
     if max_bytes <= 0:
         return ""
 
     listing_lower = listing_text.lower()
     packed: List[str] = []
+    packed_words: set = set()
     current_bytes = 0
 
+    def _try_add(text: str) -> bool:
+        nonlocal current_bytes
+        text_bytes = len(text.encode("utf-8"))
+        separator_bytes = 1 if packed else 0
+        if current_bytes + separator_bytes + text_bytes <= max_bytes:
+            packed.append(text)
+            current_bytes += separator_bytes + text_bytes
+            packed_words.update(text.lower().split())
+            return True
+        return False
+
+    # Pass 1: full phrases not already covered in listing
     for kw in keywords:
         phrase = kw["phrase"].strip()
-        # WHY: Skip if every word already appears in title/bullets/description
         phrase_words = phrase.lower().split()
         if all(w in listing_lower for w in phrase_words):
             continue
+        _try_add(phrase)
 
-        phrase_bytes = len(phrase.encode("utf-8"))
-        separator_bytes = 1 if packed else 0
-        if current_bytes + separator_bytes + phrase_bytes <= max_bytes:
-            packed.append(phrase)
-            current_bytes += separator_bytes + phrase_bytes
+    # Pass 2: individual root words not in listing or already packed
+    # WHY: Amazon indexes individual words — adding roots that aren't
+    # in visible content expands search match surface within 249 bytes
+    all_roots: Dict[str, int] = {}
+    for kw in keywords:
+        for w in kw["phrase"].lower().split():
+            w = w.strip(".,;:-()[]")
+            if len(w) >= 2:
+                all_roots[w] = all_roots.get(w, 0) + kw.get("search_volume", 0)
+
+    for word, _ in sorted(all_roots.items(), key=lambda x: x[1], reverse=True):
+        if word in listing_lower or word in packed_words:
+            continue
+        _try_add(word)
 
     return " ".join(packed)
 
