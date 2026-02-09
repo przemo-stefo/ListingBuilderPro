@@ -6,21 +6,19 @@ from sqlalchemy import (
     Column, String, Integer, Float, Boolean, JSON, DateTime, Text,
     ForeignKey, UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
 import uuid
 
 
-def _uuid():
-    return str(uuid.uuid4())
-
-
 class TrackedProduct(Base):
     """A product being monitored across a specific marketplace."""
     __tablename__ = "tracked_products"
 
-    id = Column(String(36), primary_key=True, default=_uuid)
+    # WHY PG_UUID: DB column is UUID type (from migration), not VARCHAR
+    id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(Text, nullable=False, index=True)
     marketplace = Column(String(50), nullable=False)
     product_id = Column(Text, nullable=False)
@@ -46,9 +44,9 @@ class MonitoringSnapshot(Base):
     """Point-in-time capture of product price/stock/status."""
     __tablename__ = "monitoring_snapshots"
 
-    id = Column(String(36), primary_key=True, default=_uuid)
+    id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     tracked_product_id = Column(
-        String(36),
+        PG_UUID(as_uuid=False),
         ForeignKey("tracked_products.id", ondelete="CASCADE"),
         index=True,
     )
@@ -66,7 +64,7 @@ class AlertConfig(Base):
     """User-defined rule: when to fire an alert."""
     __tablename__ = "alert_configs"
 
-    id = Column(String(36), primary_key=True, default=_uuid)
+    id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(Text, nullable=False, index=True)
     alert_type = Column(String(50), nullable=False)
     name = Column(Text, nullable=False)
@@ -91,9 +89,9 @@ class Alert(Base):
     """A single triggered alert instance."""
     __tablename__ = "alerts"
 
-    id = Column(String(36), primary_key=True, default=_uuid)
+    id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     config_id = Column(
-        String(36),
+        PG_UUID(as_uuid=False),
         ForeignKey("alert_configs.id", ondelete="CASCADE"),
         index=True,
     )
