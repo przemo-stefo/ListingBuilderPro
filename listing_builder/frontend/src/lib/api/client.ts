@@ -65,7 +65,7 @@ apiClient.interceptors.response.use(
 
 // Generic API wrapper with error handling
 export async function apiRequest<T>(
-  method: 'get' | 'post' | 'put' | 'delete',
+  method: 'get' | 'post' | 'put' | 'delete' | 'patch',
   url: string,
   data?: unknown,
   params?: Record<string, unknown>

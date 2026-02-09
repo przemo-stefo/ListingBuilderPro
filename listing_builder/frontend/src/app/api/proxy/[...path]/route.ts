@@ -20,6 +20,7 @@ const ALLOWED_PATH_PREFIXES = [
   'export',
   'settings',
   'quiz',
+  'monitoring',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
@@ -125,5 +126,9 @@ export async function PUT(request: NextRequest, context: { params: { path: strin
 }
 
 export async function DELETE(request: NextRequest, context: { params: { path: string[] } }) {
+  return proxyRequest(request, context.params)
+}
+
+export async function PATCH(request: NextRequest, context: { params: { path: string[] } }) {
   return proxyRequest(request, context.params)
 }

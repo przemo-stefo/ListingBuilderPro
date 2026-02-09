@@ -15,6 +15,7 @@ import {
   Sparkles,
   Send,
   Shield,
+  Activity,
 } from 'lucide-react'
 
 const navItems = [
@@ -47,6 +48,11 @@ const navItems = [
     title: 'Compliance',
     href: '/compliance',
     icon: Shield,
+  },
+  {
+    title: 'Monitoring',
+    href: '/monitoring',
+    icon: Activity,
   },
   {
     title: 'Publish',

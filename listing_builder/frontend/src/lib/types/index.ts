@@ -574,6 +574,71 @@ export interface OptimizationHistoryDetail extends OptimizationHistoryItem {
   response_data: OptimizerResponse
 }
 
+// Monitoring types
+export interface MonitoringDashboardStats {
+  tracked_products: number
+  active_alerts: number
+  alerts_today: number
+  last_poll: string | null
+  marketplaces: Record<string, number>
+}
+
+export interface TrackedProduct {
+  id: string
+  marketplace: string
+  product_id: string
+  product_url: string | null
+  product_title: string | null
+  poll_interval_hours: number
+  enabled: boolean
+  created_at: string
+}
+
+export interface TrackProductRequest {
+  marketplace: string
+  product_id: string
+  product_url?: string
+  product_title?: string
+  poll_interval_hours?: number
+}
+
+export interface AlertConfig {
+  id: string
+  alert_type: string
+  name: string
+  enabled: boolean
+  threshold: number | null
+  marketplace: string | null
+  email: string | null
+  webhook_url: string | null
+  cooldown_minutes: number
+  last_triggered: string | null
+  created_at: string
+}
+
+export interface AlertConfigCreateRequest {
+  alert_type: string
+  name: string
+  enabled?: boolean
+  threshold?: number
+  marketplace?: string
+  cooldown_minutes?: number
+  webhook_url?: string
+}
+
+export interface MonitoringAlert {
+  id: string
+  config_id: string | null
+  alert_type: string
+  severity: string
+  title: string
+  message: string
+  details: Record<string, unknown>
+  triggered_at: string
+  acknowledged: boolean
+  acknowledged_at: string | null
+}
+
 // Error types
 export interface ApiError {
   message: string
