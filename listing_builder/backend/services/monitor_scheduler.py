@@ -16,8 +16,12 @@ logger = structlog.get_logger()
 _scheduler: Optional[AsyncIOScheduler] = None
 
 
-async def poll_marketplace(session_factory, marketplace: str) -> None:
-    """Poll all enabled tracked products for a given marketplace."""
+async def poll_marketplace(session_factory, marketplace: str) -> list:
+    """Poll all enabled tracked products for a given marketplace.
+
+    Returns list of dicts with product_id, status, and error (if any).
+    """
+    results = []
     db: Session = session_factory()
     try:
         products = (
@@ -30,13 +34,14 @@ async def poll_marketplace(session_factory, marketplace: str) -> None:
         )
 
         if not products:
-            return
+            return results
 
         logger.info("poll_start", marketplace=marketplace, count=len(products))
 
         for product in products:
             try:
-                await _poll_single_product(db, product)
+                result = await _poll_single_product(db, product)
+                results.append(result)
             except Exception as e:
                 logger.error(
                     "poll_product_failed",
@@ -44,24 +49,27 @@ async def poll_marketplace(session_factory, marketplace: str) -> None:
                     product_id=product.product_id,
                     error=str(e),
                 )
+                results.append({"product_id": product.product_id, "status": "error", "error": str(e)})
 
         logger.info("poll_complete", marketplace=marketplace, count=len(products))
     finally:
         db.close()
+    return results
 
 
-async def _poll_single_product(db: Session, product: TrackedProduct) -> None:
+async def _poll_single_product(db: Session, product: TrackedProduct) -> dict:
     """Scrape/fetch one product, save snapshot, compare with previous."""
     new_data = await _fetch_product_data(product.marketplace, product.product_id, product.product_url)
 
     if not new_data or new_data.get("error"):
+        error_msg = new_data.get("error") if new_data else "no data"
         logger.warning(
             "poll_fetch_failed",
             marketplace=product.marketplace,
             product_id=product.product_id,
-            error=new_data.get("error") if new_data else "no data",
+            error=error_msg,
         )
-        return
+        return {"product_id": product.product_id, "status": "fetch_failed", "error": error_msg}
 
     # Save snapshot
     snapshot = MonitoringSnapshot(
@@ -87,6 +95,8 @@ async def _poll_single_product(db: Session, product: TrackedProduct) -> None:
 
     if previous:
         _compare_and_alert(db, product, previous.snapshot_data, new_data)
+
+    return {"product_id": product.product_id, "status": "ok", "title": new_data.get("title", "")[:60]}
 
 
 async def _fetch_product_data(marketplace: str, product_id: str, product_url: Optional[str]) -> Optional[dict]:

@@ -282,14 +282,13 @@ async def trigger_poll(request: Request, marketplace: str, db: Session = Depends
     from services.monitor_scheduler import poll_marketplace
     from database import SessionLocal
 
-    await poll_marketplace(SessionLocal, marketplace)
-    # Return fresh snapshot count for this marketplace
+    results = await poll_marketplace(SessionLocal, marketplace)
     count = (
         db.query(sa_func.count(MonitoringSnapshot.id))
         .filter(MonitoringSnapshot.marketplace == marketplace)
         .scalar()
     )
-    return {"marketplace": marketplace, "status": "polled", "total_snapshots": count}
+    return {"marketplace": marketplace, "status": "polled", "total_snapshots": count, "results": results}
 
 
 # ── Dashboard ──
