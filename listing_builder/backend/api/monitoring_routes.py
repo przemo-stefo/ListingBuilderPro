@@ -242,6 +242,35 @@ async def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
     return {"id": alert_id, "acknowledged": True}
 
 
+# ── Scheduler Status ──
+
+@router.get("/status")
+async def scheduler_status():
+    """Show scheduler and alert service health. Used to verify startup."""
+    from services.monitor_scheduler import _scheduler
+    from services.alert_service import get_alert_service
+
+    scheduler_info = {"running": False, "jobs": []}
+    if _scheduler:
+        scheduler_info["running"] = _scheduler.running
+        for job in _scheduler.get_jobs():
+            scheduler_info["jobs"].append({
+                "id": job.id,
+                "next_run": str(job.next_run_time) if job.next_run_time else None,
+            })
+
+    try:
+        svc = get_alert_service()
+        alert_ready = svc is not None
+    except Exception:
+        alert_ready = False
+
+    return {
+        "scheduler": scheduler_info,
+        "alert_service": alert_ready,
+    }
+
+
 # ── Dashboard ──
 
 @router.get("/dashboard", response_model=DashboardStats)
