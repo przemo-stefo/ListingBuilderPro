@@ -271,6 +271,27 @@ async def scheduler_status():
     }
 
 
+@router.post("/poll/{marketplace}")
+@limiter.limit("5/minute")
+async def trigger_poll(request: Request, marketplace: str, db: Session = Depends(get_db)):
+    """Manually trigger a poll for a marketplace. For testing — don't wait 6 hours."""
+    valid = {"allegro", "amazon", "kaufland", "ebay"}
+    if marketplace not in valid:
+        raise HTTPException(status_code=400, detail=f"Must be one of: {', '.join(valid)}")
+
+    from services.monitor_scheduler import poll_marketplace
+    from database import SessionLocal
+
+    await poll_marketplace(SessionLocal, marketplace)
+    # Return fresh snapshot count for this marketplace
+    count = (
+        db.query(sa_func.count(MonitoringSnapshot.id))
+        .filter(MonitoringSnapshot.marketplace == marketplace)
+        .scalar()
+    )
+    return {"marketplace": marketplace, "status": "polled", "total_snapshots": count}
+
+
 # ── Dashboard ──
 
 @router.get("/dashboard", response_model=DashboardStats)
