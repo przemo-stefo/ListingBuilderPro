@@ -115,6 +115,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
             mode=body.mode,
             product_line=body.product_line or "",
             language=body.language,
+            db=db,
         )
 
         logger.info(
@@ -174,7 +175,7 @@ class BatchOptimizerResponse(BaseModel):
 
 @router.post("/generate-batch", response_model=BatchOptimizerResponse)
 @limiter.limit("3/minute")
-async def generate_batch(request: Request, body: BatchOptimizerRequest = None):
+async def generate_batch(request: Request, body: BatchOptimizerRequest = None, db: Session = Depends(get_db)):
     """
     Generate optimized listings for multiple products.
 
@@ -200,6 +201,7 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None):
                 mode=product.mode,
                 product_line=product.product_line or "",
                 language=product.language,
+                db=db,
             )
 
             results.append(BatchOptimizerResult(

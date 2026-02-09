@@ -8,6 +8,7 @@ import asyncio
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from groq import Groq
+from sqlalchemy.orm import Session
 from config import settings
 import structlog
 
@@ -302,12 +303,20 @@ def _check_compliance(
 
 def _build_title_prompt(
     product_title: str, brand: str, product_line: str,
-    tier1_phrases: List[str], lang: str, max_chars: int
+    tier1_phrases: List[str], lang: str, max_chars: int,
+    expert_context: str = "",
 ) -> str:
     kw_list = ", ".join(tier1_phrases[:10])
-    return f"""You are an expert Amazon listing optimizer.
+    # WHY: Expert context from Inner Circle transcripts teaches proven title strategies
+    context_block = ""
+    if expert_context:
+        context_block = f"""
+EXPERT KNOWLEDGE (use these best practices):
+{expert_context}
 
-Product: {product_title}
+"""
+    return f"""You are an expert Amazon listing optimizer.
+{context_block}Product: {product_title}
 Brand: {brand}
 Product line: {product_line}
 Language: {lang}
@@ -328,12 +337,19 @@ Return ONLY the optimized title, nothing else."""
 
 def _build_bullets_prompt(
     product_title: str, brand: str, tier2_phrases: List[str],
-    lang: str, max_chars: int
+    lang: str, max_chars: int,
+    expert_context: str = "",
 ) -> str:
     kw_list = ", ".join(tier2_phrases[:15])
-    return f"""You are an expert Amazon listing optimizer.
+    context_block = ""
+    if expert_context:
+        context_block = f"""
+EXPERT KNOWLEDGE (use these best practices):
+{expert_context}
 
-Product: {product_title}
+"""
+    return f"""You are an expert Amazon listing optimizer.
+{context_block}Product: {product_title}
 Brand: {brand}
 Language: {lang}
 Max characters per bullet: {max_chars}
@@ -354,12 +370,19 @@ Return ONLY 5 bullet points, one per line, no numbering or bullet symbols."""
 
 def _build_description_prompt(
     product_title: str, brand: str, remaining_phrases: List[str],
-    lang: str
+    lang: str,
+    expert_context: str = "",
 ) -> str:
     kw_list = ", ".join(remaining_phrases[:10])
-    return f"""You are an expert Amazon listing optimizer.
+    context_block = ""
+    if expert_context:
+        context_block = f"""
+EXPERT KNOWLEDGE (use these best practices):
+{expert_context}
 
-Product: {product_title}
+"""
+    return f"""You are an expert Amazon listing optimizer.
+{context_block}Product: {product_title}
 Brand: {brand}
 Language: {lang}
 
@@ -412,6 +435,7 @@ async def optimize_listing(
     mode: str = "aggressive",
     product_line: str = "",
     language: str | None = None,
+    db: Session | None = None,
     **kwargs,
 ) -> Dict[str, Any]:
     """
@@ -435,25 +459,40 @@ async def optimize_listing(
     tier3_phrases = [k["phrase"] for k in tier3]
     root_words = _extract_root_words(all_kw)
 
+    # WHY: Retrieve expert context from Inner Circle transcripts to improve LLM output
+    title_context = bullets_context = desc_context = ""
+    if db:
+        from services.knowledge_service import search_knowledge
+        search_query = f"{product_title} {' '.join(tier1_phrases[:5])}"
+        title_context = search_knowledge(db, search_query, "title")
+        bullets_context = search_knowledge(db, search_query, "bullets")
+        desc_context = search_knowledge(db, search_query, "description")
+
     logger.info(
         "optimizer_start",
         product=product_title[:50],
         keywords=len(all_kw),
         tiers=f"{len(tier1)}/{len(tier2)}/{len(tier3)}",
+        knowledge_title=len(title_context),
+        knowledge_bullets=len(bullets_context),
+        knowledge_desc=len(desc_context),
     )
 
     # 2. Three Groq LLM calls (title first, then bullets + description in parallel)
     title_prompt = _build_title_prompt(
-        product_title, brand, product_line, tier1_phrases, lang, limits["title"]
+        product_title, brand, product_line, tier1_phrases, lang, limits["title"],
+        expert_context=title_context,
     )
     title_text = await asyncio.to_thread(_call_groq, title_prompt, 0.4, 250)
 
     # WHY: bullets and description are independent — run in parallel
     bullets_prompt = _build_bullets_prompt(
-        product_title, brand, tier2_phrases, lang, limits["bullet"]
+        product_title, brand, tier2_phrases, lang, limits["bullet"],
+        expert_context=bullets_context,
     )
     desc_prompt = _build_description_prompt(
-        product_title, brand, tier3_phrases + tier2_phrases[-5:], lang
+        product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
+        expert_context=desc_context,
     )
 
     bullets_raw, desc_text = await asyncio.gather(
