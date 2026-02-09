@@ -17,7 +17,7 @@ from config import settings
 
 # WHY: Rate limiter prevents API abuse (Groq quota burn, DB flood, scraper overload)
 limiter = Limiter(key_func=get_remote_address)
-from database import init_db, check_db_connection
+from database import init_db, check_db_connection, SessionLocal
 
 # Import routers
 from api import import_routes, export_routes, product_routes
@@ -26,6 +26,7 @@ from api import inventory_routes, analytics_routes, settings_routes
 from api import compliance_routes
 from api import converter_routes
 from api import optimizer_routes
+from api import monitoring_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -56,9 +57,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("database_init_failed", error=str(e))
 
+    # WHY init here: AlertService needs DB session factory, scheduler needs AlertService
+    try:
+        from services.alert_service import init_alert_service
+        init_alert_service(SessionLocal)
+    except Exception as e:
+        logger.error("alert_service_init_failed", error=str(e))
+
+    try:
+        from services.monitor_scheduler import start_scheduler
+        start_scheduler(SessionLocal)
+    except Exception as e:
+        logger.error("monitor_scheduler_init_failed", error=str(e))
+
     yield
 
     # Shutdown
+    try:
+        from services.monitor_scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
     logger.info("application_shutting_down")
 
 
@@ -118,6 +137,7 @@ app.include_router(settings_routes.router)
 app.include_router(compliance_routes.router)
 app.include_router(converter_routes.router)
 app.include_router(optimizer_routes.router)
+app.include_router(monitoring_routes.router)
 
 
 @app.get("/")
