@@ -2,18 +2,24 @@
 # Purpose: Debug/admin endpoints for knowledge base search and stats
 # NOT for: Production-facing features (knowledge injection happens inside optimizer_service)
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from database import get_db
 from services.knowledge_service import search_knowledge
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
 
 @router.get("/search")
+@limiter.limit("20/minute")
 async def knowledge_search(
+    request: Request,
     q: str = Query(..., min_length=2, max_length=200),
     prompt_type: str = Query("title", pattern="^(title|bullets|description)$"),
     max_chunks: int = Query(5, ge=1, le=20),

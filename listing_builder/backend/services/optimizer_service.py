@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from groq import Groq
 from sqlalchemy.orm import Session
 from config import settings
+from services.knowledge_service import search_knowledge_batch
 import structlog
 
 logger = structlog.get_logger()
@@ -460,13 +461,14 @@ async def optimize_listing(
     root_words = _extract_root_words(all_kw)
 
     # WHY: Retrieve expert context from Inner Circle transcripts to improve LLM output
+    # Single DB query fetches chunks for all 3 prompt types at once
     title_context = bullets_context = desc_context = ""
     if db:
-        from services.knowledge_service import search_knowledge
         search_query = f"{product_title} {' '.join(tier1_phrases[:5])}"
-        title_context = search_knowledge(db, search_query, "title")
-        bullets_context = search_knowledge(db, search_query, "bullets")
-        desc_context = search_knowledge(db, search_query, "description")
+        knowledge = search_knowledge_batch(db, search_query)
+        title_context = knowledge.get("title", "")
+        bullets_context = knowledge.get("bullets", "")
+        desc_context = knowledge.get("description", "")
 
     logger.info(
         "optimizer_start",

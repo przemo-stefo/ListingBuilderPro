@@ -18,6 +18,87 @@ CATEGORY_MAP = {
 
 MAX_CONTEXT_CHARS = 3000
 
+# WHY: Union of all categories across prompt types — for batch query
+ALL_CATEGORIES = list({c for cats in CATEGORY_MAP.values() for c in cats})
+
+
+def search_knowledge_batch(
+    db: Session,
+    query: str,
+    max_chunks_per_type: int = 5,
+) -> dict[str, str]:
+    """Fetch expert context for all prompt types in a single DB query.
+
+    Returns {"title": "...", "bullets": "...", "description": "..."}.
+    WHY: 1 query instead of 3-6 round-trips per optimization request.
+    """
+    try:
+        rows = db.execute(
+            text("""
+                SELECT content, filename, category,
+                       ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
+                FROM knowledge_chunks
+                WHERE search_vector @@ plainto_tsquery('english', :query)
+                  AND category = ANY(:categories)
+                ORDER BY rank DESC
+                LIMIT :limit
+            """),
+            {
+                "query": query,
+                "categories": ALL_CATEGORIES,
+                "limit": max_chunks_per_type * 3,
+            },
+        ).fetchall()
+
+        # WHY: If category-filtered returned nothing, try without filter
+        if not rows:
+            rows = db.execute(
+                text("""
+                    SELECT content, filename, category,
+                           ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
+                    FROM knowledge_chunks
+                    WHERE search_vector @@ plainto_tsquery('english', :query)
+                    ORDER BY rank DESC
+                    LIMIT :limit
+                """),
+                {"query": query, "limit": max_chunks_per_type * 3},
+            ).fetchall()
+
+        result = {}
+        for prompt_type, categories in CATEGORY_MAP.items():
+            cat_set = set(categories)
+            # WHY: Pick top chunks whose category matches this prompt type
+            matched = [r for r in rows if r[2] in cat_set]
+            # Fallback: if no category match, use all rows (better than nothing)
+            if not matched:
+                matched = list(rows)
+
+            parts = []
+            total_len = 0
+            for row in matched[:max_chunks_per_type]:
+                chunk = f"[{row[2]} — {row[1]}]\n{row[0]}"
+                if total_len + len(chunk) > MAX_CONTEXT_CHARS:
+                    break
+                parts.append(chunk)
+                total_len += len(chunk)
+
+            result[prompt_type] = "\n\n".join(parts)
+
+        hit_count = sum(1 for v in result.values() if v)
+        if hit_count:
+            logger.info(
+                "knowledge_batch_hit",
+                chunks_fetched=len(rows),
+                types_with_context=hit_count,
+                query_preview=query[:60],
+            )
+
+        return result
+
+    except Exception as e:
+        logger.warning("knowledge_batch_error", error=str(e))
+        return {"title": "", "bullets": "", "description": ""}
+
 
 def search_knowledge(
     db: Session,
