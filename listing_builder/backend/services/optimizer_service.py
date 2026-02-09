@@ -38,6 +38,21 @@ PROMO_WORDS = [
 FORBIDDEN_CHARS = ["!", "¡", "$", "€", "™", "®", "©"]
 
 
+def _sanitize_llm_input(text: str) -> str:
+    """Strip control characters and LLM injection patterns from user input.
+
+    WHY: User-supplied product_title, brand, keywords go into LLM prompts.
+    An attacker could inject "Ignore all instructions..." to hijack the prompt.
+    We strip common injection prefixes and control chars, but keep normal text.
+    """
+    # Strip control characters (except newline/tab which are harmless)
+    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    # Collapse multiple newlines (injection payloads use them to "escape" context)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    # Truncate — no single field should exceed 1000 chars going into a prompt
+    return cleaned[:1000]
+
+
 def _get_limits(marketplace: str) -> dict:
     return MARKETPLACE_LIMITS.get(marketplace, MARKETPLACE_LIMITS["amazon_de"])
 
@@ -405,6 +420,13 @@ async def optimize_listing(
     """
     limits = _get_limits(marketplace)
     lang = _detect_language(marketplace, language)
+
+    # WHY: Sanitize user inputs before they enter LLM prompts (injection prevention)
+    product_title = _sanitize_llm_input(product_title)
+    brand = _sanitize_llm_input(brand)
+    product_line = _sanitize_llm_input(product_line)
+    for kw in keywords:
+        kw["phrase"] = _sanitize_llm_input(kw["phrase"])
 
     # 1. Keyword preparation
     all_kw, tier1, tier2, tier3 = _prepare_keywords(keywords)

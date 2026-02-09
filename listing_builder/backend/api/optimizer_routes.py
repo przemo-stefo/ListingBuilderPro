@@ -2,15 +2,19 @@
 # Purpose: API endpoints for listing optimization via direct Groq service
 # NOT for: LLM prompts or keyword logic (that's in services/optimizer_service.py)
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import structlog
 
 from services.optimizer_service import optimize_listing
 from database import get_db
 from models.optimization import OptimizationRun
+
+limiter = Limiter(key_func=get_remote_address)
 
 logger = structlog.get_logger()
 
@@ -19,21 +23,21 @@ router = APIRouter(prefix="/api/optimizer", tags=["optimizer"])
 
 class OptimizerKeyword(BaseModel):
     """Single keyword with optional search volume"""
-    phrase: str
-    search_volume: int = 0
+    phrase: str = Field(..., min_length=1, max_length=200)
+    search_volume: int = Field(default=0, ge=0)
 
 
 class OptimizerRequest(BaseModel):
     """Request payload for listing optimization"""
-    product_title: str = Field(..., min_length=3)
-    brand: str = Field(..., min_length=1)
-    product_line: Optional[str] = ""
-    keywords: List[OptimizerKeyword] = Field(..., min_length=1)
-    marketplace: str = Field(default="amazon_de")
-    mode: str = Field(default="aggressive")
-    language: Optional[str] = None
-    asin: Optional[str] = ""
-    category: Optional[str] = ""
+    product_title: str = Field(..., min_length=3, max_length=500)
+    brand: str = Field(..., min_length=1, max_length=200)
+    product_line: Optional[str] = Field(default="", max_length=200)
+    keywords: List[OptimizerKeyword] = Field(..., min_length=1, max_length=200)
+    marketplace: str = Field(default="amazon_de", max_length=50)
+    mode: str = Field(default="aggressive", max_length=20)
+    language: Optional[str] = Field(default=None, max_length=10)
+    asin: Optional[str] = Field(default="", max_length=20)
+    category: Optional[str] = Field(default="", max_length=200)
 
 
 class OptimizerScores(BaseModel):
@@ -83,7 +87,8 @@ class OptimizerResponse(BaseModel):
 
 
 @router.post("/generate", response_model=OptimizerResponse)
-async def generate_listing(request: OptimizerRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def generate_listing(request: Request, body: OptimizerRequest, db: Session = Depends(get_db)):
     """
     Generate an optimized listing using Groq LLM + keyword analysis.
 
@@ -92,24 +97,24 @@ async def generate_listing(request: OptimizerRequest, db: Session = Depends(get_
     """
     logger.info(
         "optimizer_request",
-        product=request.product_title[:50],
-        brand=request.brand,
-        marketplace=request.marketplace,
-        keyword_count=len(request.keywords),
+        product=body.product_title[:50],
+        brand=body.brand,
+        marketplace=body.marketplace,
+        keyword_count=len(body.keywords),
     )
 
     try:
         result = await optimize_listing(
-            product_title=request.product_title,
-            brand=request.brand,
+            product_title=body.product_title,
+            brand=body.brand,
             keywords=[
                 {"phrase": k.phrase, "search_volume": k.search_volume}
-                for k in request.keywords
+                for k in body.keywords
             ],
-            marketplace=request.marketplace,
-            mode=request.mode,
-            product_line=request.product_line or "",
-            language=request.language,
+            marketplace=body.marketplace,
+            mode=body.mode,
+            product_line=body.product_line or "",
+            language=body.language,
         )
 
         logger.info(
@@ -121,13 +126,13 @@ async def generate_listing(request: OptimizerRequest, db: Session = Depends(get_
         # WHY: Auto-save to history — non-blocking, don't fail the response if DB save fails
         try:
             run = OptimizationRun(
-                product_title=request.product_title,
-                brand=request.brand,
-                marketplace=request.marketplace,
-                mode=request.mode,
+                product_title=body.product_title,
+                brand=body.brand,
+                marketplace=body.marketplace,
+                mode=body.mode,
                 coverage_pct=result.get("scores", {}).get("coverage_pct", 0),
                 compliance_status=result.get("compliance", {}).get("status", "UNKNOWN"),
-                request_data=request.model_dump(),
+                request_data=body.model_dump(),
                 response_data=result,
             )
             db.add(run)
@@ -139,7 +144,7 @@ async def generate_listing(request: OptimizerRequest, db: Session = Depends(get_
 
     except Exception as e:
         logger.error("optimizer_error", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Optimization failed")
 
 
 # WHY: Batch endpoint processes multiple products sequentially
@@ -168,7 +173,8 @@ class BatchOptimizerResponse(BaseModel):
 
 
 @router.post("/generate-batch", response_model=BatchOptimizerResponse)
-async def generate_batch(request: BatchOptimizerRequest):
+@limiter.limit("3/minute")
+async def generate_batch(request: Request, body: BatchOptimizerRequest = None):
     """
     Generate optimized listings for multiple products.
 
@@ -179,9 +185,9 @@ async def generate_batch(request: BatchOptimizerRequest):
     succeeded = 0
     failed = 0
 
-    logger.info("batch_optimizer_start", total_products=len(request.products))
+    logger.info("batch_optimizer_start", total_products=len(body.products))
 
-    for i, product in enumerate(request.products):
+    for i, product in enumerate(body.products):
         try:
             data = await optimize_listing(
                 product_title=product.product_title,
@@ -215,19 +221,19 @@ async def generate_batch(request: BatchOptimizerRequest):
             results.append(BatchOptimizerResult(
                 product_title=product.product_title,
                 status="error",
-                error=str(e),
+                error="Optimization failed for this product",
             ))
             failed += 1
 
     logger.info(
         "batch_optimizer_done",
-        total=len(request.products),
+        total=len(body.products),
         succeeded=succeeded,
         failed=failed,
     )
 
     return BatchOptimizerResponse(
-        total=len(request.products),
+        total=len(body.products),
         succeeded=succeeded,
         failed=failed,
         results=results,
@@ -292,7 +298,8 @@ async def get_history_detail(run_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/history/{run_id}")
-async def delete_history(run_id: int, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def delete_history(request: Request, run_id: int, db: Session = Depends(get_db)):
     """Delete a single optimization run."""
     run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id).first()
     if not run:
@@ -322,5 +329,5 @@ async def optimizer_health():
         return {
             "status": "unhealthy",
             "provider": "groq",
-            "error": str(e),
+            "error": "Connection failed",
         }

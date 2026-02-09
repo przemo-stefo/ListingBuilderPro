@@ -8,8 +8,42 @@ import { NextRequest, NextResponse } from 'next/server'
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
 const API_KEY = process.env.API_KEY || ''
 
+// WHY: Allowlist prevents the proxy from being an open relay to arbitrary backend paths
+const ALLOWED_PATH_PREFIXES = [
+  'optimizer/generate',
+  'optimizer/history',
+  'optimizer/health',
+  'products',
+  'compliance',
+  'converter',
+  'import',
+  'export',
+  'settings',
+  'quiz',
+]
+
+// WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
+const BLOCKED_METHODS: Record<string, string[]> = {
+  'import/webhook': ['DELETE'],
+  'settings': ['DELETE'],
+}
+
 async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   const path = params.path.join('/')
+
+  // Security: only allow known API paths
+  const isAllowed = ALLOWED_PATH_PREFIXES.some(prefix => path.startsWith(prefix))
+  if (!isAllowed) {
+    return NextResponse.json({ detail: 'Forbidden: path not allowed' }, { status: 403 })
+  }
+
+  // Security: block destructive methods on sensitive paths
+  for (const [blockedPath, methods] of Object.entries(BLOCKED_METHODS)) {
+    if (path.startsWith(blockedPath) && methods.includes(request.method)) {
+      return NextResponse.json({ detail: 'Method not allowed' }, { status: 405 })
+    }
+  }
+
   const url = new URL(`/api/${path}`, BACKEND_URL)
 
   // Forward query params (except cache-busting _t)

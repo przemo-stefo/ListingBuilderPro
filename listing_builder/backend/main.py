@@ -2,14 +2,21 @@
 # Purpose: FastAPI application entry point with security middleware
 # NOT for: Business logic or database models
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import structlog
 
 import os
 
 from config import settings
+
+# WHY: Rate limiter prevents API abuse (Groq quota burn, DB flood, scraper overload)
+limiter = Limiter(key_func=get_remote_address)
 from database import init_db, check_db_connection
 
 # Import routers
@@ -67,6 +74,10 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.app_debug else None,  # Hide OpenAPI schema in production
 )
 
+# Rate limiter setup
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Security Middleware (order matters - outermost first)
 
 # 1. HTTPS redirect (production only)
@@ -112,26 +123,12 @@ app.include_router(optimizer_routes.router)
 @app.get("/")
 async def root():
     """API root endpoint"""
+    # WHY: Don't expose environment name or full endpoint map in production —
+    # attackers use this to enumerate attack surface
     return {
         "name": "Marketplace Listing Automation API",
         "version": "1.0.0",
         "status": "running",
-        "environment": settings.app_env,
-        "endpoints": {
-            "import": "/api/import",
-            "export": "/api/export",
-            "products": "/api/products",
-            "listings": "/api/listings",
-            "keywords": "/api/keywords",
-            "competitors": "/api/competitors",
-            "inventory": "/api/inventory",
-            "analytics": "/api/analytics",
-            "settings": "/api/settings",
-            "compliance": "/api/compliance",
-            "converter": "/api/converter",
-            "optimizer": "/api/optimizer",
-            "docs": "/docs",
-        }
     }
 
 
@@ -143,10 +140,10 @@ async def health_check():
     """
     db_status = check_db_connection()
 
+    # WHY: Don't expose environment name — load balancers only need status
     return {
         "status": "healthy" if db_status else "unhealthy",
         "database": "connected" if db_status else "disconnected",
-        "environment": settings.app_env,
     }
 
 

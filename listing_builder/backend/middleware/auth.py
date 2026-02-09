@@ -6,6 +6,7 @@ from fastapi import Header, HTTPException, Request, status
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Optional
+import hmac
 import structlog
 
 from config import settings
@@ -39,7 +40,7 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None)) -> str:
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
-    if x_api_key != settings.api_secret_key:
+    if not hmac.compare_digest(x_api_key, settings.api_secret_key):
         logger.warning("api_key_invalid", key_prefix=x_api_key[:8] if x_api_key else None)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -101,7 +102,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             logger.warning("api_key_missing", path=path, ip=request.client.host)
             return self._unauthorized_response("Missing API key. Include X-API-Key header.")
 
-        if api_key != settings.api_secret_key:
+        if not hmac.compare_digest(api_key, settings.api_secret_key):
             logger.warning(
                 "api_key_invalid",
                 path=path,

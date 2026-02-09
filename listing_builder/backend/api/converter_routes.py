@@ -4,14 +4,19 @@
 
 import asyncio
 from typing import List, Optional
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 import structlog
 
 from config import settings
+
+limiter = Limiter(key_func=get_remote_address)
 from services.scraper.allegro_scraper import (
     scrape_allegro_product,
     scrape_allegro_batch,
@@ -49,8 +54,14 @@ class ScrapeRequest(BaseModel):
         if len(v) > 50:
             raise ValueError("Max 50 URLs per request")
         for url in v:
-            if "allegro.pl" not in url:
+            # WHY: Strict hostname check prevents SSRF — "allegro.pl" substring
+            # would match evil.com/allegro.pl or allegro.pl.evil.com
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+            if not (host == "allegro.pl" or host.endswith(".allegro.pl")):
                 raise ValueError(f"Not an Allegro URL: {url}")
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"Invalid URL scheme: {url}")
         return v
 
 
@@ -96,6 +107,13 @@ class ConvertRequest(BaseModel):
             raise ValueError("At least one URL required")
         if len(v) > 50:
             raise ValueError("Max 50 URLs per request")
+        for url in v:
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+            if not (host == "allegro.pl" or host.endswith(".allegro.pl")):
+                raise ValueError(f"Not an Allegro URL: {url}")
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"Invalid URL scheme: {url}")
         return v
 
 
@@ -120,16 +138,17 @@ class ConvertResponse(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.post("/scrape", response_model=ScrapeResponse)
-async def scrape_allegro(request: ScrapeRequest):
+@limiter.limit("5/minute")
+async def scrape_allegro(request: Request, body: ScrapeRequest = None):
     """Scrape product data from Allegro URLs.
 
     Returns structured product data (title, EAN, description, images,
     parameters) for each URL. Use this to preview scraped data before
     converting to a marketplace template.
     """
-    logger.info("scrape_request", urls_count=len(request.urls))
+    logger.info("scrape_request", urls_count=len(body.urls))
 
-    products = await scrape_allegro_batch(request.urls, delay=request.delay)
+    products = await scrape_allegro_batch(body.urls, delay=body.delay)
 
     succeeded = sum(1 for p in products if not p.error)
 
@@ -142,7 +161,8 @@ async def scrape_allegro(request: ScrapeRequest):
 
 
 @router.post("/convert", response_model=ConvertResponse)
-async def convert_to_marketplace(request: ConvertRequest):
+@limiter.limit("5/minute")
+async def convert_to_marketplace(request: Request, body: ConvertRequest = None):
     """Full pipeline: Scrape Allegro → Translate → Map → Return JSON.
 
     Use this endpoint to preview converted data before downloading
@@ -150,12 +170,12 @@ async def convert_to_marketplace(request: ConvertRequest):
     """
     logger.info(
         "convert_request",
-        urls_count=len(request.urls),
-        marketplace=request.marketplace,
+        urls_count=len(body.urls),
+        marketplace=body.marketplace,
     )
 
     # Step 1: Scrape
-    scraped = await scrape_allegro_batch(request.urls, delay=request.delay)
+    scraped = await scrape_allegro_batch(body.urls, delay=body.delay)
 
     # Step 2: Initialize AI translator
     translator = AITranslator(groq_api_key=settings.groq_api_key)
@@ -163,10 +183,10 @@ async def convert_to_marketplace(request: ConvertRequest):
     # Step 3: Convert
     converted = convert_batch(
         products=scraped,
-        marketplace=request.marketplace,
+        marketplace=body.marketplace,
         translator=translator,
-        gpsr_data=request.gpsr_data.model_dump(),
-        eur_rate=request.eur_rate,
+        gpsr_data=body.gpsr_data.model_dump(),
+        eur_rate=body.eur_rate,
     )
 
     succeeded = sum(1 for c in converted if not c.error)
@@ -178,7 +198,7 @@ async def convert_to_marketplace(request: ConvertRequest):
         total=len(converted),
         succeeded=succeeded,
         failed=len(converted) - succeeded,
-        marketplace=request.marketplace,
+        marketplace=body.marketplace,
         products=[
             {
                 "source_url": c.source_url,
@@ -194,7 +214,8 @@ async def convert_to_marketplace(request: ConvertRequest):
 
 
 @router.post("/download")
-async def download_template(request: ConvertRequest):
+@limiter.limit("3/minute")
+async def download_template(request: Request, body: ConvertRequest = None):
     """Full pipeline: Scrape → Translate → Map → Download CSV/TSV file.
 
     Returns a downloadable file:
@@ -204,30 +225,30 @@ async def download_template(request: ConvertRequest):
     """
     logger.info(
         "download_request",
-        urls_count=len(request.urls),
-        marketplace=request.marketplace,
+        urls_count=len(body.urls),
+        marketplace=body.marketplace,
     )
 
     # Step 1: Scrape
-    scraped = await scrape_allegro_batch(request.urls, delay=request.delay)
+    scraped = await scrape_allegro_batch(body.urls, delay=body.delay)
 
     # Step 2: Translate + Convert
     translator = AITranslator(groq_api_key=settings.groq_api_key)
     converted = convert_batch(
         products=scraped,
-        marketplace=request.marketplace,
+        marketplace=body.marketplace,
         translator=translator,
-        gpsr_data=request.gpsr_data.model_dump(),
-        eur_rate=request.eur_rate,
+        gpsr_data=body.gpsr_data.model_dump(),
+        eur_rate=body.eur_rate,
     )
 
     # Step 3: Generate file
-    file_bytes = generate_template(converted, request.marketplace)
-    filename = get_filename(request.marketplace)
-    content_type = get_content_type(request.marketplace)
+    file_bytes = generate_template(converted, body.marketplace)
+    filename = get_filename(body.marketplace)
+    content_type = get_content_type(body.marketplace)
 
     succeeded = sum(1 for c in converted if not c.error)
-    logger.info("download_generated", marketplace=request.marketplace, products=succeeded)
+    logger.info("download_generated", marketplace=body.marketplace, products=succeeded)
 
     return Response(
         content=file_bytes,

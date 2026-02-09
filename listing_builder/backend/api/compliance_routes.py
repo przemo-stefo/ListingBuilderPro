@@ -2,8 +2,10 @@
 # Purpose: API endpoints for compliance template validation
 # NOT for: Parsing logic, rules, or database models
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from database import get_db
 from services.compliance import ComplianceService
 from schemas.compliance import (
@@ -18,6 +20,7 @@ import structlog
 
 logger = structlog.get_logger()
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/compliance", tags=["Compliance"])
 
 # WHY 10MB limit: Amazon XLSM templates can be 3-5MB with macros,
@@ -28,7 +31,9 @@ ALLOWED_EXTENSIONS = {".xlsm", ".xlsx", ".csv"}
 
 
 @router.post("/validate", status_code=201)
+@limiter.limit("5/minute")
 async def validate_template(
+    request: Request,
     file: UploadFile = File(..., description="XLSM, XLSX, or CSV template file"),
     marketplace: Optional[str] = Query(
         None,
@@ -79,7 +84,7 @@ async def validate_template(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("compliance_validation_failed", error=str(e), filename=filename)
-        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Validation failed")
 
     # Build response from ORM objects
     return _report_to_response(report)

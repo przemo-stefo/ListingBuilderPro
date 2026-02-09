@@ -13,6 +13,9 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/export", tags=["Export"])
 
 
+ALLOWED_MARKETPLACES = {"amazon", "ebay", "kaufland"}
+
+
 @router.post("/publish/{product_id}")
 async def publish_product(
     product_id: int,
@@ -29,6 +32,13 @@ async def publish_product(
     Returns:
         Publishing result
     """
+    # WHY: Validate marketplace before passing to service — prevents unexpected behavior
+    if marketplace not in ALLOWED_MARKETPLACES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported marketplace. Allowed: {', '.join(sorted(ALLOWED_MARKETPLACES))}",
+        )
+
     logger.info("publish_requested", product_id=product_id, marketplace=marketplace)
 
     try:
@@ -43,7 +53,7 @@ async def publish_product(
         raise
     except Exception as e:
         logger.error("publish_failed", error=str(e), product_id=product_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Publishing failed")
 
 
 @router.post("/bulk-publish", response_model=BulkJobResponse)
@@ -72,7 +82,7 @@ async def bulk_publish(
         return job
     except Exception as e:
         logger.error("bulk_publish_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Bulk publishing failed")
 
 
 @router.get("/marketplaces")

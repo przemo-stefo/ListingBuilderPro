@@ -9,6 +9,7 @@ from schemas import ProductImport, WebhookPayload, ImportJobResponse
 from services.import_service import ImportService
 from config import settings
 from typing import List, Optional
+import hmac
 import structlog
 
 logger = structlog.get_logger()
@@ -20,8 +21,8 @@ def verify_webhook_secret(x_webhook_secret: Optional[str] = Header(None)):
     Verify webhook secret from n8n.
     This prevents unauthorized webhook calls.
     """
-    if not x_webhook_secret or x_webhook_secret != settings.webhook_secret:
-        logger.warning("invalid_webhook_secret", provided=x_webhook_secret)
+    if not x_webhook_secret or not hmac.compare_digest(x_webhook_secret, settings.webhook_secret):
+        logger.warning("invalid_webhook_secret", provided_length=len(x_webhook_secret) if x_webhook_secret else 0)
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
     return True
 
@@ -71,7 +72,7 @@ async def receive_webhook(
 
     except Exception as e:
         logger.error("webhook_processing_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Import failed")
 
 
 @router.post("/product")
@@ -91,7 +92,7 @@ async def import_single_product(
         return {"status": "success", "product_id": result.id}
     except Exception as e:
         logger.error("product_import_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Product import failed")
 
 
 @router.post("/batch")
@@ -112,7 +113,7 @@ async def import_batch(
         return {"status": "success", **result}
     except Exception as e:
         logger.error("batch_import_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Batch import failed")
 
 
 @router.get("/job/{job_id}", response_model=ImportJobResponse)
