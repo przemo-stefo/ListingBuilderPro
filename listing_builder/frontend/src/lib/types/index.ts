@@ -509,6 +509,14 @@ export interface OptimizerKeywordIntel {
   root_words: Array<{ word: string; frequency: number }>
 }
 
+export interface RankingJuice {
+  score: number
+  grade: string
+  verdict: string
+  components: Record<string, number>
+  weights: Record<string, number>
+}
+
 export interface OptimizerResponse {
   status: string
   marketplace: string
@@ -519,6 +527,8 @@ export interface OptimizerResponse {
   scores: OptimizerScores
   compliance: OptimizerCompliance
   keyword_intel: OptimizerKeywordIntel
+  ranking_juice?: RankingJuice
+  optimization_source?: 'n8n' | 'direct'
 }
 
 // Batch Optimizer types — multiple products in one request

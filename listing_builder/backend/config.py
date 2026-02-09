@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     scrape_do_token: str = ""  # Scrape.do API token (recommended for Allegro)
     scraper_proxy_url: str = ""  # Fallback: raw residential proxy URL
 
+    # n8n Integration (optional — empty = skip n8n, use direct Groq only)
+    n8n_webhook_url: str = ""
+    n8n_webhook_secret: str = ""
+
     # Webhook Security
     webhook_secret: str  # REQUIRED - no default value
 

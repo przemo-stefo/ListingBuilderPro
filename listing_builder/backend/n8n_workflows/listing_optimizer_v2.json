@@ -1,0 +1,104 @@
+{
+  "name": "Listing Optimizer v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "listing/generate",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate required fields from FastAPI payload\nconst body = $input.first().json;\n\nconst required = ['brand', 'product_title', 'keywords', 'marketplace', 'language'];\nconst missing = required.filter(f => !body[f]);\n\nif (missing.length > 0) {\n  throw new Error(`Missing required fields: ${missing.join(', ')}`);\n}\n\nif (!Array.isArray(body.keywords) || body.keywords.length === 0) {\n  throw new Error('keywords must be a non-empty array');\n}\n\nreturn [{ json: body }];"
+      },
+      "id": "validate-1",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Groq prompt from FastAPI-prepared context\nconst data = $input.first().json;\n\nconst brand = data.brand;\nconst product = data.product_title;\nconst lang = data.language;\nconst mode = data.mode || 'aggressive';\nconst keywords = data.keywords || [];\nconst expert = data.expert_context || {};\nconst successes = data.past_successes || [];\n\n// Tier keywords by search volume\nconst sorted = [...keywords].sort((a, b) => (b.search_volume || 0) - (a.search_volume || 0));\nconst t1End = Math.max(1, Math.floor(sorted.length * 0.3));\nconst t2End = Math.max(t1End + 1, Math.floor(sorted.length * 0.7));\nconst tier1 = sorted.slice(0, t1End).map(k => k.phrase).slice(0, 10);\nconst tier2 = sorted.slice(t1End, t2End).map(k => k.phrase).slice(0, 15);\nconst tier3 = sorted.slice(t2End).map(k => k.phrase).slice(0, 10);\n\n// Few-shot examples from past successes\nlet fewShot = '';\nif (successes.length > 0) {\n  fewShot = '\\n\\nPAST SUCCESSFUL LISTINGS (RJ >= 75, use as style reference):\\n';\n  for (const s of successes.slice(0, 2)) {\n    fewShot += `Title: ${s.title}\\nRanking Juice: ${s.ranking_juice}\\n\\n`;\n  }\n}\n\n// Expert context blocks\nconst titleCtx = expert.title ? `\\nEXPERT KNOWLEDGE (title best practices):\\n${expert.title}\\n` : '';\nconst bulletsCtx = expert.bullets ? `\\nEXPERT KNOWLEDGE (bullet best practices):\\n${expert.bullets}\\n` : '';\nconst descCtx = expert.description ? `\\nEXPERT KNOWLEDGE (description best practices):\\n${expert.description}\\n` : '';\n\nconst prompt = `You are an expert Amazon listing optimizer. Generate a complete optimized listing.\n${titleCtx}${bulletsCtx}${descCtx}${fewShot}\nProduct: ${product}\nBrand: ${brand}\nLanguage: ${lang}\nMode: ${mode}\n\nTOP KEYWORDS (must include in title): ${tier1.join(', ')}\nSECONDARY KEYWORDS (weave into bullets): ${tier2.join(', ')}\nREMAINING KEYWORDS (use in description): ${tier3.join(', ')}\n\nRules:\n- Title: Start with brand, include top keywords naturally, max 200 chars\n- Bullets: Exactly 5, start each with CAPITALIZED benefit keyword, max 500 chars each\n- Description: 2-3 paragraphs, use remaining keywords naturally\n- No promotional words (bestseller, #1, sale, etc.)\n- No special characters (!, \\u20ac, \\u2122, etc.)\n- Write entirely in ${lang}\n\nRespond ONLY in this exact JSON format (no markdown, no explanation):\n{\"title\": \"...\", \"bullet_points\": [\"...\", \"...\", \"...\", \"...\", \"...\"], \"description\": \"...\"}`;\n\nreturn [{ json: { prompt, model: 'llama-3.3-70b-versatile' } }];"
+      },
+      "id": "build-prompt-1",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.model, messages: [{ role: 'user', content: $json.prompt }], temperature: 0.4, max_tokens: 2000 }) }}",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "groq-1",
+      "name": "Groq LLM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Groq response and extract listing JSON\nconst response = $input.first().json;\n\nif (!response.choices || !response.choices[0]) {\n  throw new Error('No response from Groq');\n}\n\nconst content = response.choices[0].message.content.trim();\n\n// Try to parse JSON from response (handle markdown code blocks)\nlet listing;\ntry {\n  // Remove markdown code fences if present\n  const cleaned = content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  listing = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error(`Failed to parse Groq response as JSON: ${e.message}`);\n}\n\n// Validate structure\nif (!listing.title || !Array.isArray(listing.bullet_points) || !listing.description) {\n  throw new Error('Invalid listing structure from Groq');\n}\n\nreturn [{ json: listing }];"
+      },
+      "id": "respond-1",
+      "name": "Parse & Respond",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Validate Input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [{ "node": "Build Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [{ "node": "Groq LLM", "type": "main", "index": 0 }]
+      ]
+    },
+    "Groq LLM": {
+      "main": [
+        [{ "node": "Parse & Respond", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    { "name": "listing-optimizer" }
+  ]
+}

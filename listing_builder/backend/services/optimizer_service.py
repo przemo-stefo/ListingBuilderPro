@@ -1,16 +1,20 @@
 # backend/services/optimizer_service.py
-# Purpose: Direct Groq-powered listing optimization (replaces n8n proxy)
-# NOT for: Database operations or marketplace publishing
+# Purpose: Listing optimization — n8n-first with direct Groq fallback
+# NOT for: Database models or marketplace publishing
 
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from groq import Groq
 from sqlalchemy.orm import Session
 from config import settings
 from services.knowledge_service import search_knowledge_batch
+from services.ranking_juice_service import calculate_ranking_juice
+from services.learning_service import store_successful_listing, get_past_successes
+from services.n8n_orchestrator_service import call_n8n_optimizer, build_n8n_payload
 import structlog
 
 logger = structlog.get_logger()
@@ -470,6 +474,11 @@ async def optimize_listing(
         bullets_context = knowledge.get("bullets", "")
         desc_context = knowledge.get("description", "")
 
+    # WHY: Fetch past successful listings as few-shot examples for the LLM
+    past_successes = []
+    if db:
+        past_successes = get_past_successes(db, marketplace)
+
     logger.info(
         "optimizer_start",
         product=product_title[:50],
@@ -478,41 +487,75 @@ async def optimize_listing(
         knowledge_title=len(title_context),
         knowledge_bullets=len(bullets_context),
         knowledge_desc=len(desc_context),
+        past_successes=len(past_successes),
     )
 
-    # 2. Three Groq LLM calls (title first, then bullets + description in parallel)
-    title_prompt = _build_title_prompt(
-        product_title, brand, product_line, tier1_phrases, lang, limits["title"],
-        expert_context=title_context,
-    )
-    title_text = await asyncio.to_thread(_call_groq, title_prompt, 0.4, 250)
+    # 2. Try n8n first, fall back to direct Groq
+    optimization_source = "direct"
+    n8n_result = None
 
-    # WHY: bullets and description are independent — run in parallel
-    bullets_prompt = _build_bullets_prompt(
-        product_title, brand, tier2_phrases, lang, limits["bullet"],
-        expert_context=bullets_context,
-    )
-    desc_prompt = _build_description_prompt(
-        product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
-        expert_context=desc_context,
-    )
+    if settings.n8n_webhook_url:
+        expert_context = {
+            "title": title_context,
+            "bullets": bullets_context,
+            "description": desc_context,
+        }
+        payload = build_n8n_payload(
+            brand=brand,
+            product_title=product_title,
+            keywords=all_kw,
+            marketplace=marketplace,
+            mode=mode,
+            language=lang,
+            expert_context=expert_context,
+            past_successes=past_successes,
+        )
+        n8n_result = await call_n8n_optimizer(payload)
 
-    bullets_raw, desc_text = await asyncio.gather(
-        asyncio.to_thread(_call_groq, bullets_prompt, 0.5, 800),
-        asyncio.to_thread(_call_groq, desc_prompt, 0.5, 600),
-    )
+    if n8n_result:
+        # WHY: n8n returned a valid listing — use it
+        optimization_source = "n8n"
+        title_text = n8n_result.get("title", "")
+        bullet_lines = n8n_result.get("bullet_points", [])
+        desc_text = n8n_result.get("description", "")
+        # WHY: Still strip promo words — n8n/LLM might slip them in
+        title_text = _strip_promo_words(title_text)
+        bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
+        desc_text = _strip_promo_words(desc_text)
+    else:
+        # Fallback: direct Groq calls (existing flow)
+        title_prompt = _build_title_prompt(
+            product_title, brand, product_line, tier1_phrases, lang, limits["title"],
+            expert_context=title_context,
+        )
+        title_text = await asyncio.to_thread(_call_groq, title_prompt, 0.4, 250)
 
-    # Parse bullets — one per line, strip numbering artifacts
-    bullet_lines = [
-        re.sub(r"^[\d\.\-\*\•]+\s*", "", line).strip()
-        for line in bullets_raw.split("\n")
-        if line.strip() and len(line.strip()) > 10
-    ][:5]
+        # WHY: bullets and description are independent — run in parallel
+        bullets_prompt = _build_bullets_prompt(
+            product_title, brand, tier2_phrases, lang, limits["bullet"],
+            expert_context=bullets_context,
+        )
+        desc_prompt = _build_description_prompt(
+            product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
+            expert_context=desc_context,
+        )
 
-    # WHY: LLM sometimes ignores "no promotional words" instruction — strip them
-    title_text = _strip_promo_words(title_text)
-    bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
-    desc_text = _strip_promo_words(desc_text)
+        bullets_raw, desc_text = await asyncio.gather(
+            asyncio.to_thread(_call_groq, bullets_prompt, 0.5, 800),
+            asyncio.to_thread(_call_groq, desc_prompt, 0.5, 600),
+        )
+
+        # Parse bullets — one per line, strip numbering artifacts
+        bullet_lines = [
+            re.sub(r"^[\d\.\-\*\•]+\s*", "", line).strip()
+            for line in bullets_raw.split("\n")
+            if line.strip() and len(line.strip()) > 10
+        ][:5]
+
+        # WHY: LLM sometimes ignores "no promotional words" instruction — strip them
+        title_text = _strip_promo_words(title_text)
+        bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
+        desc_text = _strip_promo_words(desc_text)
 
     # 3. Backend keyword packing
     full_listing_text = title_text + " " + " ".join(bullet_lines) + " " + desc_text
@@ -531,11 +574,37 @@ async def optimize_listing(
     # 6. Backend utilization
     backend_util = round((backend_bytes / limits["backend"]) * 100, 1) if limits["backend"] > 0 else 0
 
+    # 6. Ranking Juice — quantifies listing quality 0-100
+    rj = calculate_ranking_juice(all_kw, title_text, bullet_lines, backend_kw, desc_text)
+
+    # 7. Self-learning — store if RJ >= 75
+    if db:
+        try:
+            store_successful_listing(
+                db,
+                listing_data={
+                    "brand": brand,
+                    "marketplace": marketplace,
+                    "product_title": product_title,
+                    "title": title_text,
+                    "bullets": json.dumps(bullet_lines),
+                    "description": desc_text,
+                    "backend_keywords": backend_kw,
+                    "keyword_count": len(all_kw),
+                },
+                ranking_juice_data=rj,
+            )
+        except Exception as e:
+            logger.warning("self_learning_save_failed", error=str(e))
+
     logger.info(
         "optimizer_done",
         coverage=coverage_pct,
         compliance=compliance["status"],
         backend_bytes=backend_bytes,
+        ranking_juice=rj["score"],
+        grade=rj["grade"],
+        source=optimization_source,
     )
 
     return {
@@ -568,4 +637,6 @@ async def optimize_listing(
             "missing_keywords": missing[:20],
             "root_words": root_words,
         },
+        "ranking_juice": rj,
+        "optimization_source": optimization_source,
     }

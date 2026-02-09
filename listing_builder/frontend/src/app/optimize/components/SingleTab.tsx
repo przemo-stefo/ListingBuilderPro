@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useGenerateListing } from '@/lib/hooks/useOptimizer'
-import { ScoresCard, ListingCard, KeywordIntelCard } from './ResultDisplay'
+import { ScoresCard, ListingCard, KeywordIntelCard, RankingJuiceCard } from './ResultDisplay'
 import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword } from '@/lib/types'
 
 // WHY: Marketplace options match what the n8n workflow supports
@@ -307,6 +307,12 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
       {/* Results */}
       {displayResults && (displayResults.status === 'success' || displayResults.status === 'completed') && (
         <div className="space-y-4">
+          {displayResults.ranking_juice && (
+            <RankingJuiceCard
+              rankingJuice={displayResults.ranking_juice}
+              optimizationSource={displayResults.optimization_source}
+            />
+          )}
           <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} />
           <ListingCard
             listing={displayResults.listing}

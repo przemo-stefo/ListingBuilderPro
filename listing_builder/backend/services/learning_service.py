@@ -1,0 +1,111 @@
+# backend/services/learning_service.py
+# Purpose: Self-learning — store successful listings, retrieve as few-shot examples
+# NOT for: Ranking Juice calculation or LLM calls
+
+from typing import List, Dict, Optional
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+import structlog
+
+logger = structlog.get_logger()
+
+# WHY: 75 is the quality gate — listings below this aren't good enough as examples
+MIN_RANKING_JUICE = 75
+
+
+def store_successful_listing(
+    db: Session,
+    listing_data: Dict,
+    ranking_juice_data: Dict,
+) -> Optional[str]:
+    """
+    INSERT into listing_history when RJ >= 75.
+    Returns the new row's UUID or None if below threshold.
+    """
+    score = ranking_juice_data.get("score", 0)
+    if score < MIN_RANKING_JUICE:
+        return None
+
+    try:
+        result = db.execute(
+            text("""
+                INSERT INTO listing_history
+                    (brand, marketplace, product_title, title, bullets, description,
+                     backend_keywords, ranking_juice, grade, keyword_count)
+                VALUES
+                    (:brand, :marketplace, :product_title, :title, :bullets::jsonb,
+                     :description, :backend_keywords, :ranking_juice, :grade, :keyword_count)
+                RETURNING id
+            """),
+            {
+                "brand": listing_data.get("brand", ""),
+                "marketplace": listing_data.get("marketplace", ""),
+                "product_title": listing_data.get("product_title", ""),
+                "title": listing_data.get("title", ""),
+                "bullets": str(listing_data.get("bullets", "[]")),
+                "description": listing_data.get("description", ""),
+                "backend_keywords": listing_data.get("backend_keywords", ""),
+                "ranking_juice": score,
+                "grade": ranking_juice_data.get("grade", ""),
+                "keyword_count": listing_data.get("keyword_count", 0),
+            },
+        )
+        db.commit()
+        row = result.fetchone()
+        listing_id = str(row[0]) if row else None
+        logger.info("learning_stored", rj=score, grade=ranking_juice_data.get("grade"))
+        return listing_id
+    except Exception as e:
+        logger.warning("learning_store_failed", error=str(e))
+        db.rollback()
+        return None
+
+
+def get_past_successes(
+    db: Session, marketplace: str, limit: int = 3
+) -> List[Dict]:
+    """
+    SELECT top listings by ranking_juice WHERE RJ >= 75 AND marketplace matches.
+    Returns few-shot examples for prompt injection.
+    """
+    try:
+        result = db.execute(
+            text("""
+                SELECT title, bullets, description, backend_keywords, ranking_juice, grade
+                FROM listing_history
+                WHERE ranking_juice >= :min_rj AND marketplace = :marketplace
+                ORDER BY ranking_juice DESC
+                LIMIT :limit
+            """),
+            {"min_rj": MIN_RANKING_JUICE, "marketplace": marketplace, "limit": limit},
+        )
+        rows = result.fetchall()
+        return [
+            {
+                "title": r[0],
+                "bullets": r[1],  # Already JSONB → Python list
+                "description": r[2],
+                "backend_keywords": r[3],
+                "ranking_juice": r[4],
+                "grade": r[5],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.warning("learning_fetch_failed", error=str(e))
+        return []
+
+
+def submit_feedback(db: Session, listing_id: str, rating: int) -> bool:
+    """UPDATE user_rating on a listing_history row. Returns True on success."""
+    try:
+        result = db.execute(
+            text("UPDATE listing_history SET user_rating = :rating WHERE id = :id"),
+            {"rating": rating, "id": listing_id},
+        )
+        db.commit()
+        return result.rowcount > 0
+    except Exception as e:
+        logger.warning("learning_feedback_failed", error=str(e))
+        db.rollback()
+        return False

@@ -74,6 +74,14 @@ class OptimizerKeywordIntel(BaseModel):
     root_words: List[Dict[str, Any]] = []
 
 
+class RankingJuiceResponse(BaseModel):
+    score: float = 0
+    grade: str = ""
+    verdict: str = ""
+    components: Dict[str, float] = {}
+    weights: Dict[str, float] = {}
+
+
 class OptimizerResponse(BaseModel):
     status: str
     marketplace: str = ""
@@ -84,6 +92,8 @@ class OptimizerResponse(BaseModel):
     scores: OptimizerScores = OptimizerScores()
     compliance: OptimizerCompliance = OptimizerCompliance()
     keyword_intel: OptimizerKeywordIntel = OptimizerKeywordIntel()
+    ranking_juice: Optional[RankingJuiceResponse] = None
+    optimization_source: str = "direct"
 
 
 @router.post("/generate", response_model=OptimizerResponse)
@@ -309,6 +319,27 @@ async def delete_history(request: Request, run_id: int, db: Session = Depends(ge
     db.delete(run)
     db.commit()
     return {"status": "deleted", "id": run_id}
+
+
+class FeedbackRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+
+
+@router.patch("/history/{listing_id}/feedback")
+@limiter.limit("10/minute")
+async def submit_feedback(
+    request: Request,
+    listing_id: str,
+    body: FeedbackRequest,
+    db: Session = Depends(get_db),
+):
+    """User rates a listing 1-5. Updates listing_history table."""
+    from services.learning_service import submit_feedback as do_feedback
+
+    success = do_feedback(db, listing_id, body.rating)
+    if not success:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return {"status": "updated", "listing_id": listing_id, "rating": body.rating}
 
 
 @router.get("/health")
