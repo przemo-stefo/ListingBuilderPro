@@ -107,6 +107,18 @@ def _get_scrape_do_token() -> str:
     return token
 
 
+def _get_scraperapi_key() -> str:
+    """Get ScraperAPI key from env or config."""
+    key = os.environ.get("SCRAPERAPI_KEY", "")
+    if not key:
+        try:
+            from config import settings
+            key = getattr(settings, "scraperapi_key", "")
+        except Exception:
+            pass
+    return key
+
+
 def _get_proxy_config() -> Optional[dict]:
     """Build Playwright proxy config from SCRAPER_PROXY_URL env var.
 
@@ -361,8 +373,41 @@ async def _scrape_via_scrape_do(url: str, token: str) -> AllegroProduct:
     return product
 
 
+async def _scrape_via_scraperapi(url: str, api_key: str) -> AllegroProduct:
+    """Scrape Allegro via ScraperAPI (same approach as Scrape.do — HTTP API returns HTML)."""
+    product = AllegroProduct(source_url=url, source_id=extract_offer_id(url))
+    encoded_url = quote(url, safe="")
+    api_url = f"https://api.scraperapi.com?api_key={api_key}&url={encoded_url}&country_code=pl"
+
+    logger.info("scraperapi_request", url=url, offer_id=product.source_id)
+
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.get(api_url)
+            if resp.status_code != 200:
+                product.error = f"ScraperAPI returned HTTP {resp.status_code}"
+                logger.error("scraperapi_failed", status=resp.status_code, url=url)
+                return product
+
+            _parse_html_product(resp.text, product)
+            logger.info(
+                "scraperapi_complete",
+                offer_id=product.source_id,
+                title=product.title[:60] if product.title else "(empty)",
+                price=product.price or "(none)",
+            )
+    except httpx.TimeoutException:
+        product.error = "ScraperAPI request timed out (90s)"
+        logger.error("scraperapi_timeout", url=url)
+    except Exception as e:
+        product.error = f"ScraperAPI request failed: {str(e)}"
+        logger.error("scraperapi_error", url=url, error=str(e))
+
+    return product
+
+
 # ═══════════════════════════════════════════════════════════════════════
-# STRATEGY 2: Playwright fallback (direct or with raw proxy)
+# STRATEGY 3: Playwright fallback (direct or with raw proxy)
 # Used when no Scrape.do token is configured.
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -636,7 +681,12 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
     if token:
         return await _scrape_via_scrape_do(url, token)
 
-    # Strategy 2: Playwright fallback
+    # Strategy 2: ScraperAPI (same HTTP approach, different provider)
+    scraperapi_key = _get_scraperapi_key()
+    if scraperapi_key:
+        return await _scrape_via_scraperapi(url, scraperapi_key)
+
+    # Strategy 3: Playwright fallback
     return await _scrape_via_playwright(url, _browser)
 
 
