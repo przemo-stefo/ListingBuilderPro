@@ -14,36 +14,48 @@ logger = structlog.get_logger()
 
 
 async def fetch_ebay_product(item_id: str) -> Optional[dict]:
-    """Fetch eBay product data by item ID using Scrape.do.
+    """Fetch eBay product data by item ID.
 
-    WHY Scrape.do not eBay API: eBay Browse API requires a developer account
-    and OAuth setup. Scrape.do is already configured for Allegro and works
-    for any site. Public product pages have all the data we need.
+    WHY direct httpx first: eBay doesn't use DataDome — simple GET with
+    stealth UA works fine from any IP. Falls back to ScraperAPI/Scrape.do
+    if direct request fails.
     """
-    token = os.environ.get("SCRAPE_DO_TOKEN", "")
-    if not token:
-        try:
-            from config import settings
-            token = settings.scrape_do_token
-        except Exception:
-            pass
-
-    if not token:
-        return {"error": "SCRAPE_DO_TOKEN not configured"}
-
     url = f"https://www.ebay.com/itm/{item_id}"
-    encoded_url = quote(url, safe="")
-    api_url = f"https://api.scrape.do/?token={token}&url={encoded_url}"
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+    }
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.get(api_url)
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
 
-            if resp.status_code != 200:
-                return {"error": f"Scrape.do returned HTTP {resp.status_code}"}
+            if resp.status_code == 200 and len(resp.text) > 5000:
+                return _parse_ebay_html(resp.text, item_id)
 
-            html = resp.text
-            return _parse_ebay_html(html, item_id)
+            # Fallback: ScraperAPI
+            scraperapi_key = os.environ.get("SCRAPERAPI_KEY", "")
+            if scraperapi_key:
+                encoded_url = quote(url, safe="")
+                api_url = f"https://api.scraperapi.com?api_key={scraperapi_key}&url={encoded_url}"
+                resp = await client.get(api_url)
+                if resp.status_code == 200:
+                    return _parse_ebay_html(resp.text, item_id)
+
+            # Fallback: Scrape.do
+            token = os.environ.get("SCRAPE_DO_TOKEN", "")
+            if token:
+                encoded_url = quote(url, safe="")
+                api_url = f"https://api.scrape.do/?token={token}&url={encoded_url}"
+                resp = await client.get(api_url)
+                if resp.status_code == 200:
+                    return _parse_ebay_html(resp.text, item_id)
+
+            return {"error": f"All fetch strategies failed (HTTP {resp.status_code})"}
 
     except httpx.TimeoutException:
         return {"error": "eBay scrape timed out"}
