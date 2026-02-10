@@ -50,8 +50,8 @@ def store_successful_listing(
                 "keyword_count": listing_data.get("keyword_count", 0),
             },
         )
-        db.commit()
         row = result.fetchone()
+        db.commit()
         listing_id = str(row[0]) if row else None
         logger.info("learning_stored", rj=score, grade=ranking_juice_data.get("grade"))
         return listing_id
