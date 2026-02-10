@@ -658,6 +658,16 @@ async def optimize_listing(
         title_text = _strip_promo_words(title_text)
         bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
         desc_text = _strip_promo_words(desc_text)
+
+        # WHY: LLM often generates titles 5-15 chars over limit — truncate at last word boundary
+        if len(title_text) > limits["title"]:
+            truncated = title_text[:limits["title"]]
+            # Cut at last space to avoid broken words
+            last_space = truncated.rfind(" ")
+            if last_space > limits["title"] * 0.8:
+                title_text = truncated[:last_space]
+            else:
+                title_text = truncated
         # WHY: LLM backend suggestions fill remaining 249 bytes after algorithmic packing
         backend_suggestions = _strip_promo_words(backend_suggestions)
 
