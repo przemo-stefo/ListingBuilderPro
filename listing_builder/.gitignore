@@ -102,8 +102,8 @@ ohmycake/
 n8n-fashion-generator/
 n8n-fashion-security/
 
-# Dashboard (old/separate)
-dashboard/
+# Dashboard (old/separate, root-level only)
+/dashboard/
 
 # Carousel / LinkedIn (marketing assets)
 carousel_slides/
