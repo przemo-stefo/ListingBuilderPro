@@ -321,21 +321,22 @@ EXPERT KNOWLEDGE (use these best practices):
 {expert_context}
 
 """
-    return f"""You are an expert Amazon listing optimizer.
+    return f"""You are an expert Amazon listing optimizer. Your #1 goal is MAXIMUM keyword density in the title.
 {context_block}Product: {product_title}
 Brand: {brand}
 Product line: {product_line}
 Language: {lang}
 Max characters: {max_chars}
 
-TOP KEYWORDS (must include): {kw_list}
+TOP KEYWORDS (must include as EXACT phrases): {kw_list}
 
 Rules:
 - Start with brand name
-- Include as many top keywords as naturally possible
+- CRITICAL: Include as many keyword phrases as EXACT matches in the title — this is the most important ranking factor
+- Use " - " dash separators between keyword groups for better Amazon indexing
+- Use the FULL {max_chars} characters — longer titles rank better on Amazon
 - No promotional words (bestseller, #1, günstig, etc.)
 - No special characters (!, €, ™, etc.)
-- Stay under {max_chars} characters
 - Write in {lang}
 
 Return ONLY the optimized title, nothing else."""
@@ -365,7 +366,8 @@ KEYWORDS to weave in: {kw_list}
 Rules:
 - Write exactly 5 bullet points
 - Start each bullet with a CAPITALIZED benefit keyword
-- Include keywords naturally, not forced
+- CRITICAL: Include keyword phrases as EXACT matches — weave each phrase verbatim into bullet text
+- Each bullet should contain 2-3 keyword phrases naturally integrated
 - Focus on benefits, not just features
 - Each bullet under {max_chars} characters
 - Write in {lang}

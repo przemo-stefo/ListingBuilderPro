@@ -27,9 +27,11 @@ def calculate_ranking_juice(
          + (Backend Efficiency × 0.10) + (Structure × 0.05)
     """
     coverage = _coverage_score(keywords, title, bullets, backend, description)
-    exact = _exact_match_score(keywords, title)
+    # WHY: Visible coverage (without backend) tells us if keywords are well-placed
+    visible_coverage = _coverage_score(keywords, title, bullets, "", description)
+    exact = _exact_match_score(keywords, title, bullets)
     volume = _search_volume_score(keywords, title, bullets)
-    backend_eff = _backend_efficiency(backend)
+    backend_eff = _backend_efficiency(backend, visible_coverage)
     structure = _structure_score(title, bullets)
 
     rj = (
@@ -103,11 +105,26 @@ def _coverage_score(
     return min(100, (covered / len(top)) * 100 / 98 * 100)
 
 
-def _exact_match_score(keywords: List[Dict], title: str) -> float:
-    """Exact phrase matches in title (0-100). Target = 8 matches from top 30."""
+def _exact_match_score(keywords: List[Dict], title: str, bullets: List[str] = None) -> float:
+    """Exact phrase matches in title + bullets (0-100).
+
+    WHY title+bullets: Amazon indexes both for exact keyword matching.
+    Title matches count 1.5x (more weight), bullet matches count 1.0x.
+    WHY dynamic target: With 5 keywords, expecting 8 exact matches is impossible.
+    Target = min(8, keyword_count * 0.5) so the score is achievable.
+    """
     title_lower = title.lower()
-    exact = sum(1 for kw in keywords[:30] if kw["phrase"].lower() in title_lower)
-    return min(100, (exact / 8) * 100)
+    bullets_text = " ".join(bullets).lower() if bullets else ""
+    top = keywords[:30]
+    score = 0
+    for kw in top:
+        phrase = kw["phrase"].lower()
+        if phrase in title_lower:
+            score += 1.5
+        elif phrase in bullets_text:
+            score += 1.0
+    target = max(3, min(8, len(top) * 0.5))
+    return min(100, (score / target) * 100)
 
 
 def _search_volume_score(
@@ -139,8 +156,14 @@ def _search_volume_score(
     return min(100, (captured / max_possible) * 100)
 
 
-def _backend_efficiency(backend: str) -> float:
-    """Backend byte utilization (0-100). Optimal = 240-249 bytes."""
+def _backend_efficiency(backend: str, visible_coverage: float = 0) -> float:
+    """Backend byte utilization (0-100). Optimal = 240-249 bytes.
+
+    WHY visible_coverage bonus: If keywords are already 95%+ covered in
+    title/bullets/description, a light backend is FINE — the listing doesn't
+    need backend to compensate. Penalizing empty backend when visible
+    coverage is excellent produces misleadingly low scores.
+    """
     byte_size = len(backend.encode("utf-8"))
     if byte_size > 250:
         return 50  # WHY: Penalty for exceeding limit
@@ -150,9 +173,18 @@ def _backend_efficiency(backend: str) -> float:
         return 95
     if 220 <= byte_size < 230:
         return 85
-    if byte_size < 220:
-        return (byte_size / 240) * 80
-    return (byte_size / 250) * 100
+
+    # WHY: Base score for low byte count
+    base = (byte_size / 240) * 80 if byte_size < 220 else (byte_size / 250) * 100
+
+    # WHY: If visible fields already cover 90%+ keywords, backend doesn't need to
+    # compensate — give a floor of 60 so it doesn't drag the total score down
+    if visible_coverage >= 95:
+        return max(80, base)
+    if visible_coverage >= 90:
+        return max(60, base)
+
+    return base
 
 
 def _structure_score(title: str, bullets: List[str]) -> float:
