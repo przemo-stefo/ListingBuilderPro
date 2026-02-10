@@ -11,7 +11,7 @@ export async function getListings(
 ): Promise<ListingsResponse> {
   const response = await apiRequest<ListingsResponse>(
     'get',
-    '/api/listings',
+    '/listings',
     undefined,
     {
       marketplace: params?.marketplace,

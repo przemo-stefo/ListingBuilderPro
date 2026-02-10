@@ -11,7 +11,7 @@ export async function getKeywords(
 ): Promise<KeywordsResponse> {
   const response = await apiRequest<KeywordsResponse>(
     'get',
-    '/api/keywords',
+    '/keywords',
     undefined,
     {
       marketplace: params?.marketplace,
