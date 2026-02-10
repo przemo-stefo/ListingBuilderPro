@@ -56,8 +56,7 @@ def store_successful_listing(
         logger.info("learning_stored", rj=score, grade=ranking_juice_data.get("grade"))
         return listing_id
     except Exception as e:
-        import traceback
-        logger.warning("learning_store_failed", error=str(e), error_type=type(e).__name__, tb=traceback.format_exc())
+        logger.warning("learning_store_failed", error=str(e))
         db.rollback()
         return None
 
