@@ -95,6 +95,7 @@ class OptimizerResponse(BaseModel):
     keyword_intel: OptimizerKeywordIntel = OptimizerKeywordIntel()
     ranking_juice: Optional[RankingJuiceResponse] = None
     optimization_source: str = "direct"
+    trace: Optional[Dict[str, Any]] = None  # WHY: Observability — tokens, latency, cost per run
 
 
 @router.post("/generate", response_model=OptimizerResponse)
