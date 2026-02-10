@@ -55,8 +55,16 @@ async def expert_chat(
     db: Session = Depends(get_db),
 ):
     """Expert Q&A — ask Amazon questions, answered using Inner Circle transcript RAG."""
-    result = await ask_expert(body.question, db)
-    return result
+    try:
+        result = await ask_expert(body.question, db)
+        return result
+    except Exception as e:
+        logger.error("expert_chat_error", error=str(e))
+        return ChatResponse(
+            answer="Sorry, I couldn't process your question right now. Please try again.",
+            sources_used=0,
+            has_context=False,
+        )
 
 
 @router.get("/stats")
