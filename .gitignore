@@ -41,3 +41,6 @@ exports/
 *.xlsx
 *.csv
 !sample*.csv
+
+# Course materials
+ACQ Scale Advisory*/
