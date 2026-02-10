@@ -13,6 +13,8 @@ const ALLOWED_PATH_PREFIXES = [
   'optimizer/generate',
   'optimizer/history',
   'optimizer/health',
+  'knowledge/chat',
+  'knowledge/stats',
   'products',
   'compliance',
   'converter',

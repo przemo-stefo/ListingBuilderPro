@@ -1,8 +1,9 @@
 # backend/api/knowledge_routes.py
-# Purpose: Debug/admin endpoints for knowledge base search and stats
-# NOT for: Production-facing features (knowledge injection happens inside optimizer_service)
+# Purpose: Knowledge base endpoints — search, stats, and Expert Q&A chat
+# NOT for: Listing optimization (that's optimizer_service + optimizer_routes)
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from slowapi import Limiter
@@ -10,6 +11,7 @@ from slowapi.util import get_remote_address
 
 from database import get_db
 from services.knowledge_service import search_knowledge
+from services.qa_service import ask_expert
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -33,6 +35,28 @@ async def knowledge_search(
         "context_length": len(context),
         "context": context,
     }
+
+
+class ChatRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=1000)
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    sources_used: int
+    has_context: bool
+
+
+@router.post("/chat", response_model=ChatResponse)
+@limiter.limit("10/minute")
+async def expert_chat(
+    request: Request,
+    body: ChatRequest,
+    db: Session = Depends(get_db),
+):
+    """Expert Q&A — ask Amazon questions, answered using Inner Circle transcript RAG."""
+    result = await ask_expert(body.question, db)
+    return result
 
 
 @router.get("/stats")

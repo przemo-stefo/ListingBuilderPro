@@ -16,6 +16,7 @@ import {
   Send,
   Shield,
   Activity,
+  Brain,
 } from 'lucide-react'
 
 const navItems = [
@@ -38,6 +39,11 @@ const navItems = [
     title: 'Optimize',
     href: '/optimize',
     icon: Sparkles,
+  },
+  {
+    title: 'Expert Q&A',
+    href: '/expert-qa',
+    icon: Brain,
   },
   {
     title: 'Converter',
