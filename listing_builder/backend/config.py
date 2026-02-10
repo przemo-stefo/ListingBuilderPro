@@ -29,8 +29,11 @@ class Settings(BaseSettings):
 
     # AI/LLM - Groq (PRIMARY, NOT OpenAI)
     groq_api_key: str
-    groq_api_key_2: str = ""  # WHY: Backup key for rotation on 429 rate limits
-    groq_api_key_3: str = ""  # WHY: Third key — 300k tokens/day total with 3-key rotation
+    groq_api_key_2: str = ""  # WHY: Backup keys for rotation on 429 rate limits
+    groq_api_key_3: str = ""
+    groq_api_key_4: str = ""
+    groq_api_key_5: str = ""
+    groq_api_key_6: str = ""
 
     # Marketplace APIs
     amazon_refresh_token: str = ""
@@ -103,10 +106,11 @@ class Settings(BaseSettings):
     def groq_api_keys(self) -> List[str]:
         """All available Groq API keys for rotation."""
         keys = [self.groq_api_key]
-        if self.groq_api_key_2:
-            keys.append(self.groq_api_key_2)
-        if self.groq_api_key_3:
-            keys.append(self.groq_api_key_3)
+        for attr in ("groq_api_key_2", "groq_api_key_3", "groq_api_key_4",
+                      "groq_api_key_5", "groq_api_key_6"):
+            val = getattr(self, attr, "")
+            if val:
+                keys.append(val)
         return keys
 
     @property
