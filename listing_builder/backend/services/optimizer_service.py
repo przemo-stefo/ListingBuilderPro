@@ -344,6 +344,7 @@ Max characters: {max_chars}
 TOP KEYWORDS (include as EXACT phrases): {kw_list}
 
 Rules:
+- IMPORTANT: If any keyword or product info is NOT in {lang}, TRANSLATE it to {lang} first, then use the translated version
 - Start with brand name
 - Include as many UNIQUE keyword phrases as possible — each phrase should appear ONLY ONCE
 - NEVER repeat the same word or phrase — Amazon ignores duplicates and may flag keyword stuffing
@@ -352,7 +353,7 @@ Rules:
 - Use the FULL {max_chars} characters
 - No promotional words (bestseller, #1, günstig, etc.)
 - No special characters (!, €, ™, etc.)
-- Write in {lang}
+- The ENTIRE title must be in {lang} — no words in other languages
 
 Return ONLY the optimized title, nothing else."""
 
@@ -379,13 +380,14 @@ Max characters per bullet: {max_chars}
 KEYWORDS to weave in: {kw_list}
 
 Rules:
+- IMPORTANT: If any keyword is NOT in {lang}, TRANSLATE it to {lang} first, then use the translated version
 - Write exactly 5 bullet points
 - Start each bullet with a CAPITALIZED benefit keyword
 - CRITICAL: Include keyword phrases as EXACT matches — weave each phrase verbatim into bullet text
 - Each bullet should contain 2-3 keyword phrases naturally integrated
 - Focus on benefits, not just features
 - Each bullet under {max_chars} characters
-- Write in {lang}
+- The ENTIRE text must be in {lang} — no words in other languages
 - No promotional words
 
 Return ONLY 5 bullet points, one per line, no numbering or bullet symbols."""
@@ -412,14 +414,16 @@ Language: {lang}
 REMAINING KEYWORDS to include: {kw_list}
 
 Rules:
+- IMPORTANT: If any keyword or product info is NOT in {lang}, TRANSLATE it to {lang} first
 - Write a compelling product description (2-3 short paragraphs)
 - Naturally include the remaining keywords
 - Focus on use cases and benefits
 - Professional tone, no hype
-- Write in {lang}
-- No HTML tags
+- The ENTIRE text must be in {lang} — no words in other languages
+- Format as simple HTML: use <p> for paragraphs, <ul><li> for feature lists, <b> for emphasis
+- Keep HTML clean and minimal — no classes, no inline styles, no <div> or <span>
 
-Return ONLY the description text."""
+Return ONLY the HTML description, nothing else."""
 
 
 def _build_backend_prompt(
@@ -453,12 +457,12 @@ Include:
 - Complementary use-case terms (e.g. "camping hiking outdoor" for a water bottle)
 
 Rules:
+- IMPORTANT: All terms must be in {lang} — translate if needed
 - Space-separated, lowercase, no commas or punctuation
 - No brand names, no promotional words, no special characters
 - Every word must be UNIQUE (no repetition)
-- Write in {lang}
 
-Return ONLY space-separated search terms, nothing else."""
+Return ONLY space-separated search terms in {lang}, nothing else."""
 
 
 def _call_groq(prompt: str, temperature: float, max_tokens: int) -> Tuple[str, Optional[dict]]:

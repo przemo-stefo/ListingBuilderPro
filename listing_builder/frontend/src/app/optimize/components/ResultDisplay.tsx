@@ -219,7 +219,7 @@ export function ListingCard({
           </div>
         </div>
 
-        {/* Description */}
+        {/* Description — rendered as HTML since LLM outputs <p>/<ul>/<b> tags */}
         <ListingSection
           label="Description"
           content={listing.description}
@@ -228,7 +228,7 @@ export function ListingCard({
           field="description"
           copiedField={copiedField}
           onCopy={onCopy}
-          multiline
+          isHtml
         />
 
         {/* Backend Keywords */}
@@ -285,6 +285,7 @@ function ListingSection({
   onCopy,
   multiline = false,
   mono = false,
+  isHtml = false,
 }: {
   label: string
   content: string
@@ -296,6 +297,7 @@ function ListingSection({
   onCopy: (text: string, field: string) => void
   multiline?: boolean
   mono?: boolean
+  isHtml?: boolean
 }) {
   const overLimit = charCount > maxChars
 
@@ -310,15 +312,22 @@ function ListingSection({
         </div>
         <CopyButton text={content} field={field} copiedField={copiedField} onCopy={onCopy} />
       </div>
-      <div
-        className={cn(
-          'rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white',
-          multiline && 'whitespace-pre-wrap',
-          mono && 'font-mono text-xs'
-        )}
-      >
-        {content || '—'}
-      </div>
+      {isHtml && content ? (
+        <div
+          className="listing-html rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_b]:font-semibold [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+      ) : (
+        <div
+          className={cn(
+            'rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white',
+            multiline && 'whitespace-pre-wrap',
+            mono && 'font-mono text-xs'
+          )}
+        >
+          {content || '—'}
+        </div>
+      )}
     </div>
   )
 }
