@@ -8,11 +8,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import structlog
 
 from database import get_db
 from services.knowledge_service import search_knowledge
 from services.qa_service import ask_expert
 
+logger = structlog.get_logger()
+
+# WHY: Rate limiter prevents API abuse — matches pattern used by all other route files
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
