@@ -29,6 +29,8 @@ class Settings(BaseSettings):
 
     # AI/LLM - Groq (PRIMARY, NOT OpenAI)
     groq_api_key: str
+    groq_api_key_2: str = ""  # WHY: Backup key for rotation on 429 rate limits
+    groq_api_key_3: str = ""  # WHY: Third key — 300k tokens/day total with 3-key rotation
 
     # Marketplace APIs
     amazon_refresh_token: str = ""
@@ -96,6 +98,16 @@ class Settings(BaseSettings):
         if v not in allowed:
             raise ValueError(f"app_env must be one of: {allowed}")
         return v
+
+    @property
+    def groq_api_keys(self) -> List[str]:
+        """All available Groq API keys for rotation."""
+        keys = [self.groq_api_key]
+        if self.groq_api_key_2:
+            keys.append(self.groq_api_key_2)
+        if self.groq_api_key_3:
+            keys.append(self.groq_api_key_3)
+        return keys
 
     @property
     def cors_origins_list(self) -> List[str]:

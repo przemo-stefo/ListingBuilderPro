@@ -405,15 +405,29 @@ Return ONLY the description text."""
 
 
 def _call_groq(prompt: str, temperature: float, max_tokens: int) -> str:
-    """Synchronous Groq call — will be wrapped in asyncio.to_thread()."""
-    client = Groq(api_key=settings.groq_api_key)
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    return response.choices[0].message.content.strip()
+    """Synchronous Groq call with automatic key rotation on 429 rate limits."""
+    keys = settings.groq_api_keys
+    last_error = None
+
+    for i, key in enumerate(keys):
+        try:
+            client = Groq(api_key=key)
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            last_error = e
+            if "429" in str(e) or "rate_limit" in str(e):
+                logger.warning("groq_rate_limit", key_index=i, remaining_keys=len(keys) - i - 1)
+                continue
+            raise  # Non-rate-limit errors should propagate immediately
+
+    # WHY: All keys exhausted — raise the last error
+    raise last_error
 
 
 # --- Post-processing: strip promo words LLM may have slipped in ---

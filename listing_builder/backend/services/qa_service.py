@@ -94,15 +94,28 @@ async def ask_expert(
     prompt = _build_qa_prompt(question, context)
 
     # WHY: Higher temperature (0.6) for more natural conversational answers
-    client = Groq(api_key=settings.groq_api_key)
-    response = await asyncio.to_thread(
-        lambda: client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6,
-            max_tokens=1500,
-        )
-    )
+    # WHY: Try all available keys to handle 429 rate limits
+    def _call_with_rotation():
+        keys = settings.groq_api_keys
+        last_error = None
+        for i, key in enumerate(keys):
+            try:
+                client = Groq(api_key=key)
+                return client.chat.completions.create(
+                    model=MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.6,
+                    max_tokens=1500,
+                )
+            except Exception as e:
+                last_error = e
+                if "429" in str(e) or "rate_limit" in str(e):
+                    logger.warning("qa_groq_rate_limit", key_index=i)
+                    continue
+                raise
+        raise last_error
+
+    response = await asyncio.to_thread(_call_with_rotation)
 
     answer = response.choices[0].message.content.strip()
 
