@@ -7,6 +7,7 @@ from .jobs import ImportJob, BulkJob, SyncLog, Webhook, JobStatus
 from .compliance import ComplianceReport, ComplianceReportItem
 from .optimization import OptimizationRun
 from .monitoring import TrackedProduct, MonitoringSnapshot, AlertConfig, Alert
+from .listing import Listing, TrackedKeyword
 
 __all__ = [
     "Product",
@@ -23,4 +24,6 @@ __all__ = [
     "MonitoringSnapshot",
     "AlertConfig",
     "Alert",
+    "Listing",
+    "TrackedKeyword",
 ]

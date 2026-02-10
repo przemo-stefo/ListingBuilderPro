@@ -1,61 +1,127 @@
 # backend/api/keywords_routes.py
-# Purpose: Mock keywords endpoint — search volume, rank tracking, relevance
-# NOT for: Real keyword data (swap to DB when rank-tracker integrations arrive)
+# Purpose: CRUD endpoints for tracked keyword rankings and search volumes
+# NOT for: Keyword extraction from optimizer (that's in optimizer_service.py)
 
-from fastapi import APIRouter, Query
-from schemas import KeywordsResponse, KeywordItem
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
+from sqlalchemy import func as sa_func
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from typing import Optional
 
-router = APIRouter(prefix="/api/keywords", tags=["Keywords"])
+from database import get_db
+from models.listing import TrackedKeyword
+from schemas import KeywordCreate, KeywordItem, KeywordsResponse
 
-# In-memory mock data — 15 keywords across 5 marketplaces
-MOCK_KEYWORDS: list[dict] = [
-    {"id": "kw-001", "keyword": "wireless headphones", "search_volume": 245000, "current_rank": 3, "marketplace": "Amazon", "trend": "up", "relevance_score": 95, "last_updated": "2026-02-01T10:00:00Z"},
-    {"id": "kw-002", "keyword": "bluetooth earbuds", "search_volume": 189000, "current_rank": 7, "marketplace": "Amazon", "trend": "up", "relevance_score": 92, "last_updated": "2026-02-01T10:00:00Z"},
-    {"id": "kw-003", "keyword": "usb c cable", "search_volume": 320000, "current_rank": 12, "marketplace": "Amazon", "trend": "stable", "relevance_score": 88, "last_updated": "2026-02-01T10:00:00Z"},
-    {"id": "kw-004", "keyword": "leather wallet", "search_volume": 98000, "current_rank": 5, "marketplace": "eBay", "trend": "down", "relevance_score": 90, "last_updated": "2026-02-01T08:30:00Z"},
-    {"id": "kw-005", "keyword": "mens wallet bifold", "search_volume": 54000, "current_rank": 2, "marketplace": "eBay", "trend": "up", "relevance_score": 85, "last_updated": "2026-02-01T08:30:00Z"},
-    {"id": "kw-006", "keyword": "water bottle stainless", "search_volume": 167000, "current_rank": None, "marketplace": "eBay", "trend": "stable", "relevance_score": 78, "last_updated": "2026-02-01T08:30:00Z"},
-    {"id": "kw-007", "keyword": "bed sheets queen", "search_volume": 210000, "current_rank": 8, "marketplace": "Walmart", "trend": "up", "relevance_score": 91, "last_updated": "2026-02-01T11:00:00Z"},
-    {"id": "kw-008", "keyword": "organic cotton sheets", "search_volume": 87000, "current_rank": 15, "marketplace": "Walmart", "trend": "stable", "relevance_score": 82, "last_updated": "2026-02-01T11:00:00Z"},
-    {"id": "kw-009", "keyword": "nonstick frying pan", "search_volume": 143000, "current_rank": 22, "marketplace": "Walmart", "trend": "down", "relevance_score": 75, "last_updated": "2026-02-01T11:00:00Z"},
-    {"id": "kw-010", "keyword": "soy candle lavender", "search_volume": 34000, "current_rank": 1, "marketplace": "Shopify", "trend": "up", "relevance_score": 97, "last_updated": "2026-02-01T07:00:00Z"},
-    {"id": "kw-011", "keyword": "handmade candles", "search_volume": 78000, "current_rank": 4, "marketplace": "Shopify", "trend": "stable", "relevance_score": 89, "last_updated": "2026-02-01T07:00:00Z"},
-    {"id": "kw-012", "keyword": "desk organizer wood", "search_volume": 45000, "current_rank": None, "marketplace": "Shopify", "trend": "down", "relevance_score": 72, "last_updated": "2026-02-01T07:00:00Z"},
-    {"id": "kw-013", "keyword": "plecak turystyczny", "search_volume": 28000, "current_rank": 6, "marketplace": "Allegro", "trend": "up", "relevance_score": 94, "last_updated": "2026-02-01T12:00:00Z"},
-    {"id": "kw-014", "keyword": "plecak wodoodporny", "search_volume": 15000, "current_rank": 9, "marketplace": "Allegro", "trend": "stable", "relevance_score": 86, "last_updated": "2026-02-01T12:00:00Z"},
-    {"id": "kw-015", "keyword": "zestaw narzedzi", "search_volume": 42000, "current_rank": 18, "marketplace": "Allegro", "trend": "down", "relevance_score": 70, "last_updated": "2026-02-01T12:00:00Z"},
-]
+router = APIRouter(prefix="/api/keywords", tags=["Keywords"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("", response_model=KeywordsResponse)
 async def get_keywords(
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     search: Optional[str] = Query(None, description="Search keyword text"),
+    db: Session = Depends(get_db),
 ):
     """
     List tracked keywords with rank, volume, and relevance data.
     Summary stats are computed from the FULL dataset (before filtering).
     """
-    all_items = [KeywordItem(**kw) for kw in MOCK_KEYWORDS]
+    all_query = db.query(TrackedKeyword)
+    total_count = all_query.count()
 
-    # Summary stats from full dataset
-    tracked_count = sum(1 for kw in all_items if kw.current_rank is not None)
-    top_10_count = sum(1 for kw in all_items if kw.current_rank is not None and kw.current_rank <= 10)
-    avg_relevance = round(sum(kw.relevance_score for kw in all_items) / len(all_items), 1)
+    # WHY full-dataset stats: dashboard cards must stay consistent
+    tracked_count = all_query.filter(TrackedKeyword.current_rank.isnot(None)).count()
+    top_10_count = all_query.filter(
+        TrackedKeyword.current_rank.isnot(None),
+        TrackedKeyword.current_rank <= 10,
+    ).count()
+
+    avg_relevance = 0.0
+    if total_count > 0:
+        avg_val = db.query(sa_func.avg(TrackedKeyword.relevance_score)).scalar()
+        avg_relevance = round(float(avg_val or 0), 1)
 
     # Apply filters for the table view
-    filtered = all_items
+    filtered = all_query
     if marketplace:
-        filtered = [kw for kw in filtered if kw.marketplace == marketplace]
+        filtered = filtered.filter(TrackedKeyword.marketplace == marketplace)
     if search:
-        q = search.lower()
-        filtered = [kw for kw in filtered if q in kw.keyword.lower()]
+        # WHY ilike: case-insensitive partial match
+        filtered = filtered.filter(TrackedKeyword.keyword.ilike(f"%{search}%"))
+
+    items = filtered.order_by(TrackedKeyword.last_updated.desc()).all()
+
+    keyword_items = [
+        KeywordItem(
+            id=str(row.id),
+            keyword=row.keyword,
+            search_volume=row.search_volume,
+            current_rank=row.current_rank,
+            marketplace=row.marketplace,
+            trend=row.trend,
+            relevance_score=row.relevance_score,
+            last_updated=row.last_updated.isoformat() if row.last_updated else None,
+        )
+        for row in items
+    ]
 
     return KeywordsResponse(
-        keywords=filtered,
-        total=len(filtered),
+        keywords=keyword_items,
+        total=len(keyword_items),
         tracked_count=tracked_count,
         top_10_count=top_10_count,
         avg_relevance=avg_relevance,
     )
+
+
+@router.post("", response_model=KeywordItem, status_code=201)
+@limiter.limit("20/minute")
+async def create_keyword(
+    request: Request,
+    body: KeywordCreate,
+    db: Session = Depends(get_db),
+):
+    """Add a keyword to track."""
+    existing = (
+        db.query(TrackedKeyword)
+        .filter(TrackedKeyword.keyword == body.keyword, TrackedKeyword.marketplace == body.marketplace)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="Keyword already tracked for this marketplace")
+
+    kw = TrackedKeyword(
+        keyword=body.keyword,
+        marketplace=body.marketplace,
+        search_volume=body.search_volume,
+        current_rank=body.current_rank,
+        trend=body.trend.value,
+        relevance_score=body.relevance_score,
+    )
+    db.add(kw)
+    db.commit()
+    db.refresh(kw)
+
+    return KeywordItem(
+        id=str(kw.id),
+        keyword=kw.keyword,
+        search_volume=kw.search_volume,
+        current_rank=kw.current_rank,
+        marketplace=kw.marketplace,
+        trend=kw.trend,
+        relevance_score=kw.relevance_score,
+        last_updated=kw.last_updated.isoformat() if kw.last_updated else None,
+    )
+
+
+@router.delete("/{keyword_id}")
+async def delete_keyword(keyword_id: str, db: Session = Depends(get_db)):
+    """Stop tracking a keyword."""
+    kw = db.query(TrackedKeyword).filter(TrackedKeyword.id == keyword_id).first()
+    if not kw:
+        raise HTTPException(status_code=404, detail="Keyword not found")
+
+    db.delete(kw)
+    db.commit()
+    return {"status": "deleted", "id": keyword_id}

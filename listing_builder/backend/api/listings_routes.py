@@ -1,57 +1,114 @@
 # backend/api/listings_routes.py
-# Purpose: Mock listings endpoint — compliance status across marketplaces
-# NOT for: Real listing data (swap to DB when marketplace integrations arrive)
+# Purpose: CRUD endpoints for product listings with compliance status
+# NOT for: Compliance evaluation logic (that's in compliance_routes.py)
 
-from fastapi import APIRouter, Query
-from schemas import ListingsResponse, ListingItem
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
+from sqlalchemy import func as sa_func
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from typing import Optional
 
-router = APIRouter(prefix="/api/listings", tags=["Listings"])
+from database import get_db
+from models.listing import Listing
+from schemas import ListingCreate, ListingItem, ListingsResponse
 
-# In-memory mock data — 10 listings across 5 marketplaces
-MOCK_LISTINGS: list[dict] = [
-    {"sku": "AMZ-001", "title": "Wireless Bluetooth Headphones Pro", "marketplace": "Amazon", "compliance_status": "compliant", "issues_count": 0, "last_checked": "2026-02-01T10:30:00Z"},
-    {"sku": "AMZ-002", "title": "USB-C Fast Charging Cable 6ft", "marketplace": "Amazon", "compliance_status": "warning", "issues_count": 2, "last_checked": "2026-02-01T09:15:00Z"},
-    {"sku": "EBY-001", "title": "Vintage Leather Wallet Men", "marketplace": "eBay", "compliance_status": "compliant", "issues_count": 0, "last_checked": "2026-02-01T08:00:00Z"},
-    {"sku": "EBY-002", "title": "Stainless Steel Water Bottle 32oz", "marketplace": "eBay", "compliance_status": "suppressed", "issues_count": 3, "last_checked": "2026-01-31T22:45:00Z"},
-    {"sku": "WMT-001", "title": "Organic Cotton Bed Sheets Queen", "marketplace": "Walmart", "compliance_status": "compliant", "issues_count": 0, "last_checked": "2026-02-01T11:00:00Z"},
-    {"sku": "WMT-002", "title": "Non-Stick Frying Pan 12 inch", "marketplace": "Walmart", "compliance_status": "blocked", "issues_count": 5, "last_checked": "2026-01-31T18:30:00Z"},
-    {"sku": "SHP-001", "title": "Handmade Soy Candle Lavender", "marketplace": "Shopify", "compliance_status": "compliant", "issues_count": 0, "last_checked": "2026-02-01T07:20:00Z"},
-    {"sku": "SHP-002", "title": "Minimalist Desk Organizer Wood", "marketplace": "Shopify", "compliance_status": "warning", "issues_count": 1, "last_checked": "2026-02-01T06:45:00Z"},
-    {"sku": "ALG-001", "title": "Plecak turystyczny 40L wodoodporny", "marketplace": "Allegro", "compliance_status": "compliant", "issues_count": 0, "last_checked": "2026-02-01T12:00:00Z"},
-    {"sku": "ALG-002", "title": "Zestaw narzedzi domowych 120 elementow", "marketplace": "Allegro", "compliance_status": "warning", "issues_count": 1, "last_checked": "2026-01-31T20:10:00Z"},
-]
+router = APIRouter(prefix="/api/listings", tags=["Listings"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("", response_model=ListingsResponse)
 async def get_listings(
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     compliance_status: Optional[str] = Query(None, description="Filter by compliance status"),
+    db: Session = Depends(get_db),
 ):
     """
     List all product listings with compliance status.
     Summary counts are computed from the FULL dataset (before filtering).
     """
-    all_items = [ListingItem(**item) for item in MOCK_LISTINGS]
+    # WHY full-dataset counts: dashboard cards must stay consistent regardless of filters
+    all_query = db.query(Listing)
 
-    # Summary counts from full dataset — dashboard cards stay consistent
-    compliant_count = sum(1 for i in all_items if i.compliance_status == "compliant")
-    warning_count = sum(1 for i in all_items if i.compliance_status == "warning")
-    suppressed_count = sum(1 for i in all_items if i.compliance_status == "suppressed")
-    blocked_count = sum(1 for i in all_items if i.compliance_status == "blocked")
+    compliant_count = all_query.filter(Listing.compliance_status == "compliant").count()
+    warning_count = all_query.filter(Listing.compliance_status == "warning").count()
+    suppressed_count = all_query.filter(Listing.compliance_status == "suppressed").count()
+    blocked_count = all_query.filter(Listing.compliance_status == "blocked").count()
 
     # Apply filters for the table view
-    filtered = all_items
+    filtered = all_query
     if marketplace:
-        filtered = [i for i in filtered if i.marketplace == marketplace]
+        filtered = filtered.filter(Listing.marketplace == marketplace)
     if compliance_status:
-        filtered = [i for i in filtered if i.compliance_status == compliance_status]
+        filtered = filtered.filter(Listing.compliance_status == compliance_status)
+
+    items = filtered.order_by(Listing.last_checked.desc()).all()
+
+    # WHY manual serialization: last_checked is datetime, frontend expects ISO string
+    listing_items = [
+        ListingItem(
+            id=str(row.id),
+            sku=row.sku,
+            title=row.title,
+            marketplace=row.marketplace,
+            compliance_status=row.compliance_status,
+            issues_count=row.issues_count,
+            last_checked=row.last_checked.isoformat() if row.last_checked else None,
+        )
+        for row in items
+    ]
 
     return ListingsResponse(
-        listings=filtered,
-        total=len(filtered),
+        listings=listing_items,
+        total=len(listing_items),
         compliant_count=compliant_count,
         warning_count=warning_count,
         suppressed_count=suppressed_count,
         blocked_count=blocked_count,
     )
+
+
+@router.post("", response_model=ListingItem, status_code=201)
+@limiter.limit("20/minute")
+async def create_listing(
+    request: Request,
+    body: ListingCreate,
+    db: Session = Depends(get_db),
+):
+    """Add a new product listing."""
+    existing = db.query(Listing).filter(Listing.sku == body.sku).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Listing with SKU {body.sku} already exists")
+
+    listing = Listing(
+        sku=body.sku,
+        title=body.title,
+        marketplace=body.marketplace,
+        compliance_status=body.compliance_status.value,
+        issues_count=body.issues_count,
+    )
+    db.add(listing)
+    db.commit()
+    db.refresh(listing)
+
+    return ListingItem(
+        id=str(listing.id),
+        sku=listing.sku,
+        title=listing.title,
+        marketplace=listing.marketplace,
+        compliance_status=listing.compliance_status,
+        issues_count=listing.issues_count,
+        last_checked=listing.last_checked.isoformat() if listing.last_checked else None,
+    )
+
+
+@router.delete("/{listing_id}")
+async def delete_listing(listing_id: str, db: Session = Depends(get_db)):
+    """Remove a listing by ID."""
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    db.delete(listing)
+    db.commit()
+    return {"status": "deleted", "id": listing_id}

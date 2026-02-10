@@ -24,6 +24,8 @@ const ALLOWED_PATH_PREFIXES = [
   'settings',
   'quiz',
   'monitoring',
+  'listings',
+  'keywords',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access

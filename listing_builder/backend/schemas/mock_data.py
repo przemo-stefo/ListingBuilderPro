@@ -1,5 +1,5 @@
 # backend/schemas/mock_data.py
-# Purpose: Pydantic schemas for all mock/in-memory endpoints (listings, keywords, competitors, inventory, analytics, settings)
+# Purpose: Pydantic schemas for listings, keywords, competitors, inventory, analytics, settings
 # NOT for: DB-backed product schemas — those live in product.py
 
 from pydantic import BaseModel
@@ -16,13 +16,25 @@ class ComplianceStatusEnum(str, Enum):
     blocked = "blocked"
 
 
+class ListingCreate(BaseModel):
+    sku: str
+    title: str
+    marketplace: str
+    compliance_status: ComplianceStatusEnum = ComplianceStatusEnum.compliant
+    issues_count: int = 0
+
+
 class ListingItem(BaseModel):
+    id: str
     sku: str
     title: str
     marketplace: str
     compliance_status: ComplianceStatusEnum
     issues_count: int
-    last_checked: str
+    last_checked: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class ListingsResponse(BaseModel):
@@ -42,6 +54,15 @@ class TrendEnum(str, Enum):
     stable = "stable"
 
 
+class KeywordCreate(BaseModel):
+    keyword: str
+    marketplace: str
+    search_volume: int = 0
+    current_rank: Optional[int] = None
+    trend: TrendEnum = TrendEnum.stable
+    relevance_score: int = 0
+
+
 class KeywordItem(BaseModel):
     id: str
     keyword: str
@@ -50,7 +71,10 @@ class KeywordItem(BaseModel):
     marketplace: str
     trend: TrendEnum
     relevance_score: int
-    last_updated: str
+    last_updated: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class KeywordsResponse(BaseModel):
