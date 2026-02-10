@@ -20,6 +20,7 @@ class OptimizationRun(Base):
     compliance_status = Column(String(20), default="UNKNOWN")
     request_data = Column(JSON)  # WHY: Full request for re-running
     response_data = Column(JSON)  # WHY: Full response for reload
+    trace_data = Column(JSON)  # WHY: Observability — tokens, latency, cost per run
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self):

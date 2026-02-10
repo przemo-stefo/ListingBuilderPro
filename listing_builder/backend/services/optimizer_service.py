@@ -15,6 +15,7 @@ from services.knowledge_service import search_knowledge_batch
 from services.ranking_juice_service import calculate_ranking_juice
 from services.learning_service import store_successful_listing, get_past_successes
 from services.n8n_orchestrator_service import call_n8n_optimizer, build_n8n_payload
+from services.trace_service import new_trace, span, record_llm_usage, finalize_trace
 import structlog
 
 logger = structlog.get_logger()
@@ -404,8 +405,11 @@ Rules:
 Return ONLY the description text."""
 
 
-def _call_groq(prompt: str, temperature: float, max_tokens: int) -> str:
-    """Synchronous Groq call with automatic key rotation on 429 rate limits."""
+def _call_groq(prompt: str, temperature: float, max_tokens: int) -> Tuple[str, Optional[dict]]:
+    """Synchronous Groq call with automatic key rotation on 429 rate limits.
+
+    Returns (text, usage_dict | None) — usage_dict contains token counts for tracing.
+    """
     keys = settings.groq_api_keys
     last_error = None
 
@@ -418,7 +422,17 @@ def _call_groq(prompt: str, temperature: float, max_tokens: int) -> str:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            return response.choices[0].message.content.strip()
+            text = response.choices[0].message.content.strip()
+            # WHY: Extract token usage for observability tracing
+            usage = None
+            if hasattr(response, "usage") and response.usage:
+                usage = {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                    "model": MODEL,
+                }
+            return text, usage
         except Exception as e:
             last_error = e
             if "429" in str(e) or "rate_limit" in str(e):
@@ -461,6 +475,7 @@ async def optimize_listing(
     Run full listing optimization: keyword prep → 3 LLM calls → packing → scoring.
     Returns dict matching OptimizerResponse shape.
     """
+    trace = new_trace("optimize_listing")
     limits = _get_limits(marketplace)
     lang = _detect_language(marketplace, language)
 
@@ -472,26 +487,27 @@ async def optimize_listing(
         kw["phrase"] = _sanitize_llm_input(kw["phrase"])
 
     # 1. Keyword preparation
-    all_kw, tier1, tier2, tier3 = _prepare_keywords(keywords)
-    tier1_phrases = [k["phrase"] for k in tier1]
-    tier2_phrases = [k["phrase"] for k in tier2]
-    tier3_phrases = [k["phrase"] for k in tier3]
-    root_words = _extract_root_words(all_kw)
+    with span(trace, "keyword_prep"):
+        all_kw, tier1, tier2, tier3 = _prepare_keywords(keywords)
+        tier1_phrases = [k["phrase"] for k in tier1]
+        tier2_phrases = [k["phrase"] for k in tier2]
+        tier3_phrases = [k["phrase"] for k in tier3]
+        root_words = _extract_root_words(all_kw)
 
     # WHY: Retrieve expert context from Inner Circle transcripts to improve LLM output
     # Single DB query fetches chunks for all 3 prompt types at once
     title_context = bullets_context = desc_context = ""
-    if db:
-        search_query = f"{product_title} {' '.join(tier1_phrases[:5])}"
-        knowledge = search_knowledge_batch(db, search_query)
-        title_context = knowledge.get("title", "")
-        bullets_context = knowledge.get("bullets", "")
-        desc_context = knowledge.get("description", "")
-
-    # WHY: Fetch past successful listings as few-shot examples for the LLM
     past_successes = []
-    if db:
-        past_successes = get_past_successes(db, marketplace)
+    with span(trace, "rag_search"):
+        if db:
+            search_query = f"{product_title} {' '.join(tier1_phrases[:5])}"
+            knowledge = search_knowledge_batch(db, search_query)
+            title_context = knowledge.get("title", "")
+            bullets_context = knowledge.get("bullets", "")
+            desc_context = knowledge.get("description", "")
+        # WHY: Fetch past successful listings as few-shot examples for the LLM
+        if db:
+            past_successes = get_past_successes(db, marketplace)
 
     logger.info(
         "optimizer_start",
@@ -527,12 +543,11 @@ async def optimize_listing(
         n8n_result = await call_n8n_optimizer(payload)
 
     if n8n_result:
-        # WHY: n8n returned a valid listing — use it
+        # WHY: n8n returned a valid listing — use it (no token tracking for n8n path)
         optimization_source = "n8n"
         title_text = n8n_result.get("title", "")
         bullet_lines = n8n_result.get("bullet_points", [])
         desc_text = n8n_result.get("description", "")
-        # WHY: Still strip promo words — n8n/LLM might slip them in
         title_text = _strip_promo_words(title_text)
         bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
         desc_text = _strip_promo_words(desc_text)
@@ -542,7 +557,11 @@ async def optimize_listing(
             product_title, brand, product_line, tier1_phrases, lang, limits["title"],
             expert_context=title_context,
         )
-        title_text = await asyncio.to_thread(_call_groq, title_prompt, 0.4, 250)
+
+        with span(trace, "llm_title") as s:
+            title_text, title_usage = await asyncio.to_thread(_call_groq, title_prompt, 0.4, 250)
+            if title_usage:
+                record_llm_usage(s, title_usage)
 
         # WHY: bullets and description are independent — run in parallel
         bullets_prompt = _build_bullets_prompt(
@@ -554,10 +573,15 @@ async def optimize_listing(
             expert_context=desc_context,
         )
 
-        bullets_raw, desc_text = await asyncio.gather(
-            asyncio.to_thread(_call_groq, bullets_prompt, 0.5, 800),
-            asyncio.to_thread(_call_groq, desc_prompt, 0.5, 600),
-        )
+        with span(trace, "llm_bullets_desc") as s:
+            (bullets_raw, b_usage), (desc_text, d_usage) = await asyncio.gather(
+                asyncio.to_thread(_call_groq, bullets_prompt, 0.5, 800),
+                asyncio.to_thread(_call_groq, desc_prompt, 0.5, 600),
+            )
+            if b_usage:
+                record_llm_usage(s, b_usage)
+            if d_usage:
+                record_llm_usage(s, d_usage, accumulate=True)
 
         # Parse bullets — one per line, strip numbering artifacts
         bullet_lines = [
@@ -571,27 +595,22 @@ async def optimize_listing(
         bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
         desc_text = _strip_promo_words(desc_text)
 
-    # 3. Backend keyword packing
-    full_listing_text = title_text + " " + " ".join(bullet_lines) + " " + desc_text
-    backend_kw = _pack_backend_keywords(all_kw, full_listing_text, limits["backend"])
-    backend_bytes = len(backend_kw.encode("utf-8"))
+    # 3. Backend keyword packing + coverage + compliance + scoring
+    with span(trace, "scoring"):
+        full_listing_text = title_text + " " + " ".join(bullet_lines) + " " + desc_text
+        backend_kw = _pack_backend_keywords(all_kw, full_listing_text, limits["backend"])
+        backend_bytes = len(backend_kw.encode("utf-8"))
 
-    # 4. Coverage calculation (include backend keywords in full text)
-    full_text_with_backend = full_listing_text + " " + backend_kw
-    coverage_pct, exact_matches, coverage_mode = _calculate_coverage(all_kw, full_text_with_backend)
-    title_cov, _, _ = _calculate_coverage(tier1, title_text)
-    missing = _find_missing_keywords(all_kw, full_text_with_backend)
+        full_text_with_backend = full_listing_text + " " + backend_kw
+        coverage_pct, exact_matches, coverage_mode = _calculate_coverage(all_kw, full_text_with_backend)
+        title_cov, _, _ = _calculate_coverage(tier1, title_text)
+        missing = _find_missing_keywords(all_kw, full_text_with_backend)
 
-    # 5. Compliance check
-    compliance = _check_compliance(title_text, bullet_lines, desc_text, brand, limits)
+        compliance = _check_compliance(title_text, bullet_lines, desc_text, brand, limits)
+        backend_util = round((backend_bytes / limits["backend"]) * 100, 1) if limits["backend"] > 0 else 0
+        rj = calculate_ranking_juice(all_kw, title_text, bullet_lines, backend_kw, desc_text)
 
-    # 6. Backend utilization
-    backend_util = round((backend_bytes / limits["backend"]) * 100, 1) if limits["backend"] > 0 else 0
-
-    # 6. Ranking Juice — quantifies listing quality 0-100
-    rj = calculate_ranking_juice(all_kw, title_text, bullet_lines, backend_kw, desc_text)
-
-    # 7. Self-learning — store if RJ >= 75
+    # Self-learning — store if RJ >= 75
     if db:
         try:
             store_successful_listing(
@@ -611,6 +630,8 @@ async def optimize_listing(
         except Exception as e:
             logger.warning("self_learning_save_failed", error=str(e))
 
+    trace_data = finalize_trace(trace)
+
     logger.info(
         "optimizer_done",
         coverage=coverage_pct,
@@ -619,6 +640,9 @@ async def optimize_listing(
         ranking_juice=rj["score"],
         grade=rj["grade"],
         source=optimization_source,
+        trace_duration_ms=trace_data["total_duration_ms"],
+        trace_tokens=trace_data["total_tokens"],
+        trace_cost_usd=trace_data["estimated_cost_usd"],
     )
 
     return {
@@ -653,4 +677,5 @@ async def optimize_listing(
         },
         "ranking_juice": rj,
         "optimization_source": optimization_source,
+        "trace": trace_data,
     }

@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import structlog
@@ -145,6 +146,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
                 compliance_status=result.get("compliance", {}).get("status", "UNKNOWN"),
                 request_data=body.model_dump(),
                 response_data=result,
+                trace_data=result.get("trace"),
             )
             db.add(run)
             db.commit()
@@ -364,3 +366,63 @@ async def optimizer_health():
             "provider": "groq",
             "error": "Connection failed",
         }
+
+
+# --- Trace / observability endpoints ---
+
+@router.get("/traces")
+async def list_traces(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """List optimization runs that have trace data, with summary info."""
+    runs = (
+        db.query(OptimizationRun)
+        .filter(OptimizationRun.trace_data.isnot(None))
+        .order_by(OptimizationRun.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    total = db.query(OptimizationRun).filter(OptimizationRun.trace_data.isnot(None)).count()
+
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "product_title": r.product_title,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "total_duration_ms": (r.trace_data or {}).get("total_duration_ms"),
+                "total_tokens": (r.trace_data or {}).get("total_tokens"),
+                "estimated_cost_usd": (r.trace_data or {}).get("estimated_cost_usd"),
+                "span_count": len((r.trace_data or {}).get("spans", [])),
+            }
+            for r in runs
+        ],
+        "total": total,
+    }
+
+
+@router.get("/traces/stats")
+async def trace_stats(db: Session = Depends(get_db)):
+    """Aggregate trace stats: avg tokens, avg latency, total cost, run count."""
+    # WHY: JSONB operators let us aggregate without pulling all rows into Python
+    row = db.execute(text("""
+        SELECT
+            COUNT(*) AS runs,
+            COALESCE(AVG((trace_data->>'total_tokens')::numeric), 0) AS avg_tokens,
+            COALESCE(AVG((trace_data->>'total_duration_ms')::numeric), 0) AS avg_duration_ms,
+            COALESCE(SUM((trace_data->>'estimated_cost_usd')::numeric), 0) AS total_cost_usd,
+            COALESCE(SUM((trace_data->>'total_tokens')::numeric), 0) AS total_tokens
+        FROM optimization_runs
+        WHERE trace_data IS NOT NULL
+    """)).fetchone()
+
+    return {
+        "runs_with_traces": row[0],
+        "avg_tokens_per_run": round(float(row[1]), 0),
+        "avg_duration_ms": round(float(row[2]), 1),
+        "total_cost_usd": round(float(row[3]), 4),
+        "total_tokens": int(row[4]),
+    }
