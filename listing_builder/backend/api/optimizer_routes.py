@@ -95,6 +95,7 @@ class OptimizerResponse(BaseModel):
     keyword_intel: OptimizerKeywordIntel = OptimizerKeywordIntel()
     ranking_juice: Optional[RankingJuiceResponse] = None
     optimization_source: str = "direct"
+    listing_history_id: Optional[str] = None  # WHY: Used by frontend feedback widget
     trace: Optional[Dict[str, Any]] = None  # WHY: Observability — tokens, latency, cost per run
 
 
