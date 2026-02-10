@@ -154,6 +154,7 @@ export interface ApiResponse<T> {
 export type ComplianceStatus = 'compliant' | 'warning' | 'suppressed' | 'blocked'
 
 export interface ListingItem {
+  id: string
   sku: string
   title: string
   marketplace: string
@@ -529,6 +530,7 @@ export interface OptimizerResponse {
   keyword_intel: OptimizerKeywordIntel
   ranking_juice?: RankingJuice
   optimization_source?: 'n8n' | 'direct'
+  listing_history_id?: string | null
 }
 
 // Batch Optimizer types — multiple products in one request
@@ -647,6 +649,25 @@ export interface MonitoringAlert {
   triggered_at: string
   acknowledged: boolean
   acknowledged_at: string | null
+}
+
+// Observability Trace types
+export interface TraceItem {
+  id: number
+  product_title: string
+  created_at: string | null
+  total_duration_ms: number | null
+  total_tokens: number | null
+  estimated_cost_usd: number | null
+  span_count: number
+}
+
+export interface TraceStats {
+  runs_with_traces: number
+  avg_tokens_per_run: number
+  avg_duration_ms: number
+  total_cost_usd: number
+  total_tokens: number
 }
 
 // Error types

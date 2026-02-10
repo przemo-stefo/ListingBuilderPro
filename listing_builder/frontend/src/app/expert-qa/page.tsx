@@ -14,6 +14,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   sources?: number
+  sourceNames?: string[]
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -71,6 +72,7 @@ export default function ExpertQAPage() {
           role: 'assistant',
           content: data.answer,
           sources: data.sources_used,
+          sourceNames: data.source_names || [],
         },
       ])
     } catch {
@@ -146,9 +148,21 @@ export default function ExpertQAPage() {
                 >
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                   {msg.sources !== undefined && msg.sources > 0 && (
-                    <p className="mt-2 text-[10px] text-gray-500">
-                      Based on {msg.sources} transcript excerpt{msg.sources !== 1 ? 's' : ''}
-                    </p>
+                    <div className="mt-2 text-[10px] text-gray-500">
+                      <p>Based on {msg.sources} source{msg.sources !== 1 ? 's' : ''}:</p>
+                      {msg.sourceNames && msg.sourceNames.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {msg.sourceNames.map((name, j) => (
+                            <span
+                              key={j}
+                              className="rounded bg-gray-800 px-1.5 py-0.5 text-gray-400"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

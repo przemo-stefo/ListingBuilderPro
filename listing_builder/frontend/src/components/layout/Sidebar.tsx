@@ -1,5 +1,5 @@
 // frontend/src/components/layout/Sidebar.tsx
-// Purpose: Main navigation sidebar with links to all pages
+// Purpose: Main navigation sidebar with links to all pages + tier badge
 // NOT for: Page content or complex routing logic
 
 'use client'
@@ -7,6 +7,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useTier } from '@/lib/hooks/useTier'
+import { TierBadge } from '@/components/tier/TierBadge'
 import {
   LayoutDashboard,
   Package,
@@ -17,12 +19,13 @@ import {
   Shield,
   Activity,
   Brain,
+  Crown,
 } from 'lucide-react'
 
 const navItems = [
   {
     title: 'Dashboard',
-    href: '/',
+    href: '/dashboard',
     icon: LayoutDashboard,
   },
   {
@@ -59,6 +62,7 @@ const navItems = [
     title: 'Monitoring',
     href: '/monitoring',
     icon: Activity,
+    premiumOnly: true,
   },
   {
     title: 'Publish',
@@ -69,9 +73,10 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { tier } = useTier()
 
   return (
-    <div className="w-64 border-r border-gray-800 bg-[#121212] p-6">
+    <div className="w-64 border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
       <div className="mb-8">
         <h1 className="text-xl font-bold text-white">
           Marketplace Listing
@@ -79,7 +84,7 @@ export function Sidebar() {
         <p className="text-sm text-gray-400">Automation System</p>
       </div>
 
-      <nav className="space-y-2">
+      <nav className="space-y-2 flex-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
@@ -97,18 +102,25 @@ export function Sidebar() {
             >
               <Icon className="h-4 w-4" />
               {item.title}
+              {item.premiumOnly && tier !== 'premium' && (
+                <Crown className="h-3 w-3 text-amber-400 ml-auto" />
+              )}
             </Link>
           )
         })}
       </nav>
 
-      <div className="mt-auto pt-8">
+      <div className="space-y-3 pt-4">
+        <div className="flex items-center justify-center">
+          <TierBadge tier={tier} size="md" />
+        </div>
         <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
           <p className="text-xs text-gray-400">
-            Connected to backend
+            API Status
           </p>
           <p className="text-xs font-mono text-green-500">
-            {process.env.NEXT_PUBLIC_API_URL || 'localhost:8000'}
+            {/* WHY: Show environment, not raw URL — avoids exposing backend address */}
+            {process.env.NODE_ENV === 'production' ? 'Production' : 'Development'}
           </p>
         </div>
       </div>

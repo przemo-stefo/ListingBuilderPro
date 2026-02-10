@@ -18,8 +18,12 @@ MODEL = "llama-3.3-70b-versatile"
 MAX_CONTEXT_CHARS = 6000  # WHY: More context for Q&A than for optimization prompts
 
 
-def _search_all_categories(db: Session, query: str, max_chunks: int = 8) -> str:
-    """Search ALL knowledge chunks regardless of category. Returns formatted context."""
+def _search_all_categories(db: Session, query: str, max_chunks: int = 8) -> tuple:
+    """Search ALL knowledge chunks regardless of category.
+
+    Returns (formatted_context, source_names) — source_names is a list of
+    unique filenames that contributed to the context, cleaned for display.
+    """
     try:
         rows = db.execute(
             text("""
@@ -34,22 +38,33 @@ def _search_all_categories(db: Session, query: str, max_chunks: int = 8) -> str:
         ).fetchall()
 
         if not rows:
-            return ""
+            return "", []
 
         parts = []
+        filenames = []
         total_len = 0
         for row in rows:
             chunk = f"[{row[2]} — {row[1]}]\n{row[0]}"
             if total_len + len(chunk) > MAX_CONTEXT_CHARS:
                 break
             parts.append(chunk)
+            filenames.append(row[1])
             total_len += len(chunk)
 
-        return "\n\n".join(parts)
+        # WHY: Clean filenames for display — "ep_123_keywords.txt" → "ep 123 keywords"
+        unique_names = []
+        seen = set()
+        for fn in filenames:
+            clean = fn.rsplit(".", 1)[0].replace("_", " ")
+            if clean not in seen:
+                seen.add(clean)
+                unique_names.append(clean)
+
+        return "\n\n".join(parts), unique_names
 
     except Exception as e:
         logger.warning("qa_search_error", error=str(e))
-        return ""
+        return "", []
 
 
 def _build_qa_prompt(question: str, context: str) -> str:
@@ -82,13 +97,14 @@ async def ask_expert(
     RAG-powered Q&A: search knowledge base → inject into Groq prompt → return answer.
     """
     # WHY: Search all categories — Q&A can be about anything (keywords, PPC, ranking, etc.)
-    context = _search_all_categories(db, question)
+    context, source_names = _search_all_categories(db, question)
 
     logger.info(
         "qa_question",
         question=question[:80],
         context_len=len(context),
         has_context=bool(context),
+        sources=len(source_names),
     )
 
     prompt = _build_qa_prompt(question, context)
@@ -119,11 +135,9 @@ async def ask_expert(
 
     answer = response.choices[0].message.content.strip()
 
-    # WHY: Count sources so frontend can show "Based on X transcript excerpts"
-    source_count = context.count("[") if context else 0
-
     return {
         "answer": answer,
-        "sources_used": source_count,
+        "sources_used": len(source_names),
+        "source_names": source_names,
         "has_context": bool(context),
     }

@@ -112,13 +112,14 @@ def _extract_root_words(keywords: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # --- Backend keyword byte-packing ---
 
 def _pack_backend_keywords(
-    keywords: List[Dict[str, Any]], listing_text: str, max_bytes: int
+    keywords: List[Dict[str, Any]], listing_text: str, max_bytes: int,
+    llm_suggestions: str = "",
 ) -> str:
     """
     Greedy byte-packing: add keywords not already in the listing text,
     separated by spaces, up to max_bytes (249 for Amazon).
-    WHY: Two passes — first unused full phrases, then individual root words
-    that didn't appear in visible listing. This maximizes search coverage.
+    WHY: Four passes — unused phrases, root words, plural/singular variants,
+    then LLM-suggested terms. This maximizes search coverage.
     """
     if max_bytes <= 0:
         return ""
@@ -198,6 +199,18 @@ def _pack_backend_keywords(
 
     for v in variants:
         _try_add(v)
+
+    # Pass 4: LLM-suggested synonyms and related terms
+    # WHY: When visible coverage is 93%+, Passes 1-3 find almost nothing.
+    # The LLM suggests related terms shoppers actually search for (synonyms,
+    # category terms, use-case words) that aren't in the keyword research data.
+    if llm_suggestions:
+        combined_check = listing_lower + " " + " ".join(packed).lower()
+        for term in llm_suggestions.lower().split():
+            term = term.strip(".,;:-()[]\"'")
+            if len(term) < 2 or term in combined_check or term in packed_words:
+                continue
+            _try_add(term)
 
     return " ".join(packed)
 
@@ -321,20 +334,22 @@ EXPERT KNOWLEDGE (use these best practices):
 {expert_context}
 
 """
-    return f"""You are an expert Amazon listing optimizer. Your #1 goal is MAXIMUM keyword density in the title.
+    return f"""You are an expert Amazon listing optimizer. Your goal is MAXIMUM unique keyword coverage in the title.
 {context_block}Product: {product_title}
 Brand: {brand}
 Product line: {product_line}
 Language: {lang}
 Max characters: {max_chars}
 
-TOP KEYWORDS (must include as EXACT phrases): {kw_list}
+TOP KEYWORDS (include as EXACT phrases): {kw_list}
 
 Rules:
 - Start with brand name
-- CRITICAL: Include as many keyword phrases as EXACT matches in the title — this is the most important ranking factor
+- Include as many UNIQUE keyword phrases as possible — each phrase should appear ONLY ONCE
+- NEVER repeat the same word or phrase — Amazon ignores duplicates and may flag keyword stuffing
 - Use " - " dash separators between keyword groups for better Amazon indexing
-- Use the FULL {max_chars} characters — longer titles rank better on Amazon
+- After all unique keywords are placed, fill remaining space with product attributes (size, color, material, count)
+- Use the FULL {max_chars} characters
 - No promotional words (bestseller, #1, günstig, etc.)
 - No special characters (!, €, ™, etc.)
 - Write in {lang}
@@ -405,6 +420,45 @@ Rules:
 - No HTML tags
 
 Return ONLY the description text."""
+
+
+def _build_backend_prompt(
+    product_title: str, brand: str, title_text: str,
+    keywords: List[Dict[str, Any]], lang: str, max_bytes: int,
+) -> str:
+    """Prompt for LLM to suggest additional backend search terms.
+
+    WHY: Algorithmic packing only uses words from the input keywords.
+    When visible coverage is 93%+, almost no keywords are left for backend.
+    The LLM can suggest synonyms, alternate phrasings, and related terms
+    that shoppers actually search for but aren't in the keyword research.
+    """
+    kw_sample = ", ".join(k["phrase"] for k in keywords[:20])
+    return f"""You are an Amazon backend keyword specialist.
+
+Product: {product_title}
+Brand: {brand}
+Current title: {title_text}
+Language: {lang}
+
+Keywords ALREADY in the listing: {kw_sample}
+
+Generate ADDITIONAL search terms for the backend keyword field (max {max_bytes} bytes).
+These terms should NOT duplicate words already in the listing or keywords above.
+
+Include:
+- Synonyms and alternate phrasings shoppers use
+- Related product category terms
+- Common abbreviations and alternate spellings
+- Complementary use-case terms (e.g. "camping hiking outdoor" for a water bottle)
+
+Rules:
+- Space-separated, lowercase, no commas or punctuation
+- No brand names, no promotional words, no special characters
+- Every word must be UNIQUE (no repetition)
+- Write in {lang}
+
+Return ONLY space-separated search terms, nothing else."""
 
 
 def _call_groq(prompt: str, temperature: float, max_tokens: int) -> Tuple[str, Optional[dict]]:
@@ -544,6 +598,8 @@ async def optimize_listing(
         )
         n8n_result = await call_n8n_optimizer(payload)
 
+    backend_suggestions = ""  # WHY: Populated by LLM on direct path, empty on n8n path
+
     if n8n_result:
         # WHY: n8n returned a valid listing — use it (no token tracking for n8n path)
         optimization_source = "n8n"
@@ -565,7 +621,7 @@ async def optimize_listing(
             if title_usage:
                 record_llm_usage(s, title_usage)
 
-        # WHY: bullets and description are independent — run in parallel
+        # WHY: bullets, description, and backend suggestions are independent — run all 3 in parallel
         bullets_prompt = _build_bullets_prompt(
             product_title, brand, tier2_phrases, lang, limits["bullet"],
             expert_context=bullets_context,
@@ -574,16 +630,22 @@ async def optimize_listing(
             product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
             expert_context=desc_context,
         )
+        backend_prompt = _build_backend_prompt(
+            product_title, brand, title_text, all_kw, lang, limits["backend"],
+        )
 
         with span(trace, "llm_bullets_desc") as s:
-            (bullets_raw, b_usage), (desc_text, d_usage) = await asyncio.gather(
+            (bullets_raw, b_usage), (desc_text, d_usage), (backend_suggestions, bk_usage) = await asyncio.gather(
                 asyncio.to_thread(_call_groq, bullets_prompt, 0.5, 800),
                 asyncio.to_thread(_call_groq, desc_prompt, 0.5, 600),
+                asyncio.to_thread(_call_groq, backend_prompt, 0.3, 200),
             )
             if b_usage:
                 record_llm_usage(s, b_usage)
             if d_usage:
                 record_llm_usage(s, d_usage, accumulate=True)
+            if bk_usage:
+                record_llm_usage(s, bk_usage, accumulate=True)
 
         # Parse bullets — one per line, strip numbering artifacts
         bullet_lines = [
@@ -596,11 +658,13 @@ async def optimize_listing(
         title_text = _strip_promo_words(title_text)
         bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
         desc_text = _strip_promo_words(desc_text)
+        # WHY: LLM backend suggestions fill remaining 249 bytes after algorithmic packing
+        backend_suggestions = _strip_promo_words(backend_suggestions)
 
     # 3. Backend keyword packing + coverage + compliance + scoring
     with span(trace, "scoring"):
         full_listing_text = title_text + " " + " ".join(bullet_lines) + " " + desc_text
-        backend_kw = _pack_backend_keywords(all_kw, full_listing_text, limits["backend"])
+        backend_kw = _pack_backend_keywords(all_kw, full_listing_text, limits["backend"], backend_suggestions)
         backend_bytes = len(backend_kw.encode("utf-8"))
 
         full_text_with_backend = full_listing_text + " " + backend_kw
@@ -612,10 +676,11 @@ async def optimize_listing(
         backend_util = round((backend_bytes / limits["backend"]) * 100, 1) if limits["backend"] > 0 else 0
         rj = calculate_ranking_juice(all_kw, title_text, bullet_lines, backend_kw, desc_text)
 
-    # Self-learning — store if RJ >= 75
+    # Self-learning — store if RJ >= 75, capture listing_id for feedback
+    listing_history_id = None
     if db:
         try:
-            store_successful_listing(
+            listing_history_id = store_successful_listing(
                 db,
                 listing_data={
                     "brand": brand,
@@ -679,5 +744,6 @@ async def optimize_listing(
         },
         "ranking_juice": rj,
         "optimization_source": optimization_source,
+        "listing_history_id": listing_history_id,
         "trace": trace_data,
     }

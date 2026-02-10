@@ -14,11 +14,15 @@ import {
   Copy,
   Check,
   Download,
+  Star,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useTier } from '@/lib/hooks/useTier'
+import { FeatureGate } from '@/components/tier/FeatureGate'
+import { Lock } from 'lucide-react'
 import type { OptimizerResponse, RankingJuice } from '@/lib/types'
 
 // WHY: Client-side CSV export — no backend needed, data already in memory
@@ -131,6 +135,8 @@ export function ListingCard({
   onCopy: (text: string, field: string) => void
   fullResponse?: OptimizerResponse
 }) {
+  const { isPremium } = useTier()
+
   return (
     <Card>
       <CardHeader>
@@ -138,9 +144,16 @@ export function ListingCard({
           <CardTitle className="text-lg">Generated Listing</CardTitle>
           <div className="flex items-center gap-2">
             {fullResponse && (
-              <Button variant="outline" size="sm" onClick={() => downloadCSV(fullResponse)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => isPremium && downloadCSV(fullResponse)}
+                disabled={!isPremium}
+                title={!isPremium ? 'CSV Export dostepny w Premium' : undefined}
+              >
                 <Download className="mr-1 h-3 w-3" />
                 CSV
+                {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
               </Button>
             )}
             <Button
@@ -350,6 +363,7 @@ export function RankingJuiceCard({
   optimizationSource?: string
 }) {
   const [expanded, setExpanded] = useState(false)
+  const { isPremium } = useTier()
 
   const gradeColor =
     rankingJuice.grade === 'A+' || rankingJuice.grade === 'A'
@@ -404,46 +418,119 @@ export function RankingJuiceCard({
         <p className="text-sm text-gray-400">{rankingJuice.verdict}</p>
       </CardHeader>
       <CardContent>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors"
-        >
-          {expanded ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
-          )}
-          Component Breakdown
-        </button>
-        {expanded && (
-          <div className="mt-3 space-y-2">
-            {Object.entries(rankingJuice.components).map(([key, value]) => {
-              const weight = rankingJuice.weights[key] || 0
-              const contribution = value * weight
-              const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-              const barWidth = Math.min(100, value)
-              return (
-                <div key={key} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">{label}</span>
-                    <span className="text-gray-500">
-                      {value}/100 (x{weight} = {contribution.toFixed(1)})
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-gray-800">
-                    <div
-                      className={cn(
-                        'h-1.5 rounded-full transition-all',
-                        value >= 80 ? 'bg-green-500' : value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                      )}
-                      style={{ width: `${barWidth}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
+        {isPremium ? (
+          <>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors"
+            >
+              {expanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+              Component Breakdown
+            </button>
+            {expanded && (
+              <div className="mt-3 space-y-2">
+                {Object.entries(rankingJuice.components).map(([key, value]) => {
+                  const weight = rankingJuice.weights[key] || 0
+                  const contribution = value * weight
+                  const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                  const barWidth = Math.min(100, value)
+                  return (
+                    <div key={key} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">{label}</span>
+                        <span className="text-gray-500">
+                          {value}/100 (x{weight} = {contribution.toFixed(1)})
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-gray-800">
+                        <div
+                          className={cn(
+                            'h-1.5 rounded-full transition-all',
+                            value >= 80 ? 'bg-green-500' : value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                          )}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <Lock className="h-3 w-3 text-amber-400" />
+            <span>Pelny breakdown dostepny w Premium</span>
           </div>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// WHY: Star rating feedback — stored in listing_history for self-learning loop
+export function FeedbackWidget({
+  listingHistoryId,
+}: {
+  listingHistoryId: string | null | undefined
+}) {
+  const [rating, setRating] = useState<number>(0)
+  const [hovered, setHovered] = useState<number>(0)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!listingHistoryId) return null
+
+  async function submitFeedback(stars: number) {
+    setRating(stars)
+    setError(null)
+    try {
+      const res = await fetch(`/api/proxy/optimizer/history/${listingHistoryId}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: stars }),
+      })
+      if (!res.ok) throw new Error('Failed to submit')
+      setSubmitted(true)
+    } catch {
+      setError('Could not save feedback')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between py-4">
+        <div>
+          <p className="text-sm font-medium text-gray-300">
+            {submitted ? 'Thanks for your feedback!' : 'Rate this listing'}
+          </p>
+          {error && <p className="text-xs text-red-400">{error}</p>}
+        </div>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => !submitted && submitFeedback(star)}
+              onMouseEnter={() => !submitted && setHovered(star)}
+              onMouseLeave={() => setHovered(0)}
+              disabled={submitted}
+              className="transition-colors disabled:cursor-default"
+            >
+              <Star
+                className={cn(
+                  'h-6 w-6',
+                  (hovered || rating) >= star
+                    ? 'fill-amber-400 text-amber-400'
+                    : 'text-gray-600'
+                )}
+              />
+            </button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   )
@@ -454,76 +541,78 @@ export function KeywordIntelCard({ intel }: { intel: OptimizerResponse['keyword_
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <Card>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between p-6"
-      >
-        <div>
-          <h3 className="text-lg font-semibold text-white">Keyword Intelligence</h3>
-          <p className="text-sm text-gray-400">
-            {intel.total_analyzed} keywords analyzed across 3 tiers
-          </p>
-        </div>
-        {expanded ? (
-          <ChevronDown className="h-5 w-5 text-gray-400" />
-        ) : (
-          <ChevronRight className="h-5 w-5 text-gray-400" />
-        )}
-      </button>
-      {expanded && (
-        <CardContent className="space-y-4">
-          {/* Tier distribution */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
-              <p className="text-xs text-gray-500">Tier 1 (Title)</p>
-              <p className="text-xl font-bold text-white">{intel.tier1_title}</p>
-            </div>
-            <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
-              <p className="text-xs text-gray-500">Tier 2 (Bullets)</p>
-              <p className="text-xl font-bold text-white">{intel.tier2_bullets}</p>
-            </div>
-            <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
-              <p className="text-xs text-gray-500">Tier 3 (Backend)</p>
-              <p className="text-xl font-bold text-white">{intel.tier3_backend}</p>
-            </div>
+    <FeatureGate mode="blur">
+      <Card>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex w-full items-center justify-between p-6"
+        >
+          <div>
+            <h3 className="text-lg font-semibold text-white">Keyword Intelligence</h3>
+            <p className="text-sm text-gray-400">
+              {intel.total_analyzed} keywords analyzed across 3 tiers
+            </p>
           </div>
-
-          {/* Missing keywords */}
-          {intel.missing_keywords.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-gray-300">
-                Missing Keywords ({intel.missing_keywords.length})
-              </h4>
-              <div className="flex flex-wrap gap-1">
-                {intel.missing_keywords.map((kw, i) => (
-                  <Badge
-                    key={i}
-                    variant="secondary"
-                    className="bg-red-500/10 text-red-400 text-[10px]"
-                  >
-                    {kw}
-                  </Badge>
-                ))}
+          {expanded ? (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronRight className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+        {expanded && (
+          <CardContent className="space-y-4">
+            {/* Tier distribution */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
+                <p className="text-xs text-gray-500">Tier 1 (Title)</p>
+                <p className="text-xl font-bold text-white">{intel.tier1_title}</p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
+                <p className="text-xs text-gray-500">Tier 2 (Bullets)</p>
+                <p className="text-xl font-bold text-white">{intel.tier2_bullets}</p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
+                <p className="text-xs text-gray-500">Tier 3 (Backend)</p>
+                <p className="text-xl font-bold text-white">{intel.tier3_backend}</p>
               </div>
             </div>
-          )}
 
-          {/* Root words */}
-          {intel.root_words.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-gray-300">Top Root Words</h4>
-              <div className="flex flex-wrap gap-1">
-                {intel.root_words.map((rw, i) => (
-                  <Badge key={i} variant="secondary" className="text-[10px]">
-                    {rw.word} ({rw.frequency})
-                  </Badge>
-                ))}
+            {/* Missing keywords */}
+            {intel.missing_keywords.length > 0 && (
+              <div>
+                <h4 className="mb-2 text-sm font-medium text-gray-300">
+                  Missing Keywords ({intel.missing_keywords.length})
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {intel.missing_keywords.map((kw, i) => (
+                    <Badge
+                      key={i}
+                      variant="secondary"
+                      className="bg-red-500/10 text-red-400 text-[10px]"
+                    >
+                      {kw}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
+            )}
+
+            {/* Root words */}
+            {intel.root_words.length > 0 && (
+              <div>
+                <h4 className="mb-2 text-sm font-medium text-gray-300">Top Root Words</h4>
+                <div className="flex flex-wrap gap-1">
+                  {intel.root_words.map((rw, i) => (
+                    <Badge key={i} variant="secondary" className="text-[10px]">
+                      {rw.word} ({rw.frequency})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+    </FeatureGate>
   )
 }

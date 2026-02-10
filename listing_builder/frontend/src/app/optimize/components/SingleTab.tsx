@@ -21,7 +21,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useGenerateListing } from '@/lib/hooks/useOptimizer'
-import { ScoresCard, ListingCard, KeywordIntelCard, RankingJuiceCard } from './ResultDisplay'
+import { useTier } from '@/lib/hooks/useTier'
+import { useToast } from '@/lib/hooks/useToast'
+import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
+import { ScoresCard, ListingCard, KeywordIntelCard, RankingJuiceCard, FeedbackWidget } from './ResultDisplay'
 import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword } from '@/lib/types'
 
 // WHY: Marketplace options match what the n8n workflow supports
@@ -56,6 +59,10 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
   const [asin, setAsin] = useState('')
   const [category, setCategory] = useState('')
 
+  // Tier
+  const { canOptimize, incrementUsage, isPremium, usageToday } = useTier()
+  const { toast } = useToast()
+
   // Hook
   const generateMutation = useGenerateListing()
 
@@ -84,6 +91,16 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
   const canSubmit = productTitle.length >= 3 && brand.length >= 1 && keywordCount >= 1
 
   const handleGenerate = () => {
+    // WHY: Free tier daily limit check
+    if (!canOptimize()) {
+      toast({
+        title: 'Dzienny limit osiagniety',
+        description: `Darmowy plan pozwala na ${FREE_DAILY_LIMIT} optymalizacje dziennie. Odblokuj Premium!`,
+        variant: 'destructive',
+      })
+      return
+    }
+
     const payload: OptimizerRequest = {
       product_title: productTitle,
       brand,
@@ -98,6 +115,7 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
     generateMutation.mutate(payload, {
       onSuccess: (data) => {
         setResults(data)
+        incrementUsage()
       },
     })
   }
@@ -197,21 +215,31 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
           <div>
             <label className="mb-2 block text-sm text-gray-400">Marketplace</label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {MARKETPLACES.map((mp) => (
-                <button
-                  key={mp.id}
-                  onClick={() => setMarketplace(mp.id)}
-                  className={cn(
-                    'rounded-lg border px-3 py-2 text-sm transition-colors',
-                    marketplace === mp.id
-                      ? 'border-white bg-white/5 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
-                  )}
-                >
-                  <span className="mr-1 text-xs">{mp.flag}</span>
-                  {mp.name}
-                </button>
-              ))}
+              {MARKETPLACES.map((mp) => {
+                // WHY: Free tier = Amazon only
+                const isAmazon = mp.id.startsWith('amazon')
+                const isLocked = !isPremium && !isAmazon
+                return (
+                  <button
+                    key={mp.id}
+                    onClick={() => !isLocked && setMarketplace(mp.id)}
+                    disabled={isLocked}
+                    title={isLocked ? 'Dostepne w Premium' : undefined}
+                    className={cn(
+                      'rounded-lg border px-3 py-2 text-sm transition-colors relative',
+                      isLocked
+                        ? 'border-gray-800 text-gray-600 cursor-not-allowed opacity-50'
+                        : marketplace === mp.id
+                          ? 'border-white bg-white/5 text-white'
+                          : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
+                    )}
+                  >
+                    <span className="mr-1 text-xs">{mp.flag}</span>
+                    {mp.name}
+                    {isLocked && <span className="ml-1 text-[10px] text-amber-400">PRO</span>}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -289,7 +317,7 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
 
       {/* Generate Button */}
       <div className="flex items-center gap-3">
-        <Button onClick={handleGenerate} disabled={!canSubmit || isLoading} size="lg">
+        <Button onClick={handleGenerate} disabled={!canSubmit || isLoading || !canOptimize()} size="lg">
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -297,6 +325,14 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
           )}
           {isLoading ? 'Generating listing...' : 'Generate Optimized Listing'}
         </Button>
+        {!isPremium && (
+          <span className={cn(
+            'text-xs',
+            usageToday >= FREE_DAILY_LIMIT ? 'text-red-400' : 'text-gray-500'
+          )}>
+            {usageToday}/{FREE_DAILY_LIMIT} optymalizacje dzis
+          </span>
+        )}
         {isLoading && (
           <span className="text-xs text-gray-500">
             AI is writing title, bullets, and description...
@@ -322,6 +358,7 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
             fullResponse={displayResults}
           />
           <KeywordIntelCard intel={displayResults.keyword_intel} />
+          <FeedbackWidget listingHistoryId={displayResults.listing_history_id} />
         </div>
       )}
 
