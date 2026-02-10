@@ -704,6 +704,7 @@ async def optimize_listing(
 
     # Self-learning — store if RJ >= 75, capture listing_id for feedback
     listing_history_id = None
+    _debug_learning_error = None  # WHY: Temporary — remove after debugging listing_history_id issue
     if db:
         try:
             listing_history_id = store_successful_listing(
@@ -721,6 +722,7 @@ async def optimize_listing(
                 ranking_juice_data=rj,
             )
         except Exception as e:
+            _debug_learning_error = f"{type(e).__name__}: {e}"
             logger.warning("self_learning_save_failed", error=str(e))
 
     trace_data = finalize_trace(trace)
@@ -771,5 +773,6 @@ async def optimize_listing(
         "ranking_juice": rj,
         "optimization_source": optimization_source,
         "listing_history_id": listing_history_id,
+        "_debug_learning_error": _debug_learning_error,  # WHY: Temporary debug — remove after fixing
         "trace": trace_data,
     }

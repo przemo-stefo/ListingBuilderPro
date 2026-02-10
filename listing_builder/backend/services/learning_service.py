@@ -33,7 +33,7 @@ def store_successful_listing(
                     (brand, marketplace, product_title, title, bullets, description,
                      backend_keywords, ranking_juice, grade, keyword_count)
                 VALUES
-                    (:brand, :marketplace, :product_title, :title, :bullets::jsonb,
+                    (:brand, :marketplace, :product_title, :title, CAST(:bullets AS jsonb),
                      :description, :backend_keywords, :ranking_juice, :grade, :keyword_count)
                 RETURNING id
             """),
@@ -56,7 +56,8 @@ def store_successful_listing(
         logger.info("learning_stored", rj=score, grade=ranking_juice_data.get("grade"))
         return listing_id
     except Exception as e:
-        logger.warning("learning_store_failed", error=str(e))
+        import traceback
+        logger.warning("learning_store_failed", error=str(e), error_type=type(e).__name__, tb=traceback.format_exc())
         db.rollback()
         return None
 
