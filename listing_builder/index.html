@@ -1459,8 +1459,9 @@ Lub po prostu wklej tekst recenzji (jedna na linię)'></textarea>
 
     <script>
         // API Configuration
-        const WEBHOOK_URL = 'https://n8n-listing.automatyzacja-ai.pl/webhook/v2/product';
-        const API_KEY = 'REDACTED_N8N_WEBHOOK_API_KEY';
+        // WHY env: API keys must never be hardcoded in client-side HTML
+        const WEBHOOK_URL = window.__CONFIG__?.WEBHOOK_URL || '';
+        const API_KEY = window.__CONFIG__?.API_KEY || '';
 
         let currentData = null;
         let currentMarketplace = null;
