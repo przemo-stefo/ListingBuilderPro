@@ -6,6 +6,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { QueryProvider } from '@/components/providers/QueryProvider'
+import { TierProvider } from '@/components/providers/TierProvider'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -26,13 +27,15 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={inter.className}>
         <QueryProvider>
-          <div className="flex h-screen bg-[#1A1A1A]">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto p-8">
-              {children}
-            </main>
-          </div>
-          <Toaster />
+          <TierProvider>
+            <div className="flex h-screen bg-[#1A1A1A]">
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto p-8">
+                {children}
+              </main>
+            </div>
+            <Toaster />
+          </TierProvider>
         </QueryProvider>
       </body>
     </html>

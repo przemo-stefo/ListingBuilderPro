@@ -129,7 +129,7 @@ security-fix-scripts/
 security-assessment-report.md
 
 # Monitoring configs (deploy separately)
-monitoring/
+/monitoring/
 
 # Legacy Python scripts at root (superseded by backend/)
 amazon_sp_api_connector.py

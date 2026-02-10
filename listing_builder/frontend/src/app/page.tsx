@@ -1,171 +1,200 @@
 // frontend/src/app/page.tsx
-// Purpose: Dashboard home page with stats and recent activity
-// NOT for: Product management or detailed views
+// Purpose: Landing page with Decoy Offer — FREE vs PREMIUM side-by-side comparison
+// NOT for: Dashboard stats or app functionality (that's /dashboard)
 
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useDashboardStats } from '@/lib/hooks/useProducts'
-import { formatNumber } from '@/lib/utils'
-import { Package, Sparkles, Send, AlertCircle, TrendingUp, Clock } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Crown, Sparkles, Check, X, ArrowRight, Zap } from 'lucide-react'
+import { useTier } from '@/lib/hooks/useTier'
 
-export default function DashboardPage() {
-  const { data: stats, isLoading, error } = useDashboardStats()
+const FREE_FEATURES = [
+  { label: '3 optymalizacje dziennie', included: true },
+  { label: 'Amazon tylko', included: true },
+  { label: 'Ranking Juice (sam wynik)', included: true },
+  { label: 'RAG Knowledge Base', included: false },
+  { label: 'Keyword Intelligence', included: false },
+  { label: 'Monitoring & Alerty', included: false },
+  { label: 'Historia optymalizacji', included: false },
+  { label: 'CSV Export', included: false },
+  { label: 'Wszystkie marketplace\'y', included: false },
+  { label: 'Ranking Juice breakdown', included: false },
+]
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="pb-2">
-                <div className="h-4 w-24 bg-gray-700 rounded" />
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-16 bg-gray-700 rounded" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+const PREMIUM_FEATURES = [
+  { label: 'Nieograniczone optymalizacje', included: true },
+  { label: 'Wszystkie marketplace\'y', included: true },
+  { label: 'Ranking Juice + full breakdown', included: true },
+  { label: 'RAG Knowledge Base', included: true },
+  { label: 'Keyword Intelligence', included: true },
+  { label: 'Monitoring & Alerty', included: true },
+  { label: 'Historia optymalizacji', included: true },
+  { label: 'CSV Export', included: true },
+  { label: 'Expert Q&A', included: true },
+  { label: 'Priorytetowe wsparcie', included: true },
+]
+
+export default function LandingPage() {
+  const router = useRouter()
+  const { unlockPremium, isPremium } = useTier()
+
+  const handleFreeStart = () => {
+    router.push('/optimize')
   }
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <Card className="border-red-500">
-          <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Stats</CardTitle>
-            <CardDescription>Failed to load dashboard data</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    )
+  const handlePremiumStart = () => {
+    unlockPremium()
+    router.push('/dashboard')
   }
-
-  const statCards = [
-    {
-      title: 'Total Products',
-      value: stats?.total_products || 0,
-      icon: Package,
-      description: 'All products in system',
-    },
-    {
-      title: 'Pending Optimization',
-      value: stats?.pending_optimization || 0,
-      icon: Clock,
-      description: 'Awaiting AI optimization',
-      color: 'text-yellow-500',
-    },
-    {
-      title: 'Optimized',
-      value: stats?.optimized_products || 0,
-      icon: Sparkles,
-      description: 'AI-optimized products',
-      color: 'text-blue-500',
-    },
-    {
-      title: 'Published',
-      value: stats?.published_products || 0,
-      icon: Send,
-      description: 'Live on marketplaces',
-      color: 'text-green-500',
-    },
-    {
-      title: 'Failed',
-      value: stats?.failed_products || 0,
-      icon: AlertCircle,
-      description: 'Products with errors',
-      color: 'text-red-500',
-    },
-    {
-      title: 'Avg Score',
-      value: `${Math.round(stats?.average_optimization_score || 0)}%`,
-      icon: TrendingUp,
-      description: 'Average optimization score',
-      color: 'text-green-500',
-    },
-    {
-      title: 'Recent Imports',
-      value: stats?.recent_imports || 0,
-      icon: Package,
-      description: 'Last 24 hours',
-    },
-    {
-      title: 'Recent Publishes',
-      value: stats?.recent_publishes || 0,
-      icon: Send,
-      description: 'Last 24 hours',
-    },
-  ]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <p className="text-gray-400 mt-2">
-          Overview of your marketplace listing automation
+    <div className="max-w-5xl mx-auto space-y-12">
+      {/* Hero */}
+      <div className="text-center space-y-4 pt-8">
+        <h1 className="text-4xl font-bold text-white">
+          Listing Builder <span className="text-amber-400">Pro</span>
+        </h1>
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+          AI-powered listing optimization dla Amazon, eBay, Kaufland i Allegro.
+          Generuj SEO-zoptymalizowane tytuly, bullety i opisy w sekundy.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  {stat.title}
-                </CardTitle>
-                <Icon className={`h-4 w-4 ${stat.color || 'text-gray-400'}`} />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${stat.color || 'text-white'}`}>
-                  {typeof stat.value === 'number' ? formatNumber(stat.value) : stat.value}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stat.description}
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
+      {/* Side-by-side cards */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* FREE card — smaller, muted (40%) */}
+        <div className="md:col-span-5 rounded-xl border border-gray-800 bg-[#121212] p-6 flex flex-col">
+          <div className="mb-6">
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/10 border border-gray-700 px-3 py-1 text-xs font-medium text-gray-400">
+              FREE
+            </span>
+            <h2 className="text-2xl font-bold text-gray-300 mt-3">Zacznij za darmo</h2>
+            <p className="text-sm text-gray-500 mt-1">Sprawdz mozliwosci platformy</p>
+          </div>
+
+          <ul className="space-y-3 flex-1">
+            {FREE_FEATURES.map((f) => (
+              <li key={f.label} className="flex items-center gap-2 text-sm">
+                {f.included ? (
+                  <Check className="h-4 w-4 text-gray-500 shrink-0" />
+                ) : (
+                  <X className="h-4 w-4 text-gray-700 shrink-0" />
+                )}
+                <span className={f.included ? 'text-gray-400' : 'text-gray-600'}>
+                  {f.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={handleFreeStart}
+            className="mt-6 w-full rounded-lg border border-gray-700 bg-gray-800 py-2.5 text-sm font-medium text-gray-300 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+          >
+            Zacznij za darmo
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* PREMIUM card — larger, golden accent (60%) */}
+        <div className="md:col-span-7 rounded-xl border border-amber-500/30 bg-gradient-to-b from-amber-500/5 to-[#121212] p-6 flex flex-col relative overflow-hidden">
+          {/* Glow effect */}
+          <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+
+          <div className="mb-6 relative">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-400">
+              <Crown className="h-3 w-3" />
+              PREMIUM
+            </span>
+            <h2 className="text-3xl font-bold text-white mt-3">Pelna moc AI</h2>
+            <p className="text-sm text-gray-400 mt-1">Wszystko czego potrzebujesz do dominacji rynku</p>
+          </div>
+
+          <ul className="space-y-3 flex-1 relative">
+            {PREMIUM_FEATURES.map((f) => (
+              <li key={f.label} className="flex items-center gap-2 text-sm">
+                <Check className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="text-gray-200">{f.label}</span>
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={handlePremiumStart}
+            className="mt-6 w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 relative"
+          >
+            <Sparkles className="h-4 w-4" />
+            Odblokuj pelna moc
+            <Zap className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Common tasks to manage your product listings
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <a
-            href="/products/import"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
+      {/* Feature comparison table */}
+      <div className="rounded-xl border border-gray-800 bg-[#121212] overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <h3 className="text-lg font-semibold text-white">Porownanie funkcji</h3>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-800 text-xs text-gray-500">
+              <th className="px-6 py-3 text-left font-medium">Funkcja</th>
+              <th className="px-6 py-3 text-center font-medium">FREE</th>
+              <th className="px-6 py-3 text-center font-medium text-amber-400">PREMIUM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { feature: 'Optymalizacje / dzien', free: '3', premium: 'Bez limitu' },
+              { feature: 'RAG Knowledge Base', free: false, premium: true },
+              { feature: 'Keyword Intelligence', free: false, premium: true },
+              { feature: 'Monitoring & Alerty', free: false, premium: true },
+              { feature: 'Historia optymalizacji', free: false, premium: true },
+              { feature: 'CSV Export', free: false, premium: true },
+              { feature: 'Marketplace', free: 'Amazon', premium: 'Wszystkie' },
+              { feature: 'Ranking Juice', free: 'Wynik', premium: 'Full breakdown' },
+            ].map((row) => (
+              <tr key={row.feature} className="border-b border-gray-800/50">
+                <td className="px-6 py-3 text-gray-300">{row.feature}</td>
+                <td className="px-6 py-3 text-center">
+                  {typeof row.free === 'boolean' ? (
+                    row.free ? (
+                      <Check className="h-4 w-4 text-green-400 mx-auto" />
+                    ) : (
+                      <X className="h-4 w-4 text-gray-700 mx-auto" />
+                    )
+                  ) : (
+                    <span className="text-gray-400">{row.free}</span>
+                  )}
+                </td>
+                <td className="px-6 py-3 text-center">
+                  {typeof row.premium === 'boolean' ? (
+                    row.premium ? (
+                      <Check className="h-4 w-4 text-amber-400 mx-auto" />
+                    ) : (
+                      <X className="h-4 w-4 text-gray-700 mx-auto" />
+                    )
+                  ) : (
+                    <span className="text-amber-400 font-medium">{row.premium}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {isPremium && (
+        <div className="text-center pb-8">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="text-amber-400 text-sm hover:underline flex items-center gap-1 mx-auto"
           >
-            <Package className="h-8 w-8 mb-2 text-white" />
-            <span className="text-sm font-medium text-white">Import Products</span>
-          </a>
-          <a
-            href="/optimize"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
-          >
-            <Sparkles className="h-8 w-8 mb-2 text-blue-500" />
-            <span className="text-sm font-medium text-white">Optimize Listings</span>
-          </a>
-          <a
-            href="/publish"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
-          >
-            <Send className="h-8 w-8 mb-2 text-green-500" />
-            <span className="text-sm font-medium text-white">Publish to Markets</span>
-          </a>
-        </CardContent>
-      </Card>
+            Jestes Premium — przejdz do Dashboard
+            <ArrowRight className="h-3 w-3" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

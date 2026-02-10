@@ -10,6 +10,8 @@ import type {
   AlertConfig,
   AlertConfigCreateRequest,
   MonitoringAlert,
+  TraceItem,
+  TraceStats,
 } from '../types'
 
 export async function fetchDashboardStats(): Promise<MonitoringDashboardStats> {
@@ -92,4 +94,20 @@ export async function fetchAlerts(
 export async function acknowledgeAlert(id: string): Promise<void> {
   const response = await apiRequest<void>('patch', `/monitoring/alerts/${id}/ack`)
   if (response.error) throw new Error(response.error)
+}
+
+export async function fetchTraces(
+  limit = 50, offset = 0
+): Promise<{ items: TraceItem[]; total: number }> {
+  const response = await apiRequest<{ items: TraceItem[]; total: number }>(
+    'get', '/optimizer/traces', undefined, { limit, offset }
+  )
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
+export async function fetchTraceStats(): Promise<TraceStats> {
+  const response = await apiRequest<TraceStats>('get', '/optimizer/traces/stats')
+  if (response.error) throw new Error(response.error)
+  return response.data!
 }

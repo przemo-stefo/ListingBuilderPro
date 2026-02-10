@@ -5,8 +5,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Layers, FileText, Clock } from 'lucide-react'
+import { Layers, FileText, Clock, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTier } from '@/lib/hooks/useTier'
+import { useToast } from '@/lib/hooks/useToast'
 import SingleTab from './components/SingleTab'
 import BatchTab from './components/BatchTab'
 import HistoryTab from './components/HistoryTab'
@@ -18,10 +20,24 @@ export default function OptimizePage() {
   const [activeTab, setActiveTab] = useState<Tab>('single')
   // WHY: When user clicks "Load" in History, we switch to Single and pass the result
   const [loadedResult, setLoadedResult] = useState<OptimizerResponse | null>(null)
+  const { isPremium } = useTier()
+  const { toast } = useToast()
 
   const handleLoadFromHistory = (result: OptimizerResponse) => {
     setLoadedResult(result)
     setActiveTab('single')
+  }
+
+  const handleHistoryClick = () => {
+    if (!isPremium) {
+      toast({
+        title: 'Historia — Premium',
+        description: 'Historia optymalizacji jest dostepna w planie Premium.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setActiveTab('history')
   }
 
   return (
@@ -62,7 +78,7 @@ export default function OptimizePage() {
             Batch
           </button>
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={handleHistoryClick}
             className={cn(
               'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors',
               activeTab === 'history'
@@ -72,6 +88,7 @@ export default function OptimizePage() {
           >
             <Clock className="h-4 w-4" />
             History
+            {!isPremium && <Crown className="h-3 w-3 text-amber-400" />}
           </button>
         </div>
       </div>
@@ -79,7 +96,7 @@ export default function OptimizePage() {
       {/* Active tab content */}
       {activeTab === 'single' && <SingleTab loadedResult={loadedResult} />}
       {activeTab === 'batch' && <BatchTab />}
-      {activeTab === 'history' && <HistoryTab onLoadResult={handleLoadFromHistory} />}
+      {activeTab === 'history' && isPremium && <HistoryTab onLoadResult={handleLoadFromHistory} />}
     </div>
   )
 }

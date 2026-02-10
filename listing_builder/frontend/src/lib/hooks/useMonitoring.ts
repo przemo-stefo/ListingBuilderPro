@@ -15,6 +15,8 @@ import {
   toggleAlertConfig,
   fetchAlerts,
   acknowledgeAlert,
+  fetchTraces,
+  fetchTraceStats,
 } from '../api/monitoring'
 import type { TrackProductRequest, AlertConfigCreateRequest } from '../types'
 import { useToast } from './useToast'
@@ -160,5 +162,21 @@ export function useAcknowledgeAlert() {
     onError: (error: Error) => {
       toast({ title: 'Failed to acknowledge alert', description: error.message, variant: 'destructive' })
     },
+  })
+}
+
+export function useTraces(limit = 50, offset = 0) {
+  return useQuery({
+    queryKey: ['traces', limit, offset],
+    queryFn: () => fetchTraces(limit, offset),
+    staleTime: STALE_TIME,
+  })
+}
+
+export function useTraceStats() {
+  return useQuery({
+    queryKey: ['trace-stats'],
+    queryFn: fetchTraceStats,
+    staleTime: STALE_TIME,
   })
 }
