@@ -634,12 +634,28 @@ async def optimize_listing(
             product_title, brand, title_text, all_kw, lang, limits["backend"],
         )
 
+        # WHY: Backend keyword LLM call is optional — use return_exceptions so it
+        # can fail without killing the essential bullets+desc calls
         with span(trace, "llm_bullets_desc") as s:
-            (bullets_raw, b_usage), (desc_text, d_usage), (backend_suggestions, bk_usage) = await asyncio.gather(
+            results = await asyncio.gather(
                 asyncio.to_thread(_call_groq, bullets_prompt, 0.5, 800),
                 asyncio.to_thread(_call_groq, desc_prompt, 0.5, 600),
                 asyncio.to_thread(_call_groq, backend_prompt, 0.3, 200),
+                return_exceptions=True,
             )
+            # WHY: Unpack — if any is an Exception, handle gracefully
+            if isinstance(results[0], Exception):
+                raise results[0]  # Bullets are essential — re-raise
+            if isinstance(results[1], Exception):
+                raise results[1]  # Description is essential — re-raise
+            (bullets_raw, b_usage) = results[0]
+            (desc_text, d_usage) = results[1]
+            if isinstance(results[2], Exception):
+                logger.warning("backend_llm_failed", error=str(results[2]))
+                backend_suggestions = ""
+                bk_usage = None
+            else:
+                (backend_suggestions, bk_usage) = results[2]
             if b_usage:
                 record_llm_usage(s, b_usage)
             if d_usage:
