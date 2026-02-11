@@ -561,7 +561,7 @@ async def optimize_listing(
     with span(trace, "rag_search"):
         if db:
             search_query = f"{product_title} {' '.join(tier1_phrases[:5])}"
-            knowledge = search_knowledge_batch(db, search_query)
+            knowledge = await search_knowledge_batch(db, search_query)
             title_context = knowledge.get("title", "")
             bullets_context = knowledge.get("bullets", "")
             desc_context = knowledge.get("description", "")

@@ -5,8 +5,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Brain, BookOpen } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Send, Loader2, Brain, BookOpen, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -15,7 +14,16 @@ interface Message {
   content: string
   sources?: number
   sourceNames?: string[]
+  mode?: string
 }
+
+// WHY: RAG behavior modes control how strictly the LLM sticks to transcript knowledge
+const RAG_MODES = [
+  { value: 'strict', label: 'Strict', desc: 'Only transcript knowledge' },
+  { value: 'balanced', label: 'Balanced', desc: 'Transcripts + general advice' },
+  { value: 'flexible', label: 'Flexible', desc: 'Blend all sources freely' },
+  { value: 'bypass', label: 'Bypass RAG', desc: 'Pure LLM, no transcripts' },
+] as const
 
 const SUGGESTED_QUESTIONS = [
   'How do I find the best keywords for my Amazon listing?',
@@ -30,6 +38,8 @@ export default function ExpertQAPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [mode, setMode] = useState('balanced')
+  const [showModeSelector, setShowModeSelector] = useState(false)
   const [stats, setStats] = useState<{ total_chunks: number; total_files: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -58,7 +68,7 @@ export default function ExpertQAPage() {
       const res = await fetch('/api/proxy/knowledge/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, mode }),
       })
 
       if (!res.ok) {
@@ -73,6 +83,7 @@ export default function ExpertQAPage() {
           content: data.answer,
           sources: data.sources_used,
           sourceNames: data.source_names || [],
+          mode: data.mode,
         },
       ])
     } catch {
@@ -92,6 +103,14 @@ export default function ExpertQAPage() {
         <div className="flex items-center gap-3">
           <Brain className="h-6 w-6 text-green-400" />
           <h1 className="text-2xl font-bold text-white">Expert Q&A</h1>
+          {/* WHY: Mode selector toggle — small gear icon keeps header clean */}
+          <button
+            onClick={() => setShowModeSelector(!showModeSelector)}
+            className="ml-auto rounded-lg border border-gray-800 p-2 text-gray-400 transition-colors hover:border-gray-600 hover:text-white"
+            title="RAG Mode"
+          >
+            <Settings2 className="h-4 w-4" />
+          </button>
         </div>
         <p className="mt-1 text-sm text-gray-400">
           Ask Amazon questions — answered using Inner Circle transcript knowledge
@@ -101,6 +120,28 @@ export default function ExpertQAPage() {
             </span>
           )}
         </p>
+
+        {/* WHY: Mode selector — collapsible to avoid clutter for casual users */}
+        {showModeSelector && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {RAG_MODES.map(m => (
+              <button
+                key={m.value}
+                onClick={() => setMode(m.value)}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5 text-xs transition-colors',
+                  mode === m.value
+                    ? 'border-green-600 bg-green-900/30 text-green-400'
+                    : 'border-gray-800 bg-[#1A1A1A] text-gray-400 hover:border-gray-600'
+                )}
+                title={m.desc}
+              >
+                {m.label}
+                <span className="ml-1.5 text-[10px] text-gray-500">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Chat area */}
@@ -147,20 +188,29 @@ export default function ExpertQAPage() {
                   )}
                 >
                   <div className="whitespace-pre-wrap">{msg.content}</div>
-                  {msg.sources !== undefined && msg.sources > 0 && (
+                  {msg.role === 'assistant' && (
                     <div className="mt-2 text-[10px] text-gray-500">
-                      <p>Based on {msg.sources} source{msg.sources !== 1 ? 's' : ''}:</p>
-                      {msg.sourceNames && msg.sourceNames.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {msg.sourceNames.map((name, j) => (
-                            <span
-                              key={j}
-                              className="rounded bg-gray-800 px-1.5 py-0.5 text-gray-400"
-                            >
-                              {name}
-                            </span>
-                          ))}
-                        </div>
+                      {msg.sources !== undefined && msg.sources > 0 && (
+                        <>
+                          <p>Based on {msg.sources} source{msg.sources !== 1 ? 's' : ''}:</p>
+                          {msg.sourceNames && msg.sourceNames.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {msg.sourceNames.map((name, j) => (
+                                <span
+                                  key={j}
+                                  className="rounded bg-gray-800 px-1.5 py-0.5 text-gray-400"
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {msg.mode && (
+                        <span className="mt-1 inline-block rounded bg-gray-800/50 px-1.5 py-0.5 text-gray-500">
+                          {msg.mode} mode
+                        </span>
                       )}
                     </div>
                   )}
@@ -171,7 +221,7 @@ export default function ExpertQAPage() {
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching transcripts...
+                  {mode === 'bypass' ? 'Thinking...' : 'Searching transcripts...'}
                 </div>
               </div>
             )}

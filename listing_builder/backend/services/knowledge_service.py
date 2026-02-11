@@ -1,15 +1,20 @@
 # backend/services/knowledge_service.py
 # Purpose: Search Inner Circle transcript chunks for expert context injection
-# NOT for: Ingestion or chunk management (see scripts/ingest_transcripts.py)
+# NOT for: Ingestion, chunk management, or low-level search (see search_strategies.py)
+
+from __future__ import annotations
 
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 import structlog
+
+from config import settings
+from services.embedding_service import get_embedding
+from services.query_understanding import analyze_query
+from services.search_strategies import lexical_search, vector_search, hybrid_merge
 
 logger = structlog.get_logger()
 
-# WHY: Map prompt types to relevant transcript categories so the LLM gets
-# expert knowledge that matches what it's currently generating
+# WHY: Map prompt types to relevant transcript categories
 CATEGORY_MAP = {
     "title": ["listing_optimization", "keyword_research", "ranking"],
     "bullets": ["listing_optimization", "conversion_optimization", "keyword_research"],
@@ -17,153 +22,160 @@ CATEGORY_MAP = {
 }
 
 MAX_CONTEXT_CHARS = 3000
-
-# WHY: Union of all categories across prompt types — for batch query
 ALL_CATEGORIES = list({c for cats in CATEGORY_MAP.values() for c in cats})
 
 
-def search_knowledge_batch(
-    db: Session,
-    query: str,
-    max_chunks_per_type: int = 5,
+async def _get_search_rows(
+    db: Session, query: str, categories: list[str] | None,
+    limit: int, query_embedding: list[float] | None = None,
+) -> list[tuple]:
+    """Route to the right search strategy based on rag_mode config."""
+    mode = settings.rag_mode
+
+    if mode == "semantic" and query_embedding:
+        return vector_search(db, query_embedding, categories, limit)
+
+    if mode == "hybrid" and query_embedding:
+        v_rows = vector_search(db, query_embedding, categories, limit)
+        k_rows = lexical_search(db, query, categories, limit)
+        return hybrid_merge(v_rows, k_rows, limit)
+
+    return lexical_search(db, query, categories, limit)
+
+
+async def _expand_query(query: str) -> str:
+    """Use query understanding to expand search terms in non-lexical modes."""
+    if settings.rag_mode == "lexical":
+        return query
+    understood = await analyze_query(query)
+    if understood and understood.get("expanded_query"):
+        return understood["expanded_query"]
+    return query
+
+
+async def _get_embedding_if_needed(query: str) -> list[float] | None:
+    """Get query embedding only when rag_mode requires it.
+
+    WHY: HuggingFace embeddings are free — no API key check needed.
+    """
+    if settings.rag_mode == "lexical":
+        return None
+    return await get_embedding(query)
+
+
+def _format_chunks(rows: list[tuple], max_chars: int = MAX_CONTEXT_CHARS) -> str:
+    """Format search results into context string with source attribution."""
+    parts = []
+    total_len = 0
+    for row in rows:
+        chunk = f"[{row[3]} — {row[2]}]\n{row[1]}"
+        if total_len + len(chunk) > max_chars:
+            break
+        parts.append(chunk)
+        total_len += len(chunk)
+    return "\n\n".join(parts)
+
+
+def _format_chunks_with_sources(
+    rows: list[tuple], max_chars: int = MAX_CONTEXT_CHARS
+) -> tuple[str, list[str]]:
+    """Format search results and extract unique source filenames."""
+    parts = []
+    filenames = []
+    total_len = 0
+    for row in rows:
+        chunk = f"[{row[3]} — {row[2]}]\n{row[1]}"
+        if total_len + len(chunk) > max_chars:
+            break
+        parts.append(chunk)
+        filenames.append(row[2])
+        total_len += len(chunk)
+
+    unique_names = []
+    seen: set[str] = set()
+    for fn in filenames:
+        clean = fn.rsplit(".", 1)[0].replace("_", " ")
+        if clean not in seen:
+            seen.add(clean)
+            unique_names.append(clean)
+
+    return "\n\n".join(parts), unique_names
+
+
+async def search_knowledge_batch(
+    db: Session, query: str, max_chunks_per_type: int = 5,
 ) -> dict[str, str]:
-    """Fetch expert context for all prompt types in a single DB query.
+    """Fetch expert context for all prompt types in a single search pass.
 
     Returns {"title": "...", "bullets": "...", "description": "..."}.
-    WHY: 1 query instead of 3-6 round-trips per optimization request.
     """
     try:
-        rows = db.execute(
-            text("""
-                SELECT content, filename, category,
-                       ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
-                FROM knowledge_chunks
-                WHERE search_vector @@ plainto_tsquery('english', :query)
-                  AND category = ANY(:categories)
-                ORDER BY rank DESC
-                LIMIT :limit
-            """),
-            {
-                "query": query,
-                "categories": ALL_CATEGORIES,
-                "limit": max_chunks_per_type * 3,
-            },
-        ).fetchall()
+        search_query = await _expand_query(query)
+        query_embedding = await _get_embedding_if_needed(search_query)
+        limit = max_chunks_per_type * 3
 
-        # WHY: If category-filtered returned nothing, try without filter
+        rows = await _get_search_rows(db, search_query, ALL_CATEGORIES, limit, query_embedding)
         if not rows:
-            rows = db.execute(
-                text("""
-                    SELECT content, filename, category,
-                           ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
-                    FROM knowledge_chunks
-                    WHERE search_vector @@ plainto_tsquery('english', :query)
-                    ORDER BY rank DESC
-                    LIMIT :limit
-                """),
-                {"query": query, "limit": max_chunks_per_type * 3},
-            ).fetchall()
+            rows = await _get_search_rows(db, search_query, None, limit, query_embedding)
 
         result = {}
         for prompt_type, categories in CATEGORY_MAP.items():
             cat_set = set(categories)
-            # WHY: Pick top chunks whose category matches this prompt type
-            matched = [r for r in rows if r[2] in cat_set]
-            # Fallback: if no category match, use all rows (better than nothing)
-            if not matched:
-                matched = list(rows)
-
-            parts = []
-            total_len = 0
-            for row in matched[:max_chunks_per_type]:
-                chunk = f"[{row[2]} — {row[1]}]\n{row[0]}"
-                if total_len + len(chunk) > MAX_CONTEXT_CHARS:
-                    break
-                parts.append(chunk)
-                total_len += len(chunk)
-
-            result[prompt_type] = "\n\n".join(parts)
+            matched = [r for r in rows if r[3] in cat_set] or list(rows)
+            result[prompt_type] = _format_chunks(matched[:max_chunks_per_type])
 
         hit_count = sum(1 for v in result.values() if v)
         if hit_count:
-            logger.info(
-                "knowledge_batch_hit",
-                chunks_fetched=len(rows),
-                types_with_context=hit_count,
-                query_preview=query[:60],
-            )
+            logger.info("knowledge_batch_hit", mode=settings.rag_mode,
+                        chunks_fetched=len(rows), types_with_context=hit_count,
+                        query_preview=query[:60])
 
         return result
-
     except Exception as e:
         logger.warning("knowledge_batch_error", error=str(e))
         return {"title": "", "bullets": "", "description": ""}
 
 
-def search_knowledge(
-    db: Session,
-    query: str,
-    prompt_type: str,
-    max_chunks: int = 5,
+async def search_knowledge(
+    db: Session, query: str, prompt_type: str, max_chunks: int = 5,
 ) -> str:
-    """Search knowledge chunks by full-text search with category pre-filtering.
+    """Search knowledge chunks with hybrid/lexical/semantic based on rag_mode.
 
-    Returns formatted context string or empty string on any failure.
     WHY: This must never crash the optimizer — expert context is a bonus, not required.
     """
     try:
         categories = CATEGORY_MAP.get(prompt_type, ["general"])
+        search_query = await _expand_query(query)
+        query_embedding = await _get_embedding_if_needed(search_query)
 
-        # WHY: plainto_tsquery handles multi-word queries without requiring operators
-        rows = db.execute(
-            text("""
-                SELECT content, filename, category,
-                       ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
-                FROM knowledge_chunks
-                WHERE search_vector @@ plainto_tsquery('english', :query)
-                  AND category = ANY(:categories)
-                ORDER BY rank DESC
-                LIMIT :max_chunks
-            """),
-            {"query": query, "categories": categories, "max_chunks": max_chunks},
-        ).fetchall()
-
-        # WHY: Fallback without category filter if pre-filtered search returns nothing
+        rows = await _get_search_rows(db, search_query, categories, max_chunks, query_embedding)
         if not rows:
-            rows = db.execute(
-                text("""
-                    SELECT content, filename, category,
-                           ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
-                    FROM knowledge_chunks
-                    WHERE search_vector @@ plainto_tsquery('english', :query)
-                    ORDER BY rank DESC
-                    LIMIT :max_chunks
-                """),
-                {"query": query, "max_chunks": max_chunks},
-            ).fetchall()
-
+            rows = await _get_search_rows(db, search_query, None, max_chunks, query_embedding)
         if not rows:
             return ""
 
-        # WHY: Format chunks with source attribution so LLM knows where advice comes from
-        parts = []
-        total_len = 0
-        for row in rows:
-            chunk = f"[{row[2]} — {row[1]}]\n{row[0]}"
-            if total_len + len(chunk) > MAX_CONTEXT_CHARS:
-                break
-            parts.append(chunk)
-            total_len += len(chunk)
-
-        logger.info(
-            "knowledge_search_hit",
-            prompt_type=prompt_type,
-            chunks_found=len(parts),
-            query_preview=query[:60],
-        )
-
-        return "\n\n".join(parts)
-
+        logger.info("knowledge_search_hit", mode=settings.rag_mode,
+                    prompt_type=prompt_type, chunks_found=len(rows),
+                    query_preview=query[:60])
+        return _format_chunks(rows)
     except Exception as e:
         logger.warning("knowledge_search_error", error=str(e))
         return ""
+
+
+async def search_all_categories(
+    db: Session, query: str, max_chunks: int = 8,
+) -> tuple[str, list[str]]:
+    """Search ALL knowledge chunks regardless of category (for Expert Q&A)."""
+    try:
+        search_query = await _expand_query(query)
+        query_embedding = await _get_embedding_if_needed(search_query)
+
+        rows = await _get_search_rows(db, search_query, None, max_chunks, query_embedding)
+        if not rows:
+            return "", []
+
+        return _format_chunks_with_sources(rows)
+    except Exception as e:
+        logger.warning("knowledge_search_all_error", error=str(e))
+        return "", []

@@ -8,67 +8,59 @@ import asyncio
 from typing import Dict
 from groq import Groq
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from config import settings
+from services.knowledge_service import search_all_categories
 import structlog
 
 logger = structlog.get_logger()
 
 MODEL = "llama-3.3-70b-versatile"
-MAX_CONTEXT_CHARS = 6000  # WHY: More context for Q&A than for optimization prompts
+
+# WHY: Mode-specific system prompt rules — controls how strictly LLM uses transcript knowledge
+MODE_RULES = {
+    "strict": (
+        "- ONLY answer based on the expert knowledge provided above\n"
+        "- If the transcripts don't cover this topic, say: "
+        "\"I don't have specific information about this in my training transcripts. "
+        "Please ask about Amazon keywords, listings, PPC, or ranking.\"\n"
+        "- Never supplement with general knowledge\n"
+        "- Cite which transcript concept your answer comes from"
+    ),
+    "balanced": (
+        "- Answer based on the expert knowledge when available\n"
+        "- Be specific and actionable — give concrete steps, not vague advice\n"
+        "- If the knowledge doesn't cover the question, say so honestly but still give your best advice\n"
+        "- Use examples when helpful\n"
+        "- Keep answers concise but complete"
+    ),
+    "flexible": (
+        "- Use expert knowledge as your primary source\n"
+        "- Freely supplement with your general Amazon marketplace knowledge\n"
+        "- Blend transcript insights with broader best practices\n"
+        "- Be comprehensive — cover the topic fully"
+    ),
+    "bypass": (
+        "- Answer purely from your general Amazon marketplace knowledge\n"
+        "- Ignore any transcript context provided\n"
+        "- Be comprehensive and actionable"
+    ),
+}
 
 
-def _search_all_categories(db: Session, query: str, max_chunks: int = 8) -> tuple:
-    """Search ALL knowledge chunks regardless of category.
+def _build_qa_prompt(question: str, context: str, mode: str = "balanced") -> str:
+    """Build system prompt with expert knowledge context and mode-specific rules."""
+    rules = MODE_RULES.get(mode, MODE_RULES["balanced"])
 
-    Returns (formatted_context, source_names) — source_names is a list of
-    unique filenames that contributed to the context, cleaned for display.
-    """
-    try:
-        rows = db.execute(
-            text("""
-                SELECT content, filename, category,
-                       ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
-                FROM knowledge_chunks
-                WHERE search_vector @@ plainto_tsquery('english', :query)
-                ORDER BY rank DESC
-                LIMIT :limit
-            """),
-            {"query": query, "limit": max_chunks},
-        ).fetchall()
+    # WHY: In bypass mode, skip RAG context entirely — pure LLM
+    if mode == "bypass":
+        return f"""You are an expert Amazon marketplace consultant. Answer the user's question.
 
-        if not rows:
-            return "", []
+Rules:
+{rules}
+- Answer in the same language as the question
 
-        parts = []
-        filenames = []
-        total_len = 0
-        for row in rows:
-            chunk = f"[{row[2]} — {row[1]}]\n{row[0]}"
-            if total_len + len(chunk) > MAX_CONTEXT_CHARS:
-                break
-            parts.append(chunk)
-            filenames.append(row[1])
-            total_len += len(chunk)
+Question: {question}"""
 
-        # WHY: Clean filenames for display — "ep_123_keywords.txt" → "ep 123 keywords"
-        unique_names = []
-        seen = set()
-        for fn in filenames:
-            clean = fn.rsplit(".", 1)[0].replace("_", " ")
-            if clean not in seen:
-                seen.add(clean)
-                unique_names.append(clean)
-
-        return "\n\n".join(parts), unique_names
-
-    except Exception as e:
-        logger.warning("qa_search_error", error=str(e))
-        return "", []
-
-
-def _build_qa_prompt(question: str, context: str) -> str:
-    """Build system prompt with expert knowledge context for Q&A."""
     context_block = ""
     if context:
         context_block = f"""
@@ -79,11 +71,7 @@ EXPERT KNOWLEDGE FROM INNER CIRCLE TRANSCRIPTS:
     return f"""You are an expert Amazon marketplace consultant with deep knowledge from Inner Circle training transcripts. Answer the user's question using the expert knowledge provided below.
 
 {context_block}Rules:
-- Answer based on the expert knowledge when available
-- Be specific and actionable — give concrete steps, not vague advice
-- If the knowledge doesn't cover the question, say so honestly but still give your best advice
-- Use examples when helpful
-- Keep answers concise but complete
+{rules}
 - Answer in the same language as the question
 
 Question: {question}"""
@@ -92,22 +80,27 @@ Question: {question}"""
 async def ask_expert(
     question: str,
     db: Session,
+    mode: str = "balanced",
 ) -> Dict:
     """
     RAG-powered Q&A: search knowledge base → inject into Groq prompt → return answer.
     """
-    # WHY: Search all categories — Q&A can be about anything (keywords, PPC, ranking, etc.)
-    context, source_names = _search_all_categories(db, question)
+    # WHY: Bypass mode skips RAG entirely — no search needed
+    context = ""
+    source_names = []
+    if mode != "bypass":
+        context, source_names = await search_all_categories(db, question)
 
     logger.info(
         "qa_question",
         question=question[:80],
+        mode=mode,
         context_len=len(context),
         has_context=bool(context),
         sources=len(source_names),
     )
 
-    prompt = _build_qa_prompt(question, context)
+    prompt = _build_qa_prompt(question, context, mode)
 
     # WHY: Higher temperature (0.6) for more natural conversational answers
     # WHY: Try all available keys to handle 429 rate limits
@@ -140,4 +133,5 @@ async def ask_expert(
         "sources_used": len(source_names),
         "source_names": source_names,
         "has_context": bool(context),
+        "mode": mode,
     }

@@ -32,7 +32,7 @@ async def knowledge_search(
     db: Session = Depends(get_db),
 ):
     """Search knowledge base — debug endpoint for testing retrieval quality."""
-    context = search_knowledge(db, q, prompt_type, max_chunks)
+    context = await search_knowledge(db, q, prompt_type, max_chunks)
     return {
         "query": q,
         "prompt_type": prompt_type,
@@ -43,6 +43,8 @@ async def knowledge_search(
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=1000)
+    # WHY: RAG behavior modes — controls how strictly the LLM sticks to transcript knowledge
+    mode: str = Field(default="balanced", pattern="^(strict|balanced|flexible|bypass)$")
 
 
 class ChatResponse(BaseModel):
@@ -50,6 +52,7 @@ class ChatResponse(BaseModel):
     sources_used: int
     source_names: list[str] = []
     has_context: bool
+    mode: str = "balanced"
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -61,7 +64,7 @@ async def expert_chat(
 ):
     """Expert Q&A — ask Amazon questions, answered using Inner Circle transcript RAG."""
     try:
-        result = await ask_expert(body.question, db)
+        result = await ask_expert(body.question, db, mode=body.mode)
         return result
     except Exception as e:
         logger.error("expert_chat_error", error=str(e))

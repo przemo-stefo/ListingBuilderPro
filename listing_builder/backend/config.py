@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     kaufland_client_key: str = ""
     kaufland_secret_key: str = ""
 
+    # RAG Search Mode + Cloudflare Workers AI embeddings (free)
+    rag_mode: str = "lexical"  # WHY: "lexical" | "hybrid" | "semantic" — feature flag
+    cf_account_id: str = ""  # WHY: Cloudflare account for Workers AI embeddings
+    cf_auth_email: str = ""  # Cloudflare auth email
+    cf_api_key: str = ""  # Cloudflare Global API Key
+
     # Scraping
     scrape_do_token: str = ""  # Scrape.do API token (recommended for Allegro)
     scraper_proxy_url: str = ""  # Fallback: raw residential proxy URL
