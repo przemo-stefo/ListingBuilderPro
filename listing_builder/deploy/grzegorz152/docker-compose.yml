@@ -1,0 +1,68 @@
+# deploy/grzegorz152/docker-compose.yml
+# Purpose: Production deployment on Mikrus grzegorz152 (4GB RAM, 40GB disk)
+# NOT for: Local development or Render deployment
+
+version: '3.8'
+
+services:
+  # Backend API — Compliance Guard + LBP
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: compliance-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PORT=8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  # Redis — caching, rate limiting, session store
+  redis:
+    image: redis:7-alpine
+    container_name: compliance-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+
+  # Cloudflare Tunnel — exposes backend to internet
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: compliance-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  redis_data:

@@ -121,13 +121,27 @@ async def _fetch_product_data(marketplace: str, product_id: str, product_url: Op
             return {"error": str(e)}
 
     if marketplace == "amazon":
-        # WHY guard: Amazon SP-API credentials come from Mateusz (blocked)
+        # WHY: Use Keepa API for Amazon monitoring (no seller credentials needed)
+        # Falls back to SP-API when available
         try:
-            from config import settings
-            if not settings.amazon_client_id:
-                return {"error": "Amazon credentials not configured"}
-            # Future: call amazon_sp_api service here
-            return {"error": "Amazon polling not yet implemented"}
+            from services.keepa_service import get_product, KEEPA_API_KEY
+            if KEEPA_API_KEY:
+                result = await get_product(product_id, "amazon.de")
+                if result:
+                    return {
+                        "title": result.get("title"),
+                        "price": result.get("current_price"),
+                        "buybox_price": result.get("buybox_price"),
+                        "buy_box_owner": "fba" if result.get("offers_fba", 0) > 0 else "fbm",
+                        "stock": None,  # Keepa doesn't give exact stock
+                        "listing_active": result.get("is_alive", False),
+                        "rating": result.get("rating"),
+                        "review_count": result.get("review_count"),
+                        "offers_fba": result.get("offers_fba", 0),
+                        "offers_fbm": result.get("offers_fbm", 0),
+                    }
+                return {"error": f"Keepa: product {product_id} not found"}
+            return {"error": "No Keepa API key and no Amazon SP-API credentials"}
         except Exception as e:
             return {"error": str(e)}
 

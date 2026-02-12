@@ -29,6 +29,7 @@ const ALLOWED_PATH_PREFIXES = [
   'analytics',
   'competitors',
   'inventory',
+  'keepa',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
