@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Globe,
   Clock,
-  ImageOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -29,15 +28,29 @@ interface NewsItem {
 type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'ecommerce' | 'compliance'
 
 // WHY: RSS feeds from major marketplace news sources — parsed via rss2json.com
-// Some feeds (eBay Community, Seller Central, Shopify) block rss2json — use alternatives
+// Some feeds block rss2json — Google News RSS as fallback for those marketplaces
 const RSS_FEEDS = [
+  // Amazon
   { url: 'https://www.aboutamazon.com/news/rss', source: 'About Amazon', category: 'amazon' },
-  { url: 'https://amazonadvertising.com/blog/feed/', source: 'Amazon Ads', category: 'amazon' },
+  { url: 'https://news.google.com/rss/search?q=Amazon+seller+FBA+marketplace+news&hl=en&gl=US&ceid=US:en', source: 'Amazon Seller News', category: 'amazon' },
+  // Allegro
+  { url: 'https://blog.allegro.tech/feed.xml', source: 'Allegro Tech Blog', category: 'allegro' },
+  { url: 'https://news.google.com/rss/search?q=Allegro+marketplace+sprzedawcy&hl=pl&gl=PL&ceid=PL:pl', source: 'Allegro News', category: 'allegro' },
+  // eBay
+  { url: 'https://www.ebayinc.com/stories/news/rss/', source: 'eBay Inc.', category: 'ebay' },
+  { url: 'https://news.google.com/rss/search?q=eBay+seller+marketplace+news&hl=en&gl=US&ceid=US:en', source: 'eBay News', category: 'ebay' },
+  // Kaufland
+  { url: 'https://news.google.com/rss/search?q=Kaufland+Global+Marketplace+ecommerce&hl=en&gl=DE&ceid=DE:en', source: 'Kaufland News', category: 'kaufland' },
+  { url: 'https://news.google.com/rss/search?q=Kaufland+marketplace+seller&hl=de&gl=DE&ceid=DE:de', source: 'Kaufland DE', category: 'kaufland' },
+  // E-commerce general
   { url: 'https://ecommercenews.eu/feed/', source: 'Ecommerce News EU', category: 'ecommerce' },
   { url: 'https://tamebay.com/feed', source: 'Tamebay', category: 'ecommerce' },
-  { url: 'https://www.webretailer.com/feed/', source: 'Web Retailer', category: 'ecommerce' },
   { url: 'https://www.practicalecommerce.com/feed', source: 'Practical Ecommerce', category: 'ecommerce' },
-  { url: 'https://crossbordercommerce.eu/feed/', source: 'CrossBorder Commerce EU', category: 'compliance' },
+  { url: 'https://news.google.com/rss/search?q=ecommerce+marketplace+seller+news&hl=en&gl=US&ceid=US:en', source: 'E-commerce News', category: 'ecommerce' },
+  // Compliance & regulations (direct RSS blocked by rss2json — Google News RSS as fallback)
+  { url: 'https://news.google.com/rss/search?q=EU+GPSR+product+safety+regulation+2025&hl=en&gl=DE&ceid=DE:en', source: 'GPSR News', category: 'compliance' },
+  { url: 'https://news.google.com/rss/search?q=EU+EPR+packaging+VAT+ecommerce+compliance&hl=en&gl=DE&ceid=DE:en', source: 'EU Compliance', category: 'compliance' },
+  { url: 'https://news.google.com/rss/search?q=Amazon+eBay+marketplace+compliance+regulation&hl=en&gl=US&ceid=US:en', source: 'Marketplace Compliance', category: 'compliance' },
 ]
 
 // WHY: rss2json.com free API (10k req/day) avoids CORS issues with direct RSS
