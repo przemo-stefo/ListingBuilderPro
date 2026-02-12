@@ -2,13 +2,11 @@
 # Purpose: Production deployment on Mikrus grzegorz152 (4GB RAM, 40GB disk)
 # NOT for: Local development or Render deployment
 
-version: '3.8'
-
 services:
   # Backend API — Compliance Guard + LBP
   backend:
     build:
-      context: ../../backend
+      context: ./backend
       dockerfile: Dockerfile
     container_name: compliance-backend
     restart: unless-stopped
@@ -18,7 +16,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
