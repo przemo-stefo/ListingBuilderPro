@@ -102,8 +102,17 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <ImageOff className="h-8 w-8 text-gray-700" />
+          <div className={cn(
+            'flex h-full items-center justify-center',
+            item.category === 'amazon' ? 'bg-gradient-to-br from-orange-950 to-[#1A1A1A]' :
+            item.category === 'ecommerce' ? 'bg-gradient-to-br from-green-950 to-[#1A1A1A]' :
+            item.category === 'compliance' ? 'bg-gradient-to-br from-red-950 to-[#1A1A1A]' :
+            item.category === 'ebay' ? 'bg-gradient-to-br from-blue-950 to-[#1A1A1A]' :
+            'bg-gradient-to-br from-gray-800 to-[#1A1A1A]'
+          )}>
+            <span className="text-3xl opacity-40">
+              {CATEGORIES.find(c => c.key === item.category)?.icon || '📰'}
+            </span>
           </div>
         )}
         <span className={cn(
