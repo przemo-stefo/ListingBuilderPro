@@ -33,6 +33,7 @@ async def fetch_ebay_product(item_id: str) -> Optional[dict]:
     try:
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             resp = await client.get(url, headers=headers)
+            logger.info("ebay_direct", item_id=item_id, status=resp.status_code, size=len(resp.text))
 
             if resp.status_code == 200 and len(resp.text) > 5000:
                 return _parse_ebay_html(resp.text, item_id)
@@ -43,6 +44,7 @@ async def fetch_ebay_product(item_id: str) -> Optional[dict]:
                 encoded_url = quote(url, safe="")
                 api_url = f"https://api.scraperapi.com?api_key={scraperapi_key}&url={encoded_url}"
                 resp = await client.get(api_url)
+                logger.info("ebay_scraperapi", item_id=item_id, status=resp.status_code)
                 if resp.status_code == 200:
                     return _parse_ebay_html(resp.text, item_id)
 
@@ -50,9 +52,10 @@ async def fetch_ebay_product(item_id: str) -> Optional[dict]:
             token = os.environ.get("SCRAPE_DO_TOKEN", "")
             if token:
                 encoded_url = quote(url, safe="")
-                api_url = f"https://api.scrape.do/?token={token}&url={encoded_url}"
+                api_url = f"https://api.scrape.do/?token={token}&url={encoded_url}&render=false"
                 resp = await client.get(api_url)
-                if resp.status_code == 200:
+                logger.info("ebay_scrapedo", item_id=item_id, status=resp.status_code, size=len(resp.text))
+                if resp.status_code == 200 and len(resp.text) > 5000:
                     return _parse_ebay_html(resp.text, item_id)
 
             return {"error": f"All fetch strategies failed (HTTP {resp.status_code})"}
