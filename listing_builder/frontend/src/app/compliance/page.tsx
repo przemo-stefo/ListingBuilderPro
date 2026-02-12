@@ -1,5 +1,5 @@
 // frontend/src/app/compliance/page.tsx
-// Purpose: Tab orchestrator for the Compliance Guard dashboard (5 tabs)
+// Purpose: Tab orchestrator for the Compliance Guard dashboard (6 tabs)
 // NOT for: Individual tab logic (those are in components/)
 
 'use client'
@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   Link2,
   Upload,
+  Newspaper,
+  GraduationCap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import DashboardTab from './components/DashboardTab'
@@ -19,11 +21,15 @@ import AlertSettingsTab from './components/AlertSettingsTab'
 import AlertsTab from './components/AlertsTab'
 import IntegrationsTab from './components/IntegrationsTab'
 import UploadTab from './components/UploadTab'
+import NewsTab from './components/NewsTab'
+import AkademiaTab from './components/AkademiaTab'
 
-type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload'
+type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'news' | 'akademia'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Panel Główny', icon: BarChart3 },
+  { key: 'news', label: 'Wiadomości', icon: Newspaper },
+  { key: 'akademia', label: 'Akademia', icon: GraduationCap },
   { key: 'settings', label: 'Aktywacja Alertów', icon: Bell },
   { key: 'alerts', label: 'Alerty', icon: AlertTriangle },
   { key: 'integrations', label: 'Integracje', icon: Link2 },
@@ -69,10 +75,12 @@ export default function CompliancePage() {
 
       {/* Tab content */}
       {activeTab === 'dashboard' && <DashboardTab onNavigate={(tab) => setActiveTab(tab as Tab)} />}
+      {activeTab === 'news' && <NewsTab />}
       {activeTab === 'settings' && <AlertSettingsTab />}
       {activeTab === 'alerts' && <AlertsTab />}
       {activeTab === 'integrations' && <IntegrationsTab />}
       {activeTab === 'upload' && <UploadTab />}
+      {activeTab === 'akademia' && <AkademiaTab />}
     </div>
   )
 }

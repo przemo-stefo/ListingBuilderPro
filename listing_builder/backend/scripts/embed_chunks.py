@@ -60,10 +60,14 @@ def embed_all_chunks():
             except Exception as e:
                 err = str(e)
                 print(f"ERROR on batch starting at id={ids[0]}: {err}")
-                # WHY: CF Workers AI has transient 500s, 429 rate limits, and 503 cold starts
-                if "500" in err:
+                # WHY: CF Workers AI has transient 500s, 408 timeouts, 429 rate limits, and 503 cold starts
+                if "500" in err or "502" in err:
                     print("Transient CF error. Waiting 10s...")
                     time.sleep(10)
+                    continue
+                if "408" in err:
+                    print("CF timeout. Waiting 15s...")
+                    time.sleep(15)
                     continue
                 if "503" in err or "loading" in err.lower():
                     print("Model loading. Waiting 20s...")
