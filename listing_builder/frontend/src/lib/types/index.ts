@@ -651,6 +651,22 @@ export interface MonitoringAlert {
   acknowledged_at: string | null
 }
 
+export interface MonitoringSnapshot {
+  id: string
+  marketplace: string
+  product_id: string
+  ean: string | null
+  snapshot_data: Record<string, unknown>
+  created_at: string
+}
+
+export interface PollResult {
+  marketplace: string
+  status: string
+  total_snapshots: number
+  results: Array<{ product_id: string; status: string; error?: string; title?: string }>
+}
+
 // Observability Trace types
 export interface TraceItem {
   id: number

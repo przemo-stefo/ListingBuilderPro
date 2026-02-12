@@ -106,7 +106,17 @@ def _parse_ebay_html(html: str, item_id: str) -> dict:
                 data["price"] = float(offers[0]["price"]) if offers[0].get("price") else None
                 data["currency"] = offers[0].get("priceCurrency")
 
-    # Fallback price from meta tag
+    # Fallback price from displayed text (eBay 2025+ markup has no JSON-LD)
+    if not data["price"]:
+        m = re.search(r'US \$(\d[\d.,]*)', html)
+        if m:
+            try:
+                data["price"] = float(m.group(1).replace(",", ""))
+                data["currency"] = "USD"
+            except ValueError:
+                pass
+
+    # Legacy fallback: prcIsum class (older eBay markup)
     if not data["price"]:
         m = re.search(r'"prcIsum[^"]*"[^>]*>([^<]+)', html)
         if m:

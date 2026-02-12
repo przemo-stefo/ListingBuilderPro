@@ -5,23 +5,23 @@
 'use client'
 
 import { useState } from 'react'
-import { BarChart3, Package, Bell, AlertTriangle, Activity } from 'lucide-react'
+import { BarChart3, Package, Bell, AlertTriangle, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FeatureGate } from '@/components/tier/FeatureGate'
 import DashboardTab from './components/DashboardTab'
 import TrackedProductsTab from './components/TrackedProductsTab'
 import AlertRulesTab from './components/AlertRulesTab'
 import AlertHistoryTab from './components/AlertHistoryTab'
-import TracesTab from './components/TracesTab'
+import SnapshotsTab from './components/SnapshotsTab'
 
-type Tab = 'dashboard' | 'products' | 'rules' | 'alerts' | 'traces'
+type Tab = 'dashboard' | 'products' | 'rules' | 'alerts' | 'snapshots'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { key: 'products', label: 'Products', icon: Package },
   { key: 'rules', label: 'Alert Rules', icon: Bell },
   { key: 'alerts', label: 'Alerts', icon: AlertTriangle },
-  { key: 'traces', label: 'Traces', icon: Activity },
+  { key: 'snapshots', label: 'Snapshots', icon: TrendingUp },
 ]
 
 export default function MonitoringPage() {
@@ -61,7 +61,7 @@ export default function MonitoringPage() {
         {activeTab === 'products' && <TrackedProductsTab />}
         {activeTab === 'rules' && <AlertRulesTab />}
         {activeTab === 'alerts' && <AlertHistoryTab />}
-        {activeTab === 'traces' && <TracesTab />}
+        {activeTab === 'snapshots' && <SnapshotsTab />}
       </div>
     </FeatureGate>
   )

@@ -15,6 +15,8 @@ import {
   toggleAlertConfig,
   fetchAlerts,
   acknowledgeAlert,
+  fetchSnapshots,
+  pollMarketplace,
   fetchTraces,
   fetchTraceStats,
 } from '../api/monitoring'
@@ -161,6 +163,33 @@ export function useAcknowledgeAlert() {
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to acknowledge alert', description: error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useSnapshots(trackedId: string | null, limit = 50) {
+  return useQuery({
+    queryKey: ['snapshots', trackedId, limit],
+    queryFn: () => fetchSnapshots(trackedId!, limit),
+    staleTime: STALE_TIME,
+    enabled: !!trackedId,
+  })
+}
+
+export function usePollMarketplace() {
+  const { toast } = useToast()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (marketplace: string) => pollMarketplace(marketplace),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['tracked-products'] })
+      qc.invalidateQueries({ queryKey: ['monitoring-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['snapshots'] })
+      toast({ title: `Poll complete: ${data.marketplace}`, description: `${data.total_snapshots} snapshots total` })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Poll failed', description: error.message, variant: 'destructive' })
     },
   })
 }

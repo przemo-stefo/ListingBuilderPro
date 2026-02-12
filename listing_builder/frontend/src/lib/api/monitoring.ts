@@ -10,6 +10,8 @@ import type {
   AlertConfig,
   AlertConfigCreateRequest,
   MonitoringAlert,
+  MonitoringSnapshot,
+  PollResult,
   TraceItem,
   TraceStats,
 } from '../types'
@@ -94,6 +96,23 @@ export async function fetchAlerts(
 export async function acknowledgeAlert(id: string): Promise<void> {
   const response = await apiRequest<void>('patch', `/monitoring/alerts/${id}/ack`)
   if (response.error) throw new Error(response.error)
+}
+
+export async function fetchSnapshots(
+  trackedId: string,
+  limit = 50
+): Promise<{ items: MonitoringSnapshot[]; total: number }> {
+  const response = await apiRequest<{ items: MonitoringSnapshot[]; total: number }>(
+    'get', `/monitoring/snapshots/${trackedId}`, undefined, { limit }
+  )
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
+export async function pollMarketplace(marketplace: string): Promise<PollResult> {
+  const response = await apiRequest<PollResult>('post', `/monitoring/poll/${marketplace}`)
+  if (response.error) throw new Error(response.error)
+  return response.data!
 }
 
 export async function fetchTraces(
