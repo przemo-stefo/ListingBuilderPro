@@ -20,6 +20,7 @@ import {
   Activity,
   Brain,
   Crown,
+  Newspaper,
 } from 'lucide-react'
 
 const navItems = [
@@ -59,6 +60,11 @@ const navItems = [
     icon: Shield,
   },
   {
+    title: 'Wiadomości',
+    href: '/compliance?tab=news',
+    icon: Newspaper,
+  },
+  {
     title: 'Monitoring',
     href: '/monitoring',
     icon: Activity,
@@ -86,7 +92,9 @@ export function Sidebar() {
 
       <nav className="space-y-2 flex-1">
         {navItems.map((item) => {
-          const isActive = pathname === item.href
+          // WHY: pathname-only match — query params ignored to avoid useSearchParams + Suspense
+          const basePath = item.href.split('?')[0]
+          const isActive = pathname === basePath && !item.href.includes('?')
           const Icon = item.icon
 
           return (

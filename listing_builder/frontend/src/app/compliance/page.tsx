@@ -4,7 +4,8 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Shield,
   BarChart3,
@@ -13,7 +14,6 @@ import {
   Link2,
   Upload,
   Newspaper,
-  GraduationCap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import DashboardTab from './components/DashboardTab'
@@ -22,22 +22,33 @@ import AlertsTab from './components/AlertsTab'
 import IntegrationsTab from './components/IntegrationsTab'
 import UploadTab from './components/UploadTab'
 import NewsTab from './components/NewsTab'
-import AkademiaTab from './components/AkademiaTab'
 
-type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'news' | 'akademia'
+type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'news'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Panel Główny', icon: BarChart3 },
   { key: 'news', label: 'Wiadomości', icon: Newspaper },
-  { key: 'akademia', label: 'Akademia', icon: GraduationCap },
   { key: 'settings', label: 'Aktywacja Alertów', icon: Bell },
   { key: 'alerts', label: 'Alerty', icon: AlertTriangle },
   { key: 'integrations', label: 'Integracje', icon: Link2 },
   { key: 'upload', label: 'Upload', icon: Upload },
 ]
 
-export default function CompliancePage() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+const validTabs = new Set(tabs.map(t => t.key))
+
+// WHY: Separate component — useSearchParams requires Suspense boundary in Next.js 14
+function ComplianceContent() {
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get('tab') as Tab | null
+  const initialTab = tabFromUrl && validTabs.has(tabFromUrl) ? tabFromUrl : 'dashboard'
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
+
+  // WHY: Sync tab when URL changes (e.g. sidebar click on "Wiadomości")
+  useEffect(() => {
+    if (tabFromUrl && validTabs.has(tabFromUrl)) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [tabFromUrl])
 
   return (
     <div className="space-y-6">
@@ -80,7 +91,14 @@ export default function CompliancePage() {
       {activeTab === 'alerts' && <AlertsTab />}
       {activeTab === 'integrations' && <IntegrationsTab />}
       {activeTab === 'upload' && <UploadTab />}
-      {activeTab === 'akademia' && <AkademiaTab />}
     </div>
+  )
+}
+
+export default function CompliancePage() {
+  return (
+    <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-[#1A1A1A]" />}>
+      <ComplianceContent />
+    </Suspense>
   )
 }
