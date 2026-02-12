@@ -11,7 +11,7 @@ export async function getInventory(
 ): Promise<InventoryResponse> {
   const response = await apiRequest<InventoryResponse>(
     'get',
-    '/api/inventory',
+    '/inventory',
     undefined,
     {
       marketplace: params?.marketplace,

@@ -20,9 +20,29 @@ class AIService:
 
     def __init__(self, db: Session = None):
         self.db = db
-        self.client = Groq(api_key=settings.groq_api_key)
-        # Use llama-3.3-70b-versatile - best balance of speed and quality
         self.model = "llama-3.3-70b-versatile"
+
+    def _call_groq(self, prompt: str, temperature: float, max_tokens: int) -> str:
+        """Groq call with key rotation on 429 rate limits."""
+        keys = settings.groq_api_keys
+        last_error = None
+        for i, key in enumerate(keys):
+            try:
+                client = Groq(api_key=key)
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as e:
+                last_error = e
+                if "429" in str(e) or "rate_limit" in str(e):
+                    logger.warning("ai_service_rate_limit", key_index=i, remaining=len(keys) - i - 1)
+                    continue
+                raise
+        raise last_error
 
     def optimize_title(self, product: Product, target_marketplace: str = "amazon") -> str:
         """
@@ -62,20 +82,12 @@ Task: Create an optimized, SEO-friendly title that:
 Return ONLY the optimized title, no explanations."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,  # Lower temperature for consistency
-                max_tokens=100,
-            )
-
-            optimized_title = response.choices[0].message.content.strip()
+            optimized_title = self._call_groq(prompt, temperature=0.3, max_tokens=100)
             logger.info("title_optimized", product_id=product.id, marketplace=target_marketplace)
             return optimized_title
 
         except Exception as e:
             logger.error("ai_optimization_failed", error=str(e), product_id=product.id)
-            # Fallback to original title
             return product.title_original
 
     def optimize_description(self, product: Product, target_marketplace: str = "amazon") -> str:
@@ -105,14 +117,7 @@ Format as markdown with bullet points.
 Return ONLY the description, no preamble."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.5,
-                max_tokens=500,
-            )
-
-            optimized_desc = response.choices[0].message.content.strip()
+            optimized_desc = self._call_groq(prompt, temperature=0.5, max_tokens=500)
             logger.info("description_optimized", product_id=product.id)
             return optimized_desc
 

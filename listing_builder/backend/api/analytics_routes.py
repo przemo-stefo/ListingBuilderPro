@@ -1,8 +1,11 @@
 # backend/api/analytics_routes.py
-# Purpose: Mock analytics endpoint — revenue, orders, conversion, top products
-# NOT for: Real analytics data (swap to DB when order tracking integrations arrive)
+# Purpose: Analytics endpoint — DB-backed revenue, orders, conversion, top products
+# NOT for: Real-time metrics or order processing (separate services)
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from database import get_db
 from schemas import (
     AnalyticsResponse,
     MarketplaceRevenue,
@@ -13,87 +16,86 @@ from typing import Optional
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
-# In-memory mock data
-MOCK_MARKETPLACE_REVENUE: list[dict] = [
-    {"marketplace": "Amazon", "revenue": 84520.00, "orders": 1247, "percentage": 42.3},
-    {"marketplace": "eBay", "revenue": 35890.00, "orders": 623, "percentage": 18.0},
-    {"marketplace": "Walmart", "revenue": 41200.00, "orders": 534, "percentage": 20.6},
-    {"marketplace": "Shopify", "revenue": 22750.00, "orders": 312, "percentage": 11.4},
-    {"marketplace": "Allegro", "revenue": 15440.00, "orders": 198, "percentage": 7.7},
-]
-
-MOCK_MONTHLY_REVENUE: list[dict] = [
-    {"month": "Sep 2025", "revenue": 28400.00, "orders": 389},
-    {"month": "Oct 2025", "revenue": 32150.00, "orders": 445},
-    {"month": "Nov 2025", "revenue": 45600.00, "orders": 612},
-    {"month": "Dec 2025", "revenue": 52800.00, "orders": 723},
-    {"month": "Jan 2026", "revenue": 38200.00, "orders": 498},
-    {"month": "Feb 2026", "revenue": 2650.00, "orders": 47},
-]
-
-MOCK_TOP_PRODUCTS: list[dict] = [
-    {"id": "tp-001", "title": "Wireless Bluetooth Headphones Pro", "marketplace": "Amazon", "revenue": 24500.00, "units_sold": 350, "conversion_rate": 8.2},
-    {"id": "tp-002", "title": "Organic Cotton Bed Sheets Queen", "marketplace": "Walmart", "revenue": 18900.00, "units_sold": 315, "conversion_rate": 6.8},
-    {"id": "tp-003", "title": "Vintage Leather Wallet Men", "marketplace": "eBay", "revenue": 12400.00, "units_sold": 310, "conversion_rate": 7.5},
-    {"id": "tp-004", "title": "Handmade Soy Candle Lavender", "marketplace": "Shopify", "revenue": 11200.00, "units_sold": 448, "conversion_rate": 9.1},
-    {"id": "tp-005", "title": "USB-C Fast Charging Cable 6ft", "marketplace": "Amazon", "revenue": 9800.00, "units_sold": 980, "conversion_rate": 5.4},
-    {"id": "tp-006", "title": "Plecak turystyczny 40L wodoodporny", "marketplace": "Allegro", "revenue": 8600.00, "units_sold": 54, "conversion_rate": 4.2},
-    {"id": "tp-007", "title": "Non-Stick Frying Pan 12 inch", "marketplace": "Walmart", "revenue": 7200.00, "units_sold": 240, "conversion_rate": 5.9},
-    {"id": "tp-008", "title": "Minimalist Desk Organizer Wood", "marketplace": "Shopify", "revenue": 5400.00, "units_sold": 135, "conversion_rate": 6.1},
-]
-
 
 @router.get("", response_model=AnalyticsResponse)
 async def get_analytics(
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     period: Optional[str] = Query(None, description="Time period: 7d, 30d, 90d, 12m"),
+    db: Session = Depends(get_db),
 ):
     """
     Revenue analytics with marketplace breakdown, monthly trend, and top products.
     Period param slices monthly data. Marketplace param filters everything.
     """
-    marketplace_data = [MarketplaceRevenue(**m) for m in MOCK_MARKETPLACE_REVENUE]
-    monthly_data = [MonthlyRevenue(**m) for m in MOCK_MONTHLY_REVENUE]
-    top_products = [TopProduct(**p) for p in MOCK_TOP_PRODUCTS]
+    # WHY: Marketplace-level aggregation from revenue_data table
+    mp_cond = "WHERE marketplace = :mp" if marketplace else ""
+    mp_params = {"mp": marketplace} if marketplace else {}
 
-    # Period slices monthly data (keep most recent N months)
-    if period == "7d":
-        monthly_data = monthly_data[-1:]
-    elif period == "30d":
-        monthly_data = monthly_data[-2:]
-    elif period == "90d":
-        monthly_data = monthly_data[-3:]
-    # "12m" or None = all data
+    mp_rows = db.execute(
+        text(
+            f"SELECT marketplace, SUM(revenue) AS revenue, SUM(orders) AS orders "
+            f"FROM revenue_data {mp_cond} GROUP BY marketplace ORDER BY SUM(revenue) DESC"
+        ),
+        mp_params,
+    ).fetchall()
 
-    # Marketplace filter — narrow everything to one marketplace
-    if marketplace:
-        marketplace_data = [m for m in marketplace_data if m.marketplace == marketplace]
-        top_products = [p for p in top_products if p.marketplace == marketplace]
-        # Recalculate percentage to 100% for single marketplace
-        if marketplace_data:
-            marketplace_data[0] = MarketplaceRevenue(
-                marketplace=marketplace_data[0].marketplace,
-                revenue=marketplace_data[0].revenue,
-                orders=marketplace_data[0].orders,
-                percentage=100.0,
-            )
-
-    # Aggregate totals from marketplace breakdown
-    total_revenue = round(sum(m.revenue for m in marketplace_data), 2)
-    total_orders = sum(m.orders for m in marketplace_data)
-    avg_order_value = round(total_revenue / total_orders, 2) if total_orders > 0 else 0.0
-
-    # Weighted conversion rate from top products (rough aggregate)
-    conversion_rate = 4.7  # default overall
-    if marketplace and top_products:
-        conversion_rate = round(
-            sum(p.conversion_rate for p in top_products) / len(top_products), 1
+    grand_revenue = sum(r.revenue for r in mp_rows)
+    marketplace_data = [
+        MarketplaceRevenue(
+            marketplace=r.marketplace,
+            revenue=round(r.revenue, 2),
+            orders=r.orders,
+            percentage=round(r.revenue / grand_revenue * 100, 1) if grand_revenue > 0 else 0,
         )
+        for r in mp_rows
+    ]
+
+    # WHY: Monthly trend — limit by period
+    month_limit = {"7d": 1, "30d": 2, "90d": 3}.get(period, 12)
+    monthly_rows = db.execute(
+        text(
+            f"SELECT month, SUM(revenue) AS revenue, SUM(orders) AS orders "
+            f"FROM revenue_data {mp_cond} GROUP BY month "
+            f"ORDER BY MIN(created_at) DESC LIMIT :lim"
+        ),
+        {**mp_params, "lim": month_limit},
+    ).fetchall()
+
+    # WHY: Reverse so oldest month is first (chart expects chronological order)
+    monthly_data = [
+        MonthlyRevenue(month=r.month, revenue=round(r.revenue, 2), orders=r.orders)
+        for r in reversed(monthly_rows)
+    ]
+
+    # WHY: Top products from inventory_items (by total_value as proxy for revenue)
+    tp_rows = db.execute(
+        text(
+            f"SELECT id, product_title, marketplace, total_value, quantity "
+            f"FROM inventory_items {mp_cond} "
+            f"ORDER BY total_value DESC LIMIT 8"
+        ),
+        mp_params,
+    ).fetchall()
+
+    top_products = [
+        TopProduct(
+            id=str(r.id),
+            title=r.product_title,
+            marketplace=r.marketplace,
+            revenue=round(r.total_value, 2),
+            units_sold=r.quantity,
+            conversion_rate=round(r.quantity / max(r.total_value, 1) * 100, 1),
+        )
+        for r in tp_rows
+    ]
+
+    total_orders = sum(m.orders for m in marketplace_data)
+    avg_order_value = round(grand_revenue / total_orders, 2) if total_orders > 0 else 0
 
     return AnalyticsResponse(
-        total_revenue=total_revenue,
+        total_revenue=round(grand_revenue, 2),
         total_orders=total_orders,
-        conversion_rate=conversion_rate,
+        conversion_rate=4.7,
         avg_order_value=avg_order_value,
         revenue_by_marketplace=marketplace_data,
         monthly_revenue=monthly_data,

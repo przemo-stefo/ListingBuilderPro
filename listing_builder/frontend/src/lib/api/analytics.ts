@@ -11,7 +11,7 @@ export async function getAnalytics(
 ): Promise<AnalyticsResponse> {
   const response = await apiRequest<AnalyticsResponse>(
     'get',
-    '/api/analytics',
+    '/analytics',
     undefined,
     {
       marketplace: params?.marketplace,

@@ -1,12 +1,16 @@
 # backend/api/settings_routes.py
-# Purpose: Mock settings endpoint — store config, marketplace connections, notifications, export
-# NOT for: Real settings persistence (swap to DB when user accounts exist)
+# Purpose: Settings endpoint — persisted to Supabase user_settings table
+# NOT for: App config or env vars (those stay in config.py)
 
+import json
 from typing import List, Optional
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from database import get_db
 from schemas import (
     SettingsResponse,
     GeneralSettings,
@@ -14,6 +18,11 @@ from schemas import (
     NotificationSettings,
     DataExportSettings,
 )
+import structlog
+
+logger = structlog.get_logger()
+
+USER_ID = "default"  # WHY: Single-user for now; swap to auth user_id later
 
 
 class SettingsUpdateRequest(BaseModel):
@@ -27,17 +36,17 @@ class SettingsUpdateRequest(BaseModel):
     notifications: Optional[NotificationSettings] = None
     data_export: Optional[DataExportSettings] = None
 
+
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
-# Module-level mutable state — survives across requests until server restart
-_settings: dict = {
+# WHY: Default settings used when no DB row exists yet
+_DEFAULT_SETTINGS = {
     "general": {
         "store_name": "My Marketplace Store",
         "default_marketplace": "amazon",
         "timezone": "America/New_York",
     },
-    # WHY: No mock API keys — even masked ones look like real credentials in responses
     "marketplace_connections": [
         {"id": "amazon", "name": "Amazon", "connected": False, "api_key": "", "last_synced": None},
         {"id": "ebay", "name": "eBay", "connected": False, "api_key": "", "last_synced": None},
@@ -57,48 +66,76 @@ _settings: dict = {
 }
 
 
-def _build_response() -> SettingsResponse:
-    """Build a typed response from the mutable state dict."""
+def _load_settings(db: Session) -> dict:
+    """Load settings from DB, falling back to defaults."""
+    row = db.execute(
+        text("SELECT settings FROM user_settings WHERE user_id = :uid"),
+        {"uid": USER_ID},
+    ).fetchone()
+    if row and row[0]:
+        return row[0]
+    return dict(_DEFAULT_SETTINGS)
+
+
+def _save_settings(db: Session, data: dict) -> None:
+    """Upsert settings to DB."""
+    db.execute(
+        text(
+            "INSERT INTO user_settings (user_id, settings, updated_at) "
+            "VALUES (:uid, CAST(:data AS jsonb), NOW()) "
+            "ON CONFLICT (user_id) DO UPDATE SET settings = CAST(:data AS jsonb), updated_at = NOW()"
+        ),
+        {"uid": USER_ID, "data": json.dumps(data)},
+    )
+    db.commit()
+
+
+def _build_response(data: dict) -> SettingsResponse:
+    """Build a typed response from settings dict."""
     return SettingsResponse(
-        general=GeneralSettings(**_settings["general"]),
+        general=GeneralSettings(**data["general"]),
         marketplace_connections=[
-            MarketplaceConnection(**mc) for mc in _settings["marketplace_connections"]
+            MarketplaceConnection(**mc) for mc in data["marketplace_connections"]
         ],
-        notifications=NotificationSettings(**_settings["notifications"]),
-        data_export=DataExportSettings(**_settings["data_export"]),
+        notifications=NotificationSettings(**data["notifications"]),
+        data_export=DataExportSettings(**data["data_export"]),
     )
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings():
-    """
-    Get all application settings.
-    """
-    return _build_response()
+async def get_settings(db: Session = Depends(get_db)):
+    """Get all application settings (from DB)."""
+    data = _load_settings(db)
+    return _build_response(data)
 
 
 @router.put("", response_model=SettingsResponse)
 @limiter.limit("10/minute")
-async def update_settings(request: Request, payload: SettingsUpdateRequest):
+async def update_settings(
+    request: Request,
+    payload: SettingsUpdateRequest,
+    db: Session = Depends(get_db),
+):
     """
     Update settings — merges each section independently.
-    Accepts partial updates: send only the sections you want to change.
-
-    Example body: {"general": {"store_name": "New Name"}}
+    Persisted to Supabase so they survive restarts.
     """
-    # WHY: Pydantic model ensures only known fields are accepted
+    data = _load_settings(db)
+
     if payload.general is not None:
-        _settings["general"].update(payload.general.model_dump(exclude_unset=True))
+        data["general"].update(payload.general.model_dump(exclude_unset=True))
 
     if payload.marketplace_connections is not None:
-        _settings["marketplace_connections"] = [
+        data["marketplace_connections"] = [
             mc.model_dump() for mc in payload.marketplace_connections
         ]
 
     if payload.notifications is not None:
-        _settings["notifications"].update(payload.notifications.model_dump(exclude_unset=True))
+        data["notifications"].update(payload.notifications.model_dump(exclude_unset=True))
 
     if payload.data_export is not None:
-        _settings["data_export"].update(payload.data_export.model_dump(exclude_unset=True))
+        data["data_export"].update(payload.data_export.model_dump(exclude_unset=True))
 
-    return _build_response()
+    _save_settings(db, data)
+    logger.info("settings_saved", user_id=USER_ID)
+    return _build_response(data)

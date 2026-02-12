@@ -86,33 +86,34 @@ class AITranslator:
     """
 
     def __init__(self, groq_api_key: str):
-        self.client = Groq(api_key=groq_api_key)
+        self.primary_key = groq_api_key
         self.model = "llama-3.3-70b-versatile"
 
     def _call_groq(self, prompt: str, max_tokens: int = 500, temperature: float = 0.3) -> str:
-        """Make a single Groq API call. Returns stripped text.
+        """Groq call with key rotation + model fallback on 429.
 
-        WHY fallback model: Groq free tier has 100K TPD per model.
-        If the primary 70b model hits rate limit, we try the 8b model
-        which has its own separate limit.
+        WHY: Tries all available keys first, then falls back to smaller model.
         """
+        from config import settings
+        keys = settings.groq_api_keys
         models = [self.model, "llama-3.1-8b-instant"]
         for model in models:
-            try:
-                response = self.client.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-                return response.choices[0].message.content.strip()
-            except Exception as e:
-                error_str = str(e)
-                if "429" in error_str and model != models[-1]:
-                    logger.warning("groq_rate_limit_trying_fallback", model=model)
-                    continue
-                logger.error("groq_call_failed", error=error_str, model=model)
-                return ""
+            for i, key in enumerate(keys):
+                try:
+                    client = Groq(api_key=key)
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+                    return response.choices[0].message.content.strip()
+                except Exception as e:
+                    if "429" in str(e) or "rate_limit" in str(e):
+                        logger.warning("groq_rate_limit", model=model, key_index=i)
+                        continue
+                    logger.error("groq_call_failed", error=str(e), model=model)
+                    return ""
         return ""
 
     def _parse_json_response(self, text: str) -> Optional[Dict]:

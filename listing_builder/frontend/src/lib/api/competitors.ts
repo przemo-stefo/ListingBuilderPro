@@ -11,7 +11,7 @@ export async function getCompetitors(
 ): Promise<CompetitorsResponse> {
   const response = await apiRequest<CompetitorsResponse>(
     'get',
-    '/api/competitors',
+    '/competitors',
     undefined,
     {
       marketplace: params?.marketplace,
