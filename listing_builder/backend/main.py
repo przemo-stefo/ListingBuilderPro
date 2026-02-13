@@ -29,6 +29,7 @@ from api import optimizer_routes
 from api import monitoring_routes
 from api import knowledge_routes
 from api import keepa_routes
+from api import epr_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -142,6 +143,7 @@ app.include_router(optimizer_routes.router)
 app.include_router(monitoring_routes.router)
 app.include_router(knowledge_routes.router)
 app.include_router(keepa_routes.router)
+app.include_router(epr_routes.router)
 
 
 @app.get("/")

@@ -8,6 +8,7 @@ from .compliance import ComplianceReport, ComplianceReportItem
 from .optimization import OptimizationRun
 from .monitoring import TrackedProduct, MonitoringSnapshot, AlertConfig, Alert
 from .listing import Listing, TrackedKeyword
+from .epr import EprReport, EprReportRow
 
 __all__ = [
     "Product",
@@ -26,4 +27,6 @@ __all__ = [
     "Alert",
     "Listing",
     "TrackedKeyword",
+    "EprReport",
+    "EprReportRow",
 ]
