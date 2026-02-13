@@ -32,18 +32,20 @@ def _cf_headers() -> dict[str, str]:
 async def get_embedding(text: str) -> list[float] | None:
     """Get embedding for a single text string. Returns None on failure.
 
-    WHY: Retry once on 500 — CF Workers AI has occasional transient errors.
+    WHY: Retry on transient CF errors — 408 timeout, 500, 503 cold start, 429 rate limit.
     """
     if not settings.cf_account_id:
         return None
 
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.post(
                     CF_API_URL, headers=_cf_headers(), json={"text": [text]},
                 )
-                if resp.status_code == 500 and attempt == 0:
+                # WHY: CF Workers AI has transient 408/500/503/429 — retry with backoff
+                if resp.status_code in (408, 500, 502, 503, 429) and attempt < 2:
+                    await _async_sleep(2 ** attempt)
                     continue
                 resp.raise_for_status()
                 data = resp.json()
@@ -51,24 +53,30 @@ async def get_embedding(text: str) -> list[float] | None:
                     return data["result"]["data"][0]
                 return None
         except Exception as e:
-            if attempt == 0:
+            if attempt < 2:
+                await _async_sleep(2 ** attempt)
                 continue
             logger.warning("embedding_error", error=str(e), text_preview=text[:60])
             return None
 
 
+async def _async_sleep(seconds: float):
+    import asyncio
+    await asyncio.sleep(seconds)
+
+
 def get_embeddings_batch_sync(texts: list[str]) -> list[list[float]]:
     """Get embeddings for a batch of texts. Synchronous for ingestion scripts.
 
-    WHY: Retry once on transient 500 errors from CF Workers AI.
+    WHY: Retry on transient CF errors — 408/500/502/503/429 all happen on free tier.
     """
-    for attempt in range(2):
+    for attempt in range(3):
         with httpx.Client(timeout=30.0) as client:
             resp = client.post(
                 CF_API_URL, headers=_cf_headers(), json={"text": texts},
             )
-            if resp.status_code == 500 and attempt == 0:
-                time.sleep(1)
+            if resp.status_code in (408, 500, 502, 503, 429) and attempt < 2:
+                time.sleep(2 ** attempt)
                 continue
             resp.raise_for_status()
             data = resp.json()

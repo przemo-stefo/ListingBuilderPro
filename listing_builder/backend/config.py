@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     kaufland_secret_key: str = ""
 
     # RAG Search Mode + Cloudflare Workers AI embeddings (free)
-    rag_mode: str = "lexical"  # WHY: "lexical" | "hybrid" | "semantic" — feature flag
+    rag_mode: str = "hybrid"  # WHY: "lexical" | "hybrid" | "semantic" — embeddings ready, hybrid active
     cf_account_id: str = ""  # WHY: Cloudflare account for Workers AI embeddings
     cf_auth_email: str = ""  # Cloudflare auth email
     cf_api_key: str = ""  # Cloudflare Global API Key
