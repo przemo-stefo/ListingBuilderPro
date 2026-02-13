@@ -31,7 +31,6 @@ type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'ecomme
 // Direct RSS preferred (og:image works). Google News only where no direct feed exists.
 const RSS_FEEDS = [
   // Amazon — direct feeds (og:image works for all)
-  { url: 'https://www.aboutamazon.com/news/rss', source: 'About Amazon', category: 'amazon' },
   { url: 'https://channelx.world/category/amazon/feed/', source: 'ChannelX Amazon', category: 'amazon' },
   { url: 'https://www.junglescout.com/blog/feed/', source: 'Jungle Scout', category: 'amazon' },
   // Allegro
@@ -218,16 +217,14 @@ export default function NewsTab() {
     try {
       const results: NewsItem[] = []
 
-      // WHY: Fetch all feeds in parallel, gracefully handle failures
-      const promises = RSS_FEEDS.map(async (feed) => {
+      // WHY: Stagger requests by 200ms to avoid rss2json.com rate limiting (free tier)
+      const fetchFeed = async (feed: typeof RSS_FEEDS[number]): Promise<NewsItem[]> => {
         try {
           const res = await fetch(`${RSS_API}${encodeURIComponent(feed.url)}`)
           if (!res.ok) return []
           const data = await res.json()
           if (data.status !== 'ok' || !data.items) return []
 
-          // WHY: rss2json returns thumbnail + enclosure.link for images
-          // Some feeds only have images inside description HTML — extract with regex
           return data.items.slice(0, 6).map((item: Record<string, unknown>) => {
             const desc = (item.description as string) || ''
             const imgMatch = desc.match(/<img[^>]+src=["']([^"']+)["']/)
@@ -248,9 +245,19 @@ export default function NewsTab() {
         } catch {
           return []
         }
-      })
+      }
 
-      const feedResults = await Promise.all(promises)
+      // WHY: Batches of 3 with 300ms delay between batches — rss2json free tier throttles parallel requests
+      const feedResults: NewsItem[][] = []
+      const BATCH_SIZE = 3
+      for (let i = 0; i < RSS_FEEDS.length; i += BATCH_SIZE) {
+        const batch = RSS_FEEDS.slice(i, i + BATCH_SIZE)
+        const batchResults = await Promise.all(batch.map(fetchFeed))
+        feedResults.push(...batchResults)
+        if (i + BATCH_SIZE < RSS_FEEDS.length) {
+          await new Promise((r) => setTimeout(r, 300))
+        }
+      }
       for (const items of feedResults) results.push(...items)
       results.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime())
       setNews(results)

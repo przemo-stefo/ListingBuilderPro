@@ -10,29 +10,39 @@ REMOTE_DIR="/root/compliance-guard"
 
 echo "=== Deploying Compliance Guard to $SERVER ==="
 
-# Step 1: Sync code to server
-echo "[1/4] Syncing code..."
-ssh $SERVER "mkdir -p $REMOTE_DIR"
+# Step 1: Sync backend code
+echo "[1/6] Syncing backend..."
+ssh $SERVER "mkdir -p $REMOTE_DIR/backend"
 rsync -avz --exclude='node_modules' --exclude='.next' --exclude='__pycache__' \
   --exclude='.git' --exclude='venv' --exclude='.env' \
   -e "ssh" ../../backend/ $SERVER:$REMOTE_DIR/backend/
 
-# Step 2: Sync docker-compose + env
-echo "[2/4] Syncing config..."
+# Step 2: Sync frontend code
+echo "[2/6] Syncing frontend..."
+ssh $SERVER "mkdir -p $REMOTE_DIR/frontend"
+rsync -avz --exclude='node_modules' --exclude='.next' --exclude='.vercel' \
+  --exclude='.git' --exclude='.env.local' \
+  -e "ssh" ../../frontend/ $SERVER:$REMOTE_DIR/frontend/
+
+# Step 3: Sync frontend Dockerfile (from deploy config, not source)
+echo "[3/6] Syncing config..."
+scp frontend/Dockerfile $SERVER:$REMOTE_DIR/frontend/Dockerfile
 scp docker-compose.yml $SERVER:$REMOTE_DIR/
 scp .env $SERVER:$REMOTE_DIR/
 
-# Step 3: Build and start
-echo "[3/4] Building containers..."
+# Step 4: Build containers
+echo "[4/6] Building containers..."
 ssh $SERVER "cd $REMOTE_DIR && docker compose build --no-cache"
 
-echo "[4/4] Starting services..."
+# Step 5: Start services
+echo "[5/6] Starting services..."
 ssh $SERVER "cd $REMOTE_DIR && docker compose down && docker compose up -d"
 
-# Step 4: Health check
-echo "Waiting 15s for startup..."
-sleep 15
+# Step 6: Health checks
+echo "[6/6] Waiting 30s for startup..."
+sleep 30
 ssh $SERVER "curl -sf http://localhost:8000/health && echo ' — Backend OK' || echo ' — Backend FAILED'"
+ssh $SERVER "curl -sf http://localhost:3000 > /dev/null && echo 'Frontend OK' || echo 'Frontend FAILED'"
 ssh $SERVER "docker compose -f $REMOTE_DIR/docker-compose.yml ps"
 
 echo "=== Deploy complete ==="
