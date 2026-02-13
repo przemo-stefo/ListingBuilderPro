@@ -124,6 +124,7 @@ export default function EprTab() {
                     isSelected={selectedId === r.id}
                     onView={() => setSelectedId(selectedId === r.id ? null : r.id)}
                     onDelete={() => {
+                      if (!window.confirm('Czy na pewno chcesz usunąć ten raport?')) return
                       if (selectedId === r.id) setSelectedId(null)
                       deleteMutation.mutate(r.id)
                     }}

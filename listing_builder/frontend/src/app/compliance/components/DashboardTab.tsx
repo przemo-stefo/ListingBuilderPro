@@ -70,7 +70,6 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
   const criticalCount = alerts.filter((a) => a.severity === 'critical' && !a.acknowledged).length
   const warningCount = alerts.filter((a) => a.severity === 'warning' && !a.acknowledged).length
   const trackedCount = dashboard.data?.tracked_products ?? 0
-  const totalAlerts = criticalCount + warningCount
 
   // WHY: Compliance % = average from latest reports, fallback 0
   const reports = reportsQuery.data?.items ?? []
