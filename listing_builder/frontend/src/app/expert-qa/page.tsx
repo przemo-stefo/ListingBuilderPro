@@ -1,5 +1,5 @@
 // frontend/src/app/expert-qa/page.tsx
-// Purpose: Expert Q&A chatbot — answers Amazon questions using Inner Circle transcript RAG
+// Purpose: Expert Q&A chatbot — answers marketplace questions using RAG knowledge base
 // NOT for: Listing optimization (that's /optimize)
 
 'use client'
@@ -19,19 +19,19 @@ interface Message {
 
 // WHY: RAG behavior modes control how strictly the LLM sticks to transcript knowledge
 const RAG_MODES = [
-  { value: 'strict', label: 'Strict', desc: 'Only transcript knowledge' },
-  { value: 'balanced', label: 'Balanced', desc: 'Transcripts + general advice' },
-  { value: 'flexible', label: 'Flexible', desc: 'Blend all sources freely' },
-  { value: 'bypass', label: 'Bypass RAG', desc: 'Pure LLM, no transcripts' },
+  { value: 'strict', label: 'Ścisły', desc: 'Tylko wiedza z transkrypcji' },
+  { value: 'balanced', label: 'Zbalansowany', desc: 'Transkrypcje + ogólne porady' },
+  { value: 'flexible', label: 'Elastyczny', desc: 'Łączy wszystkie źródła' },
+  { value: 'bypass', label: 'Bez RAG', desc: 'Czysty LLM, bez transkrypcji' },
 ] as const
 
 const SUGGESTED_QUESTIONS = [
-  'How do I find the best keywords for my Amazon listing?',
-  'What is the ideal title structure for Amazon DE?',
-  'How does Amazon A9 algorithm rank listings?',
-  'What are the best practices for backend keywords?',
-  'How to optimize PPC campaigns for new products?',
-  'What coverage percentage should I target for aggressive mode?',
+  'Jak znaleźć najlepsze słowa kluczowe dla mojego listingu na Amazon?',
+  'Jaka jest idealna struktura tytułu na Amazon DE?',
+  'Jak działa algorytm A9/COSMO i jak rankuje listingi?',
+  'Jakie są najlepsze praktyki dla backend keywords?',
+  'Jak optymalizować kampanie PPC dla nowych produktów?',
+  'Jak tworzyć skuteczne reklamy wideo na Amazon?',
 ]
 
 export default function ExpertQAPage() {
@@ -89,7 +89,7 @@ export default function ExpertQAPage() {
     } catch {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: 'Failed to get answer. Please try again.' },
+        { role: 'assistant', content: 'Nie udało się uzyskać odpowiedzi. Spróbuj ponownie.' },
       ])
     } finally {
       setIsLoading(false)
@@ -102,21 +102,21 @@ export default function ExpertQAPage() {
       <div>
         <div className="flex items-center gap-3">
           <Brain className="h-6 w-6 text-green-400" />
-          <h1 className="text-2xl font-bold text-white">Expert Q&A</h1>
+          <h1 className="text-2xl font-bold text-white">Ekspert Q&A</h1>
           {/* WHY: Mode selector toggle — small gear icon keeps header clean */}
           <button
             onClick={() => setShowModeSelector(!showModeSelector)}
             className="ml-auto rounded-lg border border-gray-800 p-2 text-gray-400 transition-colors hover:border-gray-600 hover:text-white"
-            title="RAG Mode"
+            title="Tryb RAG"
           >
             <Settings2 className="h-4 w-4" />
           </button>
         </div>
         <p className="mt-1 text-sm text-gray-400">
-          Ask Amazon questions — answered using Inner Circle transcript knowledge
+          Zadaj pytanie o Amazon, e-commerce, reklamy — odpowiedzi na bazie wiedzy eksperckiej
           {stats && (
             <span className="ml-2 text-gray-500">
-              ({stats.total_chunks.toLocaleString()} chunks from {stats.total_files} transcripts)
+              ({stats.total_chunks.toLocaleString()} fragmentów z {stats.total_files} transkrypcji)
             </span>
           )}
         </p>
@@ -151,10 +151,10 @@ export default function ExpertQAPage() {
             <div className="text-center">
               <BookOpen className="mx-auto h-12 w-12 text-gray-600" />
               <h2 className="mt-3 text-lg font-medium text-gray-400">
-                Ask me anything about Amazon
+                Zapytaj o cokolwiek
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Keywords, listings, PPC, ranking, optimization strategies
+                Słowa kluczowe, listingi, PPC, ranking, reklamy wideo, strategie kreatywne
               </p>
             </div>
             <div className="grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -192,7 +192,7 @@ export default function ExpertQAPage() {
                     <div className="mt-2 text-[10px] text-gray-500">
                       {msg.sources !== undefined && msg.sources > 0 && (
                         <>
-                          <p>Based on {msg.sources} source{msg.sources !== 1 ? 's' : ''}:</p>
+                          <p>Na podstawie {msg.sources} {msg.sources === 1 ? 'źródła' : 'źródeł'}:</p>
                           {msg.sourceNames && msg.sourceNames.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {msg.sourceNames.map((name, j) => (
@@ -209,7 +209,7 @@ export default function ExpertQAPage() {
                       )}
                       {msg.mode && (
                         <span className="mt-1 inline-block rounded bg-gray-800/50 px-1.5 py-0.5 text-gray-500">
-                          {msg.mode} mode
+                          tryb: {msg.mode}
                         </span>
                       )}
                     </div>
@@ -221,7 +221,7 @@ export default function ExpertQAPage() {
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {mode === 'bypass' ? 'Thinking...' : 'Searching transcripts...'}
+                  {mode === 'bypass' ? 'Myślę...' : 'Przeszukuję bazę wiedzy...'}
                 </div>
               </div>
             )}
@@ -237,7 +237,7 @@ export default function ExpertQAPage() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Ask about keywords, listings, PPC, ranking..."
+          placeholder="Zapytaj o słowa kluczowe, listingi, PPC, ranking, reklamy..."
           className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-gray-600"
           disabled={isLoading}
         />

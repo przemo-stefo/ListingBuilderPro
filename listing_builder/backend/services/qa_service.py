@@ -1,5 +1,5 @@
 # backend/services/qa_service.py
-# Purpose: Expert Q&A — answer Amazon questions using Inner Circle transcript RAG
+# Purpose: Expert Q&A — answer marketplace questions using RAG knowledge base
 # NOT for: Listing optimization (that's optimizer_service.py)
 
 from __future__ import annotations
@@ -53,26 +53,26 @@ def _build_qa_prompt(question: str, context: str, mode: str = "balanced") -> str
 
     # WHY: In bypass mode, skip RAG context entirely — pure LLM
     if mode == "bypass":
-        return f"""You are an expert Amazon marketplace consultant. Answer the user's question.
+        return f"""You are an expert Amazon and e-commerce marketplace consultant. Answer the user's question.
 
 Rules:
 {rules}
-- Answer in the same language as the question
+- Answer in Polish (odpowiadaj po polsku) unless the user explicitly writes in English
 
 Question: {question}"""
 
     context_block = ""
     if context:
         context_block = f"""
-EXPERT KNOWLEDGE FROM INNER CIRCLE TRANSCRIPTS:
+EXPERT KNOWLEDGE FROM TRAINING TRANSCRIPTS (Inner Circle + Ecom Creative Expert):
 {context}
 
 """
-    return f"""You are an expert Amazon marketplace consultant with deep knowledge from Inner Circle training transcripts. Answer the user's question using the expert knowledge provided below.
+    return f"""You are an expert Amazon and e-commerce marketplace consultant with deep knowledge from training transcripts covering: Amazon keywords, listings, PPC, ranking strategies, as well as video ads, creative strategies, AI tools, and marketing psychology. Answer the user's question using the expert knowledge provided below.
 
 {context_block}Rules:
 {rules}
-- Answer in the same language as the question
+- Answer in Polish (odpowiadaj po polsku) unless the user explicitly writes in English
 
 Question: {question}"""
 

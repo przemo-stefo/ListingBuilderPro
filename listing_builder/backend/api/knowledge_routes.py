@@ -69,7 +69,7 @@ async def expert_chat(
     except Exception as e:
         logger.error("expert_chat_error", error=str(e))
         return ChatResponse(
-            answer="Sorry, I couldn't process your question right now. Please try again.",
+            answer="Przepraszam, nie udało się przetworzyć pytania. Spróbuj ponownie.",
             sources_used=0,
             has_context=False,
         )
