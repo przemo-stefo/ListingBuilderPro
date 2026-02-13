@@ -28,28 +28,27 @@ interface NewsItem {
 type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'ecommerce' | 'compliance'
 
 // WHY: RSS feeds from major marketplace news sources — parsed via rss2json.com
-// Some feeds block rss2json — Google News RSS as fallback for those marketplaces
+// Direct RSS preferred (og:image works). Google News only where no direct feed exists.
 const RSS_FEEDS = [
-  // Amazon
+  // Amazon — direct feeds (og:image works for all)
   { url: 'https://www.aboutamazon.com/news/rss', source: 'About Amazon', category: 'amazon' },
-  { url: 'https://news.google.com/rss/search?q=Amazon+seller+FBA+marketplace+news&hl=en&gl=US&ceid=US:en', source: 'Amazon Seller News', category: 'amazon' },
+  { url: 'https://channelx.world/category/amazon/feed/', source: 'ChannelX Amazon', category: 'amazon' },
+  { url: 'https://www.junglescout.com/blog/feed/', source: 'Jungle Scout', category: 'amazon' },
   // Allegro
   { url: 'https://blog.allegro.tech/feed.xml', source: 'Allegro Tech Blog', category: 'allegro' },
   { url: 'https://news.google.com/rss/search?q=Allegro+marketplace+sprzedawcy&hl=pl&gl=PL&ceid=PL:pl', source: 'Allegro News', category: 'allegro' },
-  // eBay
+  // eBay — direct feeds (og:image works)
   { url: 'https://www.ebayinc.com/stories/news/rss/', source: 'eBay Inc.', category: 'ebay' },
-  { url: 'https://news.google.com/rss/search?q=eBay+seller+marketplace+news&hl=en&gl=US&ceid=US:en', source: 'eBay News', category: 'ebay' },
-  // Kaufland
+  { url: 'https://channelx.world/category/ebay/feed/', source: 'ChannelX eBay', category: 'ebay' },
+  // Kaufland — no direct RSS, Google News only (gradient placeholder expected)
   { url: 'https://news.google.com/rss/search?q=Kaufland+Global+Marketplace+ecommerce&hl=en&gl=DE&ceid=DE:en', source: 'Kaufland News', category: 'kaufland' },
-  { url: 'https://news.google.com/rss/search?q=Kaufland+marketplace+seller&hl=de&gl=DE&ceid=DE:de', source: 'Kaufland DE', category: 'kaufland' },
-  // E-commerce general
+  // E-commerce general — 3 direct feeds with working og:image
   { url: 'https://ecommercenews.eu/feed/', source: 'Ecommerce News EU', category: 'ecommerce' },
   { url: 'https://tamebay.com/feed', source: 'Tamebay', category: 'ecommerce' },
   { url: 'https://www.practicalecommerce.com/feed', source: 'Practical Ecommerce', category: 'ecommerce' },
-  { url: 'https://news.google.com/rss/search?q=ecommerce+marketplace+seller+news&hl=en&gl=US&ceid=US:en', source: 'E-commerce News', category: 'ecommerce' },
-  // Compliance & regulations (direct RSS blocked by rss2json — Google News RSS as fallback)
-  { url: 'https://news.google.com/rss/search?q=EU+GPSR+product+safety+regulation+2025&hl=en&gl=DE&ceid=DE:en', source: 'GPSR News', category: 'compliance' },
-  { url: 'https://news.google.com/rss/search?q=EU+EPR+packaging+VAT+ecommerce+compliance&hl=en&gl=DE&ceid=DE:en', source: 'EU Compliance', category: 'compliance' },
+  { url: 'https://sellerengine.com/feed/', source: 'SellerEngine', category: 'ecommerce' },
+  // Compliance — Google News only (no direct compliance RSS feeds exist)
+  { url: 'https://news.google.com/rss/search?q=EU+GPSR+EPR+product+safety+ecommerce+compliance&hl=en&gl=DE&ceid=DE:en', source: 'EU Compliance', category: 'compliance' },
   { url: 'https://news.google.com/rss/search?q=Amazon+eBay+marketplace+compliance+regulation&hl=en&gl=US&ceid=US:en', source: 'Marketplace Compliance', category: 'compliance' },
 ]
 
@@ -87,9 +86,25 @@ function formatDate(dateStr: string) {
   return date.toLocaleDateString('pl-PL')
 }
 
+// WHY: Fetch og:image from article URL when RSS doesn't include a thumbnail
+function useOgImage(url: string, skip: boolean) {
+  const [image, setImage] = useState<string | null>(null)
+  useEffect(() => {
+    if (skip || !url) return
+    fetch(`/api/og-image?url=${encodeURIComponent(url)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.image) setImage(d.image) })
+      .catch(() => {})
+  }, [url, skip])
+  return image
+}
+
 // WHY: Reusable card — shows thumbnail, title, source badge, description
 function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boolean }) {
   const [imgError, setImgError] = useState(false)
+  // WHY: Only fetch og:image when RSS thumbnail is missing
+  const ogImage = useOgImage(item.link, !!item.thumbnail)
+  const displayImage = (item.thumbnail && !imgError) ? item.thumbnail : ogImage
 
   return (
     <a
@@ -106,9 +121,9 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
         'relative shrink-0 overflow-hidden bg-[#151515]',
         featured ? 'h-48 md:h-auto md:w-72' : 'h-40'
       )}>
-        {item.thumbnail && !imgError ? (
+        {displayImage ? (
           <img
-            src={item.thumbnail}
+            src={displayImage}
             alt=""
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
             onError={() => setImgError(true)}
