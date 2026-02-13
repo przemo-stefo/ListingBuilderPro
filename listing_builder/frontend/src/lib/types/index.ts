@@ -686,6 +686,51 @@ export interface TraceStats {
   total_tokens: number
 }
 
+// EPR Report types (matches backend schemas/epr.py)
+export interface EprReportRow {
+  id: string
+  asin: string | null
+  marketplace: string | null
+  epr_category: string | null
+  registration_number: string | null
+  paper_kg: number
+  glass_kg: number
+  aluminum_kg: number
+  steel_kg: number
+  plastic_kg: number
+  wood_kg: number
+  units_sold: number
+  reporting_period: string | null
+}
+
+export interface EprReport {
+  id: string
+  report_type: string
+  marketplace_id: string
+  status: string
+  sp_api_report_id: string | null
+  row_count: number
+  error_message: string | null
+  created_at: string
+  completed_at: string | null
+  rows?: EprReportRow[]
+}
+
+export interface EprReportsListResponse {
+  reports: EprReport[]
+  total: number
+}
+
+export interface EprStatusResponse {
+  credentials_configured: boolean
+  has_refresh_token: boolean
+}
+
+export interface EprFetchRequest {
+  report_type?: string
+  marketplace_id?: string
+}
+
 // Error types
 export interface ApiError {
   message: string

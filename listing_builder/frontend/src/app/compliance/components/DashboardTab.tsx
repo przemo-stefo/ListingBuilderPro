@@ -16,15 +16,31 @@ import {
 import { cn } from '@/lib/utils'
 import { useMonitoringDashboard, useAlerts, useTrackedProducts } from '@/lib/hooks/useMonitoring'
 import { useComplianceReports } from '@/lib/hooks/useCompliance'
-import type { MonitoringAlert } from '@/lib/types'
+import { useEprReports } from '@/lib/hooks/useEpr'
+import type { MonitoringAlert, EprReport } from '@/lib/types'
 
-// WHY: EPR report deadlines are hardcoded — no backend EPR calendar exists yet
-const EPR_REPORTS = [
-  { name: 'WEEE Q1 2026', deadline: '2026-03-31', progress: 65, flag: '🇩🇪' },
-  { name: 'Opakowania Q1', deadline: '2026-03-15', progress: 40, flag: '🇩🇪' },
-  { name: 'Baterie roczny', deadline: '2026-06-30', progress: 20, flag: '🇫🇷' },
-  { name: 'Tekstylia rejestracja', deadline: '2026-04-01', progress: 10, flag: '🇫🇷' },
-]
+// WHY: Maps EPR report status to a progress percentage for the visual bar
+function eprStatusToProgress(status: string): number {
+  switch (status) {
+    case 'completed': return 100
+    case 'processing': return 60
+    case 'pending': return 20
+    case 'failed': return 0
+    default: return 0
+  }
+}
+
+// WHY: Map marketplace_id to country flag for visual consistency
+const MARKETPLACE_ID_FLAGS: Record<string, string> = {
+  A1PA6795UKMFR9: '🇩🇪',
+  A1RKKUPIHCS9HS: '🇪🇸',
+  A13V1IB3VIYZZH: '🇫🇷',
+  A1F83G8C2ARO7P: '🇬🇧',
+  APJ6JRA9NG5V4: '🇮🇹',
+  A2NODRKZP88ZB9: '🇸🇪',
+  A1805IZSGTT6HS: '🇳🇱',
+  A2Q3Y263D00KWC: '🇧🇷',
+}
 
 const MARKETPLACE_FLAGS: Record<string, string> = {
   amazon: '🇩🇪',
@@ -45,6 +61,7 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
   const alertsQuery = useAlerts()
   const trackedQuery = useTrackedProducts()
   const reportsQuery = useComplianceReports({ limit: 5 })
+  const eprQuery = useEprReports()
 
   const isLoading = dashboard.isLoading || alertsQuery.isLoading
 
@@ -119,45 +136,21 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Nadchodzace Raporty EPR */}
+        {/* Raporty EPR */}
         <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] p-5">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <FileText className="h-4 w-4 text-gray-400" />
-              Nadchodzące raporty EPR
+              Raporty EPR
             </h3>
+            <button
+              onClick={() => onNavigate('epr')}
+              className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1"
+            >
+              Wszystkie <ArrowRight className="h-3 w-3" />
+            </button>
           </div>
-          <div className="space-y-4">
-            {EPR_REPORTS.map((r) => {
-              const daysLeft = Math.max(0, Math.ceil(
-                (new Date(r.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-              ))
-              return (
-                <div key={r.name}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-300">
-                      {r.flag} {r.name}
-                    </span>
-                    <span className={cn(
-                      'text-xs',
-                      daysLeft < 30 ? 'text-red-400' : daysLeft < 60 ? 'text-yellow-400' : 'text-gray-500'
-                    )}>
-                      {daysLeft} dni
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-800">
-                    <div
-                      className={cn(
-                        'h-2 rounded-full transition-all',
-                        r.progress >= 60 ? 'bg-green-500' : r.progress >= 30 ? 'bg-yellow-500' : 'bg-red-500'
-                      )}
-                      style={{ width: `${r.progress}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <EprReportsList reports={eprQuery.data?.reports ?? []} isLoading={eprQuery.isLoading} />
         </div>
 
         {/* Status Marketplace */}
@@ -292,6 +285,51 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function EprReportsList({ reports, isLoading }: { reports: EprReport[]; isLoading: boolean }) {
+  if (isLoading) {
+    return <div className="h-20 animate-pulse rounded-lg bg-gray-800" />
+  }
+  if (reports.length === 0) {
+    return <p className="text-sm text-gray-500">Brak raportów EPR</p>
+  }
+  // WHY: Show max 4 recent reports in dashboard summary
+  return (
+    <div className="space-y-4">
+      {reports.slice(0, 4).map((r) => {
+        const progress = eprStatusToProgress(r.status)
+        const flag = MARKETPLACE_ID_FLAGS[r.marketplace_id] ?? '🌍'
+        return (
+          <div key={r.id}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm text-gray-300">
+                {flag} {r.report_type}
+              </span>
+              <span className={cn(
+                'text-xs',
+                r.status === 'completed' ? 'text-green-400' :
+                r.status === 'failed' ? 'text-red-400' : 'text-yellow-400'
+              )}>
+                {r.status === 'completed' ? 'Ukończony' :
+                 r.status === 'failed' ? 'Błąd' :
+                 r.status === 'processing' ? 'Przetwarzanie' : 'Oczekujący'}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-gray-800">
+              <div
+                className={cn(
+                  'h-2 rounded-full transition-all',
+                  progress >= 60 ? 'bg-green-500' : progress >= 30 ? 'bg-yellow-500' : 'bg-red-500'
+                )}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

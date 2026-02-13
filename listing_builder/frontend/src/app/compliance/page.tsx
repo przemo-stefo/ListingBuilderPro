@@ -14,6 +14,7 @@ import {
   Link2,
   Upload,
   Newspaper,
+  FileBarChart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import DashboardTab from './components/DashboardTab'
@@ -22,8 +23,9 @@ import AlertsTab from './components/AlertsTab'
 import IntegrationsTab from './components/IntegrationsTab'
 import UploadTab from './components/UploadTab'
 import NewsTab from './components/NewsTab'
+import EprTab from './components/EprTab'
 
-type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'news'
+type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'news' | 'epr'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Panel Główny', icon: BarChart3 },
@@ -32,6 +34,7 @@ const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'alerts', label: 'Alerty', icon: AlertTriangle },
   { key: 'integrations', label: 'Integracje', icon: Link2 },
   { key: 'upload', label: 'Upload', icon: Upload },
+  { key: 'epr', label: 'Raporty EPR', icon: FileBarChart },
 ]
 
 const validTabs = new Set(tabs.map(t => t.key))
@@ -91,6 +94,7 @@ function ComplianceContent() {
       {activeTab === 'alerts' && <AlertsTab />}
       {activeTab === 'integrations' && <IntegrationsTab />}
       {activeTab === 'upload' && <UploadTab />}
+      {activeTab === 'epr' && <EprTab />}
     </div>
   )
 }
