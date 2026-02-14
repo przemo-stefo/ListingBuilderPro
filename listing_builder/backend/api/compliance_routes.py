@@ -187,9 +187,12 @@ async def audit_product_card(request: Request, body: AuditRequest):
     try:
         result = await audit_product(url, marketplace)
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("audit_failed", url=url, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
+        # SECURITY: Don't leak internal error details to client
+        raise HTTPException(status_code=500, detail="Audit failed")
 
 
 def _get_extension(filename: str) -> str:

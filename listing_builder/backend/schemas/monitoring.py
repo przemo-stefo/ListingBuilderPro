@@ -42,10 +42,14 @@ class TrackProductRequest(BaseModel):
 
     @field_validator("product_url")
     @classmethod
-    def validate_url(cls, v):
-        if v and not v.startswith("http"):
-            raise ValueError("product_url must start with http")
-        return v
+    def validate_url(cls, v, info):
+        if not v:
+            return v
+        # SECURITY: Validate URL domain to prevent SSRF
+        from utils.url_validator import validate_marketplace_url
+        marketplace = info.data.get("marketplace")
+        mp_str = marketplace.value if marketplace else None
+        return validate_marketplace_url(v, mp_str)
 
 
 class TrackedProductResponse(BaseModel):
@@ -101,9 +105,11 @@ class AlertConfigCreate(BaseModel):
     @field_validator("webhook_url")
     @classmethod
     def validate_webhook(cls, v):
-        if v and not v.startswith("http"):
-            raise ValueError("webhook_url must start with http")
-        return v
+        if not v:
+            return v
+        # SECURITY: Validate webhook URL to prevent SSRF
+        from utils.url_validator import validate_webhook_url
+        return validate_webhook_url(v)
 
 
 class AlertConfigResponse(BaseModel):

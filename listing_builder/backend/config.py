@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
-    app_debug: bool = True
+    app_debug: bool = False  # SECURITY: Default off — docs hidden unless explicitly enabled
     api_secret_key: str  # REQUIRED - no default value
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 

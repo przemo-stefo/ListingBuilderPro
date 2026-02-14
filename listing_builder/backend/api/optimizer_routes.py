@@ -26,10 +26,11 @@ router = APIRouter(prefix="/api/optimizer", tags=["optimizer"])
 FREE_DAILY_LIMIT = 3
 
 
-def _check_tier_limit(db: Session):
+def _check_tier_limit(db: Session, requested_count: int = 1):
     """
     Check if user can optimize. Premium = unlimited. Free = 3/day.
     SECURITY: This is the real gate — frontend limit is cosmetic only.
+    requested_count: how many optimizations this request will consume (batch = N).
     """
     sub = db.query(Subscription).filter(Subscription.user_id == "default").first()
     if sub and sub.tier == "premium" and sub.status == "active":
@@ -42,10 +43,17 @@ def _check_tier_limit(db: Session):
         .filter(OptimizationRun.created_at >= date.today())
         .count()
     )
-    if today_count >= FREE_DAILY_LIMIT:
+    remaining = FREE_DAILY_LIMIT - today_count
+    if remaining <= 0:
         raise HTTPException(
             status_code=402,
             detail=f"Darmowy limit ({FREE_DAILY_LIMIT}/dzien) wyczerpany. Wykup Premium!",
+        )
+    # WHY: Batch must not exceed remaining quota — prevents 1-check-for-50-items bypass
+    if requested_count > remaining:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Pozostalo {remaining} optymalizacji dzis. Batch wymaga {requested_count}. Wykup Premium!",
         )
 
 
@@ -226,8 +234,8 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
     WHY: Processes sequentially because each product runs 3 LLM calls.
     Per-product error handling ensures one failure doesn't abort the batch.
     """
-    # SECURITY: Server-side tier check — batch burns multiple LLM calls
-    _check_tier_limit(db)
+    # SECURITY: Server-side tier check — batch counts ALL items against daily limit
+    _check_tier_limit(db, requested_count=len(body.products))
 
     results: List[BatchOptimizerResult] = []
     succeeded = 0
