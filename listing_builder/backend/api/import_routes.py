@@ -8,9 +8,10 @@ from database import get_db
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
 from services.import_service import ImportService
 from config import settings
-from typing import List, Optional
+from typing import List, Literal, Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from pydantic import BaseModel
 import hmac
 import structlog
 
@@ -65,6 +66,9 @@ async def receive_webhook(
         products_data = payload.data.get("products", [])
         if not products_data:
             raise HTTPException(status_code=400, detail="No products in payload")
+        # WHY: Same guard as /batch — prevents DoS via oversized webhook payloads
+        if len(products_data) > MAX_BATCH_SIZE:
+            raise HTTPException(status_code=400, detail=f"Max {MAX_BATCH_SIZE} products per webhook call")
 
         # Validate and parse products
         products = [ProductImport(**p) for p in products_data]
@@ -81,6 +85,68 @@ async def receive_webhook(
     except Exception as e:
         logger.error("webhook_processing_failed", error=str(e))
         raise HTTPException(status_code=500, detail="Import failed")
+
+
+VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "manual"}
+
+
+class ScrapeRequest(BaseModel):
+    """WHY: Typed request for URL scraping — validates URL format before processing."""
+    url: str
+    marketplace: Optional[str] = None
+
+
+@router.post("/scrape-url")
+@limiter.limit("10/minute")
+async def scrape_product_url(
+    request: Request,
+    body: ScrapeRequest,
+):
+    """
+    Scrape product data from a marketplace URL.
+    Returns scraped data WITHOUT importing — user reviews first.
+    """
+    from utils.url_validator import validate_marketplace_url
+
+    # WHY: Detect marketplace from URL domain if not specified
+    marketplace = body.marketplace
+    if not marketplace:
+        from urllib.parse import urlparse
+        hostname = urlparse(body.url).hostname or ""
+        if "allegro" in hostname:
+            marketplace = "allegro"
+        elif "amazon" in hostname:
+            marketplace = "amazon"
+        elif "ebay" in hostname:
+            marketplace = "ebay"
+        elif "kaufland" in hostname:
+            marketplace = "kaufland"
+
+    # SECURITY: Validate URL domain
+    try:
+        validate_marketplace_url(body.url, marketplace)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if marketplace != "allegro":
+        raise HTTPException(status_code=400, detail=f"Scraping not yet supported for {marketplace}")
+
+    from services.scraper.allegro_scraper import scrape_allegro_product
+    from dataclasses import asdict
+    product = await scrape_allegro_product(body.url)
+
+    if product.error:
+        raise HTTPException(status_code=502, detail=f"Scraping failed: {product.error}")
+
+    data = asdict(product)
+    # WHY: Convert price string to float for frontend form
+    if data.get("price"):
+        try:
+            data["price"] = float(data["price"].replace(",", ".").replace(" ", ""))
+        except (ValueError, AttributeError):
+            data["price"] = None
+
+    return {"status": "success", "product": data}
 
 
 @router.post("/product")
@@ -110,7 +176,7 @@ async def import_single_product(
 async def import_batch(
     request: Request,
     products: List[ProductImport],
-    source: str = "allegro",
+    source: Literal["allegro", "amazon", "ebay", "kaufland", "manual"] = "allegro",
     db: Session = Depends(get_db)
 ):
     """

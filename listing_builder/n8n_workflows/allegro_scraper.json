@@ -1,0 +1,253 @@
+{
+  "name": "[LBP] Allegro Product Scraper",
+  "notes": "15-node pipeline: Webhook → Prepare Items → Loop URLs → Scrape via Scrape.do → Parse HTML → Wait → Build Import → POST to LBP webhook → Respond. Uses $getWorkflowStaticData to pass URLs through HTTP Request nodes. headerAuth enabled. Max 50 URLs per call.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [220, 300],
+      "webhookId": "allegro-scraper",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "allegro-scraper",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      }
+    },
+    {
+      "id": "manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 520],
+      "parameters": {}
+    },
+    {
+      "id": "test-data",
+      "name": "Test Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 520],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Test Data\n// Purpose: Sample Allegro URLs for manual testing\n// NOT for: Production use\n\n// WHY: Replace with real Allegro product URLs before testing\nreturn [{ json: {\n  urls: [\n    'https://allegro.pl/oferta/przyklad-produktu-12345678'\n  ]\n}}];"
+      }
+    },
+    {
+      "id": "prepare-items",
+      "name": "Prepare Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Prepare Items\n// Purpose: Validate input, filter domains, split URLs into items\n// NOT for: Scraping or parsing\n\nconst input = $input.first().json;\nconst data = input.body || input;\nconst urls = data.urls || [];\n\nif (!urls.length) {\n  throw new Error('Brak URLi. Wyślij: { \"urls\": [\"https://allegro.pl/oferta/...\"] }');\n}\n\n// WHY: 50 URL limit prevents webhook timeout (50 × 3s delay = ~3min)\nif (urls.length > 50) {\n  throw new Error(`Za dużo URLi (${urls.length}). Limit: 50 na wywołanie.`);\n}\n\n// SECURITY: Only allow allegro.pl domains — prevents Scrape.do abuse\nconst valid = urls.filter(u => {\n  try { return new URL(u.trim()).hostname.endsWith('allegro.pl'); }\n  catch { return false; }\n});\n\nif (!valid.length) {\n  throw new Error('Żaden URL nie pochodzi z allegro.pl');\n}\n\n// WHY: Clear static data from previous execution to avoid stale data\nconst sd = $getWorkflowStaticData('global');\nsd.urls = [];\nsd.results = [];\nsd.errors = [];\nsd.skipped = urls.length - valid.length;\n\nreturn valid.map(url => ({ json: { url: url.trim() } }));"
+      }
+    },
+    {
+      "id": "split",
+      "name": "Loop URLs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [880, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "track-url",
+      "name": "Track URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Track URL\n// Purpose: Save URL before HTTP Request replaces item data\n// NOT for: Parsing or scraping\n\n// WHY: HTTP Request node replaces $json with response body,\n// so we store the original URL in staticData for the Parse node\nconst sd = $getWorkflowStaticData('global');\nsd.urls.push($json.url);\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "scrape",
+      "name": "Scrape Allegro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1320, 300],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.scrape.do/?token={{ $env.SCRAPE_DO_TOKEN }}&url={{ encodeURIComponent($json.url) }}&super=true&geoCode=pl",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "id": "parse",
+      "name": "Parse HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 300],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Parse HTML\n// Purpose: Extract product data from Allegro HTML (regex-based)\n// NOT for: HTTP requests or database writes\n// WHY: Same parsing logic as backend/services/scraper/allegro_scraper.py\n\nconst sd = $getWorkflowStaticData('global');\nconst idx = sd.results.length;\nconst url = sd.urls[idx] || '';\n\n// WHY: continueOnFail puts error info in $json when HTTP fails\nif ($json.error) {\n  sd.errors.push({ url, error: String($json.error.message || $json.error) });\n  sd.results.push(null);\n  return [{ json: { status: 'http_error', url } }];\n}\n\n// WHY: n8n may put HTML in different fields depending on Content-Type\nlet html = '';\nif (typeof $json === 'string') html = $json;\nelse if ($json.data && typeof $json.data === 'string') html = $json.data;\nelse if ($json.body && typeof $json.body === 'string') html = $json.body;\nelse {\n  for (const val of Object.values($json)) {\n    if (typeof val === 'string' && val.length > 500 && (val.includes('<html') || val.includes('allegro'))) {\n      html = val;\n      break;\n    }\n  }\n}\n\nif (!html || html.length < 500) {\n  sd.errors.push({ url, error: 'Empty or too short response' });\n  sd.results.push(null);\n  return [{ json: { status: 'empty', url } }];\n}\n\n// WHY: Detect DataDome/anti-bot blocks before parsing\nif (/zablokowany|blocked|enable\\s*js|captcha|datadome/i.test(html) && html.length < 10000) {\n  sd.errors.push({ url, error: 'Blocked by DataDome' });\n  sd.results.push(null);\n  return [{ json: { status: 'blocked', url } }];\n}\n\n// Extract offer ID from URL\nconst idMatch = url.match(/(\\d{8,12})/);\nconst sourceId = idMatch ? idMatch[1] : `import-${idx + 1}`;\n\n// Title from <h1>\nconst h1 = html.match(/<h1[^>]*>([\\s\\S]*?)<\\/h1>/);\nconst title = h1 ? h1[1].replace(/<[^>]+>/g, '').trim() : '';\n\n// Price — 3 patterns (same priority as allegro_scraper.py)\nlet price = null;\nlet currency = 'PLN';\nconst p1 = html.match(/\"price\"\\s*:\\s*\"([0-9.]+)\"\\s*,\\s*\"currency\"\\s*:\\s*\"([A-Z]+)\"/);\nconst p2 = html.match(/\"price\"\\s*:\\s*([0-9.]+)\\s*,\\s*\"currency\"\\s*:\\s*\"([A-Z]+)\"/);\nconst p3 = html.match(/\"formattedPrice\"\\s*:\\s*\"([0-9,.]+)\\s*z[łl]\"/);\nif (p1) { price = parseFloat(p1[1]); currency = p1[2]; }\nelse if (p2) { price = parseFloat(p2[1]); currency = p2[2]; }\nelse if (p3) { price = parseFloat(p3[1].replace(/\\s/g, '').replace(',', '.')); }\n\n// EAN from <title> tag\nconst eanM = html.match(/<title[^>]*>[\\s\\S]*?\\((\\d{8,14})\\)[\\s\\S]*?<\\/title>/);\nconst ean = eanM ? eanM[1] : null;\n\n// Images — Allegro CDN, original quality, filter UI icons\nconst imgRx = /https:\\/\\/a\\.allegroimg\\.com\\/original\\/[^\"'\\s]+/g;\nconst rawImgs = [...new Set(html.match(imgRx) || [])];\nconst images = rawImgs.filter(img => {\n  const fn = img.split('/').pop() || '';\n  return !/^(action-|icon-|logo-|badge-|flag-)/.test(fn);\n});\n\n// Category from JSON-LD BreadcrumbList\nlet category = '';\nconst bcM = html.match(/\"@type\"\\s*:\\s*\"BreadcrumbList\"[\\s\\S]*?\"itemListElement\"\\s*:\\s*(\\[[\\s\\S]*?\\])\\s*\\}/);\nif (bcM) {\n  try {\n    const items = JSON.parse(bcM[1]);\n    category = items.map(i => i.name || (i.item && i.item.name)).filter(Boolean).join(' > ');\n  } catch (e) { /* ignore */ }\n}\n\n// Parameters from table\nconst params = {};\nconst tblM = html.match(/data-box-name=\"Parameters\"[\\s\\S]*?<table[\\s\\S]*?<\\/table>/);\nif (tblM) {\n  const rowRx = /<tr[^>]*>[\\s\\S]*?<td[^>]*>([\\s\\S]*?)<\\/td>[\\s\\S]*?<td[^>]*>([\\s\\S]*?)<\\/td>[\\s\\S]*?<\\/tr>/g;\n  let m;\n  while ((m = rowRx.exec(tblM[0])) !== null) {\n    const key = m[1].replace(/<[^>]+>/g, '').trim().toLowerCase();\n    const val = m[2].replace(/<[^>]+>/g, '').trim();\n    if (key && val) params[key] = val;\n  }\n}\nconst brand = params['marka'] || params['brand'] || params['producent'] || '';\n\n// Description (plain text, max 2000 chars)\nlet description = '';\nconst descM = html.match(/data-box-name=\"Description\"[\\s\\S]*?<div[^>]*>([\\s\\S]{0,5000})/);\nif (descM) description = descM[1].replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().substring(0, 2000);\n\nconst product = {\n  source_platform: 'allegro',\n  source_id: sourceId,\n  source_url: url,\n  title,\n  description,\n  price,\n  currency,\n  category,\n  brand,\n  images: images.slice(0, 10),\n  attributes: { ...params, ...(ean ? { ean } : {}) }\n};\n\nsd.results.push(product);\nreturn [{ json: { status: 'ok', title: title.substring(0, 60), price, brand, images: images.length } }];"
+      }
+    },
+    {
+      "id": "wait",
+      "name": "Wait 3s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1760, 300],
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "build-import",
+      "name": "Build Import",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 520],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Build Import\n// Purpose: Collect scraped products and build LBP webhook payload\n// NOT for: HTTP requests\n\nconst sd = $getWorkflowStaticData('global');\nconst allResults = sd.results || [];\nconst errors = sd.errors || [];\nconst totalUrls = (sd.urls || []).length;\n\n// WHY: Filter nulls (failed scrapes) and products without title\nconst products = allResults.filter(p => p !== null && p.title);\n\n// WHY: Store meta for Build Response node (HTTP Request replaces $json)\nsd.meta = {\n  total_urls: totalUrls,\n  scraped: products.length,\n  failed: errors.length,\n  errors: errors.slice(0, 10)\n};\n\n// Clean up loop data\ndelete sd.urls;\ndelete sd.results;\ndelete sd.errors;\n\n// WHY: Send payload even if empty — LBP returns 400, handled by continueOnFail\nreturn [{ json: {\n  source: 'allegro',\n  event_type: 'product.import',\n  data: { products }\n}}];"
+      }
+    },
+    {
+      "id": "import-lbp",
+      "name": "Import to LBP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1100, 520],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LBP_WEBHOOK_URL || 'https://api-listing.feedmasters.org/api/import/webhook' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Secret", "value": "={{ $env.WEBHOOK_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source\": \"{{ $json.source }}\",\n  \"event_type\": \"{{ $json.event_type }}\",\n  \"data\": {{ JSON.stringify($json.data) }}\n}",
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
+      "id": "build-response",
+      "name": "Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 520],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Build Response\n// Purpose: Combine import result with scraping metadata\n// NOT for: HTTP requests or parsing\n\nconst sd = $getWorkflowStaticData('global');\nconst meta = sd.meta || {};\ndelete sd.meta;\n\nconst response = {\n  status: meta.scraped > 0 ? 'completed' : 'no_products',\n  timestamp: new Date().toISOString(),\n  scraping: {\n    total_urls: meta.total_urls || 0,\n    scraped: meta.scraped || 0,\n    failed: meta.failed || 0,\n    errors: meta.errors || []\n  }\n};\n\n// WHY: $json has LBP response or error from continueOnFail\nif ($json.error) {\n  response.import = { status: 'error', message: String($json.error.message || $json.error) };\n} else if ($json.success_count !== undefined) {\n  response.import = {\n    status: 'success',\n    imported: $json.success_count,\n    failed: $json.failed_count,\n    job_id: $json.job_id\n  };\n} else {\n  response.import = $json;\n}\n\nreturn [{ json: response }];"
+      }
+    },
+    {
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1540, 520],
+      "parameters": {
+        "respondWith": "json",
+        "options": {}
+      }
+    },
+    {
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [220, 700],
+      "parameters": {}
+    },
+    {
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 700],
+      "parameters": {
+        "jsCode": "// [LBP] Allegro Scraper / Error Handler\n// Purpose: Log and format error for debugging\nconst error = $input.first().json;\nconsole.error('Allegro Scraper Error:', JSON.stringify(error));\nreturn [{ json: {\n  status: 'error',\n  message: error.message || 'Unknown error',\n  timestamp: new Date().toISOString()\n}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Prepare Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [{ "node": "Test Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Test Data": {
+      "main": [
+        [{ "node": "Prepare Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Items": {
+      "main": [
+        [{ "node": "Loop URLs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop URLs": {
+      "main": [
+        [{ "node": "Build Import", "type": "main", "index": 0 }],
+        [{ "node": "Track URL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Track URL": {
+      "main": [
+        [{ "node": "Scrape Allegro", "type": "main", "index": 0 }]
+      ]
+    },
+    "Scrape Allegro": {
+      "main": [
+        [{ "node": "Parse HTML", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse HTML": {
+      "main": [
+        [{ "node": "Wait 3s", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait 3s": {
+      "main": [
+        [{ "node": "Loop URLs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Import": {
+      "main": [
+        [{ "node": "Import to LBP", "type": "main", "index": 0 }]
+      ]
+    },
+    "Import to LBP": {
+      "main": [
+        [{ "node": "Build Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [{ "node": "Respond", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [{ "node": "Error Handler", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  }
+}

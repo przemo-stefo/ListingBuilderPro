@@ -676,6 +676,13 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
     Returns:
         AllegroProduct with all extracted fields
     """
+    # SECURITY: Validate URL points to allegro.pl (prevents SSRF via Scrape.do proxy)
+    from utils.url_validator import validate_marketplace_url
+    try:
+        validate_marketplace_url(url, "allegro")
+    except ValueError as e:
+        return AllegroProduct(source_url=url, error=f"Invalid URL: {e}")
+
     # Strategy 1: Scrape.do API (recommended, handles DataDome)
     token = _get_scrape_do_token()
     if token:

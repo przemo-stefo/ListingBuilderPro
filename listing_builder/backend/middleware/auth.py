@@ -77,6 +77,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/api/stripe/webhook",  # WHY: Stripe sends webhooks without our API key — auth via signature
         "/api/oauth/amazon/callback",  # WHY: Amazon redirects user here without our API key
         "/api/oauth/allegro/callback",  # WHY: Allegro redirects user here without our API key
+        "/api/import/webhook",  # WHY: n8n calls with X-Webhook-Secret, not X-API-Key
     }
 
     async def dispatch(self, request: Request, call_next):

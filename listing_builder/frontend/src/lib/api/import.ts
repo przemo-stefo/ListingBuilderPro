@@ -9,6 +9,40 @@ import type {
   BatchProductImport,
 } from '../types'
 
+// WHY: Scraped product shape matches backend AllegroProduct dataclass
+export interface ScrapedProduct {
+  title: string
+  price: number | null
+  currency: string
+  source_id: string
+  source_url: string
+  brand: string
+  category: string
+  description: string
+  ean: string
+  images: string[]
+  parameters: Record<string, string>
+  bullet_points: string[]
+}
+
+// Scrape product data from marketplace URL (returns data, does NOT import)
+export async function scrapeProductUrl(
+  url: string,
+  marketplace?: string
+): Promise<ScrapedProduct> {
+  const response = await apiRequest<{ product: ScrapedProduct }>(
+    'post',
+    '/import/scrape-url',
+    { url, marketplace }
+  )
+
+  if (response.error) {
+    throw new Error(response.error)
+  }
+
+  return response.data!.product
+}
+
 // Import from n8n webhook
 export async function importFromWebhook(data: Record<string, unknown>): Promise<ImportJobStatus> {
   const response = await apiRequest<ImportJobStatus>(
@@ -61,10 +95,11 @@ export async function importBatchProducts(
 }
 
 // Get import job status
+// WHY: Path without /api/ prefix — the proxy route.ts adds /api/ automatically
 export async function getImportJobStatus(jobId: string): Promise<ImportJobStatus> {
   const response = await apiRequest<ImportJobStatus>(
     'get',
-    `/api/import/job/${jobId}`
+    `/import/job/${jobId}`
   )
 
   if (response.error) {

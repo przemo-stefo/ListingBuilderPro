@@ -1,13 +1,13 @@
 // frontend/src/app/products/import/components/SingleImport.tsx
-// Purpose: Single product import form (ASIN/URL/manual entry)
+// Purpose: Single product import form (ASIN/URL/manual + URL scraping)
 // NOT for: Batch import or optimization
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
-import { importSingleProduct } from '@/lib/api/import'
+import { importSingleProduct, scrapeProductUrl } from '@/lib/api/import'
 import { useToast } from '@/lib/hooks/useToast'
 import { cn } from '@/lib/utils'
 import {
@@ -18,8 +18,26 @@ import {
   ChevronUp,
   Plus,
   Trash2,
+  Loader2,
+  Download,
+  CheckCircle2,
 } from 'lucide-react'
 import { MARKETPLACES } from '../constants'
+
+// WHY: Detect marketplace from pasted URL to auto-select and enable scraping
+function detectMarketplace(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    if (hostname.includes('allegro')) return 'allegro'
+    if (hostname.includes('amazon')) return 'amazon'
+    if (hostname.includes('ebay')) return 'ebay'
+    if (hostname.includes('kaufland')) return 'kaufland'
+  } catch { /* not a valid URL */ }
+  return null
+}
+
+// WHY: Only Allegro scraping is implemented — others need different scrapers
+const SCRAPEABLE = new Set(['allegro'])
 
 export default function SingleImport() {
   const router = useRouter()
@@ -35,6 +53,37 @@ export default function SingleImport() {
   const [brand, setBrand] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState('')
+  const [scraped, setScraped] = useState(false)
+
+  // WHY: Auto-detect marketplace when user pastes a URL
+  const handleUrlChange = useCallback((url: string) => {
+    setProductUrl(url)
+    setScraped(false)
+    const detected = detectMarketplace(url)
+    if (detected) setMarketplace(detected)
+  }, [])
+
+  // WHY: Scrape mutation fetches data WITHOUT importing — user reviews first
+  const scrapeMutation = useMutation({
+    mutationFn: async () => {
+      return await scrapeProductUrl(productUrl, marketplace)
+    },
+    onSuccess: (data) => {
+      if (data.title) setTitle(data.title)
+      if (data.price) setPrice(String(data.price))
+      if (data.brand) setBrand(data.brand)
+      if (data.category) setCategory(data.category)
+      if (data.description) setDescription(data.description)
+      if (data.source_id) setAsin(data.source_id)
+      if (data.bullet_points?.length) setBullets(data.bullet_points)
+      setShowDetails(true)
+      setScraped(true)
+      toast({ title: 'Dane pobrane', description: `${data.title?.slice(0, 60)}...` })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Błąd scrapowania', description: error.message, variant: 'destructive' })
+    },
+  })
 
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -62,6 +111,7 @@ export default function SingleImport() {
   })
 
   const canSubmit = asin.trim() || productUrl.trim() || title.trim()
+  const canScrape = productUrl.trim() && SCRAPEABLE.has(marketplace) && !scrapeMutation.isPending
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,8 +149,36 @@ export default function SingleImport() {
         </div>
       </div>
 
-      {/* ASIN + URL */}
+      {/* ASIN + URL + Scrape button */}
       <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] p-5 space-y-4">
+        <div>
+          <label className="text-sm font-medium text-white flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-gray-400" />
+            Link do produktu
+          </label>
+          <div className="flex gap-2 mt-2">
+            <input type="url" value={productUrl} onChange={(e) => handleUrlChange(e.target.value)}
+              placeholder="https://allegro.pl/oferta/..." className={cn(inputCls, 'flex-1 px-4 py-3')} />
+            {canScrape && (
+              <button type="button" onClick={() => scrapeMutation.mutate()}
+                disabled={scrapeMutation.isPending}
+                className="flex items-center gap-2 rounded-lg border border-gray-600 px-4 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 shrink-0">
+                {scrapeMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Pobieram...</>
+                ) : scraped ? (
+                  <><CheckCircle2 className="h-4 w-4 text-green-400" /> Pobrano</>
+                ) : (
+                  <><Download className="h-4 w-4" /> Pobierz dane</>
+                )}
+              </button>
+            )}
+          </div>
+          {SCRAPEABLE.has(marketplace) && productUrl.trim() && (
+            <p className="text-xs text-gray-500 mt-1">
+              Wklej link z Allegro — pobierzemy tytuł, cenę, markę i opis automatycznie
+            </p>
+          )}
+        </div>
         <div>
           <label className="text-sm font-medium text-white flex items-center gap-2">
             <Package className="h-4 w-4 text-gray-400" />
@@ -109,22 +187,14 @@ export default function SingleImport() {
           <input type="text" value={asin} onChange={(e) => setAsin(e.target.value)}
             placeholder="np. B0XXXXXXX" className={cn(inputCls, 'mt-2 px-4 py-3')} />
         </div>
-        <div>
-          <label className="text-sm font-medium text-white flex items-center gap-2">
-            <Link2 className="h-4 w-4 text-gray-400" />
-            Link do produktu
-          </label>
-          <input type="url" value={productUrl} onChange={(e) => setProductUrl(e.target.value)}
-            placeholder="https://www.amazon.de/dp/B0XXXXXXX" className={cn(inputCls, 'mt-2 px-4 py-3')} />
-        </div>
-        <p className="text-xs text-gray-600">Podaj ASIN, link lub oba.</p>
+        <p className="text-xs text-gray-600">Podaj link, ASIN lub oba.</p>
       </div>
 
-      {/* Optional details */}
+      {/* Product details (auto-opens after scrape) */}
       <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] overflow-hidden">
         <button type="button" onClick={() => setShowDetails(!showDetails)}
           className="flex w-full items-center justify-between px-5 py-4 text-sm font-medium text-gray-400 hover:text-white transition-colors">
-          <span>Dane produktu (opcjonalne)</span>
+          <span>{scraped ? 'Dane produktu (pobrane z Allegro)' : 'Dane produktu (opcjonalne)'}</span>
           {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
         {showDetails && (
