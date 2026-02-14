@@ -14,12 +14,39 @@ import structlog
 from services.optimizer_service import optimize_listing
 from database import get_db
 from models.optimization import OptimizationRun
+from models.subscription import Subscription
 
 limiter = Limiter(key_func=get_remote_address)
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/optimizer", tags=["optimizer"])
+
+# WHY: Server-side tier enforcement — frontend limit alone is bypassable via curl
+FREE_DAILY_LIMIT = 3
+
+
+def _check_tier_limit(db: Session):
+    """
+    Check if user can optimize. Premium = unlimited. Free = 3/day.
+    SECURITY: This is the real gate — frontend limit is cosmetic only.
+    """
+    sub = db.query(Subscription).filter(Subscription.user_id == "default").first()
+    if sub and sub.tier == "premium" and sub.status == "active":
+        return  # unlimited
+
+    # WHY: Count today's runs in DB — not localStorage which user controls
+    from datetime import date
+    today_count = (
+        db.query(OptimizationRun)
+        .filter(OptimizationRun.created_at >= date.today())
+        .count()
+    )
+    if today_count >= FREE_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Darmowy limit ({FREE_DAILY_LIMIT}/dzien) wyczerpany. Wykup Premium!",
+        )
 
 
 class OptimizerKeyword(BaseModel):
@@ -108,6 +135,9 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
     WHY: Runs 3 LLM calls (title, bullets, description) then computes
     coverage scores, backend keyword packing, and compliance checks.
     """
+    # SECURITY: Server-side tier check before any LLM calls
+    _check_tier_limit(db)
+
     logger.info(
         "optimizer_request",
         product=body.product_title[:50],
@@ -196,6 +226,9 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
     WHY: Processes sequentially because each product runs 3 LLM calls.
     Per-product error handling ensures one failure doesn't abort the batch.
     """
+    # SECURITY: Server-side tier check — batch burns multiple LLM calls
+    _check_tier_limit(db)
+
     results: List[BatchOptimizerResult] = []
     succeeded = 0
     failed = 0

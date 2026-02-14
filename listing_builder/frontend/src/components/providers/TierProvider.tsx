@@ -37,14 +37,15 @@ export const TierCtx = createContext<TierContext>({
 
 // WHY: useSearchParams in a separate component so only IT lives inside Suspense,
 // not the entire page tree — fixes Next.js 14 static prerender bail-out
-function PaymentHandler({ onSuccess }: { onSuccess: () => void }) {
+function PaymentHandler({ onPaymentReturn }: { onPaymentReturn: () => void }) {
   const searchParams = useSearchParams()
   useEffect(() => {
-    // WHY: Stripe redirects back with ?payment=success after checkout
-    if (searchParams.get('payment') === 'success' || searchParams.get('unlock') === 'premium') {
-      onSuccess()
+    // WHY: Stripe redirects back with ?payment=success — verify via backend, not URL alone
+    // SECURITY: removed ?unlock=premium — was a bypass vector
+    if (searchParams.get('payment') === 'success') {
+      onPaymentReturn()
     }
-  }, [searchParams, onSuccess])
+  }, [searchParams, onPaymentReturn])
   return null
 }
 
@@ -77,6 +78,20 @@ export function TierProvider({ children }: { children: ReactNode }) {
 
   const isPremium = tier === 'premium'
 
+  // WHY: After Stripe redirect, re-fetch from backend to verify payment actually went through
+  // SECURITY: never trust URL params alone — backend is source of truth
+  const handlePaymentReturn = useCallback(() => {
+    fetch('/api/proxy/stripe/status')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.tier === 'premium' || data?.status === 'active') {
+          localStorage.setItem(TIER_STORAGE_KEY, 'premium')
+          setTier('premium')
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   const handleUnlock = useCallback(() => {
     localStorage.setItem(TIER_STORAGE_KEY, 'premium')
     setTier('premium')
@@ -99,7 +114,7 @@ export function TierProvider({ children }: { children: ReactNode }) {
       value={{ tier, usageToday, canOptimize, incrementUsage, unlockPremium: handleUnlock, isPremium }}
     >
       <Suspense fallback={null}>
-        <PaymentHandler onSuccess={handleUnlock} />
+        <PaymentHandler onPaymentReturn={handlePaymentReturn} />
       </Suspense>
       {children}
     </TierCtx.Provider>

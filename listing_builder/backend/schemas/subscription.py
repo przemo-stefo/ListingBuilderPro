@@ -11,7 +11,7 @@ class SubscriptionStatusResponse(BaseModel):
     """Current subscription status for the user."""
     tier: str = "free"
     status: str = "inactive"
-    stripe_customer_id: Optional[str] = None
+    # SECURITY: stripe_customer_id intentionally excluded — internal Stripe ID
     current_period_end: Optional[datetime] = None
     cancel_at_period_end: bool = False
 

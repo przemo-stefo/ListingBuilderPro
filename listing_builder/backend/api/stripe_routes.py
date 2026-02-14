@@ -27,13 +27,14 @@ router = APIRouter(prefix="/api/stripe", tags=["Stripe"])
 
 
 @router.get("/status", response_model=SubscriptionStatusResponse)
-async def subscription_status(db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def subscription_status(request: Request, db: Session = Depends(get_db)):
     """Get current subscription tier and status."""
     sub = get_subscription_status(db)
+    # SECURITY: stripe_customer_id intentionally excluded from response
     return SubscriptionStatusResponse(
         tier=sub.tier,
         status=sub.status,
-        stripe_customer_id=sub.stripe_customer_id,
         current_period_end=sub.current_period_end,
         cancel_at_period_end=sub.cancel_at_period_end,
     )
@@ -64,6 +65,7 @@ async def portal(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/webhook")
+@limiter.limit("60/minute")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Stripe webhook receiver.
@@ -79,8 +81,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
     try:
-        event_type = handle_webhook_event(payload, sig_header, db)
-        return {"status": "ok", "event_type": event_type}
+        handle_webhook_event(payload, sig_header, db)
+        # SECURITY: Don't leak event_type — attacker shouldn't see internal event names
+        return {"status": "ok"}
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
     except Exception as e:
