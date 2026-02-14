@@ -42,10 +42,13 @@ export interface ImportJobStatus {
 }
 
 export interface SingleProductImport {
+  source_platform?: string
+  source_id?: string
+  source_url?: string
   asin?: string
-  title: string
-  description: string
-  bullet_points: string[]
+  title?: string
+  description?: string
+  bullet_points?: string[]
   price?: number
   brand?: string
   category?: string

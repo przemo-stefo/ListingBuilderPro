@@ -25,7 +25,7 @@ interface NewsItem {
   thumbnail: string
 }
 
-type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'ecommerce' | 'compliance'
+type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'temu' | 'ecommerce' | 'compliance'
 
 // WHY: RSS feeds from major marketplace news sources — parsed via rss2json.com
 // Direct RSS preferred (og:image works). Google News only where no direct feed exists.
@@ -46,6 +46,9 @@ const RSS_FEEDS = [
   { url: 'https://tamebay.com/feed', source: 'Tamebay', category: 'ecommerce' },
   { url: 'https://www.practicalecommerce.com/feed', source: 'Practical Ecommerce', category: 'ecommerce' },
   { url: 'https://sellerengine.com/feed/', source: 'SellerEngine', category: 'ecommerce' },
+  // Temu — Google News RSS (no official Temu RSS exists)
+  { url: 'https://news.google.com/rss/search?q=Temu+marketplace+sellers+ecommerce&hl=en&gl=US&ceid=US:en', source: 'Temu News', category: 'temu' },
+  { url: 'https://channelx.world/category/temu/feed/', source: 'ChannelX Temu', category: 'temu' },
   // Compliance — Google News only (no direct compliance RSS feeds exist)
   { url: 'https://news.google.com/rss/search?q=EU+GPSR+EPR+product+safety+ecommerce+compliance&hl=en&gl=DE&ceid=DE:en', source: 'EU Compliance', category: 'compliance' },
   { url: 'https://news.google.com/rss/search?q=Amazon+eBay+marketplace+compliance+regulation&hl=en&gl=US&ceid=US:en', source: 'Marketplace Compliance', category: 'compliance' },
@@ -60,6 +63,7 @@ const CATEGORIES: { key: NewsCategory; label: string; icon: string; color: strin
   { key: 'allegro', label: 'Allegro', icon: '🇵🇱', color: 'bg-orange-500/10 text-orange-300 border-orange-500/20' },
   { key: 'ebay', label: 'eBay', icon: '🏷️', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   { key: 'kaufland', label: 'Kaufland', icon: '🇩🇪', color: 'bg-red-500/10 text-red-300 border-red-500/20' },
+  { key: 'temu', label: 'Temu', icon: '🟠', color: 'bg-orange-500/10 text-orange-300 border-orange-500/20' },
   { key: 'ecommerce', label: 'E-commerce', icon: '🛒', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
   { key: 'compliance', label: 'Compliance', icon: '📋', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
 ]
@@ -69,6 +73,7 @@ const SECTION_COLORS: Record<string, string> = {
   allegro: 'text-orange-300',
   ebay: 'text-blue-400',
   kaufland: 'text-red-300',
+  temu: 'text-orange-300',
   ecommerce: 'text-green-400',
   compliance: 'text-red-400',
 }
@@ -135,6 +140,7 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
             item.category === 'ecommerce' ? 'bg-gradient-to-br from-green-950 to-[#1A1A1A]' :
             item.category === 'compliance' ? 'bg-gradient-to-br from-red-950 to-[#1A1A1A]' :
             item.category === 'ebay' ? 'bg-gradient-to-br from-blue-950 to-[#1A1A1A]' :
+            item.category === 'temu' ? 'bg-gradient-to-br from-orange-950 to-[#1A1A1A]' :
             'bg-gradient-to-br from-gray-800 to-[#1A1A1A]'
           )}>
             <span className="text-3xl opacity-40">
@@ -273,7 +279,7 @@ export default function NewsTab() {
   const filteredNews = category === 'all' ? news : news.filter((n) => n.category === category)
 
   // WHY: Group by marketplace for "all" view — each section shows its own grid
-  const groupedByMarketplace = ['amazon', 'allegro', 'ebay', 'kaufland', 'ecommerce', 'compliance']
+  const groupedByMarketplace = ['amazon', 'allegro', 'ebay', 'kaufland', 'temu', 'ecommerce', 'compliance']
     .map((cat) => ({ category: cat, items: news.filter((n) => n.category === cat) }))
     .filter((g) => g.items.length > 0)
 
