@@ -3,7 +3,7 @@
 # NOT for: Audit logic or scraping
 
 import re
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
 
 # WHY: ASIN is always exactly 10 alphanumeric characters
@@ -16,15 +16,14 @@ class AuditRequest(BaseModel):
     asin: Optional[str] = Field(None, description="Amazon ASIN (alternative to URL)")
     marketplace: str = Field("allegro", description="allegro | amazon | ebay | kaufland")
 
-    @field_validator("url")
-    @classmethod
-    def validate_url(cls, v, info):
-        if not v:
-            return v
-        # SECURITY: Validate URL domain to prevent SSRF
-        from utils.url_validator import validate_marketplace_url
-        marketplace = info.data.get("marketplace", "allegro")
-        return validate_marketplace_url(v, marketplace.lower())
+    # WHY: model_validator instead of field_validator — needs access to marketplace
+    # which may not be parsed yet when url field_validator runs (declaration order)
+    @model_validator(mode="after")
+    def validate_url_domain(self):
+        if self.url:
+            from utils.url_validator import validate_marketplace_url
+            self.url = validate_marketplace_url(self.url, self.marketplace.lower())
+        return self
 
     @field_validator("asin")
     @classmethod
