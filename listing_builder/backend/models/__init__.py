@@ -12,6 +12,7 @@ from .epr import EprReport, EprReportRow
 from .epr_country import EprCountryRule
 from .oauth_connection import OAuthConnection
 from .subscription import Subscription
+from .premium_license import PremiumLicense
 
 __all__ = [
     "Product",
@@ -35,4 +36,5 @@ __all__ = [
     "EprCountryRule",
     "OAuthConnection",
     "Subscription",
+    "PremiumLicense",
 ]

@@ -18,7 +18,7 @@ export const apiClient: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor - prevent caching on GET requests
+// Request interceptor - prevent caching on GET requests + inject license key
 apiClient.interceptors.request.use(
   (config) => {
     // Add timestamp to prevent caching
@@ -28,6 +28,15 @@ apiClient.interceptors.request.use(
         _t: Date.now(),
       }
     }
+
+    // WHY: Send license key with every request for backend tier enforcement
+    if (typeof window !== 'undefined') {
+      const licenseKey = localStorage.getItem('lbp_license_key')
+      if (licenseKey) {
+        config.headers['X-License-Key'] = licenseKey
+      }
+    }
+
     return config
   },
   (error) => {

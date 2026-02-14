@@ -1,21 +1,21 @@
 # backend/services/stripe_service.py
-# Purpose: Stripe Checkout session creation and webhook event handling
-# NOT for: Database models or route definitions
+# Purpose: Stripe Checkout + license key generation/validation
+# NOT for: Route definitions (see api/stripe_routes.py)
 
+import secrets
 import stripe
 import structlog
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from config import settings
-from models.subscription import Subscription
+from models.premium_license import PremiumLicense
 
 logger = structlog.get_logger()
 
-# WHY: Set API key at module level — stripe lib uses global state
 stripe.api_key = getattr(settings, "stripe_secret_key", "")
 
-# WHY: Hardcoded success/cancel URLs — frontend handles ?payment=success|canceled
 FRONTEND_URL = (
     "https://listing.feedmasters.org"
     if settings.is_production
@@ -23,71 +23,133 @@ FRONTEND_URL = (
 )
 
 
-def _get_or_create_subscription(db: Session, user_id: str = "default") -> Subscription:
-    """Get existing subscription row or create a free one."""
-    sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
-    if not sub:
-        sub = Subscription(user_id=user_id)
-        db.add(sub)
-        db.commit()
-        db.refresh(sub)
-    return sub
-
-
-def get_subscription_status(db: Session, user_id: str = "default") -> Subscription:
-    """Return current subscription state."""
-    return _get_or_create_subscription(db, user_id)
-
-
-def create_checkout_session(db: Session, user_id: str = "default") -> str:
+def create_checkout_session(plan_type: str, email: str) -> str:
     """
-    Create a Stripe Checkout session and return the URL.
-
-    Flow: creates/reuses Stripe customer → creates checkout → returns URL.
+    Create Stripe Checkout session for lifetime or monthly plan.
+    Returns Checkout URL.
     """
-    sub = _get_or_create_subscription(db, user_id)
+    if plan_type == "lifetime":
+        price_id = settings.stripe_price_lifetime
+        mode = "payment"  # WHY: One-time payment, not subscription
+    elif plan_type == "monthly":
+        price_id = settings.stripe_price_monthly
+        mode = "subscription"
+    else:
+        raise ValueError(f"Invalid plan_type: {plan_type}")
 
-    # WHY: Reuse Stripe customer to keep subscription history clean
-    if not sub.stripe_customer_id:
-        customer = stripe.Customer.create(
-            metadata={"user_id": user_id},
-        )
-        sub.stripe_customer_id = customer.id
-        db.commit()
+    if not price_id:
+        raise ValueError(f"Stripe price not configured for {plan_type}")
 
     session = stripe.checkout.Session.create(
-        customer=sub.stripe_customer_id,
-        mode="subscription",
-        line_items=[{"price": settings.stripe_price_id, "quantity": 1}],
-        success_url=f"{FRONTEND_URL}?payment=success",
-        cancel_url=f"{FRONTEND_URL}?payment=canceled",
-        # WHY: Allow only one active subscription per customer
-        subscription_data={"metadata": {"user_id": user_id}},
+        mode=mode,
+        customer_email=email,
+        line_items=[{"price": price_id, "quantity": 1}],
+        success_url=f"{FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{FRONTEND_URL}/payment/cancel",
+        metadata={"plan_type": plan_type},
     )
 
-    logger.info("stripe_checkout_created", session_id=session.id, user_id=user_id)
+    logger.info("stripe_checkout_created", session_id=session.id, plan_type=plan_type)
     return session.url
 
 
-def create_portal_session(db: Session, user_id: str = "default") -> str:
-    """Create a Stripe Customer Portal session for managing subscription."""
-    sub = _get_or_create_subscription(db, user_id)
+def handle_checkout_completed(session_data: dict, db: Session):
+    """
+    After successful payment — generate license key and store in DB.
+    Idempotent via UNIQUE constraint on stripe_checkout_session_id.
+    """
+    session_id = session_data.get("id")
+    customer_id = session_data.get("customer")
+    email = session_data.get("customer_email") or session_data.get("customer_details", {}).get("email", "")
+    plan_type = session_data.get("metadata", {}).get("plan_type", "lifetime")
+    subscription_id = session_data.get("subscription")
 
-    if not sub.stripe_customer_id:
-        raise ValueError("No Stripe customer — subscribe first")
+    license_key = secrets.token_urlsafe(32)
 
-    session = stripe.billing_portal.Session.create(
-        customer=sub.stripe_customer_id,
-        return_url=FRONTEND_URL,
+    license_obj = PremiumLicense(
+        email=email,
+        license_key=license_key,
+        stripe_customer_id=customer_id,
+        stripe_checkout_session_id=session_id,
+        stripe_subscription_id=subscription_id,
+        plan_type=plan_type,
+        status="active",
+        expires_at=None,  # WHY: Lifetime = never expires, monthly managed by Stripe webhooks
     )
-    return session.url
+
+    try:
+        db.add(license_obj)
+        db.commit()
+        logger.info("license_created", email=email, plan_type=plan_type, session_id=session_id)
+    except IntegrityError:
+        # WHY: Idempotent — Stripe may send duplicate webhooks
+        db.rollback()
+        logger.info("license_already_exists", session_id=session_id)
+
+
+def handle_subscription_cancelled(sub_data: dict, db: Session):
+    """Revoke license when monthly subscription is cancelled."""
+    stripe_sub_id = sub_data.get("id")
+
+    license_obj = db.query(PremiumLicense).filter(
+        PremiumLicense.stripe_subscription_id == stripe_sub_id
+    ).first()
+
+    if not license_obj:
+        logger.warning("subscription_cancel_no_license", stripe_sub_id=stripe_sub_id)
+        return
+
+    license_obj.status = "revoked"
+    license_obj.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    logger.info("license_revoked", email=license_obj.email, stripe_sub_id=stripe_sub_id)
+
+
+def validate_license(license_key: str, db: Session) -> bool:
+    """Check if license key is active (not revoked/expired)."""
+    if not license_key:
+        return False
+
+    license_obj = db.query(PremiumLicense).filter(
+        PremiumLicense.license_key == license_key,
+        PremiumLicense.status == "active",
+    ).first()
+
+    if not license_obj:
+        return False
+
+    # WHY: Monthly licenses can expire if Stripe says so
+    if license_obj.expires_at and license_obj.expires_at < datetime.now(timezone.utc):
+        license_obj.status = "expired"
+        license_obj.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        return False
+
+    return True
+
+
+def get_license_by_email(email: str, db: Session) -> str | None:
+    """Recover active license key by email."""
+    license_obj = db.query(PremiumLicense).filter(
+        PremiumLicense.email == email,
+        PremiumLicense.status == "active",
+    ).order_by(PremiumLicense.created_at.desc()).first()
+
+    return license_obj.license_key if license_obj else None
+
+
+def get_license_by_session(session_id: str, db: Session) -> str | None:
+    """Get license key by Stripe checkout session ID (for success page redirect)."""
+    license_obj = db.query(PremiumLicense).filter(
+        PremiumLicense.stripe_checkout_session_id == session_id,
+    ).first()
+
+    return license_obj.license_key if license_obj else None
 
 
 def handle_webhook_event(payload: bytes, sig_header: str, db: Session) -> str:
     """
     Verify Stripe webhook signature and process the event.
-
-    Returns event type string for logging.
     WHY bytes+sig: Stripe requires raw body for signature verification.
     """
     try:
@@ -104,96 +166,8 @@ def handle_webhook_event(payload: bytes, sig_header: str, db: Session) -> str:
     logger.info("stripe_webhook_received", event_type=event_type)
 
     if event_type == "checkout.session.completed":
-        _handle_checkout_completed(data, db)
-    elif event_type in (
-        "customer.subscription.updated",
-        "customer.subscription.deleted",
-    ):
-        _handle_subscription_change(data, db)
-    elif event_type == "invoice.payment_failed":
-        _handle_payment_failed(data, db)
+        handle_checkout_completed(data, db)
+    elif event_type == "customer.subscription.deleted":
+        handle_subscription_cancelled(data, db)
 
     return event_type
-
-
-def _handle_checkout_completed(session_data: dict, db: Session):
-    """After successful checkout — link subscription to user."""
-    customer_id = session_data.get("customer")
-    subscription_id = session_data.get("subscription")
-
-    if not customer_id:
-        return
-
-    sub = db.query(Subscription).filter(
-        Subscription.stripe_customer_id == customer_id
-    ).first()
-
-    if not sub:
-        logger.warning("stripe_no_subscription_row", customer_id=customer_id)
-        return
-
-    sub.stripe_subscription_id = subscription_id
-    sub.status = "active"
-    sub.tier = "premium"
-    sub.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    logger.info("stripe_subscription_activated", user_id=sub.user_id)
-
-
-def _handle_subscription_change(sub_data: dict, db: Session):
-    """Handle subscription updated/deleted events."""
-    stripe_sub_id = sub_data.get("id")
-    status = sub_data.get("status")  # active, past_due, canceled, unpaid
-    cancel_at_period_end = sub_data.get("cancel_at_period_end", False)
-
-    sub = db.query(Subscription).filter(
-        Subscription.stripe_subscription_id == stripe_sub_id
-    ).first()
-
-    if not sub:
-        # WHY: Fallback — find by customer ID if subscription ID not yet saved
-        customer_id = sub_data.get("customer")
-        if customer_id:
-            sub = db.query(Subscription).filter(
-                Subscription.stripe_customer_id == customer_id
-            ).first()
-
-    if not sub:
-        logger.warning("stripe_subscription_not_found", stripe_sub_id=stripe_sub_id)
-        return
-
-    sub.status = status
-    sub.tier = "premium" if status == "active" else "free"
-    sub.cancel_at_period_end = cancel_at_period_end
-    sub.stripe_subscription_id = stripe_sub_id
-
-    # WHY: Store period dates for frontend "expires on" display
-    period_start = sub_data.get("current_period_start")
-    period_end = sub_data.get("current_period_end")
-    if period_start:
-        sub.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
-    if period_end:
-        sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
-
-    sub.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    logger.info("stripe_subscription_updated", user_id=sub.user_id, status=status, tier=sub.tier)
-
-
-def _handle_payment_failed(invoice_data: dict, db: Session):
-    """Mark subscription as past_due on payment failure."""
-    customer_id = invoice_data.get("customer")
-    if not customer_id:
-        return
-
-    sub = db.query(Subscription).filter(
-        Subscription.stripe_customer_id == customer_id
-    ).first()
-
-    if sub:
-        sub.status = "past_due"
-        sub.updated_at = datetime.now(timezone.utc)
-        db.commit()
-        logger.warning("stripe_payment_failed", user_id=sub.user_id)

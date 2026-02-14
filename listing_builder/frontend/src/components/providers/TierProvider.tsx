@@ -1,24 +1,23 @@
 // frontend/src/components/providers/TierProvider.tsx
-// Purpose: React Context for tier system — backend-first with localStorage fallback
+// Purpose: React Context for tier system — license key validation via backend
 // NOT for: Payment processing or Stripe API calls
 
 'use client'
 
-import { createContext, useState, useEffect, useCallback, Suspense, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { TierLevel, TierContext } from '@/lib/types/tier'
 import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
 
-const TIER_STORAGE_KEY = 'lbp_tier'
+const LICENSE_KEY_STORAGE = 'lbp_license_key'
 
 function getUsageKey(): string {
   const today = new Date().toISOString().slice(0, 10)
   return `free_usage_${today}`
 }
 
-function getStoredTier(): TierLevel {
-  if (typeof window === 'undefined') return 'free'
-  return (localStorage.getItem(TIER_STORAGE_KEY) as TierLevel) || 'free'
+function getStoredLicenseKey(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem(LICENSE_KEY_STORAGE) || ''
 }
 
 function getStoredUsage(): number {
@@ -33,68 +32,54 @@ export const TierCtx = createContext<TierContext>({
   incrementUsage: () => {},
   unlockPremium: () => {},
   isPremium: false,
+  licenseKey: '',
 })
-
-// WHY: useSearchParams in a separate component so only IT lives inside Suspense,
-// not the entire page tree — fixes Next.js 14 static prerender bail-out
-function PaymentHandler({ onPaymentReturn }: { onPaymentReturn: () => void }) {
-  const searchParams = useSearchParams()
-  useEffect(() => {
-    // WHY: Stripe redirects back with ?payment=success — verify via backend, not URL alone
-    // SECURITY: removed ?unlock=premium — was a bypass vector
-    if (searchParams.get('payment') === 'success') {
-      onPaymentReturn()
-    }
-  }, [searchParams, onPaymentReturn])
-  return null
-}
 
 export function TierProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<TierLevel>('free')
   const [usageToday, setUsageToday] = useState(0)
+  const [licenseKey, setLicenseKey] = useState('')
 
-  // WHY: Try backend first, fall back to localStorage
+  // WHY: On mount, check stored license key against backend
   useEffect(() => {
-    setTier(getStoredTier())
     setUsageToday(getStoredUsage())
 
-    // WHY: Fetch real tier from backend — overrides localStorage if backend says premium
-    fetch('/api/proxy/stripe/status')
+    const storedKey = getStoredLicenseKey()
+    if (!storedKey) return
+
+    setLicenseKey(storedKey)
+
+    // WHY: Validate key with backend — don't trust localStorage alone
+    fetch('/api/proxy/stripe/validate-license', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_key: storedKey }),
+    })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.tier === 'premium' || data?.status === 'active') {
-          localStorage.setItem(TIER_STORAGE_KEY, 'premium')
+        if (data?.valid) {
           setTier('premium')
-        } else if (data?.tier === 'free' && data?.status !== 'active') {
-          // WHY: Backend says free — clear any stale localStorage premium
-          localStorage.setItem(TIER_STORAGE_KEY, 'free')
+        } else {
+          // WHY: Key is invalid/expired — clear it
+          localStorage.removeItem(LICENSE_KEY_STORAGE)
+          setLicenseKey('')
           setTier('free')
         }
       })
       .catch(() => {
-        // WHY: Backend unavailable — keep localStorage value as fallback
+        // WHY: Backend unavailable — trust stored key as fallback
+        setTier('premium')
       })
   }, [])
 
   const isPremium = tier === 'premium'
 
-  // WHY: After Stripe redirect, re-fetch from backend to verify payment actually went through
-  // SECURITY: never trust URL params alone — backend is source of truth
-  const handlePaymentReturn = useCallback(() => {
-    fetch('/api/proxy/stripe/status')
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.tier === 'premium' || data?.status === 'active') {
-          localStorage.setItem(TIER_STORAGE_KEY, 'premium')
-          setTier('premium')
-        }
-      })
-      .catch(() => {})
-  }, [])
-
-  const handleUnlock = useCallback(() => {
-    localStorage.setItem(TIER_STORAGE_KEY, 'premium')
-    setTier('premium')
+  const handleUnlock = useCallback((key?: string) => {
+    if (key) {
+      localStorage.setItem(LICENSE_KEY_STORAGE, key)
+      setLicenseKey(key)
+      setTier('premium')
+    }
   }, [])
 
   const canOptimize = useCallback(() => {
@@ -111,11 +96,8 @@ export function TierProvider({ children }: { children: ReactNode }) {
 
   return (
     <TierCtx.Provider
-      value={{ tier, usageToday, canOptimize, incrementUsage, unlockPremium: handleUnlock, isPremium }}
+      value={{ tier, usageToday, canOptimize, incrementUsage, unlockPremium: handleUnlock, isPremium, licenseKey }}
     >
-      <Suspense fallback={null}>
-        <PaymentHandler onPaymentReturn={handlePaymentReturn} />
-      </Suspense>
       {children}
     </TierCtx.Provider>
   )

@@ -1,9 +1,10 @@
 // frontend/src/app/page.tsx
-// Purpose: Landing page with Decoy Offer — FREE vs PREMIUM side-by-side comparison
+// Purpose: Landing page with pricing — FREE vs PREMIUM with Stripe checkout
 // NOT for: Dashboard stats or app functionality (that's /dashboard)
 
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Crown, Sparkles, Check, X, ArrowRight, Zap } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
@@ -34,17 +35,43 @@ const PREMIUM_FEATURES = [
   { label: 'Priorytetowe wsparcie', included: true },
 ]
 
+async function redirectToCheckout(planType: 'lifetime' | 'monthly') {
+  const email = prompt('Podaj email (do odzyskania klucza licencyjnego):')
+  if (!email) return
+
+  const res = await fetch('/api/proxy/stripe/create-checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan_type: planType, email }),
+  })
+
+  if (!res.ok) {
+    alert('Blad tworzenia sesji platnosci. Sprobuj ponownie.')
+    return
+  }
+
+  const data = await res.json()
+  if (data.checkout_url) {
+    window.location.href = data.checkout_url
+  }
+}
+
 export default function LandingPage() {
   const router = useRouter()
-  const { unlockPremium, isPremium } = useTier()
+  const { isPremium } = useTier()
+  const [loading, setLoading] = useState(false)
 
   const handleFreeStart = () => {
     router.push('/optimize')
   }
 
-  const handlePremiumStart = () => {
-    unlockPremium()
-    router.push('/dashboard')
+  const handlePremiumStart = async (plan: 'lifetime' | 'monthly') => {
+    setLoading(true)
+    try {
+      await redirectToCheckout(plan)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -119,14 +146,27 @@ export default function LandingPage() {
             ))}
           </ul>
 
-          <button
-            onClick={handlePremiumStart}
-            className="mt-6 w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 relative"
-          >
-            <Sparkles className="h-4 w-4" />
-            Odblokuj pelna moc
-            <Zap className="h-4 w-4" />
-          </button>
+          <div className="mt-6 space-y-3 relative">
+            <button
+              onClick={() => handlePremiumStart('lifetime')}
+              disabled={loading}
+              className="w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" />
+              {loading ? 'Ladowanie...' : '149 PLN — Lifetime'}
+              <Zap className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => handlePremiumStart('monthly')}
+              disabled={loading}
+              className="w-full rounded-lg border border-amber-500/30 bg-transparent py-2.5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? 'Ladowanie...' : '49 PLN/mies — Subskrypcja'}
+            </button>
+            <p className="text-center text-xs text-gray-600">
+              Lifetime = kup raz, miej zawsze. Subskrypcja = anuluj kiedy chcesz.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -182,6 +222,16 @@ export default function LandingPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* License key recovery link */}
+      <div className="text-center pb-4">
+        <button
+          onClick={() => router.push('/payment/recover')}
+          className="text-gray-500 text-xs hover:text-gray-400 transition-colors"
+        >
+          Masz juz klucz? Odzyskaj go tutaj
+        </button>
       </div>
 
       {isPremium && (

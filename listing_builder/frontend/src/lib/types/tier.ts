@@ -1,5 +1,5 @@
 // frontend/src/lib/types/tier.ts
-// Purpose: Tier system types for Decoy Offer (free vs premium gating)
+// Purpose: Tier system types for license-key based premium gating
 // NOT for: Backend tier enforcement or payment logic
 
 export type TierLevel = 'free' | 'premium'
@@ -21,9 +21,10 @@ export interface TierContext {
   usageToday: number
   canOptimize: () => boolean
   incrementUsage: () => void
-  unlockPremium: () => void
+  unlockPremium: (key?: string) => void
   isPremium: boolean
+  licenseKey: string
 }
 
-// WHY: Daily limit for free tier — Hormozi decoy strategy
+// WHY: Daily limit for free tier
 export const FREE_DAILY_LIMIT = 3

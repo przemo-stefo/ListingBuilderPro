@@ -12,9 +12,9 @@ from slowapi.util import get_remote_address
 import structlog
 
 from services.optimizer_service import optimize_listing
+from services.stripe_service import validate_license
 from database import get_db
 from models.optimization import OptimizationRun
-from models.subscription import Subscription
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -26,21 +26,24 @@ router = APIRouter(prefix="/api/optimizer", tags=["optimizer"])
 FREE_DAILY_LIMIT = 3
 
 
-def _check_tier_limit(db: Session, requested_count: int = 1):
+def _check_tier_limit(request: Request, db: Session, requested_count: int = 1):
     """
-    Check if user can optimize. Premium = unlimited. Free = 3/day.
+    Check if user can optimize. Valid license key = unlimited. No key = 3/day per IP.
     SECURITY: This is the real gate — frontend limit is cosmetic only.
-    requested_count: how many optimizations this request will consume (batch = N).
     """
-    sub = db.query(Subscription).filter(Subscription.user_id == "default").first()
-    if sub and sub.tier == "premium" and sub.status == "active":
+    license_key = request.headers.get("X-License-Key", "")
+    if license_key and validate_license(license_key, db):
         return  # unlimited
 
-    # WHY: Count today's runs in DB — not localStorage which user controls
+    # WHY: Per-IP limit prevents abuse — DB count per client IP, not global
     from datetime import date
+    client_ip = get_remote_address(request)
     today_count = (
         db.query(OptimizationRun)
-        .filter(OptimizationRun.created_at >= date.today())
+        .filter(
+            OptimizationRun.created_at >= date.today(),
+            OptimizationRun.client_ip == client_ip,
+        )
         .count()
     )
     remaining = FREE_DAILY_LIMIT - today_count
@@ -49,7 +52,6 @@ def _check_tier_limit(db: Session, requested_count: int = 1):
             status_code=402,
             detail=f"Darmowy limit ({FREE_DAILY_LIMIT}/dzien) wyczerpany. Wykup Premium!",
         )
-    # WHY: Batch must not exceed remaining quota — prevents 1-check-for-50-items bypass
     if requested_count > remaining:
         raise HTTPException(
             status_code=402,
@@ -144,7 +146,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
     coverage scores, backend keyword packing, and compliance checks.
     """
     # SECURITY: Server-side tier check before any LLM calls
-    _check_tier_limit(db)
+    _check_tier_limit(request, db)
 
     logger.info(
         "optimizer_request",
@@ -187,6 +189,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
                 request_data=body.model_dump(),
                 response_data=result,
                 trace_data=result.get("trace"),
+                client_ip=get_remote_address(request),
             )
             db.add(run)
             db.commit()
@@ -235,7 +238,7 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
     Per-product error handling ensures one failure doesn't abort the batch.
     """
     # SECURITY: Server-side tier check — batch counts ALL items against daily limit
-    _check_tier_limit(db, requested_count=len(body.products))
+    _check_tier_limit(request, db, requested_count=len(body.products))
 
     results: List[BatchOptimizerResult] = []
     succeeded = 0

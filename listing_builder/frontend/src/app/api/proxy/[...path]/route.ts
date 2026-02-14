@@ -80,6 +80,12 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
     headers['X-Webhook-Secret'] = webhookSecret
   }
 
+  // WHY: Forward license key for backend premium tier enforcement
+  const licenseKey = request.headers.get('X-License-Key')
+  if (licenseKey) {
+    headers['X-License-Key'] = licenseKey
+  }
+
   // Forward request body for non-GET methods
   // WHY: Multipart bodies must stay as raw bytes — text() would corrupt binary file data
   let body: BodyInit | undefined

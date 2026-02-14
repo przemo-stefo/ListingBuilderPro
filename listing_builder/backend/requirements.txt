@@ -19,6 +19,7 @@ groq==0.4.1
 # Validation & Serialization
 pydantic==2.5.3
 pydantic-settings==2.1.0
+email-validator>=2.0.0  # WHY: Required by Pydantic EmailStr
 
 # HTTP Client
 httpx==0.25.2

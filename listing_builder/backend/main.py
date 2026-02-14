@@ -124,6 +124,7 @@ app.add_middleware(
         "Authorization",
         "X-API-Key",  # Custom API key header
         "X-Webhook-Secret",  # Webhook authentication
+        "X-License-Key",  # Premium license validation
     ],
     expose_headers=["X-Total-Count"],  # For pagination
     max_age=600,  # Cache preflight for 10 minutes

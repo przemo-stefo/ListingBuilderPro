@@ -1,39 +1,55 @@
 // frontend/src/lib/api/stripe.ts
-// Purpose: API calls for Stripe subscription management
-// NOT for: React hooks or UI logic (those are in hooks/useSubscription.ts)
+// Purpose: API calls for Stripe license-key payment flow
+// NOT for: React hooks or UI logic
 
 import { apiRequest } from './client'
 
-export interface SubscriptionStatus {
-  tier: string
-  status: string
-  stripe_customer_id: string | null
-  current_period_end: string | null
-  cancel_at_period_end: boolean
+export interface CheckoutRequest {
+  plan_type: 'lifetime' | 'monthly'
+  email: string
 }
 
-export interface CheckoutSession {
+export interface CheckoutResponse {
   checkout_url: string
 }
 
-export interface PortalSession {
-  portal_url: string
+export interface ValidateLicenseResponse {
+  valid: boolean
+  tier: string
 }
 
-export async function fetchSubscriptionStatus(): Promise<SubscriptionStatus> {
-  const response = await apiRequest<SubscriptionStatus>('get', '/stripe/status')
+export interface RecoverLicenseResponse {
+  found: boolean
+  license_key: string | null
+}
+
+export interface SessionLicenseResponse {
+  license_key: string | null
+  status: string
+}
+
+export async function createCheckoutSession(req: CheckoutRequest): Promise<CheckoutResponse> {
+  const response = await apiRequest<CheckoutResponse>('post', '/stripe/create-checkout', req)
   if (response.error) throw new Error(response.error)
   return response.data!
 }
 
-export async function createCheckoutSession(): Promise<CheckoutSession> {
-  const response = await apiRequest<CheckoutSession>('post', '/stripe/checkout')
+export async function validateLicense(licenseKey: string): Promise<ValidateLicenseResponse> {
+  const response = await apiRequest<ValidateLicenseResponse>('post', '/stripe/validate-license', {
+    license_key: licenseKey,
+  })
   if (response.error) throw new Error(response.error)
   return response.data!
 }
 
-export async function createPortalSession(): Promise<PortalSession> {
-  const response = await apiRequest<PortalSession>('post', '/stripe/portal')
+export async function recoverLicense(email: string): Promise<RecoverLicenseResponse> {
+  const response = await apiRequest<RecoverLicenseResponse>('post', '/stripe/recover-license', { email })
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
+export async function getSessionLicense(sessionId: string): Promise<SessionLicenseResponse> {
+  const response = await apiRequest<SessionLicenseResponse>('get', `/stripe/session/${sessionId}/license`)
   if (response.error) throw new Error(response.error)
   return response.data!
 }

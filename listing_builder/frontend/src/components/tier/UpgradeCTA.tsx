@@ -1,9 +1,10 @@
 // frontend/src/components/tier/UpgradeCTA.tsx
-// Purpose: Upgrade call-to-action — inline banner or full comparison card
-// NOT for: Payment processing or auth
+// Purpose: Upgrade call-to-action — redirects to Stripe Checkout
+// NOT for: Payment processing or license key management
 
 'use client'
 
+import { useState } from 'react'
 import { Crown, Sparkles, ArrowRight } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
 import { cn } from '@/lib/utils'
@@ -13,10 +14,41 @@ interface UpgradeCTAProps {
   className?: string
 }
 
+async function redirectToCheckout(planType: 'lifetime' | 'monthly') {
+  const email = prompt('Podaj email (do odzyskania klucza licencyjnego):')
+  if (!email) return
+
+  const res = await fetch('/api/proxy/stripe/create-checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan_type: planType, email }),
+  })
+
+  if (!res.ok) {
+    alert('Blad tworzenia sesji platnosci. Sprobuj ponownie.')
+    return
+  }
+
+  const data = await res.json()
+  if (data.checkout_url) {
+    window.location.href = data.checkout_url
+  }
+}
+
 export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
-  const { unlockPremium, isPremium } = useTier()
+  const { isPremium } = useTier()
+  const [loading, setLoading] = useState(false)
 
   if (isPremium) return null
+
+  const handleUpgrade = async (plan: 'lifetime' | 'monthly') => {
+    setLoading(true)
+    try {
+      await redirectToCheckout(plan)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (variant === 'inline') {
     return (
@@ -33,18 +65,19 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
           </span>
         </div>
         <button
-          onClick={unlockPremium}
-          className="flex items-center gap-1 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors"
+          onClick={() => handleUpgrade('lifetime')}
+          disabled={loading}
+          className="flex items-center gap-1 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors disabled:opacity-50"
         >
           <Sparkles className="h-3 w-3" />
-          Upgrade
+          {loading ? 'Ladowanie...' : 'Upgrade — 149 PLN'}
           <ArrowRight className="h-3 w-3" />
         </button>
       </div>
     )
   }
 
-  // Card variant — full comparison
+  // Card variant — full comparison with both plans
   return (
     <div
       className={cn(
@@ -79,13 +112,23 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
           <span className="text-amber-400">+</span> Ranking Juice breakdown
         </li>
       </ul>
-      <button
-        onClick={unlockPremium}
-        className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2"
-      >
-        <Sparkles className="h-4 w-4" />
-        Odblokuj pelna moc
-      </button>
+      <div className="space-y-2">
+        <button
+          onClick={() => handleUpgrade('lifetime')}
+          disabled={loading}
+          className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          <Sparkles className="h-4 w-4" />
+          {loading ? 'Ladowanie...' : '149 PLN — Lifetime'}
+        </button>
+        <button
+          onClick={() => handleUpgrade('monthly')}
+          disabled={loading}
+          className="w-full rounded-lg border border-amber-500/30 bg-transparent py-2.5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {loading ? 'Ladowanie...' : '49 PLN/mies'}
+        </button>
+      </div>
     </div>
   )
 }
