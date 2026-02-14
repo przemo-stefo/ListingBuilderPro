@@ -15,6 +15,8 @@ from schemas.compliance import (
     ComplianceReportsListResponse,
     ComplianceReportSummary,
 )
+from schemas.audit import AuditRequest, AuditResult
+from services.audit_service import audit_product
 from typing import Optional
 import structlog
 
@@ -160,6 +162,34 @@ def _report_to_response(report) -> ComplianceReportResponse:
             for item in (report.items or [])
         ],
     )
+
+
+@router.post("/audit", response_model=AuditResult)
+@limiter.limit("10/minute")
+async def audit_product_card(request: Request, body: AuditRequest):
+    """
+    Audit a single product card by URL or ASIN.
+
+    Scrapes the product page, runs compliance checks,
+    and returns issues with AI-generated fix suggestions.
+    """
+    url = body.url
+    marketplace = body.marketplace.lower()
+
+    # WHY: ASIN → build Amazon URL (for future Amazon scraper support)
+    if body.asin and not url:
+        url = f"https://www.amazon.de/dp/{body.asin}"
+        marketplace = "amazon"
+
+    if not url:
+        raise HTTPException(status_code=400, detail="URL lub ASIN jest wymagany")
+
+    try:
+        result = await audit_product(url, marketplace)
+        return result
+    except Exception as e:
+        logger.error("audit_failed", url=url, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
 
 
 def _get_extension(filename: str) -> str:

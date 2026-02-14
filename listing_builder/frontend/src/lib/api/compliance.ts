@@ -8,6 +8,25 @@ import type {
   ComplianceReportsListResponse,
 } from '../types'
 
+// Audit types (inline — no separate types file needed)
+export interface AuditIssue {
+  field: string
+  severity: string
+  message: string
+  fix_suggestion: string | null
+}
+
+export interface AuditResult {
+  source_url: string
+  source_id: string
+  marketplace: string
+  product_title: string
+  overall_status: string
+  score: number
+  issues: AuditIssue[]
+  product_data: Record<string, unknown>
+}
+
 // WHY: Template validation can be slow for large files (1000+ products)
 const COMPLIANCE_TIMEOUT = 60_000
 
@@ -54,6 +73,19 @@ export async function getComplianceReports(
     throw new Error(response.error)
   }
 
+  return response.data!
+}
+
+export async function auditProductCard(
+  url: string,
+  marketplace: string = 'allegro'
+): Promise<AuditResult> {
+  const response = await apiRequest<AuditResult>(
+    'post',
+    '/compliance/audit',
+    { url, marketplace }
+  )
+  if (response.error) throw new Error(response.error)
   return response.data!
 }
 

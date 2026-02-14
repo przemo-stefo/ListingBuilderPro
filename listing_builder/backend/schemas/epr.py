@@ -70,3 +70,31 @@ class EprStatusResponse(BaseModel):
     """Credentials configuration status."""
     credentials_configured: bool
     has_refresh_token: bool
+
+
+# ── Country rules ──
+
+class EprCountryRuleResponse(BaseModel):
+    """Single EPR rule for a country + category."""
+    id: str
+    country_code: str
+    country_name: str
+    category: str
+    registration_required: bool
+    authority_name: Optional[str] = None
+    authority_url: Optional[str] = None
+    threshold_description: Optional[str] = None
+    threshold_units: Optional[int] = None
+    threshold_revenue_eur: Optional[int] = None
+    deadline: Optional[str] = None
+    penalty_description: Optional[str] = None
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EprCountryRulesListResponse(BaseModel):
+    """All country rules, grouped by country_code on the frontend."""
+    rules: List[EprCountryRuleResponse]
+    total: int

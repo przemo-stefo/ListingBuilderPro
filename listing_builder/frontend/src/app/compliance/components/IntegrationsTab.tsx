@@ -1,38 +1,63 @@
 // frontend/src/app/compliance/components/IntegrationsTab.tsx
-// Purpose: Marketplace integration cards — show connection status based on tracked products
+// Purpose: Marketplace integration cards — OAuth connect/disconnect + connection status
 // NOT for: Managing tracked products (that's in monitoring page)
 
 'use client'
 
+import { useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Link2,
   CheckCircle2,
   ExternalLink,
+  Loader2,
+  Unplug,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTrackedProducts } from '@/lib/hooks/useMonitoring'
+import { useOAuthConnections, useOAuthAuthorize, useOAuthDisconnect } from '@/lib/hooks/useOAuth'
+import { useToast } from '@/lib/hooks/useToast'
 
-// WHY: Static marketplace list — not all have backend integrations yet
+// WHY: Only amazon & allegro have OAuth flow ready — others are static cards
+const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro'])
+
 const MARKETPLACES = [
-  { id: 'amazon', name: 'Amazon Seller Central', desc: 'Europejskie rynki Amazon (DE, FR, IT, ES, PL)', flag: '🇩🇪', color: 'border-orange-500/20' },
-  { id: 'ebay', name: 'eBay', desc: 'Globalna platforma aukcyjna i sprzedażowa', flag: '🇬🇧', color: 'border-blue-500/20' },
-  { id: 'kaufland', name: 'Kaufland.de', desc: 'Jeden z największych marketplace w Niemczech', flag: '🇩🇪', color: 'border-red-500/20' },
-  { id: 'allegro', name: 'Allegro', desc: 'Największy marketplace w Polsce', flag: '🇵🇱', color: 'border-orange-500/20' },
-  { id: 'shopify', name: 'Shopify', desc: 'Własny sklep internetowy', flag: '🛒', color: 'border-green-500/20' },
-  { id: 'woocommerce', name: 'WooCommerce', desc: 'Sklep oparty na WordPress', flag: '🛒', color: 'border-purple-500/20' },
-  { id: 'otto', name: 'Otto.de', desc: 'Drugi co do wielkości marketplace w Niemczech', flag: '🇩🇪', color: 'border-gray-500/20' },
-  { id: 'etsy', name: 'Etsy', desc: 'Platforma dla produktów handmade i vintage', flag: '🇺🇸', color: 'border-orange-500/20' },
-  { id: 'zalando', name: 'Zalando', desc: 'Europejska platforma modowa', flag: '🇩🇪', color: 'border-orange-500/20' },
-  { id: 'cdiscount', name: 'Cdiscount', desc: 'Wiodący marketplace we Francji', flag: '🇫🇷', color: 'border-blue-500/20' },
-  { id: 'bol', name: 'Bol.com', desc: 'Największy marketplace w Holandii i Belgii', flag: '🇳🇱', color: 'border-blue-500/20' },
+  { id: 'amazon', name: 'Amazon Seller Central', desc: 'Europejskie rynki Amazon (DE, FR, IT, ES, PL)', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-orange-500/20' },
+  { id: 'allegro', name: 'Allegro', desc: 'Najwiekszy marketplace w Polsce', flag: '\u{1F1F5}\u{1F1F1}', color: 'border-orange-500/20' },
+  { id: 'ebay', name: 'eBay', desc: 'Globalna platforma aukcyjna i sprzedazowa', flag: '\u{1F1EC}\u{1F1E7}', color: 'border-blue-500/20' },
+  { id: 'kaufland', name: 'Kaufland.de', desc: 'Jeden z najwiekszych marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-red-500/20' },
+  { id: 'shopify', name: 'Shopify', desc: 'Wlasny sklep internetowy', flag: '\u{1F6D2}', color: 'border-green-500/20' },
+  { id: 'otto', name: 'Otto.de', desc: 'Drugi co do wielkosci marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-gray-500/20' },
+  { id: 'etsy', name: 'Etsy', desc: 'Platforma dla produktow handmade i vintage', flag: '\u{1F1FA}\u{1F1F8}', color: 'border-orange-500/20' },
+  { id: 'bol', name: 'Bol.com', desc: 'Najwiekszy marketplace w Holandii i Belgii', flag: '\u{1F1F3}\u{1F1F1}', color: 'border-blue-500/20' },
 ]
 
 export default function IntegrationsTab() {
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
   const trackedQuery = useTrackedProducts()
-  const tracked = trackedQuery.data?.items ?? []
+  const oauthQuery = useOAuthConnections()
+  const authorizeMutation = useOAuthAuthorize()
+  const disconnectMutation = useOAuthDisconnect()
 
-  // WHY: A marketplace is "connected" if it has any tracked products
-  const connectedMarketplaces = new Set(tracked.map((p) => p.marketplace))
+  const tracked = trackedQuery.data?.items ?? []
+  const oauthConns = oauthQuery.data?.connections ?? []
+
+  // WHY: Show toast on OAuth redirect back (?oauth=success or ?oauth=error)
+  useEffect(() => {
+    const oauthResult = searchParams.get('oauth')
+    if (oauthResult === 'success') {
+      const mp = searchParams.get('marketplace') || ''
+      toast({ title: 'Polaczono!', description: `${mp} OAuth zakonczone pomyslnie` })
+    } else if (oauthResult === 'error') {
+      const msg = searchParams.get('msg') || 'Nieznany blad'
+      toast({ title: 'Blad OAuth', description: msg, variant: 'destructive' })
+    }
+  }, [searchParams, toast])
+
+  // WHY: Merge tracked products (legacy) + OAuth connections for status
+  const connectedByOAuth = new Set(oauthConns.filter(c => c.status === 'active').map(c => c.marketplace))
+  const connectedByTracking = new Set(tracked.map(p => p.marketplace))
 
   return (
     <div className="space-y-6">
@@ -42,14 +67,18 @@ export default function IntegrationsTab() {
           Integracje Marketplace
         </h2>
         <p className="text-sm text-gray-400">
-          Połącz swoje konta, aby automatycznie monitorować compliance
+          Polacz swoje konta, aby automatycznie monitorowac compliance
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {MARKETPLACES.map((mp) => {
-          const isConnected = connectedMarketplaces.has(mp.id)
-          const productCount = tracked.filter((p) => p.marketplace === mp.id).length
+          const hasOAuth = OAUTH_MARKETPLACES.has(mp.id)
+          const oauthConn = oauthConns.find(c => c.marketplace === mp.id)
+          const isOAuthActive = oauthConn?.status === 'active'
+          const isTracked = connectedByTracking.has(mp.id)
+          const isConnected = isOAuthActive || isTracked
+          const productCount = tracked.filter(p => p.marketplace === mp.id).length
 
           return (
             <div
@@ -73,28 +102,54 @@ export default function IntegrationsTab() {
               </div>
 
               <div className="flex items-center justify-between">
-                {isConnected ? (
-                  <span className="text-xs text-green-400">
-                    Połączony &middot; {productCount} {productCount === 1 ? 'produkt' : 'produktów'}
-                  </span>
-                ) : (
-                  <span className="text-xs text-gray-500">Nie połączony</span>
-                )}
-
-                <button
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                    isConnected
-                      ? 'bg-gray-800 text-gray-400 hover:text-white'
-                      : 'bg-white/5 text-white hover:bg-white/10 border border-gray-700'
-                  )}
-                >
-                  {isConnected ? (
-                    <>Ustawienia <ExternalLink className="h-3 w-3" /></>
+                <div>
+                  {isOAuthActive ? (
+                    <span className="text-xs text-green-400">
+                      OAuth aktywny{oauthConn?.seller_id ? ` (${oauthConn.seller_id})` : ''}
+                    </span>
+                  ) : isTracked ? (
+                    <span className="text-xs text-green-400">
+                      Polaczony &middot; {productCount} {productCount === 1 ? 'produkt' : 'produktow'}
+                    </span>
                   ) : (
-                    'Połącz'
+                    <span className="text-xs text-gray-500">
+                      {hasOAuth ? 'Nie polaczony' : 'Wkrotce'}
+                    </span>
                   )}
-                </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {hasOAuth && isOAuthActive && (
+                    <button
+                      onClick={() => disconnectMutation.mutate(mp.id)}
+                      disabled={disconnectMutation.isPending}
+                      className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                    >
+                      <Unplug className="h-3 w-3" />
+                      Rozlacz
+                    </button>
+                  )}
+                  <button
+                    onClick={() => hasOAuth && !isOAuthActive ? authorizeMutation.mutate(mp.id) : undefined}
+                    disabled={!hasOAuth || isOAuthActive || authorizeMutation.isPending}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                      hasOAuth && !isOAuthActive
+                        ? 'bg-white/5 text-white hover:bg-white/10 border border-gray-700'
+                        : isOAuthActive
+                          ? 'bg-gray-800 text-gray-400'
+                          : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                    )}
+                  >
+                    {authorizeMutation.isPending && authorizeMutation.variables === mp.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : isOAuthActive ? (
+                      <>Ustawienia <ExternalLink className="h-3 w-3" /></>
+                    ) : (
+                      'Polacz'
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )

@@ -31,6 +31,8 @@ const ALLOWED_PATH_PREFIXES = [
   'inventory',
   'keepa',
   'epr',
+  'oauth',
+  'stripe',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access

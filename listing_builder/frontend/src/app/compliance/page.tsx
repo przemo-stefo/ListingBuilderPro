@@ -14,6 +14,7 @@ import {
   Link2,
   Upload,
   FileBarChart,
+  Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import DashboardTab from './components/DashboardTab'
@@ -22,11 +23,13 @@ import AlertsTab from './components/AlertsTab'
 import IntegrationsTab from './components/IntegrationsTab'
 import UploadTab from './components/UploadTab'
 import EprTab from './components/EprTab'
+import AuditTab from './components/AuditTab'
 
-type Tab = 'dashboard' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'epr'
+type Tab = 'dashboard' | 'audit' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'epr'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Panel Główny', icon: BarChart3 },
+  { key: 'audit', label: 'Audyt', icon: Search },
   { key: 'settings', label: 'Aktywacja Alertów', icon: Bell },
   { key: 'alerts', label: 'Alerty', icon: AlertTriangle },
   { key: 'integrations', label: 'Integracje', icon: Link2 },
@@ -86,6 +89,7 @@ function ComplianceContent() {
 
       {/* Tab content */}
       {activeTab === 'dashboard' && <DashboardTab onNavigate={(tab) => setActiveTab(tab as Tab)} />}
+      {activeTab === 'audit' && <AuditTab />}
       {activeTab === 'settings' && <AlertSettingsTab />}
       {activeTab === 'alerts' && <AlertsTab />}
       {activeTab === 'integrations' && <IntegrationsTab />}

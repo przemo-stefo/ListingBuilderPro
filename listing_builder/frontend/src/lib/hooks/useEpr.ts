@@ -9,6 +9,7 @@ import {
   fetchEprReport,
   triggerEprFetch,
   deleteEprReport,
+  fetchEprCountryRules,
 } from '../api/epr'
 import type { EprFetchRequest } from '../types'
 import { useToast } from './useToast'
@@ -51,6 +52,14 @@ export function useEprFetch() {
     onError: (error: Error) => {
       toast({ title: 'Błąd pobierania EPR', description: error.message, variant: 'destructive' })
     },
+  })
+}
+
+export function useEprCountryRules() {
+  return useQuery({
+    queryKey: ['epr-country-rules'],
+    queryFn: fetchEprCountryRules,
+    staleTime: 300_000, // WHY: Country rules rarely change — 5 min cache
   })
 }
 

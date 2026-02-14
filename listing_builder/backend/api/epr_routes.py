@@ -10,11 +10,14 @@ import structlog
 
 from database import get_db, SessionLocal
 from models.epr import EprReport, EprReportRow
+from models.epr_country import EprCountryRule
 from schemas.epr import (
     EprFetchRequest,
     EprReportResponse,
     EprReportsListResponse,
     EprStatusResponse,
+    EprCountryRuleResponse,
+    EprCountryRulesListResponse,
 )
 from services.sp_api_auth import credentials_configured, has_refresh_token
 from services.epr_service import fetch_epr_report_pipeline
@@ -114,3 +117,31 @@ async def delete_epr_report(report_id: str, db: Session = Depends(get_db)):
     db.delete(report)
     db.commit()
     logger.info("epr_report_deleted", report_id=report_id)
+
+
+# ── Country rules endpoints ──────────────────────────────────────────────────
+
+
+@router.get("/countries", response_model=EprCountryRulesListResponse)
+async def list_country_rules(db: Session = Depends(get_db)):
+    """List all EPR country rules (7 countries × 3 categories)."""
+    rules = (
+        db.query(EprCountryRule)
+        .order_by(EprCountryRule.country_code, EprCountryRule.category)
+        .all()
+    )
+    return EprCountryRulesListResponse(rules=rules, total=len(rules))
+
+
+@router.get("/countries/{country_code}", response_model=EprCountryRulesListResponse)
+async def get_country_rules(country_code: str, db: Session = Depends(get_db)):
+    """Get EPR rules for a specific country (3 categories)."""
+    rules = (
+        db.query(EprCountryRule)
+        .filter(EprCountryRule.country_code == country_code.upper())
+        .order_by(EprCountryRule.category)
+        .all()
+    )
+    if not rules:
+        raise HTTPException(status_code=404, detail=f"No rules for country: {country_code}")
+    return EprCountryRulesListResponse(rules=rules, total=len(rules))

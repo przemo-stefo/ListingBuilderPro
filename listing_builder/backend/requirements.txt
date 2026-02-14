@@ -47,5 +47,8 @@ slowapi==0.1.9
 # Background Scheduling (lightweight, no external process)
 apscheduler==3.10.4
 
+# Payments
+stripe==8.0.0
+
 # Logging
 structlog==24.1.0

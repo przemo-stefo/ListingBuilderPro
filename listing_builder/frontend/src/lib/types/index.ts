@@ -734,6 +734,56 @@ export interface EprFetchRequest {
   marketplace_id?: string
 }
 
+// EPR Country Rules types (cross-border compliance)
+export interface EprCountryRule {
+  id: string
+  country_code: string
+  country_name: string
+  category: string
+  registration_required: boolean
+  authority_name: string | null
+  authority_url: string | null
+  threshold_description: string | null
+  threshold_units: number | null
+  threshold_revenue_eur: number | null
+  deadline: string | null
+  penalty_description: string | null
+  notes: string | null
+}
+
+export interface EprCountryRulesListResponse {
+  rules: EprCountryRule[]
+  total: number
+}
+
+// OAuth Connection types
+export interface OAuthConnection {
+  id: string
+  marketplace: string
+  status: string
+  seller_id: string | null
+  seller_name: string | null
+  created_at: string | null
+}
+
+export interface OAuthConnectionsResponse {
+  connections: OAuthConnection[]
+}
+
+export interface OAuthAuthorizeResponse {
+  authorize_url: string
+  state: string
+}
+
+// Subscription types (Stripe)
+export interface SubscriptionStatus {
+  tier: string
+  status: string
+  stripe_customer_id: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+}
+
 // Error types
 export interface ApiError {
   message: string

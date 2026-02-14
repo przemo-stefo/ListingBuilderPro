@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useEprStatus, useEprReports, useEprReport, useEprFetch, useDeleteEprReport } from '@/lib/hooks/useEpr'
 import type { EprReport } from '@/lib/types'
+import EprCountryRulesSection from './EprCountryRulesSection'
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
   completed: { label: 'Ukończony', cls: 'bg-green-500/10 text-green-400' },
@@ -144,6 +145,9 @@ export default function EprTab() {
           onClose={() => setSelectedId(null)}
         />
       )}
+
+      {/* Cross-border EPR rules per country */}
+      <EprCountryRulesSection />
     </div>
   )
 }

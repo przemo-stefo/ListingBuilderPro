@@ -1,6 +1,6 @@
 // frontend/src/components/providers/TierProvider.tsx
-// Purpose: React Context for tier system — persists to localStorage, supports URL unlock
-// NOT for: Backend enforcement or payment processing
+// Purpose: React Context for tier system — backend-first with localStorage fallback
+// NOT for: Payment processing or Stripe API calls
 
 'use client'
 
@@ -37,13 +37,14 @@ export const TierCtx = createContext<TierContext>({
 
 // WHY: useSearchParams in a separate component so only IT lives inside Suspense,
 // not the entire page tree — fixes Next.js 14 static prerender bail-out
-function UnlockHandler({ onUnlock }: { onUnlock: () => void }) {
+function PaymentHandler({ onSuccess }: { onSuccess: () => void }) {
   const searchParams = useSearchParams()
   useEffect(() => {
-    if (searchParams.get('unlock') === 'premium') {
-      onUnlock()
+    // WHY: Stripe redirects back with ?payment=success after checkout
+    if (searchParams.get('payment') === 'success' || searchParams.get('unlock') === 'premium') {
+      onSuccess()
     }
-  }, [searchParams, onUnlock])
+  }, [searchParams, onSuccess])
   return null
 }
 
@@ -51,10 +52,27 @@ export function TierProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<TierLevel>('free')
   const [usageToday, setUsageToday] = useState(0)
 
-  // WHY: Hydrate from localStorage on mount
+  // WHY: Try backend first, fall back to localStorage
   useEffect(() => {
     setTier(getStoredTier())
     setUsageToday(getStoredUsage())
+
+    // WHY: Fetch real tier from backend — overrides localStorage if backend says premium
+    fetch('/api/proxy/stripe/status')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.tier === 'premium' || data?.status === 'active') {
+          localStorage.setItem(TIER_STORAGE_KEY, 'premium')
+          setTier('premium')
+        } else if (data?.tier === 'free' && data?.status !== 'active') {
+          // WHY: Backend says free — clear any stale localStorage premium
+          localStorage.setItem(TIER_STORAGE_KEY, 'free')
+          setTier('free')
+        }
+      })
+      .catch(() => {
+        // WHY: Backend unavailable — keep localStorage value as fallback
+      })
   }, [])
 
   const isPremium = tier === 'premium'
@@ -81,7 +99,7 @@ export function TierProvider({ children }: { children: ReactNode }) {
       value={{ tier, usageToday, canOptimize, incrementUsage, unlockPremium: handleUnlock, isPremium }}
     >
       <Suspense fallback={null}>
-        <UnlockHandler onUnlock={handleUnlock} />
+        <PaymentHandler onSuccess={handleUnlock} />
       </Suspense>
       {children}
     </TierCtx.Provider>

@@ -8,6 +8,7 @@ import type {
   EprReportsListResponse,
   EprReport,
   EprFetchRequest,
+  EprCountryRulesListResponse,
 } from '../types'
 
 export async function fetchEprStatus(): Promise<EprStatusResponse> {
@@ -37,4 +38,10 @@ export async function triggerEprFetch(body: EprFetchRequest): Promise<{ message:
 export async function deleteEprReport(id: string): Promise<void> {
   const response = await apiRequest<void>('delete', `/epr/reports/${id}`)
   if (response.error) throw new Error(response.error)
+}
+
+export async function fetchEprCountryRules(): Promise<EprCountryRulesListResponse> {
+  const response = await apiRequest<EprCountryRulesListResponse>('get', '/epr/countries')
+  if (response.error) throw new Error(response.error)
+  return response.data!
 }

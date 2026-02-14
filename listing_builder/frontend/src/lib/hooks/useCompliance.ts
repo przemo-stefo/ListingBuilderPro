@@ -7,6 +7,7 @@ import {
   uploadComplianceFile,
   getComplianceReports,
   getComplianceReport,
+  auditProductCard,
   type ComplianceReportsParams,
 } from '../api/compliance'
 import { useToast } from './useToast'
@@ -25,6 +26,22 @@ export function useComplianceReport(reportId: string | null) {
     queryFn: () => getComplianceReport(reportId!),
     enabled: !!reportId, // WHY: Only fetch when user clicks into a specific report
     staleTime: 60_000, // WHY: Individual report data is immutable once created
+  })
+}
+
+export function useAuditProduct() {
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: ({ url, marketplace }: { url: string; marketplace?: string }) =>
+      auditProductCard(url, marketplace),
+    onError: (error: Error) => {
+      toast({
+        title: 'Audit nie powiódł się',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
   })
 }
 

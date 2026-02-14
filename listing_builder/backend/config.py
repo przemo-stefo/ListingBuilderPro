@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     ebay_dev_id: str = ""
     ebay_user_token: str = ""
 
+    allegro_client_id: str = ""  # WHY: Allegro OAuth app credentials (from Mateusz)
+    allegro_client_secret: str = ""
+
     kaufland_client_key: str = ""
     kaufland_secret_key: str = ""
 
@@ -62,6 +65,11 @@ class Settings(BaseSettings):
     # n8n Integration (optional — empty = skip n8n, use direct Groq only)
     n8n_webhook_url: str = ""
     n8n_webhook_secret: str = ""
+
+    # Stripe (subscription/monetization)
+    stripe_secret_key: str = ""  # WHY: Empty = Stripe disabled (dev mode)
+    stripe_price_id: str = ""  # Stripe Price object for premium plan
+    stripe_webhook_secret: str = ""  # WHY: Stripe signs webhooks with this
 
     # Webhook Security
     webhook_secret: str  # REQUIRED - no default value

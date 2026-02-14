@@ -9,6 +9,9 @@ from .optimization import OptimizationRun
 from .monitoring import TrackedProduct, MonitoringSnapshot, AlertConfig, Alert
 from .listing import Listing, TrackedKeyword
 from .epr import EprReport, EprReportRow
+from .epr_country import EprCountryRule
+from .oauth_connection import OAuthConnection
+from .subscription import Subscription
 
 __all__ = [
     "Product",
@@ -29,4 +32,7 @@ __all__ = [
     "TrackedKeyword",
     "EprReport",
     "EprReportRow",
+    "EprCountryRule",
+    "OAuthConnection",
+    "Subscription",
 ]
