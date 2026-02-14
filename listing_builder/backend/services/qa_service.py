@@ -131,7 +131,6 @@ async def ask_expert(
     return {
         "answer": answer,
         "sources_used": len(source_names),
-        "source_names": source_names,
         "has_context": bool(context),
         "mode": mode,
     }

@@ -50,7 +50,6 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources_used: int
-    source_names: list[str] = []
     has_context: bool
     mode: str = "balanced"
 

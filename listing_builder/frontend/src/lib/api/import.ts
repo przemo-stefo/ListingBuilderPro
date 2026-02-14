@@ -42,13 +42,15 @@ export async function importSingleProduct(
 }
 
 // Import batch of products
+// WHY: Backend expects List[ProductImport] as body + source as query param (not wrapped in object)
 export async function importBatchProducts(
-  batch: BatchProductImport
+  products: SingleProductImport[],
+  source: string = 'allegro'
 ): Promise<ImportJobStatus> {
   const response = await apiRequest<ImportJobStatus>(
     'post',
-    '/import/batch',
-    batch
+    `/import/batch?source=${source}`,
+    products
   )
 
   if (response.error) {

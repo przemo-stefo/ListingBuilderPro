@@ -4,8 +4,9 @@
 
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
 import { TierBadge } from '@/components/tier/TierBadge'
@@ -21,7 +22,25 @@ import {
   Brain,
   Crown,
   Newspaper,
+  ChevronDown,
+  BarChart3,
+  Search,
+  Bell,
+  AlertTriangle,
+  Link2,
+  FileBarChart,
 } from 'lucide-react'
+
+// WHY: Compliance sub-tabs defined here so sidebar shows them as expandable menu
+const complianceSubItems = [
+  { key: 'dashboard', label: 'Panel Główny', icon: BarChart3 },
+  { key: 'audit', label: 'Audyt', icon: Search },
+  { key: 'settings', label: 'Aktywacja Alertów', icon: Bell },
+  { key: 'alerts', label: 'Alerty', icon: AlertTriangle },
+  { key: 'integrations', label: 'Integracje', icon: Link2 },
+  { key: 'upload', label: 'Upload', icon: Upload },
+  { key: 'epr', label: 'Raporty EPR', icon: FileBarChart },
+]
 
 const navItems = [
   {
@@ -55,11 +74,6 @@ const navItems = [
     icon: ArrowRightLeft,
   },
   {
-    title: 'Compliance',
-    href: '/compliance',
-    icon: Shield,
-  },
-  {
     title: 'Wiadomości',
     href: '/news',
     icon: Newspaper,
@@ -79,7 +93,13 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { tier } = useTier()
+
+  // WHY: Auto-expand when user is on /compliance, collapse otherwise
+  const isOnCompliance = pathname === '/compliance'
+  const [complianceOpen, setComplianceOpen] = useState(isOnCompliance)
+  const activeComplianceTab = searchParams.get('tab') || 'dashboard'
 
   return (
     <div className="w-64 border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
@@ -90,9 +110,8 @@ export function Sidebar() {
         <p className="text-sm text-gray-400">Automation System</p>
       </div>
 
-      <nav className="space-y-2 flex-1">
+      <nav className="space-y-1 flex-1 overflow-y-auto">
         {navItems.map((item) => {
-          // WHY: pathname-only match — query params ignored to avoid useSearchParams + Suspense
           const basePath = item.href.split('?')[0]
           const isActive = pathname === basePath && !item.href.includes('?')
           const Icon = item.icon
@@ -116,6 +135,51 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        {/* WHY: Compliance as expandable section — sub-tabs shown inline in sidebar */}
+        <div>
+          <button
+            onClick={() => setComplianceOpen(!complianceOpen)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+              isOnCompliance
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+            )}
+          >
+            <Shield className="h-4 w-4" />
+            Compliance
+            <ChevronDown
+              className={cn(
+                'ml-auto h-4 w-4 transition-transform',
+                complianceOpen && 'rotate-180'
+              )}
+            />
+          </button>
+
+          {complianceOpen && (
+            <div className="ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
+              {complianceSubItems.map(({ key, label, icon: SubIcon }) => {
+                const isSubActive = isOnCompliance && activeComplianceTab === key
+                return (
+                  <Link
+                    key={key}
+                    href={`/compliance?tab=${key}`}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                      isSubActive
+                        ? 'bg-white/10 text-white'
+                        : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300'
+                    )}
+                  >
+                    <SubIcon className="h-3.5 w-3.5" />
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </nav>
 
       <div className="space-y-3 pt-4">

@@ -32,7 +32,8 @@ class ProductImport(BaseModel):
     category: Optional[str] = None
     brand: Optional[str] = None
 
-    price: float = Field(..., gt=0)
+    # WHY: Optional price — batch CSV imports from Allegro may not always include price
+    price: Optional[float] = Field(default=None)
     currency: str = Field(default="PLN", max_length=3)
 
     images: List[str] = Field(default_factory=list)
@@ -61,7 +62,7 @@ class ProductResponse(BaseModel):
     category: Optional[str]
     brand: Optional[str]
 
-    price: float
+    price: Optional[float]
     currency: str
 
     images: List[str]

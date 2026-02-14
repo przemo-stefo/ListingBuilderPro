@@ -13,14 +13,14 @@ echo "=== Deploying Compliance Guard to $SERVER ==="
 # Step 1: Sync backend code
 echo "[1/6] Syncing backend..."
 ssh $SERVER "mkdir -p $REMOTE_DIR/backend"
-rsync -avz --exclude='node_modules' --exclude='.next' --exclude='__pycache__' \
+rsync -avz --delete --exclude='node_modules' --exclude='.next' --exclude='__pycache__' \
   --exclude='.git' --exclude='venv' --exclude='.env' \
   -e "ssh" ../../backend/ $SERVER:$REMOTE_DIR/backend/
 
 # Step 2: Sync frontend code
 echo "[2/6] Syncing frontend..."
 ssh $SERVER "mkdir -p $REMOTE_DIR/frontend"
-rsync -avz --exclude='node_modules' --exclude='.next' --exclude='.vercel' \
+rsync -avz --delete --exclude='node_modules' --exclude='.next' --exclude='.vercel' \
   --exclude='.git' --exclude='.env.local' \
   -e "ssh" ../../frontend/ $SERVER:$REMOTE_DIR/frontend/
 
@@ -28,7 +28,12 @@ rsync -avz --exclude='node_modules' --exclude='.next' --exclude='.vercel' \
 echo "[3/6] Syncing config..."
 scp frontend/Dockerfile $SERVER:$REMOTE_DIR/frontend/Dockerfile
 scp docker-compose.yml $SERVER:$REMOTE_DIR/
-scp .env $SERVER:$REMOTE_DIR/
+# WHY: Only overwrite .env if local copy exists (server may have its own)
+if [ -f .env ]; then
+  scp .env $SERVER:$REMOTE_DIR/
+else
+  echo "  (skipping .env — not found locally, using server copy)"
+fi
 
 # Step 4: Build containers
 echo "[4/6] Building containers..."

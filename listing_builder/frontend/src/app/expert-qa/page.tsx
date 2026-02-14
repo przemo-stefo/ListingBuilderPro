@@ -12,9 +12,6 @@ import { cn } from '@/lib/utils'
 interface Message {
   role: 'user' | 'assistant'
   content: string
-  sources?: number
-  sourceNames?: string[]
-  mode?: string
 }
 
 // WHY: RAG behavior modes control how strictly the LLM sticks to transcript knowledge
@@ -40,21 +37,12 @@ export default function ExpertQAPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [mode, setMode] = useState('balanced')
   const [showModeSelector, setShowModeSelector] = useState(false)
-  const [stats, setStats] = useState<{ total_chunks: number; total_files: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // WHY: Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  // WHY: Fetch knowledge base stats on mount to show in header
-  useEffect(() => {
-    fetch('/api/proxy/knowledge/stats')
-      .then(r => r.json())
-      .then(setStats)
-      .catch(() => {})
-  }, [])
 
   async function handleSend(question?: string) {
     const q = question || input.trim()
@@ -78,13 +66,7 @@ export default function ExpertQAPage() {
       const data = await res.json()
       setMessages(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          content: data.answer,
-          sources: data.sources_used,
-          sourceNames: data.source_names || [],
-          mode: data.mode,
-        },
+        { role: 'assistant', content: data.answer },
       ])
     } catch {
       setMessages(prev => [
@@ -114,11 +96,6 @@ export default function ExpertQAPage() {
         </div>
         <p className="mt-1 text-sm text-gray-400">
           Zadaj pytanie o Amazon, e-commerce, reklamy — odpowiedzi na bazie wiedzy eksperckiej
-          {stats && (
-            <span className="ml-2 text-gray-500">
-              ({stats.total_chunks.toLocaleString()} fragmentów z {stats.total_files} transkrypcji)
-            </span>
-          )}
         </p>
 
         {/* WHY: Mode selector — collapsible to avoid clutter for casual users */}
@@ -188,32 +165,6 @@ export default function ExpertQAPage() {
                   )}
                 >
                   <div className="whitespace-pre-wrap">{msg.content}</div>
-                  {msg.role === 'assistant' && (
-                    <div className="mt-2 text-[10px] text-gray-500">
-                      {msg.sources !== undefined && msg.sources > 0 && (
-                        <>
-                          <p>Na podstawie {msg.sources} {msg.sources === 1 ? 'źródła' : 'źródeł'}:</p>
-                          {msg.sourceNames && msg.sourceNames.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {msg.sourceNames.map((name, j) => (
-                                <span
-                                  key={j}
-                                  className="rounded bg-gray-800 px-1.5 py-0.5 text-gray-400"
-                                >
-                                  {name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {msg.mode && (
-                        <span className="mt-1 inline-block rounded bg-gray-800/50 px-1.5 py-0.5 text-gray-500">
-                          tryb: {msg.mode}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

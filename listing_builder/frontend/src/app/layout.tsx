@@ -3,6 +3,7 @@
 // NOT for: Page-specific layouts or business logic
 
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { QueryProvider } from '@/components/providers/QueryProvider'
@@ -29,7 +30,9 @@ export default function RootLayout({
         <QueryProvider>
           <TierProvider>
             <div className="flex h-screen bg-[#1A1A1A]">
-              <Sidebar />
+              <Suspense>
+                <Sidebar />
+              </Suspense>
               <main className="flex-1 overflow-y-auto p-8">
                 {children}
               </main>

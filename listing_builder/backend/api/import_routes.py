@@ -2,17 +2,25 @@
 # Purpose: API routes for product import from scrapers
 # NOT for: AI optimization or export logic
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
 from services.import_service import ImportService
 from config import settings
 from typing import List, Optional
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import hmac
 import structlog
 
 logger = structlog.get_logger()
+
+# WHY: Rate limiter prevents batch import abuse
+limiter = Limiter(key_func=get_remote_address)
+# WHY: Server-side limit prevents DoS via huge payloads
+MAX_BATCH_SIZE = 500
+
 router = APIRouter(prefix="/api/import", tags=["Import"])
 
 
@@ -76,7 +84,9 @@ async def receive_webhook(
 
 
 @router.post("/product")
+@limiter.limit("30/minute")
 async def import_single_product(
+    request: Request,
     product: ProductImport,
     db: Session = Depends(get_db)
 ):
@@ -96,7 +106,9 @@ async def import_single_product(
 
 
 @router.post("/batch")
+@limiter.limit("5/minute")
 async def import_batch(
+    request: Request,
     products: List[ProductImport],
     source: str = "allegro",
     db: Session = Depends(get_db)
@@ -105,6 +117,12 @@ async def import_batch(
     Import multiple products as a batch.
     Alternative to webhook endpoint.
     """
+    # WHY: Server-side guard against oversized payloads (frontend also caps at 500)
+    if len(products) > MAX_BATCH_SIZE:
+        raise HTTPException(status_code=400, detail=f"Max {MAX_BATCH_SIZE} products per batch")
+    if len(products) == 0:
+        raise HTTPException(status_code=400, detail="No products provided")
+
     logger.info("batch_import_started", count=len(products), source=source)
 
     try:
