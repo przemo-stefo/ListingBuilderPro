@@ -20,6 +20,7 @@ import {
   Activity,
   Brain,
   Crown,
+  Newspaper,
 } from 'lucide-react'
 
 const navItems = [
@@ -57,6 +58,11 @@ const navItems = [
     title: 'Compliance',
     href: '/compliance',
     icon: Shield,
+  },
+  {
+    title: 'Wiadomości',
+    href: '/news',
+    icon: Newspaper,
   },
   {
     title: 'Monitoring',
