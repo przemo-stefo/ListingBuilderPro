@@ -20,12 +20,21 @@ logger = structlog.get_logger()
 _pending_states: Dict[str, Dict] = {}
 
 
-# ── Frontend callback base ────────────────────────────────────────────────────
+# ── URL helpers ───────────────────────────────────────────────────────────────
 
 def _frontend_url() -> str:
     if settings.app_env == "production":
         return "https://listing.feedmasters.org"
     return "http://localhost:3000"
+
+
+def _backend_url() -> str:
+    """WHY direct backend URL: OAuth callbacks must bypass the proxy because
+    the proxy's fetch() follows redirects, breaking the browser redirect flow.
+    The backend callback is in PUBLIC_PATHS (no API key needed)."""
+    if settings.app_env == "production":
+        return "https://api-listing.feedmasters.org"
+    return "http://localhost:8000"
 
 
 # ── Amazon SP-API OAuth ──────────────────────────────────────────────────────
@@ -42,8 +51,9 @@ def get_amazon_authorize_url() -> Dict:
     state = secrets.token_urlsafe(32)
     _pending_states[state] = {"marketplace": "amazon", "created_at": datetime.now(timezone.utc)}
 
-    # WHY: redirect_uri must match exactly what's registered in Seller Central app
-    redirect_uri = f"{_frontend_url()}/api/proxy/oauth/amazon/callback"
+    # WHY: redirect_uri goes directly to backend (bypasses proxy) because
+    # proxy's fetch() follows redirects, breaking the browser redirect flow
+    redirect_uri = f"{_backend_url()}/api/oauth/amazon/callback"
 
     params = {
         "application_id": settings.amazon_client_id,
@@ -126,7 +136,7 @@ def get_allegro_authorize_url() -> Dict:
     state = secrets.token_urlsafe(32)
     _pending_states[state] = {"marketplace": "allegro", "created_at": datetime.now(timezone.utc)}
 
-    redirect_uri = f"{_frontend_url()}/api/proxy/oauth/allegro/callback"
+    redirect_uri = f"{_backend_url()}/api/oauth/allegro/callback"
 
     params = {
         "response_type": "code",
@@ -152,7 +162,7 @@ async def handle_allegro_callback(
     if not settings.allegro_client_id or not settings.allegro_client_secret:
         return {"error": "Allegro credentials not configured"}
 
-    redirect_uri = f"{_frontend_url()}/api/proxy/oauth/allegro/callback"
+    redirect_uri = f"{_backend_url()}/api/oauth/allegro/callback"
 
     # WHY: Allegro uses HTTP Basic auth for token exchange
     async with httpx.AsyncClient(timeout=15) as client:

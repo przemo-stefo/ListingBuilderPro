@@ -40,6 +40,7 @@ import type {
   GPSRData,
   StoreJobStatus,
 } from '@/lib/types'
+import AutoSyncCard from '@/components/converter/AutoSyncCard'
 
 // WHY: Default GPSR structure with empty strings — user fills only what they need
 const DEFAULT_GPSR: GPSRData = {
@@ -636,7 +637,15 @@ export default function ConverterPage() {
         )}
       </Card>
 
-      {/* Section 5: FAQ */}
+      {/* Section 5: Auto-Sync */}
+      <AutoSyncCard
+        allegroConnected={allegroConnected}
+        marketplace={marketplace}
+        gpsr={gpsr}
+        eurRate={eurRate}
+      />
+
+      {/* Section 6: FAQ */}
       <Card>
         <button
           onClick={() => setShowFaq(!showFaq)}
@@ -692,6 +701,10 @@ export default function ConverterPage() {
             <FaqItem
               question="Co jeśli niektóre produkty mają błędy?"
               answer="Produkty z błędami (np. Allegro zablokował scraping) są pomijane. Reszta konwertuje się normalnie. W podsumowaniu zobaczysz ile się udało, ile nie, i jakie warnings dostałeś (np. brakujący EAN)."
+            />
+            <FaqItem
+              question="Co to jest Auto-Sync?"
+              answer="Automatyczne monitorowanie Twojego konta Allegro. Gdy włączone, system co 6/12/24 godzin sprawdza czy masz nowe oferty na Allegro. Jeśli znajdzie nowe produkty — pokazuje badge z liczbą nowych ofert. Kliknij 'Konwertuj' i system automatycznie przetłumaczy je na wybrany marketplace i pobierze gotowy plik. Wymaga połączenia z Allegro (OAuth)."
             />
             <FaqItem
               question="Jak wgrać plik na Amazon?"
