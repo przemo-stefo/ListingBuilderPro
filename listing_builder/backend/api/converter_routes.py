@@ -468,3 +468,16 @@ async def get_allegro_offers(
     """
     result = await fetch_seller_offers(db)
     return StoreUrlsResponse(**result)
+
+
+@router.get("/allegro-offer-debug/{offer_id}")
+async def debug_allegro_offer(offer_id: str, db: Session = Depends(get_db)):
+    """TEMPORARY: Debug Allegro API response for a single offer.
+    TODO: Remove after testing.
+    """
+    from services.allegro_api import fetch_offer_details, get_access_token
+    token = await get_access_token(db)
+    if not token:
+        return {"error": "No Allegro token"}
+    result = await fetch_offer_details(offer_id, token)
+    return result
