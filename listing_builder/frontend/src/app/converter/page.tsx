@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  HelpCircle,
   Loader2,
   AlertTriangle,
   CheckCircle,
@@ -69,6 +70,7 @@ export default function ConverterPage() {
   // Collapsible sections
   const [showSettings, setShowSettings] = useState(false)
   const [showGpsr, setShowGpsr] = useState(false)
+  const [showFaq, setShowFaq] = useState(false)
 
   // Store input
   const [storeName, setStoreName] = useState('')
@@ -634,6 +636,71 @@ export default function ConverterPage() {
         )}
       </Card>
 
+      {/* Section 5: FAQ */}
+      <Card>
+        <button
+          onClick={() => setShowFaq(!showFaq)}
+          className="flex w-full items-center justify-between p-6"
+        >
+          <div className="flex items-center gap-2">
+            <HelpCircle className="h-5 w-5 text-gray-400" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">FAQ — Jak korzystać</h3>
+              <p className="text-sm text-gray-400">Instrukcja krok po kroku</p>
+            </div>
+          </div>
+          {showFaq ? (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronRight className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+        {showFaq && (
+          <CardContent className="space-y-4 pt-0">
+            <FaqItem
+              question="Jak pobrać oferty ze sklepu Allegro?"
+              answer="Masz 3 opcje: (1) Połącz swoje konto Allegro — kliknij 'Połącz z Allegro', zaloguj się i kliknij 'Pobierz moje oferty (API)'. To najszybsza i darmowa metoda. (2) Wpisz nazwę sklepu w pole 'Sklep Allegro' i kliknij 'Pobierz oferty'. System zescrapuje stronę sklepu. (3) Wklej URLe ręcznie do pola tekstowego, po jednym w linii."
+            />
+            <FaqItem
+              question="Co to jest 'Połącz z Allegro'?"
+              answer="Logowanie przez OAuth — jak 'Zaloguj przez Google'. Klikasz, logujesz się na swoje konto Allegro, zezwalasz na dostęp i wracasz do convertera. System pobierze Twoje oferty przez oficjalne API Allegro — za darmo, bez scrapowania."
+            />
+            <FaqItem
+              question="Co to jest 'Target Marketplace'?"
+              answer="Wybierz gdzie chcesz wystawić produkty: Amazon.de (plik TSV), eBay.de (plik CSV) lub Kaufland.de (plik CSV). Każdy marketplace ma inny format pliku do importu."
+            />
+            <FaqItem
+              question="Co to jest GPSR?"
+              answer="General Product Safety Regulation — wymóg UE od 2024. Musisz podać dane producenta, osoby odpowiedzialnej w UE i kraj pochodzenia. Wypełnij raz — dane dotyczą wszystkich produktów tego sprzedawcy. Bez tego Amazon/eBay mogą odrzucić listing."
+            />
+            <FaqItem
+              question="Co to jest 'EUR exchange rate'?"
+              answer="Kurs wymiany PLN → EUR. Domyślnie 0.23 (1 PLN ≈ 0.23 EUR). Zmień go na aktualny kurs przed konwersją, żeby ceny były poprawne."
+            />
+            <FaqItem
+              question="Co to jest 'Amazon Browse Node' i 'Product Type'?"
+              answer="Browse Node to ID kategorii na Amazon (np. 3169011 = Kawa). Product Type to typ produktu (np. HOME, BEAUTY). Znajdziesz je w Amazon Seller Central → Add a Product → wybierz kategorię."
+            />
+            <FaqItem
+              question="Czym się różni 'Preview' od 'Download Template'?"
+              answer="Preview pokazuje skonwertowane dane na ekranie — możesz sprawdzić tłumaczenia, ceny, pola przed pobraniem. Download Template generuje gotowy plik TSV/CSV do uploadu na marketplace."
+            />
+            <FaqItem
+              question="Co oznacza progress bar 'Przetwarzam 12/47'?"
+              answer="Przy >20 produktach konwersja działa w tle. Każdy produkt jest osobno scrapowany, tłumaczony na niemiecki przez AI i mapowany na pola marketplace. Progress bar pokazuje ile produktów już przetworzono. Plik pobierze się automatycznie po zakończeniu."
+            />
+            <FaqItem
+              question="Co jeśli niektóre produkty mają błędy?"
+              answer="Produkty z błędami (np. Allegro zablokował scraping) są pomijane. Reszta konwertuje się normalnie. W podsumowaniu zobaczysz ile się udało, ile nie, i jakie warnings dostałeś (np. brakujący EAN)."
+            />
+            <FaqItem
+              question="Jak wgrać plik na Amazon?"
+              answer="Amazon Seller Central → Catalog → Add Products via Upload → Download Template (żeby sprawdzić format) → Upload your file (wgraj pobrany TSV). Upewnij się, że wybrałeś właściwy Product Type i Browse Node."
+            />
+          </CardContent>
+        )}
+      </Card>
+
       {/* Action Bar */}
       <div className="flex items-center gap-3">
         <Button
@@ -745,6 +812,31 @@ export default function ConverterPage() {
     </div>
   )
 }
+
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-lg border border-gray-800 bg-[#1A1A1A]">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-3 text-left"
+      >
+        <span className="text-sm font-medium text-white">{question}</span>
+        {open ? (
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-gray-400" />
+        ) : (
+          <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-gray-400" />
+        )}
+      </button>
+      {open && (
+        <div className="border-t border-gray-800 px-3 py-2">
+          <p className="text-xs leading-relaxed text-gray-400">{answer}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 // WHY: Separate component to keep the main page cleaner and avoid re-rendering everything
 function ProductResultCard({
