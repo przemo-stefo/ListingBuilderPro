@@ -770,3 +770,113 @@ async def scrape_allegro_batch(
         failed=total - succeeded,
     )
     return results
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# STORE SCRAPING — fetch all product URLs from an Allegro seller page
+# ═══════════════════════════════════════════════════════════════════════
+
+async def scrape_allegro_store_urls(store_input: str) -> dict:
+    """Scrape all product URLs from an Allegro store/seller page.
+
+    WHY separate from product scraping: Store pages list many products
+    with links — we just need URLs, not full product data. The actual
+    product scraping happens later in the conversion pipeline.
+
+    Args:
+        store_input: Store name (e.g. 'electronics-shop-pl') or full URL
+
+    Returns:
+        {"store_name": str, "urls": list, "total": int, "error": str|None}
+    """
+    # Parse input — extract store name from URL or use directly
+    store_name = store_input.strip().rstrip("/")
+    if "allegro.pl" in store_name:
+        match = re.search(r'allegro\.pl/uzytkownik/([^/?#]+)', store_name)
+        if match:
+            store_name = match.group(1)
+        else:
+            return {"store_name": store_input, "urls": [], "total": 0,
+                    "error": "Nie udało się wyciągnąć nazwy sklepu z URL"}
+
+    token = _get_scrape_do_token()
+    if not token:
+        return {"store_name": store_name, "urls": [], "total": 0,
+                "error": "SCRAPE_DO_TOKEN not configured"}
+
+    all_urls: set = set()
+    max_pages = 5  # ~60 products/page × 5 = ~300 max
+
+    for page in range(1, max_pages + 1):
+        store_url = f"https://allegro.pl/uzytkownik/{store_name}/oferty?p={page}"
+        encoded = quote(store_url, safe="")
+        api_url = (
+            f"https://api.scrape.do/"
+            f"?token={token}"
+            f"&url={encoded}"
+            f"&super=true"
+            f"&geoCode=pl"
+        )
+
+        logger.info("scraping_store_page", store=store_name, page=page)
+
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                resp = await client.get(api_url)
+
+                if resp.status_code != 200:
+                    logger.error("store_page_failed", page=page, status=resp.status_code)
+                    if page == 1:
+                        return {"store_name": store_name, "urls": [], "total": 0,
+                                "error": f"Nie udało się pobrać strony sklepu (HTTP {resp.status_code})"}
+                    break
+
+                html = resp.text
+
+                # WHY regex not BeautifulSoup: we only need href links, regex is faster
+                # Allegro store pages have links like /oferta/product-name-12345678901
+                found = re.findall(
+                    r'href="(https?://allegro\.pl/oferta/[^"]+)"', html
+                )
+
+                page_urls: set = set()
+                for url in found:
+                    clean = url.split("?")[0].split("#")[0]
+                    if re.search(r'-\d{8,14}$', clean):
+                        page_urls.add(clean)
+
+                if not page_urls:
+                    logger.info("store_pagination_end", store=store_name, page=page)
+                    break
+
+                all_urls.update(page_urls)
+                logger.info("store_page_scraped", store=store_name, page=page,
+                            found=len(page_urls))
+
+                if page < max_pages:
+                    await asyncio.sleep(random.uniform(2.0, 4.0))
+
+        except httpx.TimeoutException:
+            logger.error("store_page_timeout", store=store_name, page=page)
+            if page == 1:
+                return {"store_name": store_name, "urls": [], "total": 0,
+                        "error": "Timeout — strona sklepu nie odpowiedziała"}
+            break
+        except Exception as e:
+            logger.error("store_page_error", store=store_name, page=page, error=str(e))
+            if page == 1:
+                return {"store_name": store_name, "urls": [], "total": 0,
+                        "error": f"Błąd pobierania strony sklepu: {str(e)}"}
+            break
+
+    urls_list = sorted(all_urls)
+    capped = len(urls_list) >= max_pages * 60  # rough cap indicator
+    logger.info("store_scrape_complete", store=store_name, total=len(urls_list))
+
+    return {
+        "store_name": store_name,
+        "urls": urls_list,
+        "total": len(urls_list),
+        "error": None,
+        "capped": capped,
+    }

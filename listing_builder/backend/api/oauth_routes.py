@@ -111,10 +111,10 @@ async def allegro_callback(
     if "error" in result:
         logger.error("allegro_oauth_callback_error", error=result["error"])
         frontend = "https://listing.feedmasters.org" if settings.app_env == "production" else "http://localhost:3000"
-        return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=error&msg={result['error']}")
+        return RedirectResponse(f"{frontend}/converter?allegro=error&msg={result['error']}")
 
     frontend = "https://listing.feedmasters.org" if settings.app_env == "production" else "http://localhost:3000"
-    return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=success&marketplace=allegro")
+    return RedirectResponse(f"{frontend}/converter?allegro=connected")
 
 
 # ── Disconnect ────────────────────────────────────────────────────────────────

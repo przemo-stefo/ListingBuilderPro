@@ -2,13 +2,16 @@
 # Purpose: Orchestrate Allegro→Marketplace conversion (scrape→translate→map→generate)
 # NOT for: Individual scraping, AI calls, or template file I/O
 
+import asyncio
+import random
 import re
+import uuid
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
 import structlog
 
-from services.scraper.allegro_scraper import AllegroProduct
+from services.scraper.allegro_scraper import AllegroProduct, scrape_allegro_product
 from services.converter.ai_translator import (
     AITranslator,
     translate_color,
@@ -436,3 +439,82 @@ def convert_batch(
         converted = convert_product(product, marketplace, translator, gpsr_data, eur_rate)
         results.append(converted)
     return results
+
+
+# ── Store job processing (async, in-memory) ──────────────────────────────
+# WHY in-memory: Render free tier = 1 worker, no need for Redis/DB.
+# Jobs auto-expire after processing — dict stays small.
+
+_store_jobs: Dict[str, dict] = {}
+
+
+def create_store_job(urls: List[str], marketplace: str) -> str:
+    """Create a new store conversion job, return job_id."""
+    job_id = str(uuid.uuid4())
+    _store_jobs[job_id] = {
+        "status": "processing",
+        "total": len(urls),
+        "scraped": 0,
+        "converted": 0,
+        "failed": 0,
+        "marketplace": marketplace,
+        "file_bytes": None,
+    }
+    return job_id
+
+
+def get_store_job(job_id: str) -> Optional[dict]:
+    """Get job status by ID."""
+    return _store_jobs.get(job_id)
+
+
+async def process_store_job(
+    job_id: str,
+    urls: List[str],
+    marketplace: str,
+    gpsr_data: Dict,
+    eur_rate: float,
+    groq_api_key: str,
+) -> None:
+    """Background task: scrape each URL → convert → generate file.
+
+    WHY async: scraping is I/O-bound (HTTP calls), async lets us
+    update progress counters between products without blocking.
+    """
+    from services.converter.template_generator import generate_template
+
+    job = _store_jobs[job_id]
+    translator = AITranslator(groq_api_key=groq_api_key)
+    converted_products: List[ConvertedProduct] = []
+
+    for i, url in enumerate(urls):
+        try:
+            product = await scrape_allegro_product(url)
+            job["scraped"] = i + 1
+
+            if product.error:
+                job["failed"] += 1
+                logger.warning("store_job_skip", job_id=job_id, url=url[:80],
+                               error=product.error)
+                continue
+
+            result = convert_product(product, marketplace, translator, gpsr_data, eur_rate)
+            if result.error:
+                job["failed"] += 1
+            else:
+                converted_products.append(result)
+                job["converted"] = len(converted_products)
+
+            if i < len(urls) - 1:
+                await asyncio.sleep(random.uniform(2.0, 4.0))
+
+        except Exception as e:
+            job["failed"] += 1
+            logger.error("store_job_error", job_id=job_id, url=url[:80], error=str(e))
+
+    if converted_products:
+        job["file_bytes"] = generate_template(converted_products, marketplace)
+
+    job["status"] = "done"
+    logger.info("store_job_complete", job_id=job_id, total=len(urls),
+                converted=len(converted_products), failed=job["failed"])

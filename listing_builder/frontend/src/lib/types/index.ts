@@ -408,6 +408,31 @@ export interface ScrapeResponse {
   products: Record<string, unknown>[]
 }
 
+export interface StoreUrlsResponse {
+  store_name: string
+  urls: string[]
+  total: number
+  error: string | null
+  capped: boolean
+}
+
+export interface StoreConvertRequest {
+  urls: string[]
+  marketplace: string
+  gpsr_data: GPSRData
+  eur_rate: number
+}
+
+export interface StoreJobStatus {
+  job_id: string
+  status: 'processing' | 'done' | 'failed'
+  total: number
+  scraped: number
+  converted: number
+  failed: number
+  download_ready: boolean
+}
+
 // Compliance Guard types — file upload → per-product validation report
 export type ComplianceSeverity = 'error' | 'warning' | 'info'
 export type ComplianceItemStatus = 'compliant' | 'warning' | 'error'

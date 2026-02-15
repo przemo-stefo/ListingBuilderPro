@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   ArrowRightLeft,
   ChevronDown,
@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Search,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,7 +23,22 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useMarketplaces, useConvertProducts, useDownloadTemplate } from '@/lib/hooks/useConverter'
-import type { ConvertRequest, ConvertResponse, ConvertedProductResult, GPSRData } from '@/lib/types'
+import {
+  getStoreUrls,
+  startStoreConvert,
+  getStoreJobStatus,
+  downloadStoreJob,
+  getOAuthConnections,
+  startAllegroOAuth,
+  getAllegroOffers,
+} from '@/lib/api/converter'
+import type {
+  ConvertRequest,
+  ConvertResponse,
+  ConvertedProductResult,
+  GPSRData,
+  StoreJobStatus,
+} from '@/lib/types'
 
 // WHY: Default GPSR structure with empty strings — user fills only what they need
 const DEFAULT_GPSR: GPSRData = {
@@ -54,6 +70,20 @@ export default function ConverterPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showGpsr, setShowGpsr] = useState(false)
 
+  // Store input
+  const [storeName, setStoreName] = useState('')
+  const [storeLoading, setStoreLoading] = useState(false)
+  const [storeError, setStoreError] = useState('')
+  const [storeCount, setStoreCount] = useState<number | null>(null)
+
+  // Allegro OAuth connection
+  const [allegroConnected, setAllegroConnected] = useState(false)
+  const [allegroLoading, setAllegroLoading] = useState(false)
+
+  // Async job (for >20 products)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobStatus, setJobStatus] = useState<StoreJobStatus | null>(null)
+
   // Results
   const [results, setResults] = useState<ConvertResponse | null>(null)
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set())
@@ -81,6 +111,111 @@ export default function ConverterPage() {
     delay,
   })
 
+  // ── Check Allegro OAuth on mount ──
+  useEffect(() => {
+    getOAuthConnections()
+      .then((conns) => {
+        const allegro = conns.find((c) => c.marketplace === 'allegro')
+        setAllegroConnected(allegro?.status === 'active')
+      })
+      .catch(() => {})
+  }, [])
+
+  // WHY: After OAuth callback redirects to /converter?allegro=connected
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('allegro') === 'connected') {
+      setAllegroConnected(true)
+      window.history.replaceState({}, '', '/converter')
+    }
+  }, [])
+
+  const handleConnectAllegro = useCallback(async () => {
+    try {
+      const { authorize_url } = await startAllegroOAuth()
+      window.location.href = authorize_url
+    } catch {
+      setStoreError('Nie udało się rozpocząć autoryzacji Allegro')
+    }
+  }, [])
+
+  const handleFetchAllegroOffers = useCallback(async () => {
+    setAllegroLoading(true)
+    setStoreError('')
+    setStoreCount(null)
+    try {
+      const result = await getAllegroOffers()
+      if (result.error) {
+        setStoreError(result.error)
+      } else if (result.total === 0) {
+        setStoreError('Nie znaleziono aktywnych ofert na Twoim koncie')
+      } else {
+        setUrlsText(result.urls.join('\n'))
+        setStoreCount(result.total)
+      }
+    } catch (err) {
+      setStoreError(err instanceof Error ? err.message : 'Błąd pobierania ofert')
+    } finally {
+      setAllegroLoading(false)
+    }
+  }, [])
+
+  // ── Store fetch handler ──
+  const handleFetchStore = useCallback(async () => {
+    if (!storeName.trim()) return
+    setStoreLoading(true)
+    setStoreError('')
+    setStoreCount(null)
+    try {
+      const result = await getStoreUrls(storeName.trim())
+      if (result.error) {
+        setStoreError(result.error)
+      } else if (result.total === 0) {
+        setStoreError('Nie znaleziono ofert w tym sklepie')
+      } else {
+        setUrlsText(result.urls.join('\n'))
+        setStoreCount(result.total)
+        if (result.capped) {
+          setStoreError(`Pobrano pierwsze ~${result.total} ofert (limit 5 stron)`)
+        }
+      }
+    } catch (err) {
+      setStoreError(err instanceof Error ? err.message : 'Błąd pobierania sklepu')
+    } finally {
+      setStoreLoading(false)
+    }
+  }, [storeName])
+
+  // ── Polling for async job ──
+  useEffect(() => {
+    if (!jobId) return
+    const poll = async () => {
+      try {
+        const status = await getStoreJobStatus(jobId)
+        setJobStatus(status)
+        if (status.status === 'done') {
+          if (status.download_ready) {
+            const blob = await downloadStoreJob(jobId)
+            const ext = marketplace === 'amazon' ? 'tsv' : 'csv'
+            const filename = `${marketplace}_store_template.${ext}`
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            a.click()
+            URL.revokeObjectURL(url)
+          }
+          setJobId(null)
+        }
+      } catch {
+        // Polling error — ignore, retry on next tick
+      }
+    }
+    poll()
+    const interval = setInterval(poll, 3000)
+    return () => clearInterval(interval)
+  }, [jobId, marketplace])
+
   const handlePreview = () => {
     convertMutation.mutate(buildPayload(), {
       onSuccess: (data) => {
@@ -90,8 +225,33 @@ export default function ConverterPage() {
     })
   }
 
-  const handleDownload = () => {
-    downloadMutation.mutate(buildPayload())
+  // WHY: >20 products would timeout on sync endpoint, use async job instead
+  const handleDownload = async () => {
+    const urls = parseUrls()
+    if (urls.length > 20) {
+      try {
+        const result = await startStoreConvert({
+          urls,
+          marketplace,
+          gpsr_data: gpsr,
+          eur_rate: eurRate,
+        })
+        setJobId(result.job_id)
+        setJobStatus({
+          job_id: result.job_id,
+          status: 'processing',
+          total: result.total,
+          scraped: 0,
+          converted: 0,
+          failed: 0,
+          download_ready: false,
+        })
+      } catch (err) {
+        setStoreError(err instanceof Error ? err.message : 'Nie udało się uruchomić konwersji')
+      }
+    } else {
+      downloadMutation.mutate(buildPayload())
+    }
   }
 
   const toggleProduct = (idx: number) => {
@@ -108,7 +268,7 @@ export default function ConverterPage() {
     setGpsr((prev) => ({ ...prev, [field]: value }))
   }
 
-  const isLoading = convertMutation.isPending || downloadMutation.isPending
+  const isLoading = convertMutation.isPending || downloadMutation.isPending || jobId !== null
 
   return (
     <div className="space-y-6">
@@ -127,9 +287,95 @@ export default function ConverterPage() {
             <ArrowRightLeft className="h-5 w-5 text-gray-400" />
             <CardTitle className="text-lg">Allegro URLs</CardTitle>
           </div>
-          <CardDescription>Paste Allegro product URLs, one per line (max 50)</CardDescription>
+          <CardDescription>Fetch from store or paste URLs manually (max 300)</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Allegro API connection */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#121212] p-3">
+            <div className="flex items-center gap-2">
+              {allegroConnected ? (
+                <CheckCircle className="h-4 w-4 text-green-400" />
+              ) : (
+                <XCircle className="h-4 w-4 text-gray-500" />
+              )}
+              <span className="text-sm text-gray-300">
+                {allegroConnected ? 'Allegro połączone' : 'Allegro niepołączone'}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {allegroConnected ? (
+                <Button
+                  onClick={handleFetchAllegroOffers}
+                  disabled={allegroLoading}
+                  size="sm"
+                >
+                  {allegroLoading ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-3 w-3" />
+                  )}
+                  Pobierz moje oferty (API)
+                </Button>
+              ) : (
+                <Button onClick={handleConnectAllegro} variant="outline" size="sm">
+                  Połącz z Allegro
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-800" />
+            <span className="text-xs text-gray-500">lub wpisz nazwę sklepu</span>
+            <div className="h-px flex-1 bg-gray-800" />
+          </div>
+
+          {/* Store input */}
+          <div>
+            <label className="mb-1 block text-sm text-gray-400">
+              Sklep Allegro
+            </label>
+            <div className="flex gap-2">
+              <Input
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="nazwa-sklepu lub https://allegro.pl/uzytkownik/nazwa"
+                onKeyDown={(e) => e.key === 'Enter' && handleFetchStore()}
+                disabled={storeLoading}
+              />
+              <Button
+                onClick={handleFetchStore}
+                disabled={!storeName.trim() || storeLoading}
+                variant="outline"
+                className="shrink-0"
+              >
+                {storeLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-2 h-4 w-4" />
+                )}
+                Pobierz oferty
+              </Button>
+            </div>
+            {storeCount !== null && !storeError && (
+              <p className="mt-1 text-xs text-green-400">
+                Znaleziono {storeCount} ofert
+              </p>
+            )}
+            {storeError && (
+              <p className="mt-1 text-xs text-yellow-400">{storeError}</p>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-800" />
+            <span className="text-xs text-gray-500">lub wklej URLe ręcznie</span>
+            <div className="h-px flex-1 bg-gray-800" />
+          </div>
+
+          {/* Manual URL textarea */}
           <textarea
             value={urlsText}
             onChange={(e) => setUrlsText(e.target.value)}
@@ -413,12 +659,42 @@ export default function ConverterPage() {
           )}
           Download Template
         </Button>
-        {isLoading && (
+        {isLoading && !jobId && (
           <span className="text-xs text-gray-500">
             This may take a while for multiple URLs...
           </span>
         )}
       </div>
+
+      {/* Progress bar for async store conversion */}
+      {jobStatus && jobId && (
+        <Card>
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">
+                Przetwarzam... {jobStatus.scraped}/{jobStatus.total}
+              </span>
+              <span className="text-gray-500">
+                {jobStatus.converted} skonwertowano
+                {jobStatus.failed > 0 && `, ${jobStatus.failed} błędów`}
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-gray-800">
+              <div
+                className="h-2 rounded-full bg-white transition-all duration-500"
+                style={{
+                  width: `${jobStatus.total > 0 ? (jobStatus.scraped / jobStatus.total) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            {jobStatus.status === 'done' && (
+              <p className="text-xs text-green-400">
+                Gotowe! Plik pobiera się automatycznie.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Section 5: Results */}
       {results && (
