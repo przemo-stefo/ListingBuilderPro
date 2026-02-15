@@ -472,33 +472,31 @@ async def get_allegro_offers(
 
 @router.get("/allegro-offer-debug/{offer_id}")
 async def debug_allegro_offer(offer_id: str, db: Session = Depends(get_db)):
-    """TEMPORARY: Debug Allegro API endpoints. TODO: Remove after testing."""
+    """TEMPORARY: Debug — fetch_offer_details raw result + API structure."""
+    from services.allegro_api import fetch_offer_details, get_access_token
     import httpx
-    from services.allegro_api import get_access_token
     token = await get_access_token(db)
     if not token:
         return {"error": "No Allegro token"}
 
-    results = {}
+    # Test 1: Raw fetch_offer_details result (what converter gets)
+    details = await fetch_offer_details(offer_id, token)
+
+    # Test 2: Raw API response keys + sellingMode
     async with httpx.AsyncClient(timeout=15) as client:
-        base_h = {"Authorization": f"Bearer {token}"}
-        h1 = {**base_h, "Accept": "application/vnd.allegro.public.v1+json"}
+        h = {"Authorization": f"Bearer {token}",
+             "Accept": "application/vnd.allegro.public.v1+json"}
+        resp = await client.get(
+            f"https://api.allegro.pl/sale/product-offers/{offer_id}", headers=h)
+        api_keys = list(resp.json().keys()) if resp.status_code == 200 else resp.text[:300]
+        api_selling = resp.json().get("sellingMode") if resp.status_code == 200 else None
+        api_stock = resp.json().get("stock") if resp.status_code == 200 else None
+        api_images_count = len(resp.json().get("images", [])) if resp.status_code == 200 else 0
 
-        # Test 1: /sale/product-offers/{id}
-        r1 = await client.get(
-            f"https://api.allegro.pl/sale/product-offers/{offer_id}", headers=h1)
-        results["product_offers"] = {"status": r1.status_code, "body": r1.text[:500]}
-
-        # Test 2: /offers/listing?offer.id=
-        r2 = await client.get(
-            "https://api.allegro.pl/offers/listing",
-            params={"offer.id": offer_id}, headers=h1)
-        results["offers_listing"] = {"status": r2.status_code, "body": r2.text[:500]}
-
-        # Test 3: /sale/offers list (should work — gives offer keys)
-        r3 = await client.get(
-            "https://api.allegro.pl/sale/offers",
-            params={"limit": 1}, headers=h1)
-        results["sale_list"] = {"status": r3.status_code, "body": r3.text[:500]}
-
-    return results
+    return {
+        "fetch_result": details,
+        "api_keys": api_keys,
+        "api_sellingMode": api_selling,
+        "api_stock": api_stock,
+        "api_images": api_images_count,
+    }
