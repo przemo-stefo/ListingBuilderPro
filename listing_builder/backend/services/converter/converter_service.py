@@ -475,13 +475,15 @@ async def process_store_job(
     gpsr_data: Dict,
     eur_rate: float,
     groq_api_key: str,
+    allegro_token: Optional[str] = None,
 ) -> None:
-    """Background task: scrape each URL → convert → generate file.
+    """Background task: fetch product data → convert → generate file.
 
-    WHY async: scraping is I/O-bound (HTTP calls), async lets us
-    update progress counters between products without blocking.
+    WHY Allegro API first: Free, fast (<1s vs 5s), structured JSON,
+    no Scrape.do limits. Falls back to scraper only if no OAuth token.
     """
     from services.converter.template_generator import generate_template
+    from services.allegro_api import fetch_offer_details
 
     job = _store_jobs[job_id]
     translator = AITranslator(groq_api_key=groq_api_key)
@@ -489,7 +491,25 @@ async def process_store_job(
 
     for i, url in enumerate(urls):
         try:
-            product = await scrape_allegro_product(url)
+            offer_id = re.search(r'(\d{8,14})$', url.split("?")[0].rstrip("/"))
+            oid = offer_id.group(1) if offer_id else ""
+
+            # WHY API first: Allegro REST API is free, fast, structured.
+            # Scrape.do fallback only when no OAuth token available.
+            if allegro_token and oid:
+                data = await fetch_offer_details(oid, allegro_token)
+                if data.get("error"):
+                    job["failed"] += 1
+                    job["scraped"] = i + 1
+                    logger.warning("store_job_api_fail", job_id=job_id,
+                                   offer_id=oid, error=data["error"])
+                    continue
+                product = AllegroProduct(**{
+                    k: v for k, v in data.items() if k != "error"
+                })
+            else:
+                product = await scrape_allegro_product(url)
+
             job["scraped"] = i + 1
 
             if product.error:
@@ -505,8 +525,10 @@ async def process_store_job(
                 converted_products.append(result)
                 job["converted"] = len(converted_products)
 
+            # WHY shorter delay for API: no anti-bot throttling needed
             if i < len(urls) - 1:
-                await asyncio.sleep(random.uniform(2.0, 4.0))
+                delay = random.uniform(0.5, 1.5) if allegro_token else random.uniform(2.0, 4.0)
+                await asyncio.sleep(delay)
 
         except Exception as e:
             job["failed"] += 1
@@ -517,4 +539,5 @@ async def process_store_job(
 
     job["status"] = "done"
     logger.info("store_job_complete", job_id=job_id, total=len(urls),
-                converted=len(converted_products), failed=job["failed"])
+                converted=len(converted_products), failed=job["failed"],
+                method="api" if allegro_token else "scraper")

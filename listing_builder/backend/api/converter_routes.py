@@ -18,7 +18,7 @@ import structlog
 
 from config import settings
 from database import get_db
-from services.allegro_api import fetch_seller_offers
+from services.allegro_api import fetch_seller_offers, get_access_token
 
 limiter = Limiter(key_func=get_remote_address)
 from services.scraper.allegro_scraper import (
@@ -375,15 +375,23 @@ async def get_store_urls(request: Request, body: StoreUrlsRequest):
 
 @router.post("/store-convert")
 @limiter.limit("2/minute")
-async def start_store_convert(request: Request, body: StoreConvertRequest):
+async def start_store_convert(
+    request: Request,
+    body: StoreConvertRequest,
+    db: Session = Depends(get_db),
+):
     """Start async conversion of store products.
 
-    Returns job_id immediately. Poll GET /store-job/{job_id} for progress.
-    When done, GET /store-job/{job_id}/download for the file.
+    WHY get_access_token: If Allegro OAuth is connected, use REST API
+    instead of Scrape.do — free, faster, no monthly limits.
     """
+    # WHY try API first: Allegro API = free + fast, Scrape.do = paid + slow
+    allegro_token = await get_access_token(db)
+
     job_id = create_store_job(body.urls, body.marketplace)
     logger.info("store_convert_started", job_id=job_id,
-                urls=len(body.urls), marketplace=body.marketplace)
+                urls=len(body.urls), marketplace=body.marketplace,
+                method="api" if allegro_token else "scraper")
 
     asyncio.create_task(
         process_store_job(
@@ -393,6 +401,7 @@ async def start_store_convert(request: Request, body: StoreConvertRequest):
             gpsr_data=body.gpsr_data.model_dump(),
             eur_rate=body.eur_rate,
             groq_api_key=settings.groq_api_key,
+            allegro_token=allegro_token,
         )
     )
 
