@@ -195,12 +195,16 @@ async def fetch_offer_details(
                 price = str(selling_mode["price"].get("amount", ""))
                 currency = selling_mode["price"].get("currency", "PLN")
 
-            # Images — from top-level images array
+            # Images — API may return strings or objects with "url" key
             images = []
             for img in data.get("images", []):
-                url = img.get("url", "")
-                if url:
-                    images.append(url)
+                if isinstance(img, str):
+                    if img:
+                        images.append(img)
+                elif isinstance(img, dict):
+                    url = img.get("url", "")
+                    if url:
+                        images.append(url)
 
             # Parameters — from productSet[0].product.parameters
             # WHY productSet: /sale/product-offers nests params under productSet
