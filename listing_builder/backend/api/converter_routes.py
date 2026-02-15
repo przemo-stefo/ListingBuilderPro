@@ -472,7 +472,7 @@ async def get_allegro_offers(
 
 @router.get("/allegro-offer-debug/{offer_id}")
 async def debug_allegro_offer(offer_id: str, db: Session = Depends(get_db)):
-    """TEMPORARY: Debug Allegro API response for a single offer."""
+    """TEMPORARY: Debug Allegro API endpoints for a single offer."""
     import httpx
     from services.allegro_api import get_access_token
     token = await get_access_token(db)
@@ -481,27 +481,43 @@ async def debug_allegro_offer(offer_id: str, db: Session = Depends(get_db)):
 
     results = {}
     async with httpx.AsyncClient(timeout=15) as client:
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.allegro.public.v1+json",
+        base_h = {"Authorization": f"Bearer {token}"}
+
+        # Test 1: /sale/product-offers/{id} (new seller endpoint)
+        h1 = {**base_h, "Accept": "application/vnd.allegro.public.v1+json"}
+        r1 = await client.get(
+            f"https://api.allegro.pl/sale/product-offers/{offer_id}", headers=h1)
+        results["sale_product_offers_v1"] = {
+            "status": r1.status_code,
+            "keys": list(r1.json().keys()) if r1.status_code == 200 else r1.text[:400],
         }
 
-        # Test 1: /sale/offers/{id} (seller endpoint)
-        r1 = await client.get(
-            f"https://api.allegro.pl/sale/offers/{offer_id}", headers=headers)
-        results["sale_offers"] = {"status": r1.status_code,
-                                   "body": r1.text[:500] if r1.status_code != 200 else "OK"}
-
-        # Test 2: /offers/{id} (public endpoint)
+        # Test 2: /offers/{id} with beta header
+        h2 = {**base_h, "Accept": "application/vnd.allegro.beta.v1+json"}
         r2 = await client.get(
-            f"https://api.allegro.pl/offers/{offer_id}", headers=headers)
-        results["public_offers"] = {"status": r2.status_code,
-                                     "body": r2.text[:500] if r2.status_code != 200 else r2.json()}
+            f"https://api.allegro.pl/offers/{offer_id}", headers=h2)
+        results["public_beta"] = {
+            "status": r2.status_code,
+            "keys": list(r2.json().keys()) if r2.status_code == 200 else r2.text[:400],
+        }
 
-        # Test 3: Check granted scopes via /me
+        # Test 3: /offers/listing with offer filter
+        h3 = {**base_h, "Accept": "application/vnd.allegro.public.v1+json"}
         r3 = await client.get(
-            "https://api.allegro.pl/me", headers=headers)
-        results["me"] = {"status": r3.status_code,
-                          "body": r3.json() if r3.status_code == 200 else r3.text[:300]}
+            "https://api.allegro.pl/offers/listing",
+            params={"offer.id": offer_id}, headers=h3)
+        results["offers_listing"] = {
+            "status": r3.status_code,
+            "keys": list(r3.json().keys()) if r3.status_code == 200 else r3.text[:400],
+        }
+
+        # Test 4: /sale/offers (list — this one works already)
+        r4 = await client.get(
+            "https://api.allegro.pl/sale/offers",
+            params={"limit": 1}, headers=h3)
+        results["sale_offers_list"] = {
+            "status": r4.status_code,
+            "sample": r4.json().get("offers", [{}])[0].keys() if r4.status_code == 200 else r4.text[:400],
+        }
 
     return results
