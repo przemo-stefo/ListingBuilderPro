@@ -470,33 +470,3 @@ async def get_allegro_offers(
     return StoreUrlsResponse(**result)
 
 
-@router.get("/allegro-offer-debug/{offer_id}")
-async def debug_allegro_offer(offer_id: str, db: Session = Depends(get_db)):
-    """TEMPORARY: Debug — fetch_offer_details raw result + API structure."""
-    from services.allegro_api import fetch_offer_details, get_access_token
-    import httpx
-    token = await get_access_token(db)
-    if not token:
-        return {"error": "No Allegro token"}
-
-    # Test 1: Raw fetch_offer_details result (what converter gets)
-    details = await fetch_offer_details(offer_id, token)
-
-    # Test 2: Raw API response keys + sellingMode
-    async with httpx.AsyncClient(timeout=15) as client:
-        h = {"Authorization": f"Bearer {token}",
-             "Accept": "application/vnd.allegro.public.v1+json"}
-        resp = await client.get(
-            f"https://api.allegro.pl/sale/product-offers/{offer_id}", headers=h)
-        api_keys = list(resp.json().keys()) if resp.status_code == 200 else resp.text[:300]
-        api_selling = resp.json().get("sellingMode") if resp.status_code == 200 else None
-        api_stock = resp.json().get("stock") if resp.status_code == 200 else None
-        api_images_count = len(resp.json().get("images", [])) if resp.status_code == 200 else 0
-
-    return {
-        "fetch_result": details,
-        "api_keys": api_keys,
-        "api_sellingMode": api_selling,
-        "api_stock": api_stock,
-        "api_images": api_images_count,
-    }
