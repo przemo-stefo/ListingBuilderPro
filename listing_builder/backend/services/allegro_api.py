@@ -170,10 +170,10 @@ async def fetch_offer_details(
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            # WHY /sale/product-offers: gives full offer details including
-            # description, parameters, images — more than /sale/offers list
+            # WHY /sale/offers/{id}: seller's full offer details including
+            # description, parameters, images, price, stock
             resp = await client.get(
-                f"{ALLEGRO_API_BASE}/sale/product-offers/{offer_id}",
+                f"{ALLEGRO_API_BASE}/sale/offers/{offer_id}",
                 headers=headers,
             )
 
