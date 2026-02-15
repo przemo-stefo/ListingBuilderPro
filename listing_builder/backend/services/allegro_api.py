@@ -170,10 +170,10 @@ async def fetch_offer_details(
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            # WHY /sale/offers/{id}: seller's full offer details including
-            # description, parameters, images, price, stock
+            # WHY /sale/product-offers: new endpoint (replaces deprecated /sale/offers/{id}).
+            # Returns full product data: name, productSet (params, images), price, stock.
             resp = await client.get(
-                f"{ALLEGRO_API_BASE}/sale/offers/{offer_id}",
+                f"{ALLEGRO_API_BASE}/sale/product-offers/{offer_id}",
                 headers=headers,
             )
 
@@ -185,9 +185,9 @@ async def fetch_offer_details(
             data = resp.json()
 
             # Extract fields into AllegroProduct-compatible dict
-            # WHY manual mapping: API JSON structure differs from scraper output,
-            # but converter_service expects the same AllegroProduct shape
             title = data.get("name", "")
+
+            # Price from sellingMode (in /sale/offers list format)
             price = ""
             currency = "PLN"
             selling_mode = data.get("sellingMode", {})
@@ -195,41 +195,58 @@ async def fetch_offer_details(
                 price = str(selling_mode["price"].get("amount", ""))
                 currency = selling_mode["price"].get("currency", "PLN")
 
-            # Images — API returns list of image objects with url field
+            # Images — from top-level images array
             images = []
             for img in data.get("images", []):
                 url = img.get("url", "")
                 if url:
                     images.append(url)
 
-            # Parameters — API returns list of {id, name, values: [{value}]}
+            # Parameters — from productSet[0].product.parameters
+            # WHY productSet: /sale/product-offers nests params under productSet
             parameters = {}
+            product_set = data.get("productSet", [])
+            if product_set:
+                for param in product_set[0].get("product", {}).get("parameters", []):
+                    name = param.get("name", "")
+                    values = param.get("values", [])
+                    if name and values:
+                        # WHY: values is a flat list of strings here (not objects)
+                        if isinstance(values[0], dict):
+                            val = ", ".join(v.get("value", "") for v in values if v.get("value"))
+                        else:
+                            val = ", ".join(str(v) for v in values if v)
+                        if val:
+                            parameters[name] = val
+
+            # Also check top-level parameters (some offers have both)
             for param in data.get("parameters", []):
                 name = param.get("name", "")
                 values = param.get("values", [])
-                if name and values:
-                    # WHY join: some params have multiple values (e.g. "Kolor: Czarny, Biały")
-                    val = ", ".join(v.get("value", "") for v in values if v.get("value"))
+                if name and values and name not in parameters:
+                    if isinstance(values[0], dict):
+                        val = ", ".join(v.get("value", "") for v in values if v.get("value"))
+                    else:
+                        val = ", ".join(str(v) for v in values if v)
                     if val:
                         parameters[name] = val
 
-            # EAN from parameters or product set
+            # EAN from parameters or external
             ean = ""
             for key in ("EAN", "EAN (GTIN)", "GTIN"):
                 if key in parameters:
                     ean = parameters[key]
                     break
-            # Also check product.id (EAN) in external field
             if not ean:
                 external = data.get("external", {})
                 if external.get("id"):
                     ean = external["id"]
 
-            # Brand / Manufacturer from parameters
+            # Brand / Manufacturer
             brand = parameters.get("Marka", "")
             manufacturer = parameters.get("Producent", "")
 
-            # Description — API returns {sections: [{items: [{type, content}]}]}
+            # Description — sections with items
             description = ""
             desc_section = data.get("description", {})
             if desc_section and desc_section.get("sections"):
@@ -238,9 +255,6 @@ async def fetch_offer_details(
                     for item in section.get("items", []):
                         if item.get("type") == "TEXT":
                             parts.append(item.get("content", ""))
-                        elif item.get("type") == "IMAGE":
-                            # Skip embedded images in description
-                            pass
                 description = "\n".join(parts)
 
             # Category
