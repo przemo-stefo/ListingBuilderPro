@@ -21,7 +21,7 @@ class PremiumLicense(Base):
     stripe_customer_id = Column(Text)
     stripe_checkout_session_id = Column(Text, unique=True)
     stripe_subscription_id = Column(Text)
-    plan_type = Column(Text, nullable=False)  # lifetime | monthly
+    plan_type = Column(Text, nullable=False)  # monthly
     status = Column(Text, nullable=False, default="active")  # active | revoked | expired
     expires_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())

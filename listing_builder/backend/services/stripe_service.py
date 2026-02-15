@@ -25,17 +25,14 @@ FRONTEND_URL = (
 
 def create_checkout_session(plan_type: str, email: str) -> str:
     """
-    Create Stripe Checkout session for lifetime or monthly plan.
+    Create Stripe Checkout session for monthly subscription.
     Returns Checkout URL.
     """
-    if plan_type == "lifetime":
-        price_id = settings.stripe_price_lifetime
-        mode = "payment"  # WHY: One-time payment, not subscription
-    elif plan_type == "monthly":
-        price_id = settings.stripe_price_monthly
-        mode = "subscription"
-    else:
-        raise ValueError(f"Invalid plan_type: {plan_type}")
+    if plan_type != "monthly":
+        raise ValueError(f"Invalid plan_type: {plan_type}. Only 'monthly' is available.")
+
+    price_id = settings.stripe_price_monthly
+    mode = "subscription"
 
     if not price_id:
         raise ValueError(f"Stripe price not configured for {plan_type}")
@@ -61,7 +58,7 @@ def handle_checkout_completed(session_data: dict, db: Session):
     session_id = session_data.get("id")
     customer_id = session_data.get("customer")
     email = session_data.get("customer_email") or session_data.get("customer_details", {}).get("email", "")
-    plan_type = session_data.get("metadata", {}).get("plan_type", "lifetime")
+    plan_type = session_data.get("metadata", {}).get("plan_type", "monthly")
     subscription_id = session_data.get("subscription")
 
     license_key = secrets.token_urlsafe(32)

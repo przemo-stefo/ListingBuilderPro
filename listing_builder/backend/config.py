@@ -66,9 +66,8 @@ class Settings(BaseSettings):
     n8n_webhook_url: str = ""
     n8n_webhook_secret: str = ""
 
-    # Stripe (license key monetization — lifetime + monthly plans)
+    # Stripe (license key monetization — monthly subscription)
     stripe_secret_key: str = ""  # WHY: Empty = Stripe disabled (dev mode)
-    stripe_price_lifetime: str = ""  # WHY: 149 PLN one-time payment
     stripe_price_monthly: str = ""  # WHY: 49 PLN/month subscription
     stripe_webhook_secret: str = ""  # WHY: Stripe signs webhooks with this
 

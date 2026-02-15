@@ -8,7 +8,7 @@ from typing import Optional
 
 class CheckoutRequest(BaseModel):
     """Request to create Stripe Checkout session."""
-    plan_type: str = Field(..., pattern="^(lifetime|monthly)$")
+    plan_type: str = Field(default="monthly", pattern="^monthly$")
     email: EmailStr
 
 

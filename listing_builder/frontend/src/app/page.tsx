@@ -35,14 +35,14 @@ const PREMIUM_FEATURES = [
   { label: 'Priorytetowe wsparcie', included: true },
 ]
 
-async function redirectToCheckout(planType: 'lifetime' | 'monthly') {
+async function redirectToCheckout() {
   const email = prompt('Podaj email (do odzyskania klucza licencyjnego):')
   if (!email) return
 
   const res = await fetch('/api/proxy/stripe/create-checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plan_type: planType, email }),
+    body: JSON.stringify({ plan_type: 'monthly', email }),
   })
 
   if (!res.ok) {
@@ -65,10 +65,10 @@ export default function LandingPage() {
     router.push('/optimize')
   }
 
-  const handlePremiumStart = async (plan: 'lifetime' | 'monthly') => {
+  const handlePremiumStart = async () => {
     setLoading(true)
     try {
-      await redirectToCheckout(plan)
+      await redirectToCheckout()
     } finally {
       setLoading(false)
     }
@@ -148,23 +148,16 @@ export default function LandingPage() {
 
           <div className="mt-6 space-y-3 relative">
             <button
-              onClick={() => handlePremiumStart('lifetime')}
+              onClick={handlePremiumStart}
               disabled={loading}
               className="w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />
-              {loading ? 'Ladowanie...' : '149 PLN — Lifetime'}
+              {loading ? 'Ladowanie...' : '49 PLN / miesiac'}
               <Zap className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => handlePremiumStart('monthly')}
-              disabled={loading}
-              className="w-full rounded-lg border border-amber-500/30 bg-transparent py-2.5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {loading ? 'Ladowanie...' : '49 PLN/mies — Subskrypcja'}
-            </button>
             <p className="text-center text-xs text-gray-600">
-              Lifetime = kup raz, miej zawsze. Subskrypcja = anuluj kiedy chcesz.
+              Anuluj kiedy chcesz. Bez zobowiazan.
             </p>
           </div>
         </div>

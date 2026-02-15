@@ -34,7 +34,7 @@ router = APIRouter(prefix="/api/stripe", tags=["Stripe"])
 @router.post("/create-checkout", response_model=CheckoutResponse)
 @limiter.limit("10/minute")
 async def checkout(request: Request, body: CheckoutRequest, db: Session = Depends(get_db)):
-    """Create Stripe Checkout session for lifetime or monthly plan."""
+    """Create Stripe Checkout session for monthly plan."""
     try:
         url = create_checkout_session(body.plan_type, body.email)
         return CheckoutResponse(checkout_url=url)

@@ -5,7 +5,7 @@
 import { apiRequest } from './client'
 
 export interface CheckoutRequest {
-  plan_type: 'lifetime' | 'monthly'
+  plan_type: 'monthly'
   email: string
 }
 
