@@ -472,12 +472,36 @@ async def get_allegro_offers(
 
 @router.get("/allegro-offer-debug/{offer_id}")
 async def debug_allegro_offer(offer_id: str, db: Session = Depends(get_db)):
-    """TEMPORARY: Debug Allegro API response for a single offer.
-    TODO: Remove after testing.
-    """
-    from services.allegro_api import fetch_offer_details, get_access_token
+    """TEMPORARY: Debug Allegro API response for a single offer."""
+    import httpx
+    from services.allegro_api import get_access_token
     token = await get_access_token(db)
     if not token:
         return {"error": "No Allegro token"}
-    result = await fetch_offer_details(offer_id, token)
-    return result
+
+    results = {}
+    async with httpx.AsyncClient(timeout=15) as client:
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.allegro.public.v1+json",
+        }
+
+        # Test 1: /sale/offers/{id} (seller endpoint)
+        r1 = await client.get(
+            f"https://api.allegro.pl/sale/offers/{offer_id}", headers=headers)
+        results["sale_offers"] = {"status": r1.status_code,
+                                   "body": r1.text[:500] if r1.status_code != 200 else "OK"}
+
+        # Test 2: /offers/{id} (public endpoint)
+        r2 = await client.get(
+            f"https://api.allegro.pl/offers/{offer_id}", headers=headers)
+        results["public_offers"] = {"status": r2.status_code,
+                                     "body": r2.text[:500] if r2.status_code != 200 else r2.json()}
+
+        # Test 3: Check granted scopes via /me
+        r3 = await client.get(
+            "https://api.allegro.pl/me", headers=headers)
+        results["me"] = {"status": r3.status_code,
+                          "body": r3.json() if r3.status_code == 200 else r3.text[:300]}
+
+    return results
