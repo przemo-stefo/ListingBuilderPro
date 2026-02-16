@@ -199,11 +199,8 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
         return result
 
     except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        logger.error("optimizer_error", error=str(e), traceback=tb)
-        # WHY: Temporarily expose error detail for debugging — remove after fix
-        raise HTTPException(status_code=500, detail=f"Optimization failed: {type(e).__name__}: {str(e)[:300]}")
+        logger.error("optimizer_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Optimization failed")
 
 
 # WHY: Batch endpoint processes multiple products sequentially
