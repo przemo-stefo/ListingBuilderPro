@@ -4,10 +4,12 @@
 
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Send, Loader2, Brain, BookOpen, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { FaqSection } from '@/components/ui/FaqSection'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -31,18 +33,31 @@ const SUGGESTED_QUESTIONS = [
   'Jak tworzyć skuteczne reklamy wideo na Amazon?',
 ]
 
-export default function ExpertQAPage() {
+// WHY: Next.js 14 requires Suspense boundary around useSearchParams()
+function ExpertQAContent() {
+  const searchParams = useSearchParams()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [mode, setMode] = useState('balanced')
   const [showModeSelector, setShowModeSelector] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const initialQuestionSent = useRef(false)
 
   // WHY: Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // WHY: Auto-send question from Dashboard widget (?q= param)
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q && !initialQuestionSent.current) {
+      initialQuestionSent.current = true
+      handleSend(q)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   async function handleSend(question?: string) {
     const q = question || input.trim()
@@ -188,7 +203,7 @@ export default function ExpertQAPage() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Zapytaj o słowa kluczowe, listingi, PPC, ranking, reklamy..."
+          placeholder="Zapytaj o slowa kluczowe, listingi, PPC, ranking, reklamy..."
           className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-gray-600"
           disabled={isLoading}
         />
@@ -204,6 +219,32 @@ export default function ExpertQAPage() {
           )}
         </Button>
       </div>
+
+      {/* WHY: FAQ at bottom — visible when chat is empty or user scrolls down */}
+      {messages.length === 0 && (
+        <FaqSection
+          title="FAQ — Ekspert AI"
+          subtitle="Jak korzystac z bazy wiedzy eksperckiej"
+          items={[
+            { question: 'Co to jest Ekspert AI?', answer: 'Chatbot AI z dostepem do bazy wiedzy o sprzedazy na marketplace. Odpowiada na pytania o Amazon, eBay, Kaufland — slowa kluczowe, listingi, PPC, strategie cenowe, backend keywords i wiele wiecej.' },
+            { question: 'Skad pochodzi wiedza?', answer: 'Baza wiedzy zawiera ponad 10 000 fragmentow z kursow ekspertow marketplace, poradnikow e-commerce i sprawdzonych strategii sprzedazowych. Wiedza jest regularnie aktualizowana.' },
+            { question: 'Co oznaczaja tryby RAG?', answer: 'Scisly = odpowiedzi tylko z bazy wiedzy. Zbalansowany = baza + ogolna wiedza AI. Elastyczny = laczy wszystkie zrodla. Bez RAG = czysty LLM bez bazy wiedzy. Domyslnie: Zbalansowany.' },
+            { question: 'Jakie pytania moge zadawac?', answer: 'Wszystko o sprzedazy online: jak pisac tytuly, jak dobierac slowa kluczowe, jak optymalizowac PPC, jak tworzyc reklamy wideo, jak budowac marke na Amazon, jakie sa najlepsze praktyki dla backend keywords, itp.' },
+          ]}
+        />
+      )}
     </div>
+  )
+}
+
+export default function ExpertQAPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+      </div>
+    }>
+      <ExpertQAContent />
+    </Suspense>
   )
 }

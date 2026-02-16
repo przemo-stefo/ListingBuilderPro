@@ -7,6 +7,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Shield } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
 import DashboardTab from './components/DashboardTab'
 import AlertSettingsTab from './components/AlertSettingsTab'
 import AlertsTab from './components/AlertsTab'
@@ -54,6 +55,17 @@ function ComplianceContent() {
       {activeTab === 'integrations' && <IntegrationsTab />}
       {activeTab === 'upload' && <UploadTab />}
       {activeTab === 'epr' && <EprTab />}
+
+      <FaqSection
+        title="FAQ — Compliance Guard"
+        subtitle="Najczesciej zadawane pytania o monitorowaniu zgodnosci"
+        items={[
+          { question: 'Co to jest Compliance Guard?', answer: 'System monitorowania zgodnosci produktow z regulacjami UE i marketplace. Sledzi zmiany w przepisach (GPSR, EPR, CE, REACH) i ostrzega Cie zanim Twoje oferty zostana zablokowane.' },
+          { question: 'Jakie regulacje monitoruje?', answer: 'GPSR (bezpieczenstwo produktow), EPR (rozszerzona odpowiedzialnosc producenta), oznaczenia CE, REACH (substancje chemiczne), regulacje marketplace (Amazon, eBay, Kaufland, Allegro) i wiele wiecej.' },
+          { question: 'Jak dzialaja alerty?', answer: 'Wlacz alerty w zakladce "Aktywacja Alertow" — wybierz typy regulacji i marketplace. System sprawdza zmiany co 24h i wysyla powiadomienia email/webhook gdy wykryje nowe wymagania lub deadline.' },
+          { question: 'Co to sa raporty EPR?', answer: 'EPR (Extended Producer Responsibility) wymaga rejestracji i raportowania opakowan w kazdym kraju UE. Zakladka "Raporty EPR" pomaga generowac wymagane raporty na podstawie danych z Twojego konta sprzedawcy.' },
+        ]}
+      />
     </div>
   )
 }

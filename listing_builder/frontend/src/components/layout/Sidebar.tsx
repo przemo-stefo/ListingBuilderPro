@@ -1,5 +1,5 @@
 // frontend/src/components/layout/Sidebar.tsx
-// Purpose: Main navigation sidebar with links to all pages + tier badge
+// Purpose: Main navigation sidebar — Octosello MVP (8 items + Compliance + Settings)
 // NOT for: Page content or complex routing logic
 
 'use client'
@@ -12,15 +12,11 @@ import { useTier } from '@/lib/hooks/useTier'
 import { TierBadge } from '@/components/tier/TierBadge'
 import {
   LayoutDashboard,
-  Package,
   Upload,
   ArrowRightLeft,
   Sparkles,
-  Send,
   Shield,
-  Activity,
   Brain,
-  Crown,
   Newspaper,
   ChevronDown,
   BarChart3,
@@ -29,12 +25,6 @@ import {
   AlertTriangle,
   Link2,
   FileBarChart,
-  Store,
-  Key,
-  List,
-  TrendingUp,
-  Warehouse,
-  Users,
   Settings,
   Info,
 } from 'lucide-react'
@@ -44,8 +34,9 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   premiumOnly?: boolean
-  // WHY: Tooltip description for clients who don't know what each tool does
   desc?: string
+  // WHY: Expert AI gets green accent to stand out as key feature
+  highlight?: boolean
 }
 
 interface NavSection {
@@ -53,50 +44,22 @@ interface NavSection {
   items: NavItem[]
 }
 
-// WHY: Grouped by seller journey — Allegro seller expanding to Amazon:
-// 1. Manage existing Allegro offers
-// 2. Optimize listings with AI for new marketplace
-// 3. Convert & publish to Amazon/eBay/Kaufland
-// 4. Track performance across all marketplaces
+// WHY: MVP simplified to 8 items — Mateusz meeting decision
+// Hidden pages (products, inventory, allegro-manager, keywords, etc.) still accessible via URL
 const navSections: NavSection[] = [
   {
-    label: 'Produkty',
+    label: 'Glowne',
     items: [
       { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przeglad statystyk i szybkie akcje' },
-      { title: 'Produkty', href: '/products', icon: Package, desc: 'Lista wszystkich produktow w systemie' },
       { title: 'Import', href: '/products/import', icon: Upload, desc: 'Importuj produkty z CSV lub Allegro' },
-      { title: 'Magazyn', href: '/inventory', icon: Warehouse, desc: 'Stany magazynowe i synchronizacja' },
-    ],
-  },
-  {
-    label: 'Allegro',
-    items: [
-      { title: 'Manager Ofert', href: '/allegro-manager', icon: Store, premiumOnly: true, desc: 'Zarzadzaj ofertami Allegro — edycja, ceny, masowe akcje' },
-      { title: 'Allegro → Amazon', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty z Allegro na format Amazon' },
+      { title: 'Konwerter', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty Allegro na Amazon/eBay/Kaufland' },
     ],
   },
   {
     label: 'Optymalizacja AI',
     items: [
       { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytul, bullety, opis i slowa kluczowe backend' },
-      { title: 'Slowa kluczowe', href: '/keywords', icon: Key, desc: 'Analiza i badanie slow kluczowych dla marketplace' },
-      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedazy na marketplace' },
-    ],
-  },
-  {
-    label: 'Sprzedaz',
-    items: [
-      { title: 'Publikuj', href: '/publish', icon: Send, desc: 'Opublikuj zoptymalizowane listingi na Amazon, eBay, Kaufland' },
-      { title: 'Listingi', href: '/listings', icon: List, desc: 'Wszystkie opublikowane listingi i ich status' },
-    ],
-  },
-  {
-    label: 'Analityka',
-    items: [
-      { title: 'Analityka', href: '/analytics', icon: TrendingUp, desc: 'Wykresy sprzedazy i metryki wydajnosci' },
-      { title: 'Konkurencja', href: '/competitors', icon: Users, desc: 'Monitoruj ceny i listingi konkurencji' },
-      { title: 'Monitoring', href: '/monitoring', icon: Activity, premiumOnly: true, desc: 'Sledz zmiany cen, pozycji i dostepnosci na marketplace' },
-      { title: 'Wiadomosci', href: '/news', icon: Newspaper, desc: 'Aktualnosci i zmiany regulacji na marketplace' },
+      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedazy na marketplace', highlight: true },
     ],
   },
 ]
@@ -126,9 +89,9 @@ export function Sidebar() {
     <div className="w-64 border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">
-          Listing Builder Pro
+          Octosello
         </h1>
-        <p className="text-sm text-gray-400">System automatyzacji listingow</p>
+        <p className="text-sm text-gray-400">Asystent sprzedawcy marketplace</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-4">
@@ -151,18 +114,22 @@ export function Sidebar() {
                         'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
                         isActive
                           ? 'bg-white text-black'
-                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                          : item.highlight
+                            ? 'text-green-400 hover:bg-green-900/20 hover:text-green-300'
+                            : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                       )}
                     >
                       <Icon className="h-4 w-4" />
                       {item.title}
-                      {item.premiumOnly && tier !== 'premium' && (
-                        <Crown className="h-3 w-3 text-amber-400 ml-auto" />
+                      {/* WHY: Green "AI" badge makes Expert AI visually distinct */}
+                      {item.highlight && !isActive && (
+                        <span className="ml-auto rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold text-green-400">
+                          AI
+                        </span>
                       )}
-                      {item.desc && (
+                      {item.desc && !item.highlight && (
                         <Info className={cn(
                           'h-3 w-3 ml-auto shrink-0 opacity-0 group-hover/nav:opacity-60 transition-opacity',
-                          item.premiumOnly && tier !== 'premium' ? 'mr-0' : ''
                         )} />
                       )}
                     </Link>
@@ -233,6 +200,22 @@ export function Sidebar() {
               })}
             </div>
           )}
+
+          {/* WHY: News as standalone item under Compliance section */}
+          <div className="group/nav relative mt-0.5">
+            <Link
+              href="/news"
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                pathname === '/news'
+                  ? 'bg-white text-black'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              )}
+            >
+              <Newspaper className="h-4 w-4" />
+              Wiadomosci
+            </Link>
+          </div>
         </div>
 
         {/* WHY: Settings separated — not part of seller workflow, utility */}
@@ -267,7 +250,7 @@ export function Sidebar() {
         </div>
         <div className="flex justify-center gap-3 text-[10px] text-gray-600">
           <Link href="/privacy" className="hover:text-gray-400 transition-colors">
-            Prywatność
+            Prywatnosc
           </Link>
           <span>·</span>
           <Link href="/terms" className="hover:text-gray-400 transition-colors">

@@ -14,8 +14,8 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Marketplace Listing Automation',
-  description: 'Automate your product listings across multiple marketplaces',
+  title: 'Octosello — Asystent sprzedawcy',
+  description: 'AI-powered asystent sprzedawcy marketplace. Optymalizuj listingi, monitoruj compliance, konwertuj oferty.',
   icons: { icon: '/favicon.svg' },
 }
 
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="pl" className="dark">
       <body className={inter.className}>
         <QueryProvider>
           <TierProvider>

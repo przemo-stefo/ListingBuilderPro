@@ -1,16 +1,26 @@
 // frontend/src/app/dashboard/page.tsx
-// Purpose: Dashboard home page with stats and recent activity (moved from /)
+// Purpose: Dashboard home page with stats, quick actions, and Expert AI widget
 // NOT for: Product management or detailed views
 
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { formatNumber } from '@/lib/utils'
-import { Package, Sparkles, Send, AlertCircle, TrendingUp, Clock } from 'lucide-react'
+import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight } from 'lucide-react'
+
+const SUGGESTED_QUESTIONS = [
+  'Jak znalezc najlepsze slowa kluczowe?',
+  'Jak zoptymalizowac tytul na Amazon DE?',
+  'Jak dziala algorytm A9/COSMO?',
+]
 
 export default function DashboardPage() {
   const { data: stats, isLoading, error } = useDashboardStats()
+  const router = useRouter()
+  const [expertQuestion, setExpertQuestion] = useState('')
 
   if (isLoading) {
     return (
@@ -46,6 +56,7 @@ export default function DashboardPage() {
     )
   }
 
+  // WHY: Removed "Opublikowane" and "Ostatnie publikacje" — Publish page hidden in MVP
   const statCards = [
     {
       title: 'Produkty',
@@ -68,10 +79,10 @@ export default function DashboardPage() {
       color: 'text-blue-500',
     },
     {
-      title: 'Opublikowane',
-      value: stats?.published_products || 0,
-      icon: Send,
-      description: 'Aktywne na marketplace',
+      title: 'Sredni wynik',
+      value: `${Math.round(stats?.average_optimization_score || 0)}%`,
+      icon: TrendingUp,
+      description: 'Srednia ocena optymalizacji',
       color: 'text-green-500',
     },
     {
@@ -82,36 +93,28 @@ export default function DashboardPage() {
       color: 'text-red-500',
     },
     {
-      title: 'Sredni wynik',
-      value: `${Math.round(stats?.average_optimization_score || 0)}%`,
-      icon: TrendingUp,
-      description: 'Srednia ocena optymalizacji',
-      color: 'text-green-500',
-    },
-    {
       title: 'Ostatni import',
       value: stats?.recent_imports || 0,
       icon: Package,
       description: 'Ostatnie 24 godziny',
     },
-    {
-      title: 'Ostatnie publikacje',
-      value: stats?.recent_publishes || 0,
-      icon: Send,
-      description: 'Ostatnie 24 godziny',
-    },
   ]
+
+  const handleExpertSubmit = () => {
+    if (!expertQuestion.trim()) return
+    router.push(`/expert-qa?q=${encodeURIComponent(expertQuestion.trim())}`)
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <p className="text-gray-400 mt-2">
-          Przeglad automatyzacji listingow na marketplace
+          Przeglad Twojego panelu Octosello
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat) => {
           const Icon = stat.icon
           return (
@@ -157,13 +160,58 @@ export default function DashboardPage() {
             <Sparkles className="h-8 w-8 mb-2 text-blue-500" />
             <span className="text-sm font-medium text-white">Optymalizuj listingi</span>
           </a>
+          {/* WHY: Replaced "Publikuj na marketplace" with "Ekspert AI" — Publish hidden in MVP */}
           <a
-            href="/publish"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
+            href="/expert-qa"
+            className="flex flex-col items-center justify-center p-6 rounded-lg border border-green-900/30 hover:bg-green-900/10 transition-colors"
           >
-            <Send className="h-8 w-8 mb-2 text-green-500" />
-            <span className="text-sm font-medium text-white">Publikuj na marketplace</span>
+            <Brain className="h-8 w-8 mb-2 text-green-400" />
+            <span className="text-sm font-medium text-green-400">Ekspert AI</span>
           </a>
+        </CardContent>
+      </Card>
+
+      {/* WHY: Expert AI widget on dashboard — makes the feature more discoverable */}
+      <Card className="border-green-900/30">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-green-400" />
+            <CardTitle className="text-green-400">Zapytaj Eksperta AI</CardTitle>
+          </div>
+          <CardDescription>
+            Odpowiedzi na bazie wiedzy eksperckiej o Amazon, e-commerce i PPC
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={expertQuestion}
+              onChange={e => setExpertQuestion(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleExpertSubmit()}
+              placeholder="Np. Jak zoptymalizowac backend keywords?"
+              className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-green-800"
+            />
+            <button
+              onClick={handleExpertSubmit}
+              disabled={!expertQuestion.trim()}
+              className="rounded-lg bg-green-900/40 px-4 py-2.5 text-green-400 hover:bg-green-900/60 transition-colors disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTED_QUESTIONS.map((q) => (
+              <button
+                key={q}
+                onClick={() => router.push(`/expert-qa?q=${encodeURIComponent(q)}`)}
+                className="rounded-lg border border-gray-800 bg-[#1A1A1A] px-3 py-1.5 text-xs text-gray-400 hover:border-green-800 hover:text-green-400 transition-colors"
+              >
+                {q}
+                <ArrowRight className="inline ml-1 h-3 w-3" />
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

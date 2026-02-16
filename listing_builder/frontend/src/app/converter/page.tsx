@@ -42,6 +42,7 @@ import type {
   StoreJobStatus,
 } from '@/lib/types'
 import AutoSyncCard from '@/components/converter/AutoSyncCard'
+import { FaqItem } from '@/components/ui/FaqSection'
 
 // WHY: Default GPSR structure with empty strings — user fills only what they need
 const DEFAULT_GPSR: GPSRData = {
@@ -849,29 +850,7 @@ export default function ConverterPage() {
   )
 }
 
-function FaqItem({ question, answer }: { question: string; answer: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="rounded-lg border border-gray-800 bg-[#1A1A1A]">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between p-3 text-left"
-      >
-        <span className="text-sm font-medium text-white">{question}</span>
-        {open ? (
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-gray-400" />
-        ) : (
-          <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-gray-400" />
-        )}
-      </button>
-      {open && (
-        <div className="border-t border-gray-800 px-3 py-2">
-          <p className="text-xs leading-relaxed text-gray-400">{answer}</p>
-        </div>
-      )}
-    </div>
-  )
-}
+// WHY: FaqItem now imported from shared @/components/ui/FaqSection
 
 
 // WHY: Separate component to keep the main page cleaner and avoid re-rendering everything

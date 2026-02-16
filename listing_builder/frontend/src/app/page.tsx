@@ -79,11 +79,11 @@ export default function LandingPage() {
       {/* Hero */}
       <div className="text-center space-y-4 pt-8">
         <h1 className="text-4xl font-bold text-white">
-          Listing Builder <span className="text-amber-400">Pro</span>
+          <span className="text-amber-400">Octosello</span>
         </h1>
         <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-          AI-powered listing optimization dla Amazon, eBay, Kaufland i Allegro.
-          Generuj SEO-zoptymalizowane tytuly, bullety i opisy w sekundy.
+          Asystent sprzedawcy marketplace. Optymalizuj listingi AI, konwertuj oferty Allegro
+          na Amazon/eBay/Kaufland i monitoruj compliance — wszystko w jednym panelu.
         </p>
       </div>
 

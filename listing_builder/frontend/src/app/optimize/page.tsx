@@ -7,6 +7,7 @@
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Layers, FileText, Clock, Crown, Loader2 } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
 import { useToast } from '@/lib/hooks/useToast'
@@ -102,6 +103,18 @@ function OptimizeContent() {
       {activeTab === 'single' && <SingleTab loadedResult={loadedResult} initialTitle={prefillTitle} />}
       {activeTab === 'batch' && <BatchTab />}
       {activeTab === 'history' && isPremium && <HistoryTab onLoadResult={handleLoadFromHistory} />}
+
+      <FaqSection
+        title="FAQ — Optymalizator"
+        subtitle="Najczesciej zadawane pytania o optymalizacji listingow"
+        items={[
+          { question: 'Jak dziala optymalizator?', answer: 'Wpisujesz tytul produktu (lub importujesz z CSV/Allegro), wybierasz marketplace i jezyk, a AI generuje zoptymalizowany tytul, 5 bullet pointow, opis i backend keywords. Kazdy element jest dostosowany do wymagan danego marketplace.' },
+          { question: 'Co to jest Ranking Juice?', answer: 'Ranking Juice to wynik 0-100 oceniajacy jakosc Twojego listingu. Analizuje tytul (dlugosc, slowa kluczowe), bullety (struktura, benefity), opis (SEO, czytelnosc) i backend keywords (unikatowe frazy). Im wyzszy wynik, tym lepsza widocznosc w wyszukiwarce marketplace.' },
+          { question: 'Jaka jest roznica miedzy trybem agresywnym a standardowym?', answer: 'Tryb standardowy generuje naturalne, czytelne listingi. Tryb agresywny maksymalizuje nasycenie slow kluczowych — tytul i bullety sa bardziej "keyword-stuffed". Uzyj agresywnego dla produktow w konkurencyjnych kategoriach.' },
+          { question: 'Ile kosztuje jedna optymalizacja?', answer: 'Plan darmowy: 3 optymalizacje dziennie (tylko Amazon). Plan Premium (49 PLN/mies): nieograniczone optymalizacje na wszystkich marketplace (Amazon, eBay, Kaufland, Allegro).' },
+          { question: 'Jak pobrac wynik jako CSV?', answer: 'Po optymalizacji kliknij przycisk "Eksportuj CSV" nad wynikiem. Plik zawiera tytul, bullety, opis i backend keywords — gotowy do uploadu na marketplace lub do flat file.' },
+        ]}
+      />
     </div>
   )
 }
