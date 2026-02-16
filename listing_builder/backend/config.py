@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     groq_api_key_4: str = ""
     groq_api_key_5: str = ""
     groq_api_key_6: str = ""
+    groq_api_key_7: str = ""  # WHY: 7th key for extended rotation pool
+    groq_api_key_8: str = ""  # WHY: 8th key for extended rotation pool
 
     # Marketplace APIs
     amazon_refresh_token: str = ""
@@ -121,7 +123,8 @@ class Settings(BaseSettings):
         """All available Groq API keys for rotation."""
         keys = [self.groq_api_key]
         for attr in ("groq_api_key_2", "groq_api_key_3", "groq_api_key_4",
-                      "groq_api_key_5", "groq_api_key_6"):
+                      "groq_api_key_5", "groq_api_key_6", "groq_api_key_7",
+                      "groq_api_key_8"):
             val = getattr(self, attr, "")
             if val:
                 keys.append(val)
