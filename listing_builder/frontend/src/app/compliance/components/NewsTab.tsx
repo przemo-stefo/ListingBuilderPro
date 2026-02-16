@@ -188,11 +188,12 @@ export default function NewsTab() {
   const [category, setCategory] = useState<NewsCategory>('all')
 
   // WHY: Backend fetches RSS + translates to Polish via Groq + caches 2h
-  const fetchNews = async () => {
+  const fetchNews = async (force = false) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/proxy/news/feed')
+      const url = force ? '/api/proxy/news/feed?force=true' : '/api/proxy/news/feed'
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
       setNews(data.articles || [])
@@ -226,8 +227,9 @@ export default function NewsTab() {
           </p>
         </div>
         <button
-          onClick={fetchNews}
+          onClick={() => fetchNews(true)}
           disabled={loading}
+          title="Wymuś ponowne pobranie i tłumaczenie"
           className="flex items-center gap-2 rounded-lg border border-gray-700 bg-[#1A1A1A] px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
         >
           <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />

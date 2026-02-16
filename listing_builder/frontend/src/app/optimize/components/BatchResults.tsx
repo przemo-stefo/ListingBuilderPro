@@ -20,7 +20,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { exportResultsCSV } from '@/lib/utils/csvParser'
-import { ScoresCard, ListingCard, KeywordIntelCard } from './ResultDisplay'
+import { ScoresCard } from './ResultDisplay'
+import { ListingCard } from './ListingCard'
+import { KeywordIntelCard } from './KeywordIntelCard'
 import type { BatchOptimizerResponse, BatchOptimizerResult } from '@/lib/types'
 
 interface BatchResultsProps {
@@ -169,7 +171,7 @@ function ProductResultCard({
           <ListingCard
             listing={item.result.listing}
             compliance={item.result.compliance}
-            copiedField={copiedField}
+            copiedField={copiedField?.startsWith(`${index}-`) ? copiedField.slice(`${index}-`.length) : null}
             onCopy={(text, field) => onCopy(text, `${index}-${field}`)}
           />
           <KeywordIntelCard intel={item.result.keyword_intel} />

@@ -22,9 +22,14 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useGenerateListing } from '@/lib/hooks/useOptimizer'
 import { useTier } from '@/lib/hooks/useTier'
+import { useOAuthConnections } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
 import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
-import { ScoresCard, ListingCard, KeywordIntelCard, RankingJuiceCard, FeedbackWidget } from './ResultDisplay'
+import { ScoresCard } from './ResultDisplay'
+import { ListingCard } from './ListingCard'
+import { RankingJuiceCard } from './RankingJuiceCard'
+import { FeedbackWidget } from './FeedbackWidget'
+import { KeywordIntelCard } from './KeywordIntelCard'
 import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword } from '@/lib/types'
 
 // WHY: Marketplace options match what the n8n workflow supports
@@ -61,6 +66,12 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
 
   // Tier
   const { canOptimize, incrementUsage, isPremium, usageToday } = useTier()
+
+  // WHY: Show "Aktualizuj na Allegro" button only when OAuth connected
+  const { data: oauthData } = useOAuthConnections()
+  const isAllegroConnected = oauthData?.connections?.some(
+    (c) => c.marketplace === 'allegro' && c.status === 'active'
+  ) ?? false
   const { toast } = useToast()
 
   // Hook
@@ -356,6 +367,7 @@ export default function SingleTab({ loadedResult }: SingleTabProps) {
             copiedField={copiedField}
             onCopy={copyToClipboard}
             fullResponse={displayResults}
+            isAllegroConnected={isAllegroConnected}
           />
           <KeywordIntelCard intel={displayResults.keyword_intel} />
           <FeedbackWidget listingHistoryId={displayResults.listing_history_id} />

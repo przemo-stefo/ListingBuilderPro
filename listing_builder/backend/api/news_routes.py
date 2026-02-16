@@ -6,9 +6,9 @@ import asyncio
 import json
 import re
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 import httpx
 import structlog
 
@@ -43,6 +43,7 @@ RSS_FEEDS = [
 
 RSS_API = "https://api.rss2json.com/v1/api.json?rss_url="
 TRANSLATE_BATCH_SIZE = 15
+MAX_TRANSLATE_RETRIES = 2
 
 
 async def _fetch_feed(client: httpx.AsyncClient, feed: dict) -> List[dict]:
@@ -94,8 +95,51 @@ async def _fetch_all_feeds() -> List[dict]:
     return articles
 
 
-async def _translate_batch(articles: List[dict], api_key: str, batch_idx: int) -> List[dict]:
-    """Translate a batch of articles to Polish via Groq."""
+async def _fetch_og_image(client: httpx.AsyncClient, url: str) -> Optional[str]:
+    """Fetch og:image from article URL — reads only first 50KB of HTML."""
+    try:
+        resp = await client.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)", "Accept": "text/html"},
+            follow_redirects=True,
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return None
+        # WHY: og:image is always in <head> — no need to read full page
+        html = resp.text[:50_000]
+        match = re.search(
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.I
+        ) or re.search(
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html, re.I
+        )
+        return match.group(1) if match else None
+    except Exception:
+        return None
+
+
+async def _resolve_thumbnails(articles: List[dict]) -> None:
+    """Fetch og:image for articles missing thumbnails — 5 at a time."""
+    missing = [a for a in articles if not a.get("thumbnail")]
+    if not missing:
+        return
+
+    async with httpx.AsyncClient() as client:
+        for i in range(0, len(missing), 5):
+            batch = missing[i : i + 5]
+            results = await asyncio.gather(*[_fetch_og_image(client, a["link"]) for a in batch])
+            for art, img in zip(batch, results):
+                if img:
+                    art["thumbnail"] = img
+            if i + 5 < len(missing):
+                await asyncio.sleep(0.2)
+
+    resolved = sum(1 for a in missing if a.get("thumbnail"))
+    logger.info("news_thumbnails_resolved", missing=len(missing), resolved=resolved)
+
+
+async def _translate_batch(articles: List[dict], keys: List[str], batch_idx: int) -> List[dict]:
+    """Translate a batch of articles to Polish via Groq — retries with different key on failure."""
     if not articles:
         return articles
 
@@ -109,46 +153,58 @@ async def _translate_batch(articles: List[dict], api_key: str, batch_idx: int) -
         "Przetłumacz tytuły (T) i opisy (D) artykułów e-commerce na język polski.\n"
         "Zachowaj nazwy własne (Amazon, Allegro, eBay, Kaufland, Temu, GPSR, EPR) bez zmian.\n"
         "Jeśli tekst jest już po polsku, zostaw go bez zmian.\n"
+        "WAŻNE: Przetłumacz KAŻDY artykuł — nie pomijaj żadnego.\n"
         'Odpowiedz TYLKO jako JSON: {"items": [{"t": "tytuł PL", "d": "opis PL"}, ...]}\n\n'
         + "\n".join(lines)
     )
 
-    try:
-        async with httpx.AsyncClient(timeout=45) as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.3,
-                    "response_format": {"type": "json_object"},
-                },
-            )
-            if resp.status_code != 200:
-                logger.warning("news_translate_failed", batch=batch_idx, status=resp.status_code)
+    # WHY: Retry with different Groq keys — 429 on one key doesn't mean all are exhausted
+    for attempt in range(min(MAX_TRANSLATE_RETRIES, len(keys))):
+        key = keys[(batch_idx + attempt) % len(keys)]
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3,
+                        "response_format": {"type": "json_object"},
+                    },
+                )
+                if resp.status_code == 429:
+                    logger.warning("news_translate_429", batch=batch_idx, attempt=attempt)
+                    await asyncio.sleep(2.0)
+                    continue
+                if resp.status_code != 200:
+                    logger.warning("news_translate_failed", batch=batch_idx, status=resp.status_code)
+                    continue
+
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                translated = json.loads(content)
+                items = translated.get("items", [])
+
+                translated_count = 0
+                for i, art in enumerate(articles):
+                    if i < len(items):
+                        if items[i].get("t"):
+                            art["title"] = items[i]["t"]
+                            translated_count += 1
+                        if items[i].get("d"):
+                            art["description"] = items[i]["d"]
+
+                logger.info("news_batch_translated", batch=batch_idx, count=translated_count)
                 return articles
 
-            data = resp.json()
-            content = data["choices"][0]["message"]["content"]
-            translated = json.loads(content)
-            items = translated.get("items", [])
+        except Exception as e:
+            logger.error("news_translate_error", batch=batch_idx, attempt=attempt, error=str(e))
+            if attempt < MAX_TRANSLATE_RETRIES - 1:
+                await asyncio.sleep(1.0)
 
-            translated_count = 0
-            for i, art in enumerate(articles):
-                if i < len(items):
-                    if items[i].get("t"):
-                        art["title"] = items[i]["t"]
-                        translated_count += 1
-                    if items[i].get("d"):
-                        art["description"] = items[i]["d"]
-
-            logger.info("news_batch_translated", batch=batch_idx, count=translated_count)
-            return articles
-
-    except Exception as e:
-        logger.error("news_translate_error", batch=batch_idx, error=str(e))
-        return articles
+    logger.error("news_translate_all_retries_failed", batch=batch_idx)
+    return articles
 
 
 async def _translate_all(articles: List[dict]) -> List[dict]:
@@ -165,8 +221,7 @@ async def _translate_all(articles: List[dict]) -> List[dict]:
     # WHY: Sequential + key rotation to avoid 429 rate limits on single key
     translated: List[dict] = []
     for idx, batch in enumerate(batches):
-        key = keys[idx % len(keys)]
-        result = await _translate_batch(batch, key, idx)
+        result = await _translate_batch(batch, keys, idx)
         translated.extend(result)
         if idx < len(batches) - 1:
             await asyncio.sleep(1.0)
@@ -176,13 +231,17 @@ async def _translate_all(articles: List[dict]) -> List[dict]:
 
 
 @router.get("/feed")
-async def get_news_feed():
-    """Aggregated marketplace news feed — translated to Polish, cached 2h."""
+async def get_news_feed(force: bool = Query(False)):
+    """Aggregated marketplace news feed — translated to Polish, cached 2h.
+
+    WHY force param: allows cache bypass when translations failed or new deploy.
+    """
     now = time.time()
-    if _cache["articles"] and (now - _cache["timestamp"]) < CACHE_TTL:
+    if not force and _cache["articles"] and (now - _cache["timestamp"]) < CACHE_TTL:
         return {"articles": _cache["articles"], "cached": True}
 
     articles = await _fetch_all_feeds()
+    await _resolve_thumbnails(articles)
     articles = await _translate_all(articles)
 
     _cache["articles"] = articles

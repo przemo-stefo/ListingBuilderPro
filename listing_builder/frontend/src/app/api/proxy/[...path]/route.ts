@@ -34,6 +34,7 @@ const ALLOWED_PATH_PREFIXES = [
   'oauth',
   'stripe',
   'news',
+  'allegro',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
