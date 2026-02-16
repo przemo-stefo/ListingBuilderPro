@@ -42,8 +42,7 @@ RSS_FEEDS = [
 ]
 
 RSS_API = "https://api.rss2json.com/v1/api.json?rss_url="
-TRANSLATE_BATCH_SIZE = 15
-MAX_TRANSLATE_RETRIES = 2
+TRANSLATE_BATCH_SIZE = 10  # WHY: Smaller batches = faster Groq response + less data lost on failure
 
 
 async def _fetch_feed(client: httpx.AsyncClient, feed: dict) -> List[dict]:
@@ -158,8 +157,8 @@ async def _translate_batch(articles: List[dict], keys: List[str], batch_idx: int
         + "\n".join(lines)
     )
 
-    # WHY: Retry with different Groq keys — 429 on one key doesn't mean all are exhausted
-    for attempt in range(min(MAX_TRANSLATE_RETRIES, len(keys))):
+    # WHY: Try ALL available Groq keys — optimizer burns through the first ones
+    for attempt in range(len(keys)):
         key = keys[(batch_idx + attempt) % len(keys)]
         try:
             async with httpx.AsyncClient(timeout=60) as client:
@@ -200,7 +199,7 @@ async def _translate_batch(articles: List[dict], keys: List[str], batch_idx: int
 
         except Exception as e:
             logger.error("news_translate_error", batch=batch_idx, attempt=attempt, error=str(e))
-            if attempt < MAX_TRANSLATE_RETRIES - 1:
+            if attempt < len(keys) - 1:
                 await asyncio.sleep(1.0)
 
     logger.error("news_translate_all_retries_failed", batch=batch_idx)
