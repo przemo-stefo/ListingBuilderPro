@@ -41,7 +41,7 @@ const EXPORT_OPTIONS: { id: ExportFormat; label: string }[] = [
 ]
 
 const SYNC_OPTIONS: { id: SyncFrequency; label: string }[] = [
-  { id: 'manual', label: 'Manual' },
+  { id: 'manual', label: 'Reczna' },
   { id: '1h', label: '1h' },
   { id: '6h', label: '6h' },
   { id: '12h', label: '12h' },
@@ -97,9 +97,9 @@ export default function SettingsPage() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <p className="text-gray-400">Failed to load settings</p>
+        <p className="text-gray-400">Nie udalo sie zaladowac ustawien</p>
         <Button variant="outline" onClick={() => refetch()}>
-          Retry
+          Ponow
         </Button>
       </div>
     )
@@ -109,35 +109,35 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <h1 className="text-2xl font-bold text-white">Ustawienia</h1>
         <p className="text-sm text-gray-400">
-          Manage your store configuration, marketplace connections, and preferences
+          Konfiguracja sklepu, polaczenia z marketplace&apos;ami i preferencje. Ustaw domyslny rynek, powiadomienia i format eksportu.
         </p>
       </div>
 
-      {/* Card 1 — General Settings */}
+      {/* Card 1 — Ustawienia ogolne */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <SettingsIcon className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">General Settings</CardTitle>
+            <CardTitle className="text-lg">Ustawienia ogolne</CardTitle>
           </div>
-          <CardDescription>Basic store configuration</CardDescription>
+          <CardDescription>Podstawowa konfiguracja sklepu</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Store Name */}
+          {/* Nazwa sklepu */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Store Name</label>
+            <label className="mb-1 block text-sm text-gray-400">Nazwa sklepu</label>
             <Input
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
-              placeholder="Your store name"
+              placeholder="Nazwa Twojego sklepu"
             />
           </div>
 
-          {/* Default Marketplace */}
+          {/* Domyslny marketplace */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Default Marketplace</label>
+            <label className="mb-1 block text-sm text-gray-400">Domyslny marketplace</label>
             <div className="flex flex-wrap gap-2">
               {MARKETPLACE_OPTIONS.map((mp) => (
                 <Button
@@ -152,9 +152,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Timezone */}
+          {/* Strefa czasowa */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Timezone</label>
+            <label className="mb-1 block text-sm text-gray-400">Strefa czasowa</label>
             <div className="flex flex-wrap gap-2">
               {TIMEZONE_OPTIONS.map((tz) => (
                 <Button
@@ -169,7 +169,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Save */}
+          {/* Zapisz */}
           <div className="flex justify-end">
             <Button
               onClick={() =>
@@ -184,20 +184,20 @@ export default function SettingsPage() {
               disabled={updateSettings.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
-              Save
+              Zapisz
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 2 — Marketplace Connections */}
+      {/* Card 2 — Polaczenia z marketplace'ami */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Link className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Marketplace Connections</CardTitle>
+            <CardTitle className="text-lg">Polaczenia z marketplace&apos;ami</CardTitle>
           </div>
-          <CardDescription>Manage API connections to your marketplaces</CardDescription>
+          <CardDescription>Zarzadzaj polaczeniami API do marketplace&apos;ow</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
@@ -215,7 +215,7 @@ export default function SettingsPage() {
                         : 'bg-gray-700 text-gray-400'
                     }`}
                   >
-                    {conn.connected ? 'Connected' : 'Disconnected'}
+                    {conn.connected ? 'Polaczony' : 'Rozlaczony'}
                   </span>
                 </div>
 
@@ -227,7 +227,7 @@ export default function SettingsPage() {
                     updated[idx] = { ...updated[idx], api_key: e.target.value }
                     setConnections(updated)
                   }}
-                  placeholder="Enter API key"
+                  placeholder="Wprowadz klucz API"
                 />
 
                 <Button
@@ -247,7 +247,7 @@ export default function SettingsPage() {
                     setConnections(updated)
                   }}
                 >
-                  {conn.connected ? 'Disconnect' : 'Connect'}
+                  {conn.connected ? 'Rozlacz' : 'Polacz'}
                 </Button>
               </div>
             ))}
@@ -261,42 +261,42 @@ export default function SettingsPage() {
               disabled={updateSettings.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
-              Save
+              Zapisz
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 3 — Notification Preferences */}
+      {/* Card 3 — Preferencje powiadomien */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Notification Preferences</CardTitle>
+            <CardTitle className="text-lg">Preferencje powiadomien</CardTitle>
           </div>
-          <CardDescription>Choose which alerts you want to receive</CardDescription>
+          <CardDescription>Wybierz jakie alerty chcesz otrzymywac</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {([
             {
               key: 'email_alerts' as const,
-              label: 'Email Alerts',
-              desc: 'Receive email notifications for important events',
+              label: 'Alerty email',
+              desc: 'Otrzymuj powiadomienia email o waznych zdarzeniach',
             },
             {
               key: 'low_stock_alerts' as const,
-              label: 'Low Stock Alerts',
-              desc: 'Get notified when inventory drops below reorder point',
+              label: 'Alerty niskiego stanu',
+              desc: 'Powiadomienie gdy stan magazynowy spadnie ponizej minimum',
             },
             {
               key: 'competitor_price_changes' as const,
-              label: 'Competitor Price Changes',
-              desc: 'Alert when competitors change their pricing',
+              label: 'Zmiany cen konkurencji',
+              desc: 'Alert gdy konkurencja zmieni ceny',
             },
             {
               key: 'compliance_warnings' as const,
-              label: 'Compliance Warnings',
-              desc: 'Notifications about listing compliance issues',
+              label: 'Ostrzezenia zgodnosci',
+              desc: 'Powiadomienia o problemach ze zgodnosciami listingow',
             },
           ]).map((item) => (
             <div
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                   }))
                 }
               >
-                {notifications[item.key] ? 'ON' : 'OFF'}
+                {notifications[item.key] ? 'WL.' : 'WYL.'}
               </Button>
             </div>
           ))}
@@ -328,25 +328,25 @@ export default function SettingsPage() {
               disabled={updateSettings.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
-              Save
+              Zapisz
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 4 — Data & Export */}
+      {/* Card 4 — Dane i eksport */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Download className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Data & Export</CardTitle>
+            <CardTitle className="text-lg">Dane i eksport</CardTitle>
           </div>
-          <CardDescription>Configure export formats and sync schedule</CardDescription>
+          <CardDescription>Skonfiguruj formaty eksportu i harmonogram synchronizacji</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Export Format */}
+          {/* Format eksportu */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Export Format</label>
+            <label className="mb-1 block text-sm text-gray-400">Format eksportu</label>
             <div className="flex gap-2">
               {EXPORT_OPTIONS.map((opt) => (
                 <Button
@@ -361,9 +361,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Sync Frequency */}
+          {/* Czestotliwosc synchronizacji */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Auto-Sync Frequency</label>
+            <label className="mb-1 block text-sm text-gray-400">Czestotliwosc auto-synchronizacji</label>
             <div className="flex gap-2">
               {SYNC_OPTIONS.map((opt) => (
                 <Button
@@ -378,7 +378,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Save */}
+          {/* Zapisz */}
           <div className="flex justify-end">
             <Button
               onClick={() =>
@@ -392,7 +392,7 @@ export default function SettingsPage() {
               disabled={updateSettings.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
-              Save
+              Zapisz
             </Button>
           </div>
         </CardContent>

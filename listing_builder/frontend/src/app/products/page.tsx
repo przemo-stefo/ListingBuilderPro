@@ -44,30 +44,30 @@ export default function ProductsPage() {
 
   // Handle delete
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
+    if (confirm('Czy na pewno chcesz usunac ten produkt?')) {
       await deleteProduct.mutateAsync(id)
     }
   }
 
   const statusFilters = [
-    { label: 'All', value: 'all' },
-    { label: 'Pending', value: 'pending' },
-    { label: 'Optimized', value: 'optimized' },
-    { label: 'Published', value: 'published' },
-    { label: 'Error', value: 'error' },
+    { label: 'Wszystkie', value: 'all' },
+    { label: 'Oczekujace', value: 'pending' },
+    { label: 'Zoptymalizowane', value: 'optimized' },
+    { label: 'Opublikowane', value: 'published' },
+    { label: 'Bledy', value: 'error' },
   ]
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Products</h1>
+          <h1 className="text-3xl font-bold text-white">Produkty</h1>
           <p className="text-gray-400 mt-2">
-            Manage your product listings
+            Zarzadzaj swoimi produktami. Tutaj zobaczysz wszystkie zaimportowane oferty — ich status, ocene AI i akcje.
           </p>
         </div>
         <Link href="/products/import">
-          <Button>Import New Products</Button>
+          <Button>Importuj produkty</Button>
         </Link>
       </div>
 
@@ -79,7 +79,7 @@ export default function ProductsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search products..."
+                placeholder="Szukaj produktow..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 className="pl-10"
@@ -117,7 +117,7 @@ export default function ProductsPage() {
       ) : error ? (
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Products</CardTitle>
+            <CardTitle className="text-red-500">Blad ladowania produktow</CardTitle>
           </CardHeader>
         </Card>
       ) : data && data.items.length > 0 ? (
@@ -140,7 +140,7 @@ export default function ProductsPage() {
                     </div>
 
                     <p className="text-sm text-gray-400 mb-3">
-                      {truncate(product.description || 'No description', 150)}
+                      {truncate(product.description || 'Brak opisu', 150)}
                     </p>
 
                     <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -148,14 +148,14 @@ export default function ProductsPage() {
                         <span>ASIN: {product.asin}</span>
                       )}
                       {product.brand && (
-                        <span>Brand: {product.brand}</span>
+                        <span>Marka: {product.brand}</span>
                       )}
                       {product.marketplace && (
-                        <span>Market: {product.marketplace}</span>
+                        <span>Rynek: {product.marketplace}</span>
                       )}
                       {product.optimization_score && (
                         <span className="text-green-500">
-                          Score: {Math.round(product.optimization_score)}%
+                          Ocena: {Math.round(product.optimization_score)}%
                         </span>
                       )}
                       <span>{formatRelativeTime(product.created_at)}</span>
@@ -189,7 +189,7 @@ export default function ProductsPage() {
                 variant="outline"
                 onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
               >
-                Load More
+                Zaladuj wiecej
               </Button>
             </div>
           )}
@@ -197,9 +197,9 @@ export default function ProductsPage() {
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-400">No products found</p>
+            <p className="text-gray-400">Brak produktow</p>
             <Link href="/products/import">
-              <Button className="mt-4">Import Your First Product</Button>
+              <Button className="mt-4">Importuj pierwszy produkt</Button>
             </Link>
           </CardContent>
         </Card>

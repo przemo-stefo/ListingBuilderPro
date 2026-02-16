@@ -24,30 +24,30 @@ import {
 const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 
 const STOCK_STATUSES: { value: StockStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'in_stock', label: 'In Stock' },
-  { value: 'low_stock', label: 'Low Stock' },
-  { value: 'out_of_stock', label: 'Out of Stock' },
-  { value: 'overstock', label: 'Overstock' },
+  { value: 'all', label: 'Wszystkie' },
+  { value: 'in_stock', label: 'Na stanie' },
+  { value: 'low_stock', label: 'Niski stan' },
+  { value: 'out_of_stock', label: 'Brak' },
+  { value: 'overstock', label: 'Nadmiar' },
 ]
 
 // WHY: Color-coded status badge so users can instantly spot stock health
 function StockStatusBadge({ status }: { status: StockStatus }) {
   const config: Record<StockStatus, { label: string; className: string }> = {
     in_stock: {
-      label: 'In Stock',
+      label: 'Na stanie',
       className: 'bg-green-500/10 text-green-500 border-green-500/20',
     },
     low_stock: {
-      label: 'Low Stock',
+      label: 'Niski stan',
       className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
     },
     out_of_stock: {
-      label: 'Out of Stock',
+      label: 'Brak',
       className: 'bg-red-500/10 text-red-500 border-red-500/20',
     },
     overstock: {
-      label: 'Overstock',
+      label: 'Nadmiar',
       className: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
     },
   }
@@ -125,9 +125,9 @@ export default function InventoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Inventory</h1>
+          <h1 className="text-3xl font-bold text-white">Magazyn</h1>
           <p className="text-gray-400 mt-2">
-            Track stock levels, reorder status, and days of supply across marketplaces
+            Sledz stany magazynowe, punkt ponownego zamowienia i zapas dni na marketplace&apos;ach. Kontroluj ktore produkty wymagaja dostawy.
           </p>
         </div>
         <Button
@@ -136,7 +136,7 @@ export default function InventoryPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
+          Odswiez
         </Button>
       </div>
 
@@ -149,7 +149,7 @@ export default function InventoryPage() {
                 <Package className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Total SKUs</p>
+                <p className="text-sm text-gray-400">Wszystkie SKU</p>
                 <p className="text-2xl font-bold text-white">
                   {data?.total ?? '—'}
                 </p>
@@ -165,7 +165,7 @@ export default function InventoryPage() {
                 <CheckCircle className="h-5 w-5 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">In Stock</p>
+                <p className="text-sm text-gray-400">Na stanie</p>
                 <p className="text-2xl font-bold text-green-500">
                   {data?.in_stock_count ?? '—'}
                 </p>
@@ -181,7 +181,7 @@ export default function InventoryPage() {
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Low Stock</p>
+                <p className="text-sm text-gray-400">Niski stan</p>
                 <p className="text-2xl font-bold text-yellow-500">
                   {data?.low_stock_count ?? '—'}
                 </p>
@@ -197,7 +197,7 @@ export default function InventoryPage() {
                 <DollarSign className="h-5 w-5 text-teal-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Total Value</p>
+                <p className="text-sm text-gray-400">Wartosc calkowita</p>
                 <p className="text-2xl font-bold text-teal-500">
                   {data?.total_value != null
                     ? `$${formatNumber(data.total_value)}`
@@ -223,7 +223,7 @@ export default function InventoryPage() {
                     size="sm"
                     onClick={() => handleMarketplaceFilter('all')}
                   >
-                    All
+                    Wszystkie
                   </Button>
                   {MARKETPLACES.map((mp) => (
                     <Button
@@ -241,7 +241,7 @@ export default function InventoryPage() {
               <div className="flex items-center gap-2 md:ml-auto">
                 <Search className="h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search SKU or product..."
+                  placeholder="Szukaj SKU lub produktu..."
                   value={searchInput}
                   onChange={handleSearchChange}
                   className="w-64"
@@ -287,14 +287,14 @@ export default function InventoryPage() {
       ) : error ? (
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Inventory</CardTitle>
+            <CardTitle className="text-red-500">Blad ladowania magazynu</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-400 mb-4">
-              {error instanceof Error ? error.message : 'Something went wrong'}
+              {error instanceof Error ? error.message : 'Cos poszlo nie tak'}
             </p>
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              Ponow
             </Button>
           </CardContent>
         </Card>
@@ -306,15 +306,15 @@ export default function InventoryPage() {
                 <thead>
                   <tr className="border-b border-gray-800">
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">SKU</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Product</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Produkt</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Marketplace</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Quantity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Reorder Pt</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Days Supply</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ilosc</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Min. zapas</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Zapas dni</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Unit Cost</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Value</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last Restocked</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Cena jedn.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Wartosc</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ostatnia dostawa</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -366,13 +366,13 @@ export default function InventoryPage() {
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-400">No inventory items match the selected filters</p>
+            <p className="text-gray-400">Brak pozycji magazynowych pasujacych do filtrow</p>
             <Button
               className="mt-4"
               variant="outline"
               onClick={clearFilters}
             >
-              Clear Filters
+              Wyczysc filtry
             </Button>
           </CardContent>
         </Card>

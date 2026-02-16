@@ -28,15 +28,15 @@ const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 function StatusBadge({ status }: { status: CompetitorStatus }) {
   const config: Record<CompetitorStatus, { label: string; className: string }> = {
     winning: {
-      label: 'Winning',
+      label: 'Wygrana',
       className: 'bg-green-500/10 text-green-500 border-green-500/20',
     },
     losing: {
-      label: 'Losing',
+      label: 'Przegrana',
       className: 'bg-red-500/10 text-red-500 border-red-500/20',
     },
     tied: {
-      label: 'Tied',
+      label: 'Remis',
       className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
     },
   }
@@ -117,9 +117,9 @@ export default function CompetitorsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Competitors</h1>
+          <h1 className="text-3xl font-bold text-white">Konkurencja</h1>
           <p className="text-gray-400 mt-2">
-            Track competitor pricing, ratings, and market position across marketplaces
+            Sledz ceny, oceny i pozycje rynkowa konkurencji na marketplace&apos;ach. Sprawdz gdzie wygrywasz, a gdzie tracisz.
           </p>
         </div>
         <Button
@@ -128,7 +128,7 @@ export default function CompetitorsPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
+          Odswiez
         </Button>
       </div>
 
@@ -141,7 +141,7 @@ export default function CompetitorsPage() {
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Total Competitors</p>
+                <p className="text-sm text-gray-400">Konkurenci ogolnie</p>
                 <p className="text-2xl font-bold text-white">
                   {data?.total ?? '—'}
                 </p>
@@ -157,7 +157,7 @@ export default function CompetitorsPage() {
                 <TrendingUp className="h-5 w-5 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Winning</p>
+                <p className="text-sm text-gray-400">Wygrywamy</p>
                 <p className="text-2xl font-bold text-green-500">
                   {data?.winning_count ?? '—'}
                 </p>
@@ -173,7 +173,7 @@ export default function CompetitorsPage() {
                 <TrendingDown className="h-5 w-5 text-red-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Losing</p>
+                <p className="text-sm text-gray-400">Przegrywamy</p>
                 <p className="text-2xl font-bold text-red-500">
                   {data?.losing_count ?? '—'}
                 </p>
@@ -189,7 +189,7 @@ export default function CompetitorsPage() {
                 <DollarSign className="h-5 w-5 text-teal-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Avg Price Gap</p>
+                <p className="text-sm text-gray-400">Srednia roznica cen</p>
                 <p className="text-2xl font-bold text-teal-500">
                   {data?.avg_price_gap != null ? `$${data.avg_price_gap.toFixed(2)}` : '—'}
                 </p>
@@ -212,7 +212,7 @@ export default function CompetitorsPage() {
                   size="sm"
                   onClick={() => handleMarketplaceFilter('all')}
                 >
-                  All
+                  Wszystkie
                 </Button>
                 {MARKETPLACES.map((mp) => (
                   <Button
@@ -231,7 +231,7 @@ export default function CompetitorsPage() {
             <div className="flex items-center gap-2 md:ml-auto">
               <Search className="h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search competitors..."
+                placeholder="Szukaj konkurentow..."
                 value={searchInput}
                 onChange={handleSearchChange}
                 className="w-64"
@@ -255,14 +255,14 @@ export default function CompetitorsPage() {
       ) : error ? (
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Competitors</CardTitle>
+            <CardTitle className="text-red-500">Blad ladowania konkurencji</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-400 mb-4">
-              {error instanceof Error ? error.message : 'Something went wrong'}
+              {error instanceof Error ? error.message : 'Cos poszlo nie tak'}
             </p>
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              Ponow
             </Button>
           </CardContent>
         </Card>
@@ -273,16 +273,16 @@ export default function CompetitorsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Competitor</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Product</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Konkurent</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Produkt</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Marketplace</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Their Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Our Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Diff</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Rating</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Reviews</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ich cena</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nasza cena</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Roznica</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ocena</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Recenzje</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last Checked</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ostatnie sprawdzenie</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -330,13 +330,13 @@ export default function CompetitorsPage() {
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-400">No competitors match the selected filters</p>
+            <p className="text-gray-400">Brak konkurentow pasujacych do filtrow</p>
             <Button
               className="mt-4"
               variant="outline"
               onClick={clearFilters}
             >
-              Clear Filters
+              Wyczysc filtry
             </Button>
           </CardContent>
         </Card>

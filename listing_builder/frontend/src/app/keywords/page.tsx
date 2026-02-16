@@ -84,9 +84,9 @@ export default function KeywordsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Keywords</h1>
+          <h1 className="text-3xl font-bold text-white">Slowa kluczowe</h1>
           <p className="text-gray-400 mt-2">
-            Track keyword rankings and search volume across marketplaces
+            Sledz pozycje slow kluczowych i wolumen wyszukiwan na marketplace&apos;ach. Sprawdz ktore frazy rosna, a ktore spadaja.
           </p>
         </div>
         <Button
@@ -95,7 +95,7 @@ export default function KeywordsPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
+          Odswiez
         </Button>
       </div>
 
@@ -108,7 +108,7 @@ export default function KeywordsPage() {
                 <Hash className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Total Keywords</p>
+                <p className="text-sm text-gray-400">Wszystkie slowa</p>
                 <p className="text-2xl font-bold text-white">
                   {data?.total ?? '—'}
                 </p>
@@ -124,7 +124,7 @@ export default function KeywordsPage() {
                 <Eye className="h-5 w-5 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Tracked</p>
+                <p className="text-sm text-gray-400">Sledzone</p>
                 <p className="text-2xl font-bold text-green-500">
                   {data?.tracked_count ?? '—'}
                 </p>
@@ -140,7 +140,7 @@ export default function KeywordsPage() {
                 <Trophy className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Top 10 Ranked</p>
+                <p className="text-sm text-gray-400">Top 10 pozycji</p>
                 <p className="text-2xl font-bold text-yellow-500">
                   {data?.top_10_count ?? '—'}
                 </p>
@@ -156,7 +156,7 @@ export default function KeywordsPage() {
                 <Target className="h-5 w-5 text-teal-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Avg Relevance</p>
+                <p className="text-sm text-gray-400">Srednia trafnosc</p>
                 <p className="text-2xl font-bold text-teal-500">
                   {data?.avg_relevance ?? '—'}
                 </p>
@@ -179,7 +179,7 @@ export default function KeywordsPage() {
                   size="sm"
                   onClick={() => handleMarketplaceFilter('all')}
                 >
-                  All
+                  Wszystkie
                 </Button>
                 {MARKETPLACES.map((mp) => (
                   <Button
@@ -198,7 +198,7 @@ export default function KeywordsPage() {
             <div className="flex items-center gap-2 md:ml-auto">
               <Search className="h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search keywords..."
+                placeholder="Szukaj slow kluczowych..."
                 value={searchInput}
                 onChange={handleSearchChange}
                 className="w-64"
@@ -222,14 +222,14 @@ export default function KeywordsPage() {
       ) : error ? (
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Keywords</CardTitle>
+            <CardTitle className="text-red-500">Blad ladowania slow kluczowych</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-400 mb-4">
-              {error instanceof Error ? error.message : 'Something went wrong'}
+              {error instanceof Error ? error.message : 'Cos poszlo nie tak'}
             </p>
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              Ponow
             </Button>
           </CardContent>
         </Card>
@@ -240,13 +240,13 @@ export default function KeywordsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Keyword</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Slowo kluczowe</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Marketplace</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Search Volume</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Rank</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Wolumen</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Pozycja</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Trend</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Relevance</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Updated</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Trafnosc</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Aktualizacja</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -287,13 +287,13 @@ export default function KeywordsPage() {
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-400">No keywords match the selected filters</p>
+            <p className="text-gray-400">Brak slow kluczowych pasujacych do filtrow</p>
             <Button
               className="mt-4"
               variant="outline"
               onClick={clearFilters}
             >
-              Clear Filters
+              Wyczysc filtry
             </Button>
           </CardContent>
         </Card>

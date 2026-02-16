@@ -47,13 +47,13 @@ export default function PublishPage() {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toast({
-        title: 'Publishing complete',
-        description: `Successfully published ${result.successful.length} product${result.successful.length !== 1 ? 's' : ''}`,
+        title: 'Publikacja zakonczona',
+        description: `Pomyslnie opublikowano ${result.successful.length} produktow`,
       })
       if (result.failed.length > 0) {
         toast({
-          title: 'Some products failed',
-          description: `${result.failed.length} product${result.failed.length !== 1 ? 's' : ''} failed to publish`,
+          title: 'Niektore produkty nie zostaly opublikowane',
+          description: `${result.failed.length} produktow nie udalo sie opublikowac`,
           variant: 'destructive',
         })
       }
@@ -61,7 +61,7 @@ export default function PublishPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Publishing failed',
+        title: 'Publikacja nie powiodla sie',
         description: error.message,
         variant: 'destructive',
       })
@@ -87,16 +87,16 @@ export default function PublishPage() {
   const handlePublish = () => {
     if (selectedIds.length === 0) {
       toast({
-        title: 'No products selected',
-        description: 'Please select at least one product to publish',
+        title: 'Nie zaznaczono produktow',
+        description: 'Zaznacz co najmniej jeden produkt do publikacji',
         variant: 'destructive',
       })
       return
     }
     if (!selectedMarketplace) {
       toast({
-        title: 'No marketplace selected',
-        description: 'Please select a marketplace',
+        title: 'Nie wybrano marketplace\'u',
+        description: 'Wybierz marketplace',
         variant: 'destructive',
       })
       return
@@ -109,9 +109,9 @@ export default function PublishPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Publish to Marketplaces</h1>
+        <h1 className="text-3xl font-bold text-white">Publikacja na marketplace&apos;y</h1>
         <p className="text-gray-400 mt-2">
-          Export your optimized products to various marketplaces
+          Eksportuj zoptymalizowane produkty na wybrane marketplace&apos;y. Zaznacz produkty i kliknij publikuj.
         </p>
       </div>
 
@@ -121,13 +121,13 @@ export default function PublishPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Products Ready to Publish</p>
+                <p className="text-sm text-gray-400">Produkty gotowe do publikacji</p>
                 <p className="text-3xl font-bold text-white mt-1">
                   {productsData?.total || 0}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-400">Selected</p>
+                <p className="text-sm text-gray-400">Zaznaczono</p>
                 <p className="text-3xl font-bold text-green-500 mt-1">
                   {selectedIds.length}
                 </p>
@@ -138,7 +138,7 @@ export default function PublishPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Select Marketplace</CardTitle>
+            <CardTitle className="text-lg">Wybierz marketplace</CardTitle>
           </CardHeader>
           <CardContent>
             {marketplacesLoading ? (
@@ -168,7 +168,7 @@ export default function PublishPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400">No marketplaces available</p>
+              <p className="text-sm text-gray-400">Brak dostepnych marketplace&apos;ow</p>
             )}
           </CardContent>
         </Card>
@@ -178,10 +178,10 @@ export default function PublishPage() {
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={selectAll}>
-            Select All
+            Zaznacz wszystkie
           </Button>
           <Button variant="outline" size="sm" onClick={deselectAll}>
-            Deselect All
+            Odznacz wszystkie
           </Button>
         </div>
         <Button
@@ -190,8 +190,8 @@ export default function PublishPage() {
         >
           <Send className="h-4 w-4 mr-2" />
           {publishMutation.isPending
-            ? 'Publishing...'
-            : `Publish ${selectedIds.length} Product${selectedIds.length !== 1 ? 's' : ''}`}
+            ? 'Publikowanie...'
+            : `Publikuj ${selectedIds.length} produktow`}
         </Button>
       </div>
 
@@ -246,12 +246,12 @@ export default function PublishPage() {
                         )}
                       </div>
                       <p className="text-sm text-gray-400">
-                        {truncate(product.description || 'No description', 120)}
+                        {truncate(product.description || 'Brak opisu', 120)}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         {product.asin && <span>ASIN: {product.asin}</span>}
-                        {product.brand && <span>Brand: {product.brand}</span>}
-                        {product.category && <span>Category: {product.category}</span>}
+                        {product.brand && <span>Marka: {product.brand}</span>}
+                        {product.category && <span>Kategoria: {product.category}</span>}
                       </div>
                     </div>
                   </div>
@@ -263,9 +263,9 @@ export default function PublishPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>No Products Ready</CardTitle>
+            <CardTitle>Brak gotowych produktow</CardTitle>
             <CardDescription>
-              Optimize your products first before publishing to marketplaces.
+              Najpierw zoptymalizuj produkty przed publikacja na marketplace&apos;y.
             </CardDescription>
           </CardHeader>
         </Card>

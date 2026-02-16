@@ -39,9 +39,9 @@ export default function ListingsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Listings</h1>
+          <h1 className="text-3xl font-bold text-white">Listingi</h1>
           <p className="text-gray-400 mt-2">
-            Monitor compliance status across all marketplaces
+            Monitoruj zgodnosc listingow na wszystkich marketplace&apos;ach. Sprawdz ktore oferty wymagaja poprawek.
           </p>
         </div>
         <Button
@@ -50,7 +50,7 @@ export default function ListingsPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
+          Odswiez
         </Button>
       </div>
 
@@ -63,7 +63,7 @@ export default function ListingsPage() {
                 <List className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Total Listings</p>
+                <p className="text-sm text-gray-400">Wszystkie listingi</p>
                 <p className="text-2xl font-bold text-white">
                   {data?.total ?? '—'}
                 </p>
@@ -79,7 +79,7 @@ export default function ListingsPage() {
                 <ShieldCheck className="h-5 w-5 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Compliant</p>
+                <p className="text-sm text-gray-400">Zgodne</p>
                 <p className="text-2xl font-bold text-green-500">
                   {data?.compliant_count ?? '—'}
                 </p>
@@ -95,7 +95,7 @@ export default function ListingsPage() {
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Warning</p>
+                <p className="text-sm text-gray-400">Ostrzezenia</p>
                 <p className="text-2xl font-bold text-yellow-500">
                   {data?.warning_count ?? '—'}
                 </p>
@@ -111,7 +111,7 @@ export default function ListingsPage() {
                 <XOctagon className="h-5 w-5 text-red-500" />
               </div>
               <div>
-                <p className="text-sm text-gray-400">Suppressed / Blocked</p>
+                <p className="text-sm text-gray-400">Wstrzymane / Zablokowane</p>
                 <p className="text-2xl font-bold text-red-500">
                   {data ? data.suppressed_count + data.blocked_count : '—'}
                 </p>
@@ -134,7 +134,7 @@ export default function ListingsPage() {
                   size="sm"
                   onClick={() => handleMarketplaceFilter('all')}
                 >
-                  All
+                  Wszystkie
                 </Button>
                 {MARKETPLACES.map((mp) => (
                   <Button
@@ -158,7 +158,7 @@ export default function ListingsPage() {
                   size="sm"
                   onClick={() => handleStatusFilter('all')}
                 >
-                  All
+                  Wszystkie
                 </Button>
                 {COMPLIANCE_STATUSES.map((s) => (
                   <Button
@@ -191,14 +191,14 @@ export default function ListingsPage() {
       ) : error ? (
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Listings</CardTitle>
+            <CardTitle className="text-red-500">Blad ladowania listingow</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-400 mb-4">
-              {error instanceof Error ? error.message : 'Something went wrong'}
+              {error instanceof Error ? error.message : 'Cos poszlo nie tak'}
             </p>
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              Ponow
             </Button>
           </CardContent>
         </Card>
@@ -210,11 +210,11 @@ export default function ListingsPage() {
                 <thead>
                   <tr className="border-b border-gray-800">
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">SKU</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Title</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Tytul</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Marketplace</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Compliance</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Issues</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last Checked</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Zgodnosc</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Problemy</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ostatnie sprawdzenie</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -254,13 +254,13 @@ export default function ListingsPage() {
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-400">No listings match the selected filters</p>
+            <p className="text-gray-400">Brak listingow pasujacych do wybranych filtrow</p>
             <Button
               className="mt-4"
               variant="outline"
               onClick={() => setParams({})}
             >
-              Clear Filters
+              Wyczysc filtry
             </Button>
           </CardContent>
         </Card>

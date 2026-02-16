@@ -21,10 +21,10 @@ import {
 
 const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 const PERIODS: { value: GetAnalyticsParams['period']; label: string }[] = [
-  { value: '7d', label: '7 Days' },
-  { value: '30d', label: '30 Days' },
-  { value: '90d', label: '90 Days' },
-  { value: '12m', label: '12 Months' },
+  { value: '7d', label: '7 dni' },
+  { value: '30d', label: '30 dni' },
+  { value: '90d', label: '90 dni' },
+  { value: '12m', label: '12 mies.' },
 ]
 
 // WHY: Each marketplace gets a distinct color so horizontal bars are easy to compare
@@ -63,9 +63,9 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Analytics</h1>
+          <h1 className="text-3xl font-bold text-white">Analityka</h1>
           <p className="text-gray-400 mt-2">
-            Sales performance, revenue breakdown, and top-selling products
+            Wyniki sprzedazowe, rozklad przychodow i najpopularniejsze produkty. Filtruj po marketplace i okresie.
           </p>
         </div>
         <Button
@@ -74,7 +74,7 @@ export default function AnalyticsPage() {
           disabled={isLoading}
         >
           <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
+          Odswiez
         </Button>
       </div>
 
@@ -84,7 +84,7 @@ export default function AnalyticsPage() {
           <div className="flex flex-col gap-4">
             {/* Period selector */}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400 whitespace-nowrap">Period:</span>
+              <span className="text-sm text-gray-400 whitespace-nowrap">Okres:</span>
               <div className="flex gap-2">
                 {PERIODS.map((p) => (
                   <Button
@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
                   size="sm"
                   onClick={() => handleMarketplaceFilter('all')}
                 >
-                  All
+                  Wszystkie
                 </Button>
                 {MARKETPLACES.map((mp) => (
                   <Button
@@ -154,14 +154,14 @@ export default function AnalyticsPage() {
       ) : error ? (
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Analytics</CardTitle>
+            <CardTitle className="text-red-500">Blad ladowania analityki</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-400 mb-4">
-              {error instanceof Error ? error.message : 'Something went wrong'}
+              {error instanceof Error ? error.message : 'Cos poszlo nie tak'}
             </p>
             <Button variant="outline" onClick={() => refetch()}>
-              Retry
+              Ponow
             </Button>
           </CardContent>
         </Card>
@@ -176,7 +176,7 @@ export default function AnalyticsPage() {
                     <DollarSign className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Total Revenue</p>
+                    <p className="text-sm text-gray-400">Calkowity przychod</p>
                     <p className="text-2xl font-bold text-green-500">
                       ${formatNumber(data.total_revenue)}
                     </p>
@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
                     <ShoppingCart className="h-5 w-5 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Total Orders</p>
+                    <p className="text-sm text-gray-400">Zamowienia</p>
                     <p className="text-2xl font-bold text-blue-500">
                       {formatNumber(data.total_orders)}
                     </p>
@@ -208,7 +208,7 @@ export default function AnalyticsPage() {
                     <TrendingUp className="h-5 w-5 text-teal-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Conversion Rate</p>
+                    <p className="text-sm text-gray-400">Konwersja</p>
                     <p className="text-2xl font-bold text-teal-500">
                       {data.conversion_rate}%
                     </p>
@@ -224,7 +224,7 @@ export default function AnalyticsPage() {
                     <BarChart3 className="h-5 w-5 text-orange-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Avg Order Value</p>
+                    <p className="text-sm text-gray-400">Srednia wartosc zamowienia</p>
                     <p className="text-2xl font-bold text-orange-500">
                       ${data.avg_order_value.toFixed(2)}
                     </p>
@@ -239,7 +239,7 @@ export default function AnalyticsPage() {
             {/* Revenue by Marketplace - Horizontal Bars */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-white">Revenue by Marketplace</CardTitle>
+                <CardTitle className="text-white">Przychod wg marketplace&apos;u</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -280,7 +280,7 @@ export default function AnalyticsPage() {
             {/* Monthly Revenue Trend - Vertical Bars */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-white">Monthly Revenue Trend</CardTitle>
+                <CardTitle className="text-white">Trend przychodow miesiecznych</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-end gap-3 h-48">
@@ -317,18 +317,18 @@ export default function AnalyticsPage() {
           {/* Top Products Table */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-white">Top Products by Revenue</CardTitle>
+              <CardTitle className="text-white">Najlepsze produkty wg przychodu</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-800">
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Product</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Produkt</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Marketplace</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Revenue</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Units Sold</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Conv. Rate</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Przychod</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Sprzedane</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Konwersja</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
