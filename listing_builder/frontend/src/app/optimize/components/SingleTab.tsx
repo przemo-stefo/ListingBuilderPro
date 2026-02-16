@@ -43,11 +43,13 @@ const MARKETPLACES = [
 
 interface SingleTabProps {
   loadedResult?: OptimizerResponse | null
+  // WHY: Allegro Manager passes ?prefill=title to pre-populate the form
+  initialTitle?: string
 }
 
-export default function SingleTab({ loadedResult }: SingleTabProps) {
-  // Form state
-  const [productTitle, setProductTitle] = useState('')
+export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps) {
+  // Form state — WHY initialTitle: prefill from Allegro Manager's "Optymalizuj z AI" button
+  const [productTitle, setProductTitle] = useState(initialTitle ?? '')
   const [brand, setBrand] = useState('')
   const [productLine, setProductLine] = useState('')
   const [keywordsText, setKeywordsText] = useState('')

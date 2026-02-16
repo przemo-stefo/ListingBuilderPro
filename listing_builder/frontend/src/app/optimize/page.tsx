@@ -4,8 +4,9 @@
 
 'use client'
 
-import { useState } from 'react'
-import { Layers, FileText, Clock, Crown } from 'lucide-react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Layers, FileText, Clock, Crown, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
 import { useToast } from '@/lib/hooks/useToast'
@@ -16,7 +17,11 @@ import type { OptimizerResponse } from '@/lib/types'
 
 type Tab = 'single' | 'batch' | 'history'
 
-export default function OptimizePage() {
+// WHY: Next.js 14 requires Suspense boundary around useSearchParams()
+function OptimizeContent() {
+  const searchParams = useSearchParams()
+  // WHY: Allegro Manager "Optymalizuj z AI" passes ?prefill=title
+  const prefillTitle = searchParams.get('prefill') ?? undefined
   const [activeTab, setActiveTab] = useState<Tab>('single')
   // WHY: When user clicks "Load" in History, we switch to Single and pass the result
   const [loadedResult, setLoadedResult] = useState<OptimizerResponse | null>(null)
@@ -94,9 +99,21 @@ export default function OptimizePage() {
       </div>
 
       {/* Active tab content */}
-      {activeTab === 'single' && <SingleTab loadedResult={loadedResult} />}
+      {activeTab === 'single' && <SingleTab loadedResult={loadedResult} initialTitle={prefillTitle} />}
       {activeTab === 'batch' && <BatchTab />}
       {activeTab === 'history' && isPremium && <HistoryTab onLoadResult={handleLoadFromHistory} />}
     </div>
+  )
+}
+
+export default function OptimizePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+      </div>
+    }>
+      <OptimizeContent />
+    </Suspense>
   )
 }
