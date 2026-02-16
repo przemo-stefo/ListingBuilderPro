@@ -94,7 +94,7 @@ async def _fetch_all_feeds() -> List[dict]:
     return articles
 
 
-async def _translate_batch(articles: List[dict], api_key: str) -> List[dict]:
+async def _translate_batch(articles: List[dict], api_key: str, batch_idx: int) -> List[dict]:
     """Translate a batch of articles to Polish via Groq."""
     if not articles:
         return articles
@@ -114,7 +114,7 @@ async def _translate_batch(articles: List[dict], api_key: str) -> List[dict]:
     )
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=45) as client:
             resp = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -126,7 +126,7 @@ async def _translate_batch(articles: List[dict], api_key: str) -> List[dict]:
                 },
             )
             if resp.status_code != 200:
-                logger.warning("news_translate_failed", status=resp.status_code)
+                logger.warning("news_translate_failed", batch=batch_idx, status=resp.status_code)
                 return articles
 
             data = resp.json()
@@ -134,35 +134,42 @@ async def _translate_batch(articles: List[dict], api_key: str) -> List[dict]:
             translated = json.loads(content)
             items = translated.get("items", [])
 
+            translated_count = 0
             for i, art in enumerate(articles):
                 if i < len(items):
                     if items[i].get("t"):
                         art["title"] = items[i]["t"]
+                        translated_count += 1
                     if items[i].get("d"):
                         art["description"] = items[i]["d"]
+
+            logger.info("news_batch_translated", batch=batch_idx, count=translated_count)
             return articles
 
     except Exception as e:
-        logger.error("news_translate_error", error=str(e))
+        logger.error("news_translate_error", batch=batch_idx, error=str(e))
         return articles
 
 
 async def _translate_all(articles: List[dict]) -> List[dict]:
-    """Split articles into batches and translate in parallel via Groq."""
-    api_key = settings.groq_api_key
-    if not api_key:
+    """Translate articles sequentially, rotating Groq API keys per batch."""
+    keys = settings.groq_api_keys
+    if not keys:
         return articles
 
     batches = [
         articles[i : i + TRANSLATE_BATCH_SIZE]
         for i in range(0, len(articles), TRANSLATE_BATCH_SIZE)
     ]
-    # WHY: Parallel Groq calls — each batch ~15 articles, all finish in ~3-5s
-    results = await asyncio.gather(*[_translate_batch(b, api_key) for b in batches])
 
+    # WHY: Sequential + key rotation to avoid 429 rate limits on single key
     translated: List[dict] = []
-    for batch in results:
-        translated.extend(batch)
+    for idx, batch in enumerate(batches):
+        key = keys[idx % len(keys)]
+        result = await _translate_batch(batch, key, idx)
+        translated.extend(result)
+        if idx < len(batches) - 1:
+            await asyncio.sleep(1.0)
 
     logger.info("news_translated", total=len(translated), batches=len(batches))
     return translated
