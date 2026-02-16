@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, ArrowLeft, Package, Layers } from 'lucide-react'
+import { Upload, ArrowLeft, Package, Layers, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import SingleImport from './components/SingleImport'
 import BatchImport from './components/BatchImport'
@@ -64,6 +64,81 @@ export default function ImportPage() {
 
       {/* Tab content */}
       {activeTab === 'single' ? <SingleImport /> : <BatchImport />}
+
+      {/* FAQ */}
+      <ImportFaq />
+    </div>
+  )
+}
+
+function ImportFaq() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="rounded-xl border border-gray-800 bg-[#1A1A1A]">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-5"
+      >
+        <div className="flex items-center gap-2">
+          <HelpCircle className="h-5 w-5 text-gray-400" />
+          <div className="text-left">
+            <h3 className="text-sm font-semibold text-white">FAQ — Import vs. Converter</h3>
+            <p className="text-xs text-gray-500">Czym się różnią i kiedy którego używać</p>
+          </div>
+        </div>
+        {open ? (
+          <ChevronDown className="h-5 w-5 text-gray-400" />
+        ) : (
+          <ChevronRight className="h-5 w-5 text-gray-400" />
+        )}
+      </button>
+      {open && (
+        <div className="space-y-3 px-5 pb-5">
+          <FaqItem
+            question="Czym się różni Import od Convertera?"
+            answer="Import zapisuje produkty do bazy danych systemu — możesz je potem przeglądać, edytować i optymalizować listingi AI. Converter to bezpośrednia konwersja Allegro→Amazon/eBay/Kaufland — od razu dostajesz plik TSV/CSV do uploadu, bez zapisu do bazy."
+          />
+          <FaqItem
+            question="Kiedy używać Importu?"
+            answer="Gdy chcesz: (1) budować bazę produktów w systemie, (2) korzystać z AI Optimizer do generowania tytułów, bulletów i opisów, (3) śledzić historię optymalizacji, (4) porównywać wersje listingów. Import → Optimize → Publish to pełny pipeline."
+          />
+          <FaqItem
+            question="Kiedy używać Convertera?"
+            answer="Gdy chcesz szybko przenieść oferty z Allegro na inny marketplace. Wpisujesz URLe lub nazwę sklepu → system scrapuje, tłumaczy na niemiecki i generuje gotowy plik do uploadu. Bez zapisywania do bazy — szybka konwersja na jedno kliknięcie."
+          />
+          <FaqItem
+            question="Co robi 'Import zbiorczy'?"
+            answer="Wklejasz CSV z danymi produktów (tytuł, cena, numer oferty, marka) lub wgrywasz plik. System parsuje dane i tworzy produkty w bazie. Obsługuje polskie i angielskie nagłówki. Limit: 500 produktów na raz."
+          />
+          <FaqItem
+            question="Skąd wziąć CSV z Allegro?"
+            answer="W Allegro Seller Center → Moje oferty → Eksportuj do pliku. Możesz też ręcznie utworzyć CSV z kolumnami: tytuł, cena, numer oferty, marka, kategoria, opis, url."
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-lg border border-gray-800 bg-[#151515]">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="text-sm font-medium text-gray-300">{question}</span>
+        {open ? (
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-gray-500" />
+        ) : (
+          <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-gray-500" />
+        )}
+      </button>
+      {open && (
+        <p className="px-4 pb-3 text-sm text-gray-500 leading-relaxed">{answer}</p>
+      )}
     </div>
   )
 }
