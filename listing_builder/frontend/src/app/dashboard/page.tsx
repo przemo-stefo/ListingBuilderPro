@@ -15,7 +15,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -35,11 +35,11 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Error Loading Stats</CardTitle>
-            <CardDescription>Failed to load dashboard data</CardDescription>
+            <CardTitle className="text-red-500">Blad ladowania danych</CardTitle>
+            <CardDescription>Nie udalo sie pobrac statystyk pulpitu</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -48,66 +48,66 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      title: 'Total Products',
+      title: 'Produkty',
       value: stats?.total_products || 0,
       icon: Package,
-      description: 'All products in system',
+      description: 'Wszystkie produkty w systemie',
     },
     {
-      title: 'Pending Optimization',
+      title: 'Do optymalizacji',
       value: stats?.pending_optimization || 0,
       icon: Clock,
-      description: 'Awaiting AI optimization',
+      description: 'Czekajace na optymalizacje AI',
       color: 'text-yellow-500',
     },
     {
-      title: 'Optimized',
+      title: 'Zoptymalizowane',
       value: stats?.optimized_products || 0,
       icon: Sparkles,
-      description: 'AI-optimized products',
+      description: 'Przetworzone przez AI',
       color: 'text-blue-500',
     },
     {
-      title: 'Published',
+      title: 'Opublikowane',
       value: stats?.published_products || 0,
       icon: Send,
-      description: 'Live on marketplaces',
+      description: 'Aktywne na marketplace',
       color: 'text-green-500',
     },
     {
-      title: 'Failed',
+      title: 'Bledy',
       value: stats?.failed_products || 0,
       icon: AlertCircle,
-      description: 'Products with errors',
+      description: 'Produkty z problemami',
       color: 'text-red-500',
     },
     {
-      title: 'Avg Score',
+      title: 'Sredni wynik',
       value: `${Math.round(stats?.average_optimization_score || 0)}%`,
       icon: TrendingUp,
-      description: 'Average optimization score',
+      description: 'Srednia ocena optymalizacji',
       color: 'text-green-500',
     },
     {
-      title: 'Recent Imports',
+      title: 'Ostatni import',
       value: stats?.recent_imports || 0,
       icon: Package,
-      description: 'Last 24 hours',
+      description: 'Ostatnie 24 godziny',
     },
     {
-      title: 'Recent Publishes',
+      title: 'Ostatnie publikacje',
       value: stats?.recent_publishes || 0,
       icon: Send,
-      description: 'Last 24 hours',
+      description: 'Ostatnie 24 godziny',
     },
   ]
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <p className="text-gray-400 mt-2">
-          Overview of your marketplace listing automation
+          Przeglad automatyzacji listingow na marketplace
         </p>
       </div>
 
@@ -137,9 +137,9 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>Szybkie akcje</CardTitle>
           <CardDescription>
-            Common tasks to manage your product listings
+            Najczesciej uzywane funkcje
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
@@ -148,21 +148,21 @@ export default function DashboardPage() {
             className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
           >
             <Package className="h-8 w-8 mb-2 text-white" />
-            <span className="text-sm font-medium text-white">Import Products</span>
+            <span className="text-sm font-medium text-white">Importuj produkty</span>
           </a>
           <a
             href="/optimize"
             className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
           >
             <Sparkles className="h-8 w-8 mb-2 text-blue-500" />
-            <span className="text-sm font-medium text-white">Optimize Listings</span>
+            <span className="text-sm font-medium text-white">Optymalizuj listingi</span>
           </a>
           <a
             href="/publish"
             className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
           >
             <Send className="h-8 w-8 mb-2 text-green-500" />
-            <span className="text-sm font-medium text-white">Publish to Markets</span>
+            <span className="text-sm font-medium text-white">Publikuj na marketplace</span>
           </a>
         </CardContent>
       </Card>

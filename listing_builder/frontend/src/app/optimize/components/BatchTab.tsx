@@ -149,16 +149,16 @@ export default function BatchTab() {
       {/* Input mode selector */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Import Products</CardTitle>
-          <CardDescription>Choose how to add products for batch optimization</CardDescription>
+          <CardTitle className="text-lg">Importuj produkty</CardTitle>
+          <CardDescription>Wybierz sposob dodania produktow do zbiorowej optymalizacji</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Sub-mode buttons */}
           <div className="flex gap-2">
             {[
-              { id: 'csv' as InputMode, label: 'CSV Upload', icon: Upload },
-              { id: 'paste' as InputMode, label: 'Paste', icon: ClipboardPaste },
-              { id: 'urls' as InputMode, label: 'URLs', icon: Link2 },
+              { id: 'csv' as InputMode, label: 'Wgraj CSV', icon: Upload },
+              { id: 'paste' as InputMode, label: 'Wklej', icon: ClipboardPaste },
+              { id: 'urls' as InputMode, label: 'URLe', icon: Link2 },
             ].map((m) => (
               <button
                 key={m.id}
@@ -182,7 +182,7 @@ export default function BatchTab() {
               <div className="rounded-lg border border-dashed border-gray-700 p-6 text-center">
                 <Upload className="mx-auto mb-2 h-8 w-8 text-gray-500" />
                 <p className="mb-2 text-sm text-gray-400">
-                  Upload CSV with columns: product_title, brand, keywords
+                  Wgraj CSV z kolumnami: product_title, brand, keywords
                 </p>
                 <input
                   ref={fileInputRef}
@@ -197,11 +197,11 @@ export default function BatchTab() {
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  Choose File
+                  Wybierz plik
                 </Button>
               </div>
               <p className="text-xs text-gray-500">
-                Keywords in CSV: pipe-separated (keyword1|keyword2|keyword3)
+                Slowa kluczowe w CSV: rozdzielone kreska (keyword1|keyword2|keyword3)
               </p>
             </div>
           )}
@@ -220,10 +220,10 @@ export default function BatchTab() {
               />
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  Format: title|brand|keyword1,keyword2,keyword3
+                  Format: tytul|marka|keyword1,keyword2,keyword3
                 </p>
                 <Button variant="outline" size="sm" onClick={handleParsePaste}>
-                  Parse Products
+                  Parsuj produkty
                 </Button>
               </div>
             </div>
@@ -233,7 +233,7 @@ export default function BatchTab() {
           {inputMode === 'urls' && (
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-sm text-gray-400">Allegro URLs (one per line)</label>
+                <label className="mb-1 block text-sm text-gray-400">URLe Allegro (po jednym w linii)</label>
                 <textarea
                   value={urlsText}
                   onChange={(e) => setUrlsText(e.target.value)}
@@ -246,7 +246,7 @@ export default function BatchTab() {
               </div>
               <div>
                 <label className="mb-1 block text-sm text-gray-400">
-                  Shared Keywords (one per line — applied to all products)
+                  Wspolne slowa kluczowe (po jednym w linii — dla wszystkich produktow)
                 </label>
                 <textarea
                   value={sharedKeywords}
@@ -268,7 +268,7 @@ export default function BatchTab() {
                   ) : (
                     <Search className="mr-2 h-4 w-4" />
                   )}
-                  {isScraping ? 'Scraping...' : 'Scrape & Preview'}
+                  {isScraping ? 'Scrapowanie...' : 'Scrapuj i podejrzyj'}
                 </Button>
               </div>
             </div>
@@ -282,9 +282,9 @@ export default function BatchTab() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Target className="h-5 w-5 text-gray-400" />
-              <CardTitle className="text-lg">Target & Mode</CardTitle>
+              <CardTitle className="text-lg">Cel i tryb</CardTitle>
             </div>
-            <CardDescription>Applied to all {products.length} products</CardDescription>
+            <CardDescription>Zastosowane do wszystkich {products.length} produktow</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -309,7 +309,7 @@ export default function BatchTab() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-gray-400">Optimization Mode</label>
+              <label className="mb-2 block text-sm text-gray-400">Tryb optymalizacji</label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setMode('aggressive')}
@@ -321,7 +321,7 @@ export default function BatchTab() {
                   )}
                 >
                   <Zap className="h-4 w-4" />
-                  Aggressive
+                  Agresywny
                 </button>
                 <button
                   onClick={() => setMode('standard')}
@@ -333,7 +333,7 @@ export default function BatchTab() {
                   )}
                 >
                   <Target className="h-4 w-4" />
-                  Standard
+                  Standardowy
                 </button>
               </div>
             </div>
@@ -347,14 +347,14 @@ export default function BatchTab() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">
-                Preview ({products.length} product{products.length !== 1 ? 's' : ''})
+                Podglad ({products.length} {products.length === 1 ? 'produkt' : products.length < 5 ? 'produkty' : 'produktow'})
               </CardTitle>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setProducts([])}
               >
-                Clear All
+                Wyczysc
               </Button>
             </div>
           </CardHeader>
@@ -364,9 +364,9 @@ export default function BatchTab() {
                 <thead>
                   <tr className="border-b border-gray-800 text-left text-gray-500">
                     <th className="pb-2 pr-4">#</th>
-                    <th className="pb-2 pr-4">Product Title</th>
-                    <th className="pb-2 pr-4">Brand</th>
-                    <th className="pb-2 pr-4">Keywords</th>
+                    <th className="pb-2 pr-4">Tytul produktu</th>
+                    <th className="pb-2 pr-4">Marka</th>
+                    <th className="pb-2 pr-4">Slowa kluczowe</th>
                     <th className="pb-2"></th>
                   </tr>
                 </thead>
@@ -417,12 +417,12 @@ export default function BatchTab() {
               <Sparkles className="mr-2 h-4 w-4" />
             )}
             {isLoading
-              ? `Processing ${products.length} products...`
-              : `Optimize All (${products.length})`}
+              ? `Przetwarzanie ${products.length} produktow...`
+              : `Optymalizuj wszystkie (${products.length})`}
           </Button>
           {isLoading && (
             <span className="text-xs text-gray-500">
-              This may take a while — ~5s per product
+              To moze chwile potrwac — ~5s na produkt
             </span>
           )}
         </div>

@@ -33,7 +33,7 @@ export function FeedbackWidget({
       if (!res.ok) throw new Error('Failed to submit')
       setSubmitted(true)
     } catch {
-      setError('Could not save feedback')
+      setError('Nie udalo sie zapisac oceny')
     }
   }
 
@@ -42,7 +42,7 @@ export function FeedbackWidget({
       <CardContent className="flex items-center justify-between py-4">
         <div>
           <p className="text-sm font-medium text-gray-300">
-            {submitted ? 'Thanks for your feedback!' : 'Rate this listing'}
+            {submitted ? 'Dzieki za ocene!' : 'Ocen ten listing'}
           </p>
           {error && <p className="text-xs text-red-400">{error}</p>}
         </div>

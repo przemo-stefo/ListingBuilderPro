@@ -23,9 +23,9 @@ export function KeywordIntelCard({ intel }: { intel: OptimizerResponse['keyword_
           className="flex w-full items-center justify-between p-6"
         >
           <div>
-            <h3 className="text-lg font-semibold text-white">Keyword Intelligence</h3>
+            <h3 className="text-lg font-semibold text-white">Analiza slow kluczowych</h3>
             <p className="text-sm text-gray-400">
-              {intel.total_analyzed} keywords analyzed across 3 tiers
+              {intel.total_analyzed} slow przeanalizowanych w 3 warstwach
             </p>
           </div>
           {expanded ? (
@@ -38,22 +38,22 @@ export function KeywordIntelCard({ intel }: { intel: OptimizerResponse['keyword_
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
-                <p className="text-xs text-gray-500">Tier 1 (Title)</p>
+                <p className="text-xs text-gray-500">Warstwa 1 (Tytul)</p>
                 <p className="text-xl font-bold text-white">{intel.tier1_title}</p>
               </div>
               <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
-                <p className="text-xs text-gray-500">Tier 2 (Bullets)</p>
+                <p className="text-xs text-gray-500">Warstwa 2 (Punkty)</p>
                 <p className="text-xl font-bold text-white">{intel.tier2_bullets}</p>
               </div>
               <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-3 text-center">
-                <p className="text-xs text-gray-500">Tier 3 (Backend)</p>
+                <p className="text-xs text-gray-500">Warstwa 3 (Backend)</p>
                 <p className="text-xl font-bold text-white">{intel.tier3_backend}</p>
               </div>
             </div>
             {intel.missing_keywords.length > 0 && (
               <div>
                 <h4 className="mb-2 text-sm font-medium text-gray-300">
-                  Missing Keywords ({intel.missing_keywords.length})
+                  Brakujace slowa kluczowe ({intel.missing_keywords.length})
                 </h4>
                 <div className="flex flex-wrap gap-1">
                   {intel.missing_keywords.map((kw, i) => (
@@ -66,7 +66,7 @@ export function KeywordIntelCard({ intel }: { intel: OptimizerResponse['keyword_
             )}
             {intel.root_words.length > 0 && (
               <div>
-                <h4 className="mb-2 text-sm font-medium text-gray-300">Top Root Words</h4>
+                <h4 className="mb-2 text-sm font-medium text-gray-300">Najczestsze rdzenie slow</h4>
                 <div className="flex flex-wrap gap-1">
                   {intel.root_words.map((rw, i) => (
                     <Badge key={i} variant="secondary" className="text-[10px]">

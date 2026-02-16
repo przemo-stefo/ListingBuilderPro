@@ -289,9 +289,9 @@ export default function ConverterPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Converter</h1>
+        <h1 className="text-2xl font-bold text-white">Konwerter</h1>
         <p className="text-sm text-gray-400">
-          Convert Allegro products to Amazon, eBay, or Kaufland templates
+          Konwertuj produkty z Allegro na szablony Amazon, eBay lub Kaufland
         </p>
       </div>
 
@@ -300,9 +300,9 @@ export default function ConverterPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Allegro URLs</CardTitle>
+            <CardTitle className="text-lg">URLe Allegro</CardTitle>
           </div>
-          <CardDescription>Fetch from store or paste URLs manually (max 300)</CardDescription>
+          <CardDescription>Pobierz ze sklepu lub wklej URLe recznie (max 300)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Allegro API connection */}
@@ -410,7 +410,7 @@ export default function ConverterPage() {
             className="w-full rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-600"
           />
           <p className="mt-1 text-xs text-gray-500">
-            {parseUrls().length} URL{parseUrls().length !== 1 ? 's' : ''} entered
+            Wprowadzono {parseUrls().length} URL{parseUrls().length !== 1 ? 'i' : ''}
           </p>
         </CardContent>
       </Card>
@@ -418,14 +418,14 @@ export default function ConverterPage() {
       {/* Section 2: Target Marketplace */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Target Marketplace</CardTitle>
-          <CardDescription>Select where to list these products</CardDescription>
+          <CardTitle className="text-lg">Docelowy marketplace</CardTitle>
+          <CardDescription>Wybierz gdzie chcesz wystawic produkty</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingMarketplaces ? (
             <div className="flex items-center gap-2 text-gray-400">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading marketplaces...
+              Ladowanie marketplace...
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -461,8 +461,8 @@ export default function ConverterPage() {
           className="flex w-full items-center justify-between p-6"
         >
           <div>
-            <h3 className="text-lg font-semibold text-white">Settings</h3>
-            <p className="text-sm text-gray-400">Exchange rate and scraping delay</p>
+            <h3 className="text-lg font-semibold text-white">Ustawienia</h3>
+            <p className="text-sm text-gray-400">Kurs wymiany i opoznienie scrapowania</p>
           </div>
           {showSettings ? (
             <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -474,7 +474,7 @@ export default function ConverterPage() {
           <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-gray-400">
-                EUR exchange rate (PLN → EUR)
+                Kurs EUR (PLN → EUR)
               </label>
               <Input
                 type="number"
@@ -485,7 +485,7 @@ export default function ConverterPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm text-gray-400">
-                Delay between requests (seconds)
+                Opoznienie miedzy zapytaniami (sekundy)
               </label>
               <Input
                 type="number"
@@ -506,8 +506,8 @@ export default function ConverterPage() {
           className="flex w-full items-center justify-between p-6"
         >
           <div>
-            <h3 className="text-lg font-semibold text-white">GPSR / Category Data</h3>
-            <p className="text-sm text-gray-400">Manufacturer, responsible person, and category IDs</p>
+            <h3 className="text-lg font-semibold text-white">GPSR / Dane kategorii</h3>
+            <p className="text-sm text-gray-400">Producent, osoba odpowiedzialna i ID kategorii</p>
           </div>
           {showGpsr ? (
             <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -519,10 +519,10 @@ export default function ConverterPage() {
           <CardContent className="space-y-6">
             {/* Manufacturer */}
             <div>
-              <h4 className="mb-3 text-sm font-medium text-gray-300">Manufacturer</h4>
+              <h4 className="mb-3 text-sm font-medium text-gray-300">Producent</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Contact</label>
+                  <label className="mb-1 block text-xs text-gray-500">Kontakt</label>
                   <Input
                     value={gpsr.manufacturer_contact}
                     onChange={(e) => updateGpsr('manufacturer_contact', e.target.value)}
@@ -530,7 +530,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Address</label>
+                  <label className="mb-1 block text-xs text-gray-500">Adres</label>
                   <Input
                     value={gpsr.manufacturer_address}
                     onChange={(e) => updateGpsr('manufacturer_address', e.target.value)}
@@ -538,7 +538,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">City</label>
+                  <label className="mb-1 block text-xs text-gray-500">Miasto</label>
                   <Input
                     value={gpsr.manufacturer_city}
                     onChange={(e) => updateGpsr('manufacturer_city', e.target.value)}
@@ -546,7 +546,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Country</label>
+                  <label className="mb-1 block text-xs text-gray-500">Kraj</label>
                   <Input
                     value={gpsr.manufacturer_country}
                     onChange={(e) => updateGpsr('manufacturer_country', e.target.value)}
@@ -558,10 +558,10 @@ export default function ConverterPage() {
 
             {/* Origin & Safety */}
             <div>
-              <h4 className="mb-3 text-sm font-medium text-gray-300">Origin & Safety</h4>
+              <h4 className="mb-3 text-sm font-medium text-gray-300">Pochodzenie i bezpieczenstwo</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Country of Origin</label>
+                  <label className="mb-1 block text-xs text-gray-500">Kraj pochodzenia</label>
                   <Input
                     value={gpsr.country_of_origin}
                     onChange={(e) => updateGpsr('country_of_origin', e.target.value)}
@@ -569,7 +569,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Safety Attestation</label>
+                  <label className="mb-1 block text-xs text-gray-500">Atest bezpieczenstwa</label>
                   <Input
                     value={gpsr.safety_attestation}
                     onChange={(e) => updateGpsr('safety_attestation', e.target.value)}
@@ -581,10 +581,10 @@ export default function ConverterPage() {
 
             {/* Responsible Person */}
             <div>
-              <h4 className="mb-3 text-sm font-medium text-gray-300">Responsible Person (EU)</h4>
+              <h4 className="mb-3 text-sm font-medium text-gray-300">Osoba odpowiedzialna (UE)</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Type</label>
+                  <label className="mb-1 block text-xs text-gray-500">Typ</label>
                   <Input
                     value={gpsr.responsible_person_type}
                     onChange={(e) => updateGpsr('responsible_person_type', e.target.value)}
@@ -592,7 +592,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Name</label>
+                  <label className="mb-1 block text-xs text-gray-500">Nazwa</label>
                   <Input
                     value={gpsr.responsible_person_name}
                     onChange={(e) => updateGpsr('responsible_person_name', e.target.value)}
@@ -600,7 +600,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Address</label>
+                  <label className="mb-1 block text-xs text-gray-500">Adres</label>
                   <Input
                     value={gpsr.responsible_person_address}
                     onChange={(e) => updateGpsr('responsible_person_address', e.target.value)}
@@ -608,7 +608,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Country</label>
+                  <label className="mb-1 block text-xs text-gray-500">Kraj</label>
                   <Input
                     value={gpsr.responsible_person_country}
                     onChange={(e) => updateGpsr('responsible_person_country', e.target.value)}
@@ -620,7 +620,7 @@ export default function ConverterPage() {
 
             {/* Category IDs */}
             <div>
-              <h4 className="mb-3 text-sm font-medium text-gray-300">Category IDs</h4>
+              <h4 className="mb-3 text-sm font-medium text-gray-300">ID kategorii</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs text-gray-500">Amazon Browse Node</label>
@@ -749,7 +749,7 @@ export default function ConverterPage() {
           ) : (
             <Eye className="mr-2 h-4 w-4" />
           )}
-          Preview
+          Podglad
         </Button>
         <Button
           onClick={handleDownload}
@@ -760,11 +760,11 @@ export default function ConverterPage() {
           ) : (
             <Download className="mr-2 h-4 w-4" />
           )}
-          Download Template
+          Pobierz szablon
         </Button>
         {isLoading && !jobId && (
           <span className="text-xs text-gray-500">
-            This may take a while for multiple URLs...
+            To moze chwile potrwac przy wielu URLach...
           </span>
         )}
       </div>
@@ -803,9 +803,9 @@ export default function ConverterPage() {
       {results && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Results</CardTitle>
+            <CardTitle className="text-lg">Wyniki</CardTitle>
             <CardDescription>
-              Converted {results.succeeded} of {results.total} products for{' '}
+              Skonwertowano {results.succeeded} z {results.total} produktow dla{' '}
               {results.marketplace}
             </CardDescription>
           </CardHeader>
@@ -814,18 +814,18 @@ export default function ConverterPage() {
             <div className="flex flex-wrap gap-2">
               <div className="flex items-center gap-1 rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-400">
                 <CheckCircle className="h-3 w-3" />
-                {results.succeeded} succeeded
+                {results.succeeded} udanych
               </div>
               {results.failed > 0 && (
                 <div className="flex items-center gap-1 rounded-full bg-red-500/10 px-3 py-1 text-xs text-red-400">
                   <XCircle className="h-3 w-3" />
-                  {results.failed} failed
+                  {results.failed} bledow
                 </div>
               )}
               {results.warnings.length > 0 && (
                 <div className="flex items-center gap-1 rounded-full bg-yellow-500/10 px-3 py-1 text-xs text-yellow-400">
                   <AlertTriangle className="h-3 w-3" />
-                  {results.warnings.length} warnings
+                  {results.warnings.length} ostrzezen
                 </div>
               )}
             </div>
@@ -905,7 +905,7 @@ function ProductResultCard({
           )}
           <div className="text-left">
             <p className="text-sm text-white">
-              Product {index + 1}
+              Produkt {index + 1}
               {product.source_id && (
                 <span className="ml-2 text-xs text-gray-500">({product.source_id})</span>
               )}
@@ -918,7 +918,7 @@ function ProductResultCard({
         <div className="flex items-center gap-2">
           {hasWarnings && (
             <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-400 text-[10px]">
-              {product.warnings.length} warnings
+              {product.warnings.length} ostrzezen
             </Badge>
           )}
           {expanded ? (
@@ -959,8 +959,8 @@ function ProductResultCard({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="pb-2 pr-4 text-left font-medium text-gray-400">Field</th>
-                    <th className="pb-2 text-left font-medium text-gray-400">Value</th>
+                    <th className="pb-2 pr-4 text-left font-medium text-gray-400">Pole</th>
+                    <th className="pb-2 text-left font-medium text-gray-400">Wartosc</th>
                   </tr>
                 </thead>
                 <tbody>

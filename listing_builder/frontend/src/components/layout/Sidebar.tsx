@@ -36,6 +36,7 @@ import {
   Warehouse,
   Users,
   Settings,
+  Info,
 } from 'lucide-react'
 
 interface NavItem {
@@ -43,6 +44,8 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   premiumOnly?: boolean
+  // WHY: Tooltip description for clients who don't know what each tool does
+  desc?: string
 }
 
 interface NavSection {
@@ -59,54 +62,54 @@ const navSections: NavSection[] = [
   {
     label: 'Produkty',
     items: [
-      { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard },
-      { title: 'Produkty', href: '/products', icon: Package },
-      { title: 'Import', href: '/products/import', icon: Upload },
-      { title: 'Magazyn', href: '/inventory', icon: Warehouse },
+      { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przeglad statystyk i szybkie akcje' },
+      { title: 'Produkty', href: '/products', icon: Package, desc: 'Lista wszystkich produktow w systemie' },
+      { title: 'Import', href: '/products/import', icon: Upload, desc: 'Importuj produkty z CSV lub Allegro' },
+      { title: 'Magazyn', href: '/inventory', icon: Warehouse, desc: 'Stany magazynowe i synchronizacja' },
     ],
   },
   {
     label: 'Allegro',
     items: [
-      { title: 'Manager Ofert', href: '/allegro-manager', icon: Store, premiumOnly: true },
-      { title: 'Allegro → Amazon', href: '/converter', icon: ArrowRightLeft },
+      { title: 'Manager Ofert', href: '/allegro-manager', icon: Store, premiumOnly: true, desc: 'Zarzadzaj ofertami Allegro — edycja, ceny, masowe akcje' },
+      { title: 'Allegro → Amazon', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty z Allegro na format Amazon' },
     ],
   },
   {
     label: 'Optymalizacja AI',
     items: [
-      { title: 'Optymalizator', href: '/optimize', icon: Sparkles },
-      { title: 'Słowa kluczowe', href: '/keywords', icon: Key },
-      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain },
+      { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytul, bullety, opis i slowa kluczowe backend' },
+      { title: 'Slowa kluczowe', href: '/keywords', icon: Key, desc: 'Analiza i badanie slow kluczowych dla marketplace' },
+      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedazy na marketplace' },
     ],
   },
   {
-    label: 'Sprzedaż',
+    label: 'Sprzedaz',
     items: [
-      { title: 'Publikuj', href: '/publish', icon: Send },
-      { title: 'Listingi', href: '/listings', icon: List },
+      { title: 'Publikuj', href: '/publish', icon: Send, desc: 'Opublikuj zoptymalizowane listingi na Amazon, eBay, Kaufland' },
+      { title: 'Listingi', href: '/listings', icon: List, desc: 'Wszystkie opublikowane listingi i ich status' },
     ],
   },
   {
     label: 'Analityka',
     items: [
-      { title: 'Analityka', href: '/analytics', icon: TrendingUp },
-      { title: 'Konkurencja', href: '/competitors', icon: Users },
-      { title: 'Monitoring', href: '/monitoring', icon: Activity, premiumOnly: true },
-      { title: 'Wiadomości', href: '/news', icon: Newspaper },
+      { title: 'Analityka', href: '/analytics', icon: TrendingUp, desc: 'Wykresy sprzedazy i metryki wydajnosci' },
+      { title: 'Konkurencja', href: '/competitors', icon: Users, desc: 'Monitoruj ceny i listingi konkurencji' },
+      { title: 'Monitoring', href: '/monitoring', icon: Activity, premiumOnly: true, desc: 'Sledz zmiany cen, pozycji i dostepnosci na marketplace' },
+      { title: 'Wiadomosci', href: '/news', icon: Newspaper, desc: 'Aktualnosci i zmiany regulacji na marketplace' },
     ],
   },
 ]
 
 // WHY: Compliance sub-tabs defined here so sidebar shows them as expandable menu
 const complianceSubItems = [
-  { key: 'dashboard', label: 'Panel Główny', icon: BarChart3 },
-  { key: 'audit', label: 'Audyt', icon: Search },
-  { key: 'settings', label: 'Aktywacja Alertów', icon: Bell },
-  { key: 'alerts', label: 'Alerty', icon: AlertTriangle },
-  { key: 'integrations', label: 'Integracje', icon: Link2 },
-  { key: 'upload', label: 'Upload', icon: Upload },
-  { key: 'epr', label: 'Raporty EPR', icon: FileBarChart },
+  { key: 'dashboard', label: 'Panel Glowny', icon: BarChart3, desc: 'Przeglad zgodnosci i statusu regulacji' },
+  { key: 'audit', label: 'Audyt', icon: Search, desc: 'Sprawdz zgodnosc produktow z regulacjami' },
+  { key: 'settings', label: 'Aktywacja Alertow', icon: Bell, desc: 'Wlacz/wylacz powiadomienia o zmianach regulacji' },
+  { key: 'alerts', label: 'Alerty', icon: AlertTriangle, desc: 'Lista alertow i zmian regulacji' },
+  { key: 'integrations', label: 'Integracje', icon: Link2, desc: 'Polaczenia z marketplace i serwisami zewnetrznymi' },
+  { key: 'upload', label: 'Upload', icon: Upload, desc: 'Wgraj dokumenty zgodnosci i certyfikaty' },
+  { key: 'epr', label: 'Raporty EPR', icon: FileBarChart, desc: 'Raporty EPR wymagane przez regulacje UE' },
 ]
 
 export function Sidebar() {
@@ -123,9 +126,9 @@ export function Sidebar() {
     <div className="w-64 border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">
-          Marketplace Listing
+          Listing Builder Pro
         </h1>
-        <p className="text-sm text-gray-400">Automation System</p>
+        <p className="text-sm text-gray-400">System automatyzacji listingow</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-4">
@@ -141,22 +144,36 @@ export function Sidebar() {
                 const Icon = item.icon
 
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                      isActive
-                        ? 'bg-white text-black'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  <div key={item.href} className="group/nav relative">
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                        isActive
+                          ? 'bg-white text-black'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.title}
+                      {item.premiumOnly && tier !== 'premium' && (
+                        <Crown className="h-3 w-3 text-amber-400 ml-auto" />
+                      )}
+                      {item.desc && (
+                        <Info className={cn(
+                          'h-3 w-3 ml-auto shrink-0 opacity-0 group-hover/nav:opacity-60 transition-opacity',
+                          item.premiumOnly && tier !== 'premium' ? 'mr-0' : ''
+                        )} />
+                      )}
+                    </Link>
+                    {/* WHY: Tooltip shows on hover — positioned to the right of sidebar */}
+                    {item.desc && (
+                      <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-56 rounded-lg border border-gray-700 bg-[#1A1A1A] p-3 text-xs text-gray-300 shadow-xl group-hover/nav:block">
+                        <p className="font-medium text-white mb-1">{item.title}</p>
+                        {item.desc}
+                      </div>
                     )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.title}
-                    {item.premiumOnly && tier !== 'premium' && (
-                      <Crown className="h-3 w-3 text-amber-400 ml-auto" />
-                    )}
-                  </Link>
+                  </div>
                 )
               })}
             </div>
@@ -189,22 +206,29 @@ export function Sidebar() {
 
           {complianceOpen && (
             <div className="ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
-              {complianceSubItems.map(({ key, label, icon: SubIcon }) => {
+              {complianceSubItems.map(({ key, label, icon: SubIcon, desc }) => {
                 const isSubActive = isOnCompliance && activeComplianceTab === key
                 return (
-                  <Link
-                    key={key}
-                    href={`/compliance?tab=${key}`}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
-                      isSubActive
-                        ? 'bg-white/10 text-white'
-                        : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300'
+                  <div key={key} className="group/sub relative">
+                    <Link
+                      href={`/compliance?tab=${key}`}
+                      className={cn(
+                        'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                        isSubActive
+                          ? 'bg-white/10 text-white'
+                          : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300'
+                      )}
+                    >
+                      <SubIcon className="h-3.5 w-3.5" />
+                      {label}
+                    </Link>
+                    {desc && (
+                      <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-52 rounded-lg border border-gray-700 bg-[#1A1A1A] p-3 text-xs text-gray-300 shadow-xl group-hover/sub:block">
+                        <p className="font-medium text-white mb-1">{label}</p>
+                        {desc}
+                      </div>
                     )}
-                  >
-                    <SubIcon className="h-3.5 w-3.5" />
-                    {label}
-                  </Link>
+                  </div>
                 )
               })}
             </div>
@@ -235,10 +259,10 @@ export function Sidebar() {
         </div>
         <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
           <p className="text-xs text-gray-400">
-            API Status
+            Status API
           </p>
           <p className="text-xs font-mono text-green-500">
-            {process.env.NODE_ENV === 'production' ? 'Production' : 'Development'}
+            {process.env.NODE_ENV === 'production' ? 'Produkcja' : 'Deweloperski'}
           </p>
         </div>
         <div className="flex justify-center gap-3 text-[10px] text-gray-600">

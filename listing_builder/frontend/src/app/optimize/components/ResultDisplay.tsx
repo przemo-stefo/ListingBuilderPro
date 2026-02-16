@@ -77,12 +77,12 @@ export function ScoresCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Optimization Scores</CardTitle>
+        <CardTitle className="text-lg">Wyniki optymalizacji</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
-            <p className="text-xs text-gray-500">Keyword Coverage</p>
+            <p className="text-xs text-gray-500">Pokrycie slow kluczowych</p>
             <p className={cn('text-2xl font-bold', coverageColor)}>
               {scores.coverage_pct}%
             </p>
@@ -101,24 +101,24 @@ export function ScoresCard({
             </Badge>
           </div>
           <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
-            <p className="text-xs text-gray-500">Exact Matches in Title</p>
+            <p className="text-xs text-gray-500">Dokladne trafienia w tytule</p>
             <p className="text-2xl font-bold text-white">{scores.exact_matches_in_title}</p>
-            <p className="mt-1 text-[10px] text-gray-500">keyword phrases</p>
+            <p className="mt-1 text-[10px] text-gray-500">fraz kluczowych</p>
           </div>
           <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
-            <p className="text-xs text-gray-500">Backend Utilization</p>
+            <p className="text-xs text-gray-500">Wykorzystanie backendu</p>
             <p className="text-2xl font-bold text-white">{scores.backend_utilization_pct}%</p>
             <p className="mt-1 text-[10px] text-gray-500">
-              {scores.backend_byte_size} / 249 bytes
+              {scores.backend_byte_size} / 249 bajtow
             </p>
           </div>
           <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
-            <p className="text-xs text-gray-500">Compliance</p>
+            <p className="text-xs text-gray-500">Zgodnosc</p>
             <p className={cn('text-2xl font-bold', complianceColor)}>
               {scores.compliance_status}
             </p>
             <p className="mt-1 text-[10px] text-gray-500">
-              {intel.total_analyzed} keywords analyzed
+              {intel.total_analyzed} slow przeanalizowanych
             </p>
           </div>
         </div>
@@ -192,12 +192,12 @@ export function CopyButton({
       {copiedField === field ? (
         <>
           <Check className="h-3 w-3 text-green-400" />
-          <span className="text-green-400">Copied</span>
+          <span className="text-green-400">Skopiowano</span>
         </>
       ) : (
         <>
           <Copy className="h-3 w-3" />
-          Copy
+          Kopiuj
         </>
       )}
     </button>

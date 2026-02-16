@@ -30,7 +30,7 @@ export function ListingCard({
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Generated Listing</CardTitle>
+          <CardTitle className="text-lg">Wygenerowany listing</CardTitle>
           <div className="flex items-center gap-2">
             {fullResponse && (
               <Button
@@ -81,22 +81,22 @@ export function ListingCard({
               }}
             >
               {copiedField === 'all' ? <Check className="mr-1 h-3 w-3" /> : <Copy className="mr-1 h-3 w-3" />}
-              Copy All
+              Kopiuj wszystko
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <ListingSection
-          label="Title" content={listing.title} charCount={listing.title.length}
+          label="Tytul" content={listing.title} charCount={listing.title.length}
           maxChars={200} field="title" copiedField={copiedField} onCopy={onCopy}
         />
         {/* Bullet Points */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-medium text-gray-300">Bullet Points</h3>
-              <span className="text-xs text-gray-500">{listing.bullet_points.length} bullets</span>
+              <h3 className="text-sm font-medium text-gray-300">Punkty (Bullet Points)</h3>
+              <span className="text-xs text-gray-500">{listing.bullet_points.length} punktow</span>
             </div>
             <CopyButton text={listing.bullet_points.join('\n')} field="bullets" copiedField={copiedField} onCopy={onCopy} />
           </div>
@@ -109,17 +109,17 @@ export function ListingCard({
           </div>
         </div>
         <ListingSection
-          label="Description" content={listing.description} charCount={listing.description.length}
+          label="Opis" content={listing.description} charCount={listing.description.length}
           maxChars={2000} field="description" copiedField={copiedField} onCopy={onCopy} isHtml
         />
         <ListingSection
-          label="Backend Keywords" content={listing.backend_keywords}
+          label="Slowa kluczowe backend" content={listing.backend_keywords}
           charCount={new TextEncoder().encode(listing.backend_keywords).length}
-          maxChars={249} unitLabel="bytes" field="backend" copiedField={copiedField} onCopy={onCopy} mono
+          maxChars={249} unitLabel="bajtow" field="backend" copiedField={copiedField} onCopy={onCopy} mono
         />
         {(compliance.errors.length > 0 || compliance.warnings.length > 0) && (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-300">Compliance Notes</h3>
+            <h3 className="text-sm font-medium text-gray-300">Uwagi zgodnosci</h3>
             {compliance.errors.map((err, i) => (
               <div key={`e-${i}`} className="flex items-start gap-2 rounded bg-red-500/10 px-3 py-2 text-xs text-red-400">
                 <XCircle className="mt-0.5 h-3 w-3 shrink-0" />{err}

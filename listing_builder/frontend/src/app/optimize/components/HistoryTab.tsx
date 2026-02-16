@@ -49,7 +49,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
   }
 
   const handleDelete = (id: number) => {
-    if (!confirm('Delete this optimization run?')) return
+    if (!confirm('Usunac te optymalizacje?')) return
     setDeletingId(id)
     deleteMutation.mutate(id, { onSettled: () => setDeletingId(null) })
   }
@@ -68,7 +68,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
     return (
       <Card>
         <CardContent className="p-6 text-center text-red-400">
-          Failed to load history: {error.message}
+          Blad ladowania historii: {error.message}
         </CardContent>
       </Card>
     )
@@ -78,7 +78,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
     return (
       <Card>
         <CardContent className="p-6 text-center text-gray-500">
-          No optimization runs yet. Generate a listing first.
+          Brak optymalizacji. Wygeneruj listing najpierw.
         </CardContent>
       </Card>
     )
@@ -88,9 +88,9 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">
-          Optimization History
+          Historia optymalizacji
           <span className="ml-2 text-sm font-normal text-gray-500">
-            {data.total} run{data.total !== 1 ? 's' : ''}
+            {data.total} {data.total === 1 ? 'rekord' : data.total < 5 ? 'rekordy' : 'rekordow'}
           </span>
         </CardTitle>
       </CardHeader>
@@ -100,19 +100,19 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800 text-left text-xs text-gray-500">
-                <th className="pb-2 pr-4">Date</th>
-                <th className="pb-2 pr-4">Product</th>
+                <th className="pb-2 pr-4">Data</th>
+                <th className="pb-2 pr-4">Produkt</th>
                 <th className="pb-2 pr-4">Marketplace</th>
-                <th className="pb-2 pr-4">Coverage</th>
-                <th className="pb-2 pr-4">Compliance</th>
-                <th className="pb-2 text-right">Actions</th>
+                <th className="pb-2 pr-4">Pokrycie</th>
+                <th className="pb-2 pr-4">Zgodnosc</th>
+                <th className="pb-2 text-right">Akcje</th>
               </tr>
             </thead>
             <tbody>
               {data.items.map((item) => (
                 <tr key={item.id} className="border-b border-gray-800/50 hover:bg-white/[0.02]">
                   <td className="py-3 pr-4 text-xs text-gray-400">
-                    {new Date(item.created_at).toLocaleDateString('en-GB', {
+                    {new Date(item.created_at).toLocaleDateString('pl-PL', {
                       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
                     })}
                   </td>
@@ -147,7 +147,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
                         size="sm"
                         onClick={() => handleLoad(item.id)}
                         disabled={loadingId === item.id}
-                        title="Load results"
+                        title="Zaladuj wyniki"
                       >
                         {loadingId === item.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -159,7 +159,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDownload(item.id)}
-                        title="Download CSV"
+                        title="Pobierz CSV"
                       >
                         <Download className="h-3 w-3" />
                       </Button>
@@ -169,7 +169,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
                         onClick={() => handleDelete(item.id)}
                         disabled={deletingId === item.id}
                         className="text-gray-500 hover:text-red-400"
-                        title="Delete"
+                        title="Usun"
                       >
                         {deletingId === item.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -189,7 +189,7 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between">
             <span className="text-xs text-gray-500">
-              Page {page} of {totalPages}
+              Strona {page} z {totalPages}
             </span>
             <div className="flex gap-1">
               <Button

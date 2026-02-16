@@ -148,38 +148,38 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
         <CardHeader>
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Product Info</CardTitle>
+            <CardTitle className="text-lg">Informacje o produkcie</CardTitle>
           </div>
-          <CardDescription>Basic product information for the listing</CardDescription>
+          <CardDescription>Podstawowe dane produktu do listingu</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="mb-1 block text-sm text-gray-400">
-              Product Title <span className="text-red-400">*</span>
+              Tytul produktu <span className="text-red-400">*</span>
             </label>
             <Input
               value={productTitle}
               onChange={(e) => setProductTitle(e.target.value)}
-              placeholder="e.g. Silicone Kitchen Utensil Set 12-Piece"
+              placeholder="np. Silikonowy zestaw przyborow kuchennych 12 elementow"
             />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-gray-400">
-                Brand <span className="text-red-400">*</span>
+                Marka <span className="text-red-400">*</span>
               </label>
               <Input
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                placeholder="e.g. ZULAY"
+                placeholder="np. ZULAY"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-gray-400">Product Line</label>
+              <label className="mb-1 block text-sm text-gray-400">Linia produktu</label>
               <Input
                 value={productLine}
                 onChange={(e) => setProductLine(e.target.value)}
-                placeholder="e.g. Premium Kitchen (optional)"
+                placeholder="np. Premium Kitchen (opcjonalnie)"
               />
             </div>
           </div>
@@ -191,10 +191,10 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
         <CardHeader>
           <div className="flex items-center gap-2">
             <Hash className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Keywords</CardTitle>
+            <CardTitle className="text-lg">Slowa kluczowe</CardTitle>
           </div>
           <CardDescription>
-            Paste keywords, one per line. Optionally add search volume after a comma.
+            Wklej slowa kluczowe, po jednym w linii. Opcjonalnie dodaj wolumen wyszukiwan po przecinku.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -209,9 +209,9 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
           />
           <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
             <span>
-              {keywordCount} keyword{keywordCount !== 1 ? 's' : ''} detected
+              Wykryto {keywordCount} {keywordCount === 1 ? 'slowo' : keywordCount < 5 ? 'slowa' : 'slow'}
             </span>
-            <span>Format: keyword phrase,search_volume (volume optional)</span>
+            <span>Format: fraza kluczowa,wolumen (wolumen opcjonalny)</span>
           </div>
         </CardContent>
       </Card>
@@ -221,7 +221,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
         <CardHeader>
           <div className="flex items-center gap-2">
             <Target className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Target & Mode</CardTitle>
+            <CardTitle className="text-lg">Cel i tryb</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -257,7 +257,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
           </div>
 
           <div>
-            <label className="mb-2 block text-sm text-gray-400">Optimization Mode</label>
+            <label className="mb-2 block text-sm text-gray-400">Tryb optymalizacji</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setMode('aggressive')}
@@ -269,8 +269,8 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
                 )}
               >
                 <Zap className="h-4 w-4" />
-                Aggressive
-                <span className="text-[10px] text-gray-500">96%+ coverage</span>
+                Agresywny
+                <span className="text-[10px] text-gray-500">96%+ pokrycie</span>
               </button>
               <button
                 onClick={() => setMode('standard')}
@@ -282,8 +282,8 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
                 )}
               >
                 <Target className="h-4 w-4" />
-                Standard
-                <span className="text-[10px] text-gray-500">82%+ coverage</span>
+                Standardowy
+                <span className="text-[10px] text-gray-500">82%+ pokrycie</span>
               </button>
             </div>
           </div>
@@ -297,8 +297,8 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
           className="flex w-full items-center justify-between p-6"
         >
           <div>
-            <h3 className="text-lg font-semibold text-white">Advanced</h3>
-            <p className="text-sm text-gray-400">ASIN, category (optional)</p>
+            <h3 className="text-lg font-semibold text-white">Zaawansowane</h3>
+            <p className="text-sm text-gray-400">ASIN, kategoria (opcjonalnie)</p>
           </div>
           {showAdvanced ? (
             <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -317,11 +317,11 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-gray-400">Category</label>
+              <label className="mb-1 block text-sm text-gray-400">Kategoria</label>
               <Input
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="Kitchen & Dining"
+                placeholder="Kuchnia i jadalnia"
               />
             </div>
           </CardContent>
@@ -336,7 +336,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
           ) : (
             <Sparkles className="mr-2 h-4 w-4" />
           )}
-          {isLoading ? 'Generating listing...' : 'Generate Optimized Listing'}
+          {isLoading ? 'Generowanie listingu...' : 'Wygeneruj zoptymalizowany listing'}
         </Button>
         {!isPremium && (
           <span className={cn(
@@ -348,7 +348,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
         )}
         {isLoading && (
           <span className="text-xs text-gray-500">
-            AI is writing title, bullets, and description...
+            AI pisze tytul, bullety i opis...
           </span>
         )}
       </div>
@@ -381,7 +381,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-red-400">
               <XCircle className="h-5 w-5" />
-              <span>Optimization failed. Check n8n workflow logs.</span>
+              <span>Optymalizacja nie powiodla sie. Sprawdz logi workflow.</span>
             </div>
           </CardContent>
         </Card>

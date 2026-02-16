@@ -50,9 +50,9 @@ function OptimizeContent() {
       {/* Page header + tab toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Listing Optimizer</h1>
+          <h1 className="text-2xl font-bold text-white">Optymalizator listingow</h1>
           <p className="text-sm text-gray-400">
-            Generate SEO-optimized titles, bullets, descriptions, and backend keywords
+            Generuj zoptymalizowane tytuly, bullety, opisy i slowa kluczowe backend
           </p>
         </div>
 
@@ -68,7 +68,7 @@ function OptimizeContent() {
             )}
           >
             <FileText className="h-4 w-4" />
-            Single
+            Pojedyncze
           </button>
           <button
             onClick={() => setActiveTab('batch')}
@@ -80,7 +80,7 @@ function OptimizeContent() {
             )}
           >
             <Layers className="h-4 w-4" />
-            Batch
+            Zbiorowe
           </button>
           <button
             onClick={handleHistoryClick}
@@ -92,7 +92,7 @@ function OptimizeContent() {
             )}
           >
             <Clock className="h-4 w-4" />
-            History
+            Historia
             {!isPremium && <Crown className="h-3 w-3 text-amber-400" />}
           </button>
         </div>

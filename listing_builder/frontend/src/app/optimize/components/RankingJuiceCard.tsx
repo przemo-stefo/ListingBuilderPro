@@ -83,7 +83,7 @@ export function RankingJuiceCard({
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors"
             >
               {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              Component Breakdown
+              Rozklad komponentow
             </button>
             {expanded && (
               <div className="mt-3 space-y-2">
