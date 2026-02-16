@@ -31,6 +31,7 @@ import {
   downloadStoreJob,
   getOAuthConnections,
   startAllegroOAuth,
+  disconnectAllegro,
   getAllegroOffers,
 } from '@/lib/api/converter'
 import type {
@@ -139,6 +140,17 @@ export default function ConverterPage() {
       window.location.href = authorize_url
     } catch {
       setStoreError('Nie udało się rozpocząć autoryzacji Allegro')
+    }
+  }, [])
+
+  const handleDisconnectAllegro = useCallback(async () => {
+    try {
+      await disconnectAllegro()
+      setAllegroConnected(false)
+      setUrlsText('')
+      setStoreCount(null)
+    } catch {
+      setStoreError('Nie udało się rozłączyć z Allegro')
     }
   }, [])
 
@@ -307,18 +319,29 @@ export default function ConverterPage() {
             </div>
             <div className="flex gap-2">
               {allegroConnected ? (
-                <Button
-                  onClick={handleFetchAllegroOffers}
-                  disabled={allegroLoading}
-                  size="sm"
-                >
-                  {allegroLoading ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <Download className="mr-2 h-3 w-3" />
-                  )}
-                  Pobierz moje oferty (API)
-                </Button>
+                <>
+                  <Button
+                    onClick={handleFetchAllegroOffers}
+                    disabled={allegroLoading}
+                    size="sm"
+                  >
+                    {allegroLoading ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-3 w-3" />
+                    )}
+                    Pobierz moje oferty (API)
+                  </Button>
+                  <Button
+                    onClick={handleDisconnectAllegro}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-400 hover:text-red-300 border-red-400/30 hover:border-red-400/50"
+                  >
+                    <XCircle className="mr-1.5 h-3 w-3" />
+                    Rozłącz
+                  </Button>
+                </>
               ) : (
                 <Button onClick={handleConnectAllegro} variant="outline" size="sm">
                   Połącz z Allegro

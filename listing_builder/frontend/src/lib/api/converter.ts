@@ -136,6 +136,11 @@ export async function startAllegroOAuth(): Promise<{ authorize_url: string }> {
   return response.data!
 }
 
+export async function disconnectAllegro(): Promise<void> {
+  const response = await apiRequest<{ status: string }>('delete', '/oauth/allegro')
+  if (response.error) throw new Error(response.error)
+}
+
 export async function getAllegroOffers(): Promise<StoreUrlsResponse> {
   const response = await apiRequest<StoreUrlsResponse>(
     'get',
