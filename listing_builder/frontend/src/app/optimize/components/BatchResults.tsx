@@ -51,20 +51,20 @@ export default function BatchResults({ response, onReset }: BatchResultsProps) {
         <CardContent className="flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-400">
-              <span className="text-white font-medium">{response.total}</span> products processed
+              <span className="text-white font-medium">{response.total}</span> produktow przetworzonych
             </div>
             <Badge
               variant="secondary"
               className="bg-green-500/10 text-green-400"
             >
-              {response.succeeded} succeeded
+              {response.succeeded} udanych
             </Badge>
             {response.failed > 0 && (
               <Badge
                 variant="secondary"
                 className="bg-red-500/10 text-red-400"
               >
-                {response.failed} failed
+                {response.failed} bledow
               </Badge>
             )}
           </div>
@@ -76,12 +76,12 @@ export default function BatchResults({ response, onReset }: BatchResultsProps) {
                 onClick={() => exportResultsCSV(response)}
               >
                 <Download className="mr-2 h-4 w-4" />
-                Download All as CSV
+                Pobierz wszystko (CSV)
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={onReset}>
               <RotateCcw className="mr-2 h-4 w-4" />
-              New Batch
+              Nowa partia
             </Button>
           </div>
         </CardContent>
@@ -153,7 +153,7 @@ function ProductResultCard({
         <div className="flex items-center gap-2">
           {isSuccess && (
             <Badge variant="secondary" className={cn('text-xs', coverageBadgeColor)}>
-              {coverage}% coverage
+              {coverage}% pokrycie
             </Badge>
           )}
           {isExpanded ? (
