@@ -809,6 +809,65 @@ export interface SubscriptionStatus {
   cancel_at_period_end: boolean
 }
 
+// Allegro Offers Manager types
+export interface AllegroOffer {
+  id: string
+  name: string
+  price: { amount: string; currency: string }
+  stock: { available: number }
+  status: string
+  image?: string
+  category?: string
+}
+
+export interface AllegroOffersListResponse {
+  offers: AllegroOffer[]
+  total: number
+}
+
+export interface AllegroOfferDetail {
+  source_url: string
+  source_id: string
+  title: string
+  description: string
+  price: string
+  currency: string
+  ean: string
+  images: string[]
+  category: string
+  quantity: string
+  condition: string
+  parameters: Record<string, string>
+  brand: string
+  manufacturer: string
+  error: string | null
+}
+
+export interface BulkCommandResponse {
+  command_id: string
+  status: string
+  count: number
+}
+
+export interface AllegroOfferUpdateRequest {
+  name?: string
+  price?: { amount: string; currency: string }
+  description_html?: string
+}
+
+export interface AllegroOffersParams {
+  limit?: number
+  offset?: number
+  status?: string
+  search?: string
+}
+
+export interface AllegroBulkPriceChange {
+  offer_id: string
+  price: string
+  currency: string
+}
+
 // Error types
 export interface ApiError {
   message: string

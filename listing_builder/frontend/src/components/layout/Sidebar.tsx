@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Link2,
   FileBarChart,
+  Store,
 } from 'lucide-react'
 
 // WHY: Compliance sub-tabs defined here so sidebar shows them as expandable menu
@@ -77,6 +78,12 @@ const navItems = [
     title: 'Wiadomości',
     href: '/news',
     icon: Newspaper,
+  },
+  {
+    title: 'Manager Ofert',
+    href: '/allegro-manager',
+    icon: Store,
+    premiumOnly: true,
   },
   {
     title: 'Monitoring',
