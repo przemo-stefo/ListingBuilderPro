@@ -27,36 +27,6 @@ interface NewsItem {
 
 type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'temu' | 'ecommerce' | 'compliance'
 
-// WHY: RSS feeds from major marketplace news sources — parsed via rss2json.com
-// Direct RSS preferred (og:image works). Google News only where no direct feed exists.
-const RSS_FEEDS = [
-  // Amazon — direct feeds (og:image works for all)
-  { url: 'https://channelx.world/category/amazon/feed/', source: 'ChannelX Amazon', category: 'amazon' },
-  { url: 'https://www.junglescout.com/blog/feed/', source: 'Jungle Scout', category: 'amazon' },
-  // Allegro
-  { url: 'https://blog.allegro.tech/feed.xml', source: 'Allegro Tech Blog', category: 'allegro' },
-  { url: 'https://news.google.com/rss/search?q=Allegro+marketplace+sprzedawcy&hl=pl&gl=PL&ceid=PL:pl', source: 'Allegro News', category: 'allegro' },
-  // eBay — direct feeds (og:image works)
-  { url: 'https://www.ebayinc.com/stories/news/rss/', source: 'eBay Inc.', category: 'ebay' },
-  { url: 'https://channelx.world/category/ebay/feed/', source: 'ChannelX eBay', category: 'ebay' },
-  // Kaufland — no direct RSS, Google News only (gradient placeholder expected)
-  { url: 'https://news.google.com/rss/search?q=Kaufland+Global+Marketplace+ecommerce&hl=en&gl=DE&ceid=DE:en', source: 'Kaufland News', category: 'kaufland' },
-  // E-commerce general — 3 direct feeds with working og:image
-  { url: 'https://ecommercenews.eu/feed/', source: 'Ecommerce News EU', category: 'ecommerce' },
-  { url: 'https://tamebay.com/feed', source: 'Tamebay', category: 'ecommerce' },
-  { url: 'https://www.practicalecommerce.com/feed', source: 'Practical Ecommerce', category: 'ecommerce' },
-  { url: 'https://sellerengine.com/feed/', source: 'SellerEngine', category: 'ecommerce' },
-  // Temu — Google News RSS (no official Temu RSS exists)
-  { url: 'https://news.google.com/rss/search?q=Temu+marketplace+sellers+ecommerce&hl=en&gl=US&ceid=US:en', source: 'Temu News', category: 'temu' },
-  { url: 'https://channelx.world/category/temu/feed/', source: 'ChannelX Temu', category: 'temu' },
-  // Compliance — Google News only (no direct compliance RSS feeds exist)
-  { url: 'https://news.google.com/rss/search?q=EU+GPSR+EPR+product+safety+ecommerce+compliance&hl=en&gl=DE&ceid=DE:en', source: 'EU Compliance', category: 'compliance' },
-  { url: 'https://news.google.com/rss/search?q=Amazon+eBay+marketplace+compliance+regulation&hl=en&gl=US&ceid=US:en', source: 'Marketplace Compliance', category: 'compliance' },
-]
-
-// WHY: rss2json.com free API (10k req/day) avoids CORS issues with direct RSS
-const RSS_API = 'https://api.rss2json.com/v1/api.json?rss_url='
-
 const CATEGORIES: { key: NewsCategory; label: string; icon: string; color: string }[] = [
   { key: 'all', label: 'Wszystkie', icon: '🌐', color: 'bg-white/10 text-white' },
   { key: 'amazon', label: 'Amazon', icon: '📦', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
@@ -217,56 +187,15 @@ export default function NewsTab() {
   const [error, setError] = useState<string | null>(null)
   const [category, setCategory] = useState<NewsCategory>('all')
 
+  // WHY: Backend fetches RSS + translates to Polish via Groq + caches 2h
   const fetchNews = async () => {
     setLoading(true)
     setError(null)
     try {
-      const results: NewsItem[] = []
-
-      // WHY: Stagger requests by 200ms to avoid rss2json.com rate limiting (free tier)
-      const fetchFeed = async (feed: typeof RSS_FEEDS[number]): Promise<NewsItem[]> => {
-        try {
-          const res = await fetch(`${RSS_API}${encodeURIComponent(feed.url)}`)
-          if (!res.ok) return []
-          const data = await res.json()
-          if (data.status !== 'ok' || !data.items) return []
-
-          return data.items.slice(0, 6).map((item: Record<string, unknown>) => {
-            const desc = (item.description as string) || ''
-            const imgMatch = desc.match(/<img[^>]+src=["']([^"']+)["']/)
-            const thumb = (item.thumbnail as string)
-              || (item.enclosure as Record<string, string>)?.link
-              || imgMatch?.[1]
-              || ''
-            return {
-              title: (item.title as string) || 'Bez tytułu',
-              link: (item.link as string) || '#',
-              source: feed.source,
-              pubDate: (item.pubDate as string) || '',
-              description: desc.replace(/<[^>]*>/g, '').slice(0, 200),
-              category: feed.category,
-              thumbnail: thumb,
-            }
-          })
-        } catch {
-          return []
-        }
-      }
-
-      // WHY: Batches of 3 with 300ms delay between batches — rss2json free tier throttles parallel requests
-      const feedResults: NewsItem[][] = []
-      const BATCH_SIZE = 3
-      for (let i = 0; i < RSS_FEEDS.length; i += BATCH_SIZE) {
-        const batch = RSS_FEEDS.slice(i, i + BATCH_SIZE)
-        const batchResults = await Promise.all(batch.map(fetchFeed))
-        feedResults.push(...batchResults)
-        if (i + BATCH_SIZE < RSS_FEEDS.length) {
-          await new Promise((r) => setTimeout(r, 300))
-        }
-      }
-      for (const items of feedResults) results.push(...items)
-      results.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime())
-      setNews(results)
+      const res = await fetch('/api/proxy/news/feed')
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
+      setNews(data.articles || [])
     } catch {
       setError('Nie udało się załadować wiadomości')
     } finally {

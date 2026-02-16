@@ -33,6 +33,7 @@ const ALLOWED_PATH_PREFIXES = [
   'epr',
   'oauth',
   'stripe',
+  'news',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
