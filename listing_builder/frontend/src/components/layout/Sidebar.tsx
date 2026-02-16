@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Link2,
   FileBarChart,
+  FileDown,
   Settings,
   Info,
 } from 'lucide-react'
@@ -44,7 +45,7 @@ interface NavSection {
   items: NavItem[]
 }
 
-// WHY: MVP simplified to 8 items — Mateusz meeting decision
+// WHY: MVP sidebar order per Mateusz: Pulpit→Import→Konwerter→Optymalizator→Publikuj (do pliku)→Ekspert AI
 // Hidden pages (products, inventory, allegro-manager, keywords, etc.) still accessible via URL
 const navSections: NavSection[] = [
   {
@@ -59,6 +60,7 @@ const navSections: NavSection[] = [
     label: 'Optymalizacja AI',
     items: [
       { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytul, bullety, opis i slowa kluczowe backend' },
+      { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace' },
       { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedazy na marketplace', highlight: true },
     ],
   },
