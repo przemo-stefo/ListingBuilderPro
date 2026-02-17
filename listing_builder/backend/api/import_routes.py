@@ -101,6 +101,7 @@ class ScrapeRequest(BaseModel):
 async def scrape_product_url(
     request: Request,
     body: ScrapeRequest,
+    db: Session = Depends(get_db),
 ):
     """
     Scrape product data from a marketplace URL.
@@ -131,6 +132,25 @@ async def scrape_product_url(
     if marketplace != "allegro":
         raise HTTPException(status_code=400, detail=f"Scraping not yet supported for {marketplace}")
 
+    # WHY: Try Allegro REST API first (free, fast, no limits) — fallback to Scrape.do
+    from services.scraper.allegro_scraper import extract_offer_id
+    from services.allegro_api import get_access_token, fetch_offer_details
+
+    offer_id = extract_offer_id(body.url)
+    allegro_token = await get_access_token(db)
+
+    if allegro_token and offer_id:
+        data = await fetch_offer_details(offer_id, allegro_token)
+        if not data.get("error"):
+            # WHY: Convert price string to float for frontend form
+            if data.get("price"):
+                try:
+                    data["price"] = float(str(data["price"]).replace(",", ".").replace(" ", ""))
+                except (ValueError, AttributeError):
+                    data["price"] = None
+            return {"status": "success", "product": data, "source": "allegro_api"}
+
+    # Fallback: Scrape.do (paid, has monthly limits)
     from services.scraper.allegro_scraper import scrape_allegro_product
     from dataclasses import asdict
     product = await scrape_allegro_product(body.url)
@@ -139,14 +159,13 @@ async def scrape_product_url(
         raise HTTPException(status_code=502, detail=f"Scraping failed: {product.error}")
 
     data = asdict(product)
-    # WHY: Convert price string to float for frontend form
     if data.get("price"):
         try:
             data["price"] = float(data["price"].replace(",", ".").replace(" ", ""))
         except (ValueError, AttributeError):
             data["price"] = None
 
-    return {"status": "success", "product": data}
+    return {"status": "success", "product": data, "source": "scrape_do"}
 
 
 @router.post("/product")
