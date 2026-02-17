@@ -1,5 +1,5 @@
 // frontend/src/components/layout/Sidebar.tsx
-// Purpose: Main navigation sidebar — Octosello MVP (8 items + Compliance + Settings)
+// Purpose: Main navigation sidebar — OctoHelper MVP (8 items + Compliance + Settings)
 // NOT for: Page content or complex routing logic
 
 'use client'
@@ -91,7 +91,7 @@ export function Sidebar() {
     <div className="w-64 border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">
-          Octosello
+          OctoHelper
         </h1>
         <p className="text-sm text-gray-400">Asystent sprzedawcy marketplace</p>
       </div>

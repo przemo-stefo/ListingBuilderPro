@@ -117,7 +117,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <p className="text-gray-400 mt-2">
-          Przeglad Twojego panelu Octosello
+          Przegląd Twojego panelu OctoHelper
         </p>
       </div>
 

@@ -79,7 +79,7 @@ export default function LandingPage() {
       {/* Hero */}
       <div className="text-center space-y-4 pt-8">
         <h1 className="text-4xl font-bold text-white">
-          <span className="text-amber-400">Octosello</span>
+          <span className="text-amber-400">OctoHelper</span>
         </h1>
         <p className="text-lg text-gray-400 max-w-2xl mx-auto">
           Asystent sprzedawcy marketplace. Optymalizuj listingi AI, konwertuj oferty Allegro

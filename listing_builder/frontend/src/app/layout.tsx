@@ -14,7 +14,7 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Octosello — Asystent sprzedawcy',
+  title: 'OctoHelper — Asystent sprzedawcy',
   description: 'AI-powered asystent sprzedawcy marketplace. Optymalizuj listingi, monitoruj compliance, konwertuj oferty.',
   icons: { icon: '/favicon.svg' },
 }
