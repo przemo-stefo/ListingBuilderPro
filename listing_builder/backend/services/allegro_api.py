@@ -1,5 +1,5 @@
 # backend/services/allegro_api.py
-# Purpose: Allegro REST API client — fetch seller's offers + product details via OAuth
+# Purpose: Allegro REST API client — fetch offers + product details via OAuth or Client Credentials
 # NOT for: OAuth flow (that's oauth_service.py) or HTML scraping (allegro_scraper.py)
 
 import httpx
@@ -15,6 +15,169 @@ logger = structlog.get_logger()
 
 ALLEGRO_API_BASE = "https://api.allegro.pl"
 ALLEGRO_TOKEN_URL = "https://allegro.pl/auth/oauth/token"
+
+# WHY module-level cache: Client Credentials token is app-level (not per-user),
+# so one token serves all requests. Avoids hitting Allegro token endpoint every call.
+_client_token_cache: Dict = {"token": None, "expires_at": None}
+
+
+async def get_client_credentials_token() -> Optional[str]:
+    """Get app-level Allegro token via Client Credentials grant.
+
+    WHY Client Credentials: No user login needed. Works for public endpoints
+    like GET /offers/{offerId}. Token auto-renews from client_id + client_secret.
+    Mateusz never gets "logged out" because no user session is involved.
+    """
+    if not settings.allegro_client_id or not settings.allegro_client_secret:
+        return None
+
+    # WHY cache check: Allegro tokens last ~12h, no need to fetch every request
+    now = datetime.now(timezone.utc)
+    if (_client_token_cache["token"]
+            and _client_token_cache["expires_at"]
+            and _client_token_cache["expires_at"] > now + timedelta(minutes=5)):
+        return _client_token_cache["token"]
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                ALLEGRO_TOKEN_URL,
+                data={"grant_type": "client_credentials"},
+                auth=(settings.allegro_client_id, settings.allegro_client_secret),
+            )
+
+        if resp.status_code != 200:
+            logger.error("allegro_client_token_failed", status=resp.status_code)
+            return None
+
+        data = resp.json()
+        token = data["access_token"]
+        expires_in = data.get("expires_in", 43200)
+
+        _client_token_cache["token"] = token
+        _client_token_cache["expires_at"] = now + timedelta(seconds=expires_in)
+
+        logger.info("allegro_client_token_obtained", expires_in=expires_in)
+        return token
+
+    except Exception as e:
+        logger.error("allegro_client_token_error", error=str(e))
+        return None
+
+
+async def fetch_public_offer_details(offer_id: str) -> Dict:
+    """Fetch offer details using public API (no seller login needed).
+
+    WHY public endpoint: Uses GET /offers/{offerId} which works with
+    Client Credentials token. No user OAuth required — app token is enough.
+    """
+    token = await get_client_credentials_token()
+    if not token:
+        return {"error": "Brak kluczy Allegro API (client_id/client_secret)"}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.allegro.public.v1+json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{ALLEGRO_API_BASE}/offers/{offer_id}",
+                headers=headers,
+            )
+
+            if resp.status_code != 200:
+                logger.error("allegro_public_offer_failed",
+                             offer_id=offer_id, status=resp.status_code)
+                return {"error": f"Allegro API {resp.status_code}"}
+
+            data = resp.json()
+
+            # WHY same structure as fetch_offer_details: converter pipeline
+            # expects AllegroProduct-compatible dict regardless of data source
+            title = data.get("name", "")
+
+            price = ""
+            currency = "PLN"
+            selling_mode = data.get("sellingMode", {})
+            if selling_mode.get("price"):
+                price = str(selling_mode["price"].get("amount", ""))
+                currency = selling_mode["price"].get("currency", "PLN")
+
+            images = []
+            for img in data.get("images", []):
+                if isinstance(img, str):
+                    if img:
+                        images.append(img)
+                elif isinstance(img, dict):
+                    url = img.get("url", "")
+                    if url:
+                        images.append(url)
+
+            parameters = {}
+            for param in data.get("parameters", []):
+                name = param.get("name", "")
+                values = param.get("values", [])
+                if name and values:
+                    if isinstance(values[0], dict):
+                        val = ", ".join(v.get("value", "") for v in values if v.get("value"))
+                    else:
+                        val = ", ".join(str(v) for v in values if v)
+                    if val:
+                        parameters[name] = val
+
+            ean = ""
+            for key in ("EAN", "EAN (GTIN)", "GTIN"):
+                if key in parameters:
+                    ean = parameters[key]
+                    break
+
+            brand = parameters.get("Marka", "")
+            manufacturer = parameters.get("Producent", "")
+
+            description = ""
+            desc_section = data.get("description", {})
+            if desc_section and desc_section.get("sections"):
+                parts = []
+                for section in desc_section["sections"]:
+                    for item in section.get("items", []):
+                        if item.get("type") == "TEXT":
+                            parts.append(item.get("content", ""))
+                description = "\n".join(parts)
+
+            category_id = data.get("category", {}).get("id", "")
+            condition = data.get("condition", "")
+            stock = data.get("stock", {})
+            quantity = str(stock.get("available", "1"))
+
+            result = {
+                "source_url": f"https://allegro.pl/oferta/{offer_id}",
+                "source_id": offer_id,
+                "title": title,
+                "description": description,
+                "price": price,
+                "currency": currency,
+                "ean": ean,
+                "images": images,
+                "category": category_id,
+                "quantity": quantity,
+                "condition": condition,
+                "parameters": parameters,
+                "brand": brand,
+                "manufacturer": manufacturer,
+                "error": None,
+            }
+
+            logger.info("allegro_public_offer_fetched", offer_id=offer_id,
+                        title=title[:60], price=price, params=len(parameters))
+            return result
+
+    except httpx.TimeoutException:
+        return {"error": f"Allegro API timeout for offer {offer_id}"}
+    except Exception as e:
+        logger.error("allegro_public_offer_error", offer_id=offer_id, error=str(e))
+        return {"error": f"Allegro API error: {str(e)}"}
 
 
 async def _refresh_token_if_needed(conn: OAuthConnection, db: Session) -> bool:
