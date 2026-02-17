@@ -19,6 +19,10 @@ RUN grep -v 'playwright' requirements.txt > requirements-prod.txt && \
 
 COPY . .
 
+# WHY: This image runs ONLY on Render production. Default to production
+# so OAuth redirect URLs point to real domains, not localhost.
+ENV APP_ENV=production
+
 EXPOSE ${PORT:-8000}
 
 # WHY: Render sets $PORT at runtime

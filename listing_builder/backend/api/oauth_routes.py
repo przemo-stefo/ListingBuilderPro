@@ -77,10 +77,10 @@ async def amazon_callback(
     if "error" in result:
         logger.error("amazon_oauth_callback_error", error=result["error"])
         # WHY redirect: user is on the callback URL, redirect to frontend with error
-        frontend = "https://listing.feedmasters.org" if settings.app_env == "production" else "http://localhost:3000"
+        frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
         return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=error&msg={result['error']}")
 
-    frontend = "https://listing.feedmasters.org" if settings.app_env == "production" else "http://localhost:3000"
+    frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=success&marketplace=amazon")
 
 
@@ -110,10 +110,10 @@ async def allegro_callback(
 
     if "error" in result:
         logger.error("allegro_oauth_callback_error", error=result["error"])
-        frontend = "https://listing.feedmasters.org" if settings.app_env == "production" else "http://localhost:3000"
+        frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
         return RedirectResponse(f"{frontend}/converter?allegro=error&msg={result['error']}")
 
-    frontend = "https://listing.feedmasters.org" if settings.app_env == "production" else "http://localhost:3000"
+    frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/converter?allegro=connected")
 
 

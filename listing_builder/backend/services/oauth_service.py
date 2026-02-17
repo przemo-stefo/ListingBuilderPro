@@ -24,7 +24,7 @@ _pending_states: Dict[str, Dict] = {}
 
 def _frontend_url() -> str:
     if settings.app_env == "production":
-        return "https://listing.feedmasters.org"
+        return "https://panel.octohelper.com"
     return "http://localhost:3000"
 
 
