@@ -207,7 +207,11 @@ async def _translate_batch(articles: List[dict], keys: List[str], batch_idx: int
 
 
 async def _translate_all(articles: List[dict]) -> List[dict]:
-    """Translate articles sequentially, rotating Groq API keys per batch."""
+    """Translate articles in parallel batches — one Groq key per batch.
+
+    WHY parallel: 6 keys × 1 batch each = ~5s total instead of 30s sequential.
+    Each batch uses a different key to avoid 429 conflicts.
+    """
     keys = settings.groq_api_keys
     if not keys:
         return articles
@@ -217,34 +221,61 @@ async def _translate_all(articles: List[dict]) -> List[dict]:
         for i in range(0, len(articles), TRANSLATE_BATCH_SIZE)
     ]
 
-    # WHY: Sequential + key rotation to avoid 429 rate limits on single key
+    # WHY: Parallel with different keys — 6 keys can handle 6 batches at once
+    results = await asyncio.gather(
+        *[_translate_batch(batch, keys, idx) for idx, batch in enumerate(batches)]
+    )
+
     translated: List[dict] = []
-    for idx, batch in enumerate(batches):
-        result = await _translate_batch(batch, keys, idx)
-        translated.extend(result)
-        if idx < len(batches) - 1:
-            await asyncio.sleep(1.0)
+    for r in results:
+        translated.extend(r)
 
     logger.info("news_translated", total=len(translated), batches=len(batches))
     return translated
+
+
+# WHY: Flag prevents duplicate background translations from concurrent requests
+_translating = False
+
+
+async def _bg_translate_and_cache(articles: List[dict]) -> None:
+    """Background task: translate articles and update cache when done."""
+    global _translating
+    if _translating:
+        return
+    _translating = True
+    try:
+        translated = await _translate_all(articles)
+        _cache["articles"] = translated
+        _cache["timestamp"] = time.time()
+        logger.info("news_bg_translation_done", total=len(translated))
+    except Exception as e:
+        logger.error("news_bg_translation_failed", error=str(e))
+    finally:
+        _translating = False
 
 
 @router.get("/feed")
 async def get_news_feed(force: bool = Query(False)):
     """Aggregated marketplace news feed — translated to Polish, cached 2h.
 
-    WHY force param: allows cache bypass when translations failed or new deploy.
+    WHY two-phase: Fetch feeds (~10s) → return immediately → translate in
+    background. Next request gets translated version. Prevents Render 60s timeout.
     """
     now = time.time()
     if not force and _cache["articles"] and (now - _cache["timestamp"]) < CACHE_TTL:
         return {"articles": _cache["articles"], "cached": True}
 
+    # Phase 1: Fetch feeds (fast: ~10-15s)
     articles = await _fetch_all_feeds()
     await _resolve_thumbnails(articles)
-    articles = await _translate_all(articles)
 
+    # Cache untranslated immediately — fast response
     _cache["articles"] = articles
     _cache["timestamp"] = now
 
-    logger.info("news_feed_refreshed", total=len(articles))
-    return {"articles": articles, "cached": False}
+    # Phase 2: Translate in background — next request gets Polish version
+    asyncio.create_task(_bg_translate_and_cache(articles))
+
+    logger.info("news_feed_refreshed", total=len(articles), translating=True)
+    return {"articles": articles, "cached": False, "translating": True}

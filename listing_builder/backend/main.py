@@ -78,6 +78,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("monitor_scheduler_init_failed", error=str(e))
 
+    # WHY: Pre-warm news cache in background so first user request is fast
+    import asyncio
+    from api.news_routes import get_news_feed
+    asyncio.create_task(get_news_feed(force=True))
+    logger.info("news_cache_prewarm_started")
+
     yield
 
     # Shutdown
