@@ -14,6 +14,14 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatRelativeTime, getStatusColor, truncate, cn } from '@/lib/utils'
 import { Search, Trash2, ExternalLink, Filter } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const PRODUCTS_FAQ = [
+  { question: 'Jak importowac produkty?', answer: 'Kliknij "Importuj produkty" w prawym gornym rogu. Mozesz wkleic URL z Allegro, przeslac plik CSV lub polaczyc sie z API Allegro. System automatycznie pobierze dane o produkcie.' },
+  { question: 'Co oznaczaja statusy produktow?', answer: 'Oczekujace = czekaja na optymalizacje AI. Zoptymalizowane = przetworzone przez AI z nowym tytulem i opisem. Opublikowane = wyeksportowane na marketplace. Bledy = problem podczas przetwarzania.' },
+  { question: 'Czy moge usunac produkt?', answer: 'Tak, kliknij ikone kosza przy produkcie. Usuniecie jest trwale — produkt zostanie usuniety z systemu wraz z historia optymalizacji.' },
+  { question: 'Jak filtrowac produkty?', answer: 'Uzyj paska wyszukiwania aby znalezc produkt po nazwie, ASIN lub marce. Przyciski statusu filtruja wedlug etapu przetwarzania.' },
+]
 
 export default function ProductsPage() {
   const [filters, setFilters] = useState<ProductFilters>({
@@ -204,6 +212,12 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       )}
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Zarzadzanie produktami"
+        items={PRODUCTS_FAQ}
+      />
     </div>
   )
 }

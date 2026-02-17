@@ -7,6 +7,14 @@
 import { useState } from 'react'
 import { BarChart3, Package, Bell, AlertTriangle, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const MONITORING_FAQ = [
+  { question: 'Co monitoruje Monitoring?', answer: 'System sledzi zmiany cen, pozycji, opinii i dostepnosci Twoich produktow na marketplace. Gdy wykryje istotna zmiane, wysyla alert.' },
+  { question: 'Jak dodac produkt do monitorowania?', answer: 'Przejdz do zakladki "Products" i kliknij "Add Product". Podaj ASIN lub URL produktu, a system zacznie go sledzic automatycznie.' },
+  { question: 'Jak skonfigurowac reguly alertow?', answer: 'W zakladce "Alert Rules" ustaw progi — np. "alert gdy cena spadnie o 10%" lub "alert gdy pozycja spadnie ponizej #50". Alerty pojawia sie w zakladce "Alerts".' },
+  { question: 'Co to sa Snapshots?', answer: 'Snapshots to migawki stanu produktu w danym momencie. System robi je automatycznie przy kazdym sprawdzeniu. Mozesz porownac stan obecny z historycznym.' },
+]
 import { FeatureGate } from '@/components/tier/FeatureGate'
 import DashboardTab from './components/DashboardTab'
 import TrackedProductsTab from './components/TrackedProductsTab'
@@ -62,6 +70,12 @@ export default function MonitoringPage() {
         {activeTab === 'rules' && <AlertRulesTab />}
         {activeTab === 'alerts' && <AlertHistoryTab />}
         {activeTab === 'snapshots' && <SnapshotsTab />}
+
+        <FaqSection
+          title="Najczesciej zadawane pytania"
+          subtitle="Monitoring i alerty"
+          items={MONITORING_FAQ}
+        />
       </div>
     </FeatureGate>
   )

@@ -23,6 +23,14 @@ import {
   Minus,
   Search,
 } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const KEYWORDS_FAQ = [
+  { question: 'Skad pochodza slowa kluczowe?', answer: 'System zbiera slowa kluczowe z Twoich produktow, optymalizacji AI i analizy konkurencji. Mozesz tez dodac wlasne frazy do sledzenia.' },
+  { question: 'Co oznacza pozycja?', answer: 'Pozycja (#1, #10 itd.) to miejsce Twojego produktu w wynikach wyszukiwania na danym marketplace dla tego slowa kluczowego. Im nizsza liczba, tym lepiej.' },
+  { question: 'Co oznaczaja trendy?', answer: 'Strzalka w gore = pozycja rosnie (dobrze), strzalka w dol = pozycja spada (trzeba zareagowac), kreska = bez zmian.' },
+  { question: 'Jak poprawic pozycje slow kluczowych?', answer: 'Uzyj Optymalizatora AI — automatycznie wplata najwazniejsze slowa kluczowe w tytul, bullet pointy i opis produktu, co poprawia widocznosc w wyszukiwarkach marketplace.' },
+]
 
 const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 
@@ -298,6 +306,12 @@ export default function KeywordsPage() {
           </CardContent>
         </Card>
       )}
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Slowa kluczowe i SEO"
+        items={KEYWORDS_FAQ}
+      />
     </div>
   )
 }

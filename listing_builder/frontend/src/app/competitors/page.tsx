@@ -21,6 +21,13 @@ import {
   Star,
   Search,
 } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const COMPETITORS_FAQ = [
+  { question: 'Jak system porownuje konkurencje?', answer: 'System sledzi ceny, oceny i liczbe recenzji konkurentow na tych samych marketplace. Status "Wygrana" oznacza ze masz lepsza cene lub ocene, "Przegrana" ze konkurent jest lepszy.' },
+  { question: 'Co oznacza roznica cen?', answer: 'Liczba ze znakiem + oznacza ze jestes tanszy od konkurenta (dobrze). Liczba ze znakiem - oznacza ze jestes drozszy. $0.00 = identyczna cena.' },
+  { question: 'Jak dodac konkurenta do sledzenia?', answer: 'Konkurenci sa wykrywani automatycznie na podstawie Twoich produktow i slow kluczowych. System porownuje oferty w tych samych kategoriach.' },
+]
 
 const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 
@@ -341,6 +348,12 @@ export default function CompetitorsPage() {
           </CardContent>
         </Card>
       )}
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Konkurencja i porownanie"
+        items={COMPETITORS_FAQ}
+      />
     </div>
   )
 }

@@ -36,24 +36,21 @@ export const TierCtx = createContext<TierContext>({
 })
 
 export function TierProvider({ children }: { children: ReactNode }) {
-  const [tier, setTier] = useState<TierLevel>('free')
-  const [usageToday, setUsageToday] = useState(0)
-  const [licenseKey, setLicenseKey] = useState('')
+  // WHY: Initialize from localStorage synchronously to prevent "FREE" flash on refresh
+  const initialKey = getStoredLicenseKey()
+  const [tier, setTier] = useState<TierLevel>(initialKey ? 'premium' : 'free')
+  const [usageToday, setUsageToday] = useState(getStoredUsage)
+  const [licenseKey, setLicenseKey] = useState(initialKey)
 
-  // WHY: On mount, check stored license key against backend
+  // WHY: Validate stored key with backend — downgrade if invalid
   useEffect(() => {
-    setUsageToday(getStoredUsage())
-
-    const storedKey = getStoredLicenseKey()
-    if (!storedKey) return
-
-    setLicenseKey(storedKey)
+    if (!initialKey) return
 
     // WHY: Validate key with backend — don't trust localStorage alone
     fetch('/api/proxy/stripe/validate-license', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_key: storedKey }),
+      body: JSON.stringify({ license_key: initialKey }),
     })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {

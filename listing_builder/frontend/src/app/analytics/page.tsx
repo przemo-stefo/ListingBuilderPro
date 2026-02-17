@@ -18,6 +18,13 @@ import {
   TrendingUp,
   BarChart3,
 } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const ANALYTICS_FAQ = [
+  { question: 'Jak odczytywac wykresy?', answer: 'Wykres "Przychod wg marketplace" pokazuje udzial kazdego kanalu w sprzedazy. Wykres "Trend przychodow" pokazuje jak zmienia sie przychod miesieczny — najezdzaj na slupki aby zobaczyc szczegoly.' },
+  { question: 'Co to jest konwersja?', answer: 'Konwersja to procent odwiedzajacych Twoj listing, ktorzy dokonali zakupu. Powyzej 5% to swietny wynik, ponizej 2% sugeruje potrzebe optymalizacji.' },
+  { question: 'Jak filtrowac dane?', answer: 'Uzyj przyciskow "Okres" aby wybrac zakres czasu (7 dni, 30 dni, 90 dni, 12 mies.) i "Marketplace" aby zobaczyc dane z konkretnego kanalu sprzedazy.' },
+]
 
 const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 const PERIODS: { value: GetAnalyticsParams['period']; label: string }[] = [
@@ -361,6 +368,12 @@ export default function AnalyticsPage() {
           </Card>
         </>
       ) : null}
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Analityka i raporty"
+        items={ANALYTICS_FAQ}
+      />
     </div>
   )
 }

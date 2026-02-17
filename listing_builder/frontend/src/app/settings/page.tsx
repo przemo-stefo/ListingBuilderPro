@@ -6,6 +6,14 @@
 
 import { useEffect, useState } from 'react'
 import { Settings as SettingsIcon, Link, Bell, Download, Save } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const SETTINGS_FAQ = [
+  { question: 'Jak zmienic domyslny marketplace?', answer: 'W sekcji "Ustawienia ogolne" wybierz nowy marketplace z listy i kliknij "Zapisz". Wszystkie nowe optymalizacje beda domyslnie tworzone dla wybranego rynku.' },
+  { question: 'Jak polaczyc klucz API marketplace?', answer: 'W sekcji "Polaczenia z marketplace" wpisz klucz API w pole obok nazwy marketplace i kliknij "Polacz". Status zmieni sie na "Polaczony" po weryfikacji klucza.' },
+  { question: 'Jakie powiadomienia sa dostepne?', answer: 'Mozesz wlaczyc alerty email, powiadomienia o niskim stanie magazynowym, zmianach cen konkurencji i ostrzezeniach o zgodnosci (compliance). Kazdy typ mozna wlaczac/wylaczac niezaleznie.' },
+  { question: 'Jak zmienic format eksportu?', answer: 'W sekcji "Dane i eksport" wybierz preferowany format (CSV, JSON, Excel). Wszystkie pobrania z systemu beda uzywaly wybranego formatu.' },
+]
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -397,6 +405,12 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Konfiguracja i ustawienia"
+        items={SETTINGS_FAQ}
+      />
     </div>
   )
 }

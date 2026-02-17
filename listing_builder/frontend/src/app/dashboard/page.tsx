@@ -10,6 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { formatNumber } from '@/lib/utils'
 import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const DASHBOARD_FAQ = [
+  { question: 'Co pokazuje Pulpit?', answer: 'Pulpit wyswietla statystyki Twojego konta: liczbe produktow, status optymalizacji, sredni wynik AI i ostatnie importy. To przeglad calego systemu w jednym miejscu.' },
+  { question: 'Co oznacza "Do optymalizacji"?', answer: 'To produkty zaimportowane do systemu, ktore jeszcze nie zostaly przetworzone przez AI. Kliknij "Optymalizuj listingi" aby je przetworzyc.' },
+  { question: 'Jak dziala Ekspert AI na Pulpicie?', answer: 'Widget Eksperta AI pozwala szybko zadac pytanie o sprzedazy na marketplace bez opuszczania Pulpitu. Wynik otwiera pelna strone Eksperta AI z odpowiedzia opartego na wiedzy eksperckiej.' },
+]
 
 const SUGGESTED_QUESTIONS = [
   'Jak znalezc najlepsze slowa kluczowe?',
@@ -214,6 +221,12 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Pulpit i nawigacja"
+        items={DASHBOARD_FAQ}
+      />
     </div>
   )
 }

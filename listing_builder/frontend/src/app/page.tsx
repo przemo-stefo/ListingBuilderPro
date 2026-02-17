@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Crown, Sparkles, Check, X, ArrowRight, Zap } from 'lucide-react'
+import { Crown, Sparkles, Check, X, ArrowRight, Zap, Brain, MessageSquare, BookOpen, Shield } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
 
 const FREE_FEATURES = [
@@ -215,6 +215,57 @@ export default function LandingPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* WHY: Dedicated Expert AI showcase — "uwypuklić zajebistość" per Mateusz meeting */}
+      <div className="rounded-xl border border-green-900/30 bg-gradient-to-b from-green-500/5 to-[#121212] p-8 relative overflow-hidden">
+        <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-green-500/10 blur-3xl" />
+        <div className="relative space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-green-500/20 p-2.5">
+              <Brain className="h-7 w-7 text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-white">Ekspert AI</h3>
+              <p className="text-sm text-green-400">Twoj osobisty doradca e-commerce</p>
+            </div>
+          </div>
+          <p className="text-gray-300 max-w-2xl">
+            Zadaj pytanie — dostaniesz ekspercka odpowiedz oparta na ponad 10 000 fragmentow wiedzy
+            od najlepszych praktyków Amazon, PPC i e-commerce. Baza wiedzy budowana latami, dostepna w sekundy.
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex items-start gap-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+              <MessageSquare className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-white">Natychmiastowe odpowiedzi</p>
+                <p className="text-xs text-gray-500">Pytaj o PPC, listingi, algorytm A9, COSMO i wiecej</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+              <BookOpen className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-white">10 266 fragmentow wiedzy</p>
+                <p className="text-xs text-gray-500">Inner Circle, Ecom Creative i materialy eksperckie</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+              <Shield className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-white">Zrodla i cytaty</p>
+                <p className="text-xs text-gray-500">Kazda odpowiedz z linkiem do zrodla wiedzy</p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/expert-qa')}
+            className="rounded-lg bg-green-900/40 border border-green-800/50 px-6 py-2.5 text-sm font-medium text-green-400 hover:bg-green-900/60 transition-colors flex items-center gap-2"
+          >
+            <Brain className="h-4 w-4" />
+            Wyprobuj Eksperta AI
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* License key recovery link */}

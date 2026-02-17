@@ -14,6 +14,13 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/lib/hooks/useToast'
 import { cn, getStatusColor, truncate } from '@/lib/utils'
 import { Send, CheckCircle2, Globe } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const PUBLISH_FAQ = [
+  { question: 'Co oznacza "Publikacja"?', answer: 'Publikacja eksportuje Twoje zoptymalizowane produkty na wybrany marketplace. Tylko produkty o statusie "zoptymalizowane" sa gotowe do publikacji.' },
+  { question: 'Jak wybrac produkty do publikacji?', answer: 'Kliknij na kartach produktow aby je zaznaczyc (pojawi sie ptaszek). Mozesz tez uzyc "Zaznacz wszystkie" aby wybrac wszystko naraz.' },
+  { question: 'Co jesli publikacja sie nie powiedzie?', answer: 'System pokaze ktore produkty sie nie opublikowaly i dlaczego. Najczesciej przyczyna jest brak wymaganych pol (np. kategorii lub ceny). Popraw dane i sprobuj ponownie.' },
+]
 
 export default function PublishPage() {
   const { toast } = useToast()
@@ -270,6 +277,12 @@ export default function PublishPage() {
           </CardHeader>
         </Card>
       )}
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Eksport i publikacja"
+        items={PUBLISH_FAQ}
+      />
     </div>
   )
 }

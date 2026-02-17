@@ -6,6 +6,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Store, Link2, Loader2 } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const ALLEGRO_FAQ = [
+  { question: 'Jak polaczyc konto Allegro?', answer: 'Kliknij "Polacz z Allegro" — zostaniesz przekierowany na strone Allegro gdzie zaakceptujesz uprawnienia. Po powrocie system automatycznie pobierze Twoje oferty.' },
+  { question: 'Co moge robic w Managerze Ofert?', answer: 'Mozesz przegladac swoje oferty Allegro, edytowac tytuly i ceny, oraz wlaczac/wylaczac oferty masowo. Zmiany sa synchronizowane bezposrednio z Allegro.' },
+  { question: 'Czy polaczenie jest bezpieczne?', answer: 'Tak, uzywamy oficjalnego OAuth 2.0 Allegro. Twoje haslo nigdy nie jest przechowywane w naszym systemie — tylko token autoryzacyjny z ograniczonymi uprawnieniami.' },
+]
 import { FeatureGate } from '@/components/tier/FeatureGate'
 import { getOAuthConnections, startAllegroOAuth } from '@/lib/api/converter'
 import { useToast } from '@/lib/hooks/useToast'
@@ -77,6 +84,12 @@ export default function AllegroManagerPage() {
         )}
 
         {connected === true && <OffersTable />}
+
+        <FaqSection
+          title="Najczesciej zadawane pytania"
+          subtitle="Allegro Manager"
+          items={ALLEGRO_FAQ}
+        />
       </div>
     </FeatureGate>
   )

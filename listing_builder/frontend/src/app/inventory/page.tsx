@@ -20,6 +20,14 @@ import {
   DollarSign,
   Search,
 } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
+
+const INVENTORY_FAQ = [
+  { question: 'Co oznaczaja kolory ilosci?', answer: 'Zielony = ilosc powyzej minimalnego zapasu (OK). Zolty = ilosc ponizej punktu zamowienia (trzeba zamowic). Czerwony = brak na stanie (pilne).' },
+  { question: 'Co to jest "Zapas dni"?', answer: 'Zapas dni to szacunek na ile dni wystarczy aktualny stan magazynowy przy obecnym tempie sprzedazy. Ponizej 10 dni = czerwony alarm.' },
+  { question: 'Co oznacza status "Nadmiar"?', answer: 'Nadmiar oznacza ze masz wiecej towaru niz optymalne. Moze to zamrazac kapital — rozważ promocje lub przesunięcie towaru miedzy marketplace.' },
+  { question: 'Jak ustawic punkt ponownego zamowienia?', answer: 'Punkt zamowienia ustala sie w ustawieniach produktu. Gdy ilosc spadnie ponizej tej wartosci, system zmieni status na "Niski stan" i wysle alert (jesli wlaczony).' },
+]
 
 const MARKETPLACES = ['Amazon', 'eBay', 'Walmart', 'Shopify', 'Allegro']
 
@@ -377,6 +385,12 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       )}
+
+      <FaqSection
+        title="Najczesciej zadawane pytania"
+        subtitle="Magazyn i zapasy"
+        items={INVENTORY_FAQ}
+      />
     </div>
   )
 }
