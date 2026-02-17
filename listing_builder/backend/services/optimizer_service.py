@@ -31,6 +31,7 @@ MARKETPLACE_LIMITS = {
     "amazon_es":  {"title": 200, "bullet": 500, "backend": 249, "lang": "es"},
     "ebay_de":    {"title": 80,  "bullet": 300, "backend": 0,   "lang": "de"},
     "kaufland":   {"title": 150, "bullet": 400, "backend": 0,   "lang": "de"},
+    "allegro":    {"title": 75,  "bullet": 500, "backend": 0,   "lang": "pl"},
 }
 
 MODEL = "llama-3.3-70b-versatile"
@@ -397,6 +398,7 @@ def _build_description_prompt(
     product_title: str, brand: str, remaining_phrases: List[str],
     lang: str,
     expert_context: str = "",
+    marketplace: str = "amazon_de",
 ) -> str:
     kw_list = ", ".join(remaining_phrases[:10])
     context_block = ""
@@ -406,7 +408,19 @@ EXPERT KNOWLEDGE (use these best practices):
 {expert_context}
 
 """
-    return f"""You are an expert Amazon listing optimizer.
+    # WHY: Allegro buyers scan descriptions — bold keywords are a game changer
+    is_allegro = "allegro" in marketplace
+    platform_name = "Allegro" if is_allegro else "Amazon"
+    paragraph_rule = "Write 3-4 detailed paragraphs" if is_allegro else "Write 2-3 short paragraphs"
+    bold_rule = ""
+    if is_allegro:
+        bold_rule = (
+            "\n- BOLD important keywords and product features using <b> tags — "
+            "product type, material, size, brand, key benefits. "
+            "8-12 bolded phrases total. Buyer must scan description and see key info at a glance."
+        )
+
+    return f"""You are an expert {platform_name} listing optimizer.
 {context_block}Product: {product_title}
 Brand: {brand}
 Language: {lang}
@@ -415,12 +429,12 @@ REMAINING KEYWORDS to include: {kw_list}
 
 Rules:
 - IMPORTANT: If any keyword or product info is NOT in {lang}, TRANSLATE it to {lang} first
-- Write a compelling product description (2-3 short paragraphs)
+- {paragraph_rule}
 - Naturally include the remaining keywords
 - Focus on use cases and benefits
 - Professional tone, no hype
 - The ENTIRE text must be in {lang} — no words in other languages
-- Format as simple HTML: use <p> for paragraphs, <ul><li> for feature lists, <b> for emphasis
+- Format as simple HTML: use <p> for paragraphs, <ul><li> for feature lists, <b> for emphasis{bold_rule}
 - Keep HTML clean and minimal — no classes, no inline styles, no <div> or <span>
 
 Return ONLY the HTML description, nothing else."""
@@ -518,6 +532,31 @@ def _strip_promo_words(text: str) -> str:
     return result.strip()
 
 
+# --- Allegro keyword bolding ---
+
+def _bold_keywords_in_html(html: str, keywords: List[str]) -> str:
+    """Wrap first occurrence of each keyword in <b> tags if not already bolded.
+
+    WHY: Allegro buyers scan descriptions — bolded keywords let them spot
+    key product features at a glance (Bartek's "game changer" insight).
+    """
+    result = html
+    for phrase in keywords[:15]:
+        if not phrase or len(phrase) < 2:
+            continue
+        # WHY: Skip if this phrase is already inside a <b> tag
+        if re.search(rf"<b>[^<]*{re.escape(phrase)}[^<]*</b>", result, re.IGNORECASE):
+            continue
+        # WHY: Match phrase only in text content (not inside HTML tags)
+        # Negative lookbehind ensures we're not inside a tag attribute
+        pattern = rf"(?<![<\w/])({re.escape(phrase)})(?![^<]*>)"
+        match = re.search(pattern, result, re.IGNORECASE)
+        if match:
+            original = match.group(0)
+            result = result[:match.start()] + f"<b>{original}</b>" + result[match.end():]
+    return result
+
+
 # --- Main entry point ---
 
 async def optimize_listing(
@@ -613,6 +652,9 @@ async def optimize_listing(
         title_text = _strip_promo_words(title_text)
         bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
         desc_text = _strip_promo_words(desc_text)
+        # WHY: Allegro descriptions need bolded keywords for scanability
+        if "allegro" in marketplace:
+            desc_text = _bold_keywords_in_html(desc_text, tier1_phrases + tier2_phrases[:10])
     else:
         # Fallback: direct Groq calls (existing flow)
         title_prompt = _build_title_prompt(
@@ -633,6 +675,7 @@ async def optimize_listing(
         desc_prompt = _build_description_prompt(
             product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
             expert_context=desc_context,
+            marketplace=marketplace,
         )
         backend_prompt = _build_backend_prompt(
             product_title, brand, title_text, all_kw, lang, limits["backend"],
@@ -678,6 +721,10 @@ async def optimize_listing(
         title_text = _strip_promo_words(title_text)
         bullet_lines = [_strip_promo_words(b) for b in bullet_lines]
         desc_text = _strip_promo_words(desc_text)
+
+        # WHY: Allegro descriptions need bolded keywords for scanability
+        if "allegro" in marketplace:
+            desc_text = _bold_keywords_in_html(desc_text, tier1_phrases + tier2_phrases[:10])
 
         # WHY: LLM often generates titles 5-15 chars over limit — truncate at last word boundary
         if len(title_text) > limits["title"]:
