@@ -527,7 +527,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.manufacturer_contact}
                     onChange={(e) => updateGpsr('manufacturer_contact', e.target.value)}
-                    placeholder="Manufacturer name"
+                    placeholder="Nazwa producenta"
                   />
                 </div>
                 <div>
@@ -535,7 +535,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.manufacturer_address}
                     onChange={(e) => updateGpsr('manufacturer_address', e.target.value)}
-                    placeholder="Street address"
+                    placeholder="Ulica i numer"
                   />
                 </div>
                 <div>
@@ -543,7 +543,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.manufacturer_city}
                     onChange={(e) => updateGpsr('manufacturer_city', e.target.value)}
-                    placeholder="City"
+                    placeholder="Miasto"
                   />
                 </div>
                 <div>
@@ -589,7 +589,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.responsible_person_type}
                     onChange={(e) => updateGpsr('responsible_person_type', e.target.value)}
-                    placeholder="Manufacturer / Importer"
+                    placeholder="Producent / Importer"
                   />
                 </div>
                 <div>
@@ -597,7 +597,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.responsible_person_name}
                     onChange={(e) => updateGpsr('responsible_person_name', e.target.value)}
-                    placeholder="Company name"
+                    placeholder="Nazwa firmy"
                   />
                 </div>
                 <div>
@@ -605,7 +605,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.responsible_person_address}
                     onChange={(e) => updateGpsr('responsible_person_address', e.target.value)}
-                    placeholder="Full address"
+                    placeholder="Pelny adres"
                   />
                 </div>
                 <div>
@@ -628,7 +628,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.amazon_browse_node}
                     onChange={(e) => updateGpsr('amazon_browse_node', e.target.value)}
-                    placeholder="e.g. 3169011"
+                    placeholder="np. 3169011"
                   />
                 </div>
                 <div>
@@ -636,7 +636,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.amazon_product_type}
                     onChange={(e) => updateGpsr('amazon_product_type', e.target.value)}
-                    placeholder="e.g. HOME"
+                    placeholder="np. HOME"
                   />
                 </div>
                 <div>
@@ -644,7 +644,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.ebay_category_id}
                     onChange={(e) => updateGpsr('ebay_category_id', e.target.value)}
-                    placeholder="e.g. 11700"
+                    placeholder="np. 11700"
                   />
                 </div>
                 <div>
@@ -652,7 +652,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.kaufland_category}
                     onChange={(e) => updateGpsr('kaufland_category', e.target.value)}
-                    placeholder="e.g. Haushalt"
+                    placeholder="np. Haushalt"
                   />
                 </div>
               </div>

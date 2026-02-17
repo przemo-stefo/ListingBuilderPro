@@ -33,31 +33,41 @@ export const TierCtx = createContext<TierContext>({
   unlockPremium: () => {},
   isPremium: false,
   licenseKey: '',
+  isLoading: true,
 })
 
 export function TierProvider({ children }: { children: ReactNode }) {
-  // WHY: Initialize from localStorage synchronously to prevent "FREE" flash on refresh
-  const initialKey = getStoredLicenseKey()
-  const [tier, setTier] = useState<TierLevel>(initialKey ? 'premium' : 'free')
-  const [usageToday, setUsageToday] = useState(getStoredUsage)
-  const [licenseKey, setLicenseKey] = useState(initialKey)
+  // WHY: Start as 'free' + loading=true during SSR — useEffect reads localStorage on client
+  const [tier, setTier] = useState<TierLevel>('free')
+  const [usageToday, setUsageToday] = useState(0)
+  const [licenseKey, setLicenseKey] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
 
-  // WHY: Validate stored key with backend — downgrade if invalid
+  // WHY: Read localStorage on client mount — NOT from SSR closure (which is always '')
   useEffect(() => {
-    if (!initialKey) return
+    const key = localStorage.getItem(LICENSE_KEY_STORAGE) || ''
+    const usage = parseInt(localStorage.getItem(getUsageKey()) || '0', 10)
+    setUsageToday(usage)
 
-    // WHY: Validate key with backend — don't trust localStorage alone
+    if (!key) {
+      setIsLoading(false)
+      return
+    }
+
+    // WHY: Set premium + stop loading immediately — no flash, no waiting for backend
+    setLicenseKey(key)
+    setTier('premium')
+    setIsLoading(false)
+
+    // WHY: Validate async in background — downgrade only if backend explicitly says invalid
     fetch('/api/proxy/stripe/validate-license', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license_key: initialKey }),
+      body: JSON.stringify({ license_key: key }),
     })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.valid) {
-          setTier('premium')
-        } else {
-          // WHY: Key is invalid/expired — clear it
+        if (!data?.valid) {
           localStorage.removeItem(LICENSE_KEY_STORAGE)
           setLicenseKey('')
           setTier('free')
@@ -65,7 +75,6 @@ export function TierProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         // WHY: Backend unavailable — trust stored key as fallback
-        setTier('premium')
       })
   }, [])
 
@@ -76,6 +85,7 @@ export function TierProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(LICENSE_KEY_STORAGE, key)
       setLicenseKey(key)
       setTier('premium')
+      setIsLoading(false)
     }
   }, [])
 
@@ -93,7 +103,7 @@ export function TierProvider({ children }: { children: ReactNode }) {
 
   return (
     <TierCtx.Provider
-      value={{ tier, usageToday, canOptimize, incrementUsage, unlockPremium: handleUnlock, isPremium, licenseKey }}
+      value={{ tier, usageToday, canOptimize, incrementUsage, unlockPremium: handleUnlock, isPremium, licenseKey, isLoading }}
     >
       {children}
     </TierCtx.Provider>

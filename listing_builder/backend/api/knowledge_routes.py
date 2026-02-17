@@ -52,6 +52,8 @@ class ChatResponse(BaseModel):
     sources_used: int
     has_context: bool
     mode: str = "balanced"
+    # WHY: Source filenames shown in frontend — makes expert answers more credible
+    sources: list[str] = []
 
 
 @router.post("/chat", response_model=ChatResponse)

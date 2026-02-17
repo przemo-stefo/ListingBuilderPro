@@ -10,10 +10,28 @@ interface TierBadgeProps {
   tier: TierLevel
   className?: string
   size?: 'sm' | 'md'
+  // WHY: When true, show neutral skeleton instead of "FREE" flash
+  isLoading?: boolean
 }
 
-export function TierBadge({ tier, className, size = 'sm' }: TierBadgeProps) {
+export function TierBadge({ tier, className, size = 'sm', isLoading }: TierBadgeProps) {
   const isPremium = tier === 'premium'
+
+  // WHY: During loading, show neutral placeholder — prevents FREE→PREMIUM flash on refresh
+  if (isLoading) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full font-medium animate-pulse',
+          size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs',
+          'bg-gray-500/10 text-gray-600 border border-gray-800',
+          className
+        )}
+      >
+        &bull;&bull;&bull;
+      </span>
+    )
+  }
 
   return (
     <span

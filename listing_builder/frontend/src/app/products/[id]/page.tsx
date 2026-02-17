@@ -28,13 +28,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product', resolvedParams.id] })
       toast({
-        title: 'Optimization complete',
-        description: 'Product has been optimized with AI',
+        title: 'Optymalizacja zakonczona',
+        description: 'Produkt zostal zoptymalizowany przez AI',
       })
     },
     onError: (error: Error) => {
       toast({
-        title: 'Optimization failed',
+        title: 'Blad optymalizacji',
         description: error.message,
         variant: 'destructive',
       })
@@ -46,7 +46,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="space-y-6">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          Wstecz
         </Button>
         <Card className="animate-pulse">
           <CardContent className="p-8">
@@ -62,12 +62,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="space-y-6">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          Wstecz
         </Button>
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Product Not Found</CardTitle>
-            <CardDescription>The product you're looking for doesn't exist</CardDescription>
+            <CardTitle className="text-red-500">Produkt nie znaleziony</CardTitle>
+            <CardDescription>Produkt ktorego szukasz nie istnieje</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -79,7 +79,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Products
+          Wstecz do produktow
         </Button>
         <div className="flex gap-2">
           <Button
@@ -88,11 +88,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             disabled={optimizeMutation.isPending}
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            {optimizeMutation.isPending ? 'Optimizing...' : 'Optimize'}
+            {optimizeMutation.isPending ? 'Optymalizuje...' : 'Optymalizuj'}
           </Button>
           <Button onClick={() => router.push('/publish')}>
             <Send className="h-4 w-4 mr-2" />
-            Publish
+            Eksportuj
           </Button>
         </div>
       </div>
@@ -105,9 +105,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <CardTitle className="text-2xl mb-2">{product.title}</CardTitle>
               <div className="flex items-center gap-4 text-sm text-gray-400">
                 {product.asin && <span>ASIN: {product.asin}</span>}
-                {product.brand && <span>Brand: {product.brand}</span>}
-                {product.category && <span>Category: {product.category}</span>}
-                {product.marketplace && <span>Market: {product.marketplace}</span>}
+                {product.brand && <span>Marka: {product.brand}</span>}
+                {product.category && <span>Kategoria: {product.category}</span>}
+                {product.marketplace && <span>Marketplace: {product.marketplace}</span>}
               </div>
             </div>
             <Badge className={cn('text-sm', getStatusColor(product.status))}>
@@ -120,7 +120,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {product.optimization_score !== undefined && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-white">Optimization Score</span>
+                <span className="text-sm font-medium text-white">Wynik optymalizacji</span>
                 <span className={cn('text-2xl font-bold', getScoreColor(product.optimization_score))}>
                   {Math.round(product.optimization_score)}%
                 </span>
@@ -140,14 +140,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Description */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Description</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Opis</h3>
             <p className="text-gray-300 whitespace-pre-wrap">{product.description}</p>
           </div>
 
           {/* Bullet Points */}
           {product.bullet_points && product.bullet_points.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Key Features</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Kluczowe cechy</h3>
               <ul className="space-y-2">
                 {product.bullet_points.map((bullet, index) => (
                   <li key={index} className="flex items-start gap-2 text-gray-300">
@@ -162,7 +162,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {/* SEO Keywords */}
           {product.seo_keywords && product.seo_keywords.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">SEO Keywords</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Slowa kluczowe SEO</h3>
               <div className="flex flex-wrap gap-2">
                 {product.seo_keywords.map((keyword, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
@@ -176,7 +176,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {/* Price */}
           {product.price && (
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Price</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Cena</h3>
               <p className="text-2xl font-bold text-green-500">
                 ${product.price.toFixed(2)}
               </p>
@@ -187,15 +187,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <div className="border-t border-gray-800 pt-4">
             <div className="grid gap-2 text-sm text-gray-400">
               <div className="flex justify-between">
-                <span>Created:</span>
+                <span>Utworzono:</span>
                 <span>{formatDate(product.created_at)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Updated:</span>
+                <span>Zaktualizowano:</span>
                 <span>{formatDate(product.updated_at)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Product ID:</span>
+                <span>ID produktu:</span>
                 <span className="font-mono text-xs">{product.id}</span>
               </div>
             </div>

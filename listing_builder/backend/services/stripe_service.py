@@ -17,7 +17,7 @@ logger = structlog.get_logger()
 stripe.api_key = getattr(settings, "stripe_secret_key", "")
 
 FRONTEND_URL = (
-    "https://listing.feedmasters.org"
+    "https://panel.octohelper.com"
     if settings.is_production
     else "http://localhost:3000"
 )

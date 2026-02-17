@@ -80,7 +80,7 @@ const complianceSubItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { tier } = useTier()
+  const { tier, isLoading } = useTier()
 
   // WHY: Auto-expand when user is on /compliance, collapse otherwise
   const isOnCompliance = pathname === '/compliance'
@@ -240,7 +240,7 @@ export function Sidebar() {
       {/* Footer — tier badge + legal links */}
       <div className="space-y-3 pt-4">
         <div className="flex items-center justify-center">
-          <TierBadge tier={tier} size="md" />
+          <TierBadge tier={tier} size="md" isLoading={isLoading} />
         </div>
         <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
           <p className="text-xs text-gray-400">

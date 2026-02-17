@@ -91,7 +91,7 @@ export default function SingleImport() {
         source_platform: marketplace,
         source_id: asin || 'manual',
         source_url: productUrl || undefined,
-        title: title || asin || productUrl || 'Untitled Product',
+        title: title || asin || productUrl || 'Produkt bez nazwy',
         asin: asin || undefined,
         brand: brand || undefined,
         price: price ? parseFloat(price) : undefined,
@@ -235,7 +235,7 @@ export default function SingleImport() {
               <div>
                 <label className="text-sm font-medium text-gray-300">Marka</label>
                 <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Brand" className={cn(inputCls, 'mt-1')} />
+                  placeholder="Marka" className={cn(inputCls, 'mt-1')} />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-300">Cena</label>
@@ -245,7 +245,7 @@ export default function SingleImport() {
               <div>
                 <label className="text-sm font-medium text-gray-300">Kategoria</label>
                 <input type="text" value={category} onChange={(e) => setCategory(e.target.value)}
-                  placeholder="Electronics" className={cn(inputCls, 'mt-1')} />
+                  placeholder="Elektronika" className={cn(inputCls, 'mt-1')} />
               </div>
             </div>
           </div>

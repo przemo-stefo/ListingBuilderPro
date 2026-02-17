@@ -6,7 +6,7 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Send, Loader2, Brain, BookOpen, Settings2 } from 'lucide-react'
+import { Send, Loader2, Brain, BookOpen, Settings2, FileText, Sparkles, Database, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/ui/FaqSection'
@@ -14,23 +14,25 @@ import { FaqSection } from '@/components/ui/FaqSection'
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  sources?: string[]
+  sourcesUsed?: number
 }
 
 // WHY: RAG behavior modes control how strictly the LLM sticks to transcript knowledge
 const RAG_MODES = [
-  { value: 'strict', label: 'Ścisły', desc: 'Tylko wiedza z transkrypcji' },
-  { value: 'balanced', label: 'Zbalansowany', desc: 'Transkrypcje + ogólne porady' },
-  { value: 'flexible', label: 'Elastyczny', desc: 'Łączy wszystkie źródła' },
+  { value: 'strict', label: 'Scisly', desc: 'Tylko wiedza z transkrypcji' },
+  { value: 'balanced', label: 'Zbalansowany', desc: 'Transkrypcje + ogolne porady' },
+  { value: 'flexible', label: 'Elastyczny', desc: 'Laczy wszystkie zrodla' },
   { value: 'bypass', label: 'Bez RAG', desc: 'Czysty LLM, bez transkrypcji' },
 ] as const
 
 const SUGGESTED_QUESTIONS = [
-  'Jak znaleźć najlepsze słowa kluczowe dla mojego listingu na Amazon?',
-  'Jaka jest idealna struktura tytułu na Amazon DE?',
-  'Jak działa algorytm A9/COSMO i jak rankuje listingi?',
-  'Jakie są najlepsze praktyki dla backend keywords?',
-  'Jak optymalizować kampanie PPC dla nowych produktów?',
-  'Jak tworzyć skuteczne reklamy wideo na Amazon?',
+  'Jak znalezc najlepsze slowa kluczowe dla mojego listingu na Amazon?',
+  'Jaka jest idealna struktura tytulu na Amazon DE?',
+  'Jak dziala algorytm A9/COSMO i jak rankuje listingi?',
+  'Jakie sa najlepsze praktyki dla backend keywords?',
+  'Jak optymalizowac kampanie PPC dla nowych produktow?',
+  'Jak tworzyc skuteczne reklamy wideo na Amazon?',
 ]
 
 // WHY: Next.js 14 requires Suspense boundary around useSearchParams()
@@ -81,12 +83,17 @@ function ExpertQAContent() {
       const data = await res.json()
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.answer },
+        {
+          role: 'assistant',
+          content: data.answer,
+          sources: data.sources || [],
+          sourcesUsed: data.sources_used || 0,
+        },
       ])
     } catch {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: 'Nie udało się uzyskać odpowiedzi. Spróbuj ponownie.' },
+        { role: 'assistant', content: 'Nie udalo sie uzyskac odpowiedzi. Sprobuj ponownie.' },
       ])
     } finally {
       setIsLoading(false)
@@ -98,8 +105,13 @@ function ExpertQAContent() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <Brain className="h-6 w-6 text-green-400" />
-          <h1 className="text-2xl font-bold text-white">Ekspert Q&A</h1>
+          <div className="rounded-lg bg-green-500/20 p-2">
+            <Brain className="h-6 w-6 text-green-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Ekspert AI</h1>
+            <p className="text-xs text-green-400">Twoj osobisty doradca e-commerce</p>
+          </div>
           {/* WHY: Mode selector toggle — small gear icon keeps header clean */}
           <button
             onClick={() => setShowModeSelector(!showModeSelector)}
@@ -109,9 +121,22 @@ function ExpertQAContent() {
             <Settings2 className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-1 text-sm text-gray-400">
-          Zadaj pytanie o Amazon, e-commerce, reklamy — odpowiedzi na bazie wiedzy eksperckiej
-        </p>
+
+        {/* WHY: Stats bar — shows knowledge base size, builds credibility */}
+        <div className="mt-3 flex flex-wrap gap-3">
+          <div className="flex items-center gap-1.5 rounded-md bg-green-900/20 border border-green-900/30 px-2.5 py-1">
+            <Database className="h-3 w-3 text-green-400" />
+            <span className="text-[11px] text-green-400 font-medium">10 266 fragmentow wiedzy</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-md bg-gray-800/50 border border-gray-700/50 px-2.5 py-1">
+            <BookOpen className="h-3 w-3 text-gray-400" />
+            <span className="text-[11px] text-gray-400">Inner Circle + Ecom Creative</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-md bg-gray-800/50 border border-gray-700/50 px-2.5 py-1">
+            <Zap className="h-3 w-3 text-gray-400" />
+            <span className="text-[11px] text-gray-400">Groq AI — odpowiedz w sekundy</span>
+          </div>
+        </div>
 
         {/* WHY: Mode selector — collapsible to avoid clutter for casual users */}
         {showModeSelector && (
@@ -139,14 +164,18 @@ function ExpertQAContent() {
       {/* Chat area */}
       <div className="flex-1 overflow-y-auto rounded-lg border border-gray-800 bg-[#121212] p-4">
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center space-y-6">
-            <div className="text-center">
-              <BookOpen className="mx-auto h-12 w-12 text-gray-600" />
-              <h2 className="mt-3 text-lg font-medium text-gray-400">
-                Zapytaj o cokolwiek
+          <div className="flex h-full flex-col items-center justify-center space-y-8">
+            {/* WHY: Hero empty state — showcases Expert AI value before first question */}
+            <div className="text-center space-y-3">
+              <div className="mx-auto rounded-2xl bg-green-500/10 border border-green-900/30 p-4 w-fit">
+                <Sparkles className="h-10 w-10 text-green-400" />
+              </div>
+              <h2 className="text-xl font-bold text-white">
+                Wiedza ekspertow w zasiegu pytania
               </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Słowa kluczowe, listingi, PPC, ranking, reklamy wideo, strategie kreatywne
+              <p className="text-sm text-gray-400 max-w-md">
+                Baza wiedzy budowana latami z kursow najlepszych praktykow Amazon, PPC i e-commerce.
+                Zadaj pytanie — dostaniesz konkretna odpowiedz z podaniem zrodel.
               </p>
             </div>
             <div className="grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -154,7 +183,7 @@ function ExpertQAContent() {
                 <button
                   key={i}
                   onClick={() => handleSend(q)}
-                  className="rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:border-gray-600 hover:text-white"
+                  className="rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:border-green-800 hover:text-green-300"
                 >
                   {q}
                 </button>
@@ -180,14 +209,33 @@ function ExpertQAContent() {
                   )}
                 >
                   <div className="whitespace-pre-wrap">{msg.content}</div>
+                  {/* WHY: Source attribution under assistant messages — builds trust */}
+                  {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-3 border-t border-gray-800 pt-2">
+                      <div className="flex items-center gap-1.5 text-[10px] text-green-500 font-medium mb-1">
+                        <FileText className="h-3 w-3" />
+                        Zrodla ({msg.sourcesUsed})
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {msg.sources.map((s, j) => (
+                          <span
+                            key={j}
+                            className="inline-block rounded bg-green-900/20 border border-green-900/30 px-1.5 py-0.5 text-[10px] text-green-400"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-gray-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {mode === 'bypass' ? 'Myślę...' : 'Przeszukuję bazę wiedzy...'}
+                  <Loader2 className="h-4 w-4 animate-spin text-green-400" />
+                  {mode === 'bypass' ? 'Mysle...' : 'Przeszukuje baze wiedzy...'}
                 </div>
               </div>
             )}
@@ -204,7 +252,7 @@ function ExpertQAContent() {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
           placeholder="Zapytaj o slowa kluczowe, listingi, PPC, ranking, reklamy..."
-          className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-gray-600"
+          className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-green-800"
           disabled={isLoading}
         />
         <Button

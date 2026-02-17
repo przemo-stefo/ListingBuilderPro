@@ -24,6 +24,8 @@ export interface TierContext {
   unlockPremium: (key?: string) => void
   isPremium: boolean
   licenseKey: string
+  // WHY: true until localStorage is read on client — prevents FREE flash on refresh
+  isLoading: boolean
 }
 
 // WHY: Daily limit for free tier
