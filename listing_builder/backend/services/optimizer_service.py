@@ -568,6 +568,7 @@ async def optimize_listing(
     product_line: str = "",
     language: str | None = None,
     db: Session | None = None,
+    audience_context: str = "",
     **kwargs,
 ) -> Dict[str, Any]:
     """
@@ -607,6 +608,14 @@ async def optimize_listing(
         # WHY: Fetch past successful listings as few-shot examples for the LLM
         if db:
             past_successes = get_past_successes(db, marketplace)
+
+    # WHY: Audience research gives buyer language — prepend to expert context
+    # so LLM uses real customer phrases in title, bullets, description
+    if audience_context:
+        audience_block = f"AUDIENCE RESEARCH (use buyer language from this):\n{audience_context[:2000]}\n\n"
+        title_context = audience_block + title_context
+        bullets_context = audience_block + bullets_context
+        desc_context = audience_block + desc_context
 
     logger.info(
         "optimizer_start",

@@ -76,6 +76,7 @@ class OptimizerRequest(BaseModel):
     language: Optional[str] = Field(default=None, max_length=10)
     asin: Optional[str] = Field(default="", max_length=20)
     category: Optional[str] = Field(default="", max_length=200)
+    audience_context: Optional[str] = Field(default="", max_length=5000)
 
 
 class OptimizerScores(BaseModel):
@@ -169,6 +170,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
             product_line=body.product_line or "",
             language=body.language,
             db=db,
+            audience_context=body.audience_context or "",
         )
 
         logger.info(

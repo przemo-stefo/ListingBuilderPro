@@ -30,6 +30,7 @@ import { ListingCard } from './ListingCard'
 import { RankingJuiceCard } from './RankingJuiceCard'
 import { FeedbackWidget } from './FeedbackWidget'
 import { KeywordIntelCard } from './KeywordIntelCard'
+import AudienceResearchCard from './AudienceResearchCard'
 import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword } from '@/lib/types'
 
 // WHY: Marketplace options match what the n8n workflow supports
@@ -60,6 +61,9 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
   const [results, setResults] = useState<OptimizerResponse | null>(null)
   const displayResults = loadedResult ?? results
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // WHY: Audience research result feeds into optimizer as LLM context
+  const [audienceContext, setAudienceContext] = useState('')
 
   // Collapsible sections
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -123,6 +127,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
       mode,
       asin: asin || undefined,
       category: category || undefined,
+      audience_context: audienceContext || undefined,
     }
 
     generateMutation.mutate(payload, {
@@ -185,6 +190,12 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
           </div>
         </CardContent>
       </Card>
+
+      {/* Audience Research (optional, between product info and keywords) */}
+      <AudienceResearchCard
+        productTitle={productTitle}
+        onResearchComplete={setAudienceContext}
+      />
 
       {/* Section 2: Keywords */}
       <Card>

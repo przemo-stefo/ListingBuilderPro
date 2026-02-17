@@ -502,6 +502,7 @@ export interface OptimizerRequest {
   language?: string
   asin?: string
   category?: string
+  audience_context?: string
 }
 
 export interface OptimizerListing {
@@ -866,6 +867,23 @@ export interface AllegroBulkPriceChange {
   offer_id: string
   price: string
   currency: string
+}
+
+// Audience Research types (OV Skills via n8n)
+export interface AudienceResearchRequest {
+  product: string
+  audience?: string
+  skill?: 'deep-customer-research' | 'icp-discovery' | 'creative-brief'
+}
+
+export interface AudienceResearchResponse {
+  skill: string
+  product: string
+  audience: string
+  result: string
+  tokens_used: number
+  model: string
+  cost: string
 }
 
 // Error types

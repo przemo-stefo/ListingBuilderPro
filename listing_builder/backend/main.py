@@ -35,6 +35,7 @@ from api import stripe_routes
 from api import news_routes
 from api import allegro_routes
 from api import allegro_offers_routes
+from api import research_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -158,6 +159,7 @@ app.include_router(stripe_routes.router)
 app.include_router(news_routes.router)
 app.include_router(allegro_routes.router)
 app.include_router(allegro_offers_routes.router)
+app.include_router(research_routes.router)
 
 
 @app.get("/")
