@@ -132,46 +132,43 @@ async def scrape_product_url(
     if marketplace != "allegro":
         raise HTTPException(status_code=400, detail=f"Scraping not yet supported for {marketplace}")
 
-    # WHY: Public API first (Client Credentials, no user login needed)
+    # WHY: OAuth API first (free, fast, structured JSON) → Scrape.do fallback
     from services.scraper.allegro_scraper import extract_offer_id
-    from services.allegro_api import (
-        get_access_token, fetch_offer_details, fetch_public_offer_details,
-    )
+    from services.allegro_api import get_access_token, fetch_offer_details
 
     offer_id = extract_offer_id(body.url)
-
-    def _price_to_float(data: dict) -> dict:
-        """Convert price string to float for frontend form."""
-        if data.get("price"):
-            try:
-                data["price"] = float(str(data["price"]).replace(",", ".").replace(" ", ""))
-            except (ValueError, AttributeError):
-                data["price"] = None
-        return data
-
-    # 1) Public API via Client Credentials (main — no OAuth needed)
-    if offer_id:
-        data = await fetch_public_offer_details(offer_id)
-        if data and not data.get("error"):
-            return {"status": "success", "product": _price_to_float(data), "source": "allegro_api"}
-
-    # 2) User OAuth API (if connected)
     allegro_token = await get_access_token(db)
+
     if allegro_token and offer_id:
         data = await fetch_offer_details(offer_id, allegro_token)
-        if data and not data.get("error"):
-            return {"status": "success", "product": _price_to_float(data), "source": "allegro_api"}
+        if not data.get("error"):
+            if data.get("price"):
+                try:
+                    data["price"] = float(str(data["price"]).replace(",", ".").replace(" ", ""))
+                except (ValueError, AttributeError):
+                    data["price"] = None
+            return {"status": "success", "product": data, "source": "allegro_api"}
 
-    # 3) Scrape.do (last resort — paid, monthly limits)
+    # Fallback: Scrape.do (paid, has monthly limits)
     from services.scraper.allegro_scraper import scrape_allegro_product
     from dataclasses import asdict
     product = await scrape_allegro_product(body.url)
 
     if product.error:
-        raise HTTPException(status_code=502, detail=f"Scraping failed: {product.error}")
+        # WHY: Clear message when both methods fail
+        error_msg = product.error
+        if "limit" in error_msg.lower() or "exceeded" in error_msg.lower():
+            error_msg = "Połącz konto Allegro w Konwerterze — scraping niedostępny"
+        raise HTTPException(status_code=502, detail=f"Scraping failed: {error_msg}")
 
     data = asdict(product)
-    return {"status": "success", "product": _price_to_float(data), "source": "scrape_do"}
+    if data.get("price"):
+        try:
+            data["price"] = float(data["price"].replace(",", ".").replace(" ", ""))
+        except (ValueError, AttributeError):
+            data["price"] = None
+
+    return {"status": "success", "product": data, "source": "scrape_do"}
 
 
 @router.post("/product")
