@@ -81,8 +81,15 @@ async def lifespan(app: FastAPI):
     # WHY: Pre-warm news cache in background so first user request is fast
     import asyncio
     from api.news_routes import get_news_feed
-    asyncio.create_task(get_news_feed(force=True))
-    logger.info("news_cache_prewarm_started")
+
+    async def _prewarm_news():
+        try:
+            await get_news_feed(force=True)
+            logger.info("news_cache_prewarm_done")
+        except Exception as e:
+            logger.error("news_cache_prewarm_failed", error=str(e))
+
+    asyncio.create_task(_prewarm_news())
 
     yield
 
