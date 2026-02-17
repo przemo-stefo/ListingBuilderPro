@@ -2,11 +2,17 @@
 # Purpose: OAuth2 authorize URL generation + callback token exchange for Amazon & Allegro
 # NOT for: Token refresh caching (that's sp_api_auth.py) or UI logic
 
+import hashlib
+import hmac
+import json
 import secrets
+import time
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+
 import httpx
 import structlog
-from typing import Optional, Dict
 from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
 
@@ -15,9 +21,51 @@ from models.oauth_connection import OAuthConnection
 
 logger = structlog.get_logger()
 
-# WHY module-level: CSRF state tokens valid for 10 min, stored in-memory
-# In production with multiple workers, use Redis or DB — for MVP this is fine
-_pending_states: Dict[str, Dict] = {}
+STATE_TTL = 600  # 10 minutes
+
+
+# ── Stateless CSRF state (survives Render free tier restarts) ────────────────
+
+def _sign_state(marketplace: str) -> str:
+    """Generate signed OAuth state token.
+
+    WHY stateless: Render free tier sleeps after 15 min — in-memory dict would
+    lose state between authorize and callback. HMAC-signed token encodes
+    marketplace + timestamp, verified on callback without any storage.
+    """
+    payload = json.dumps({"m": marketplace, "t": int(time.time())})
+    encoded = urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    sig = hmac.new(
+        settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
+    ).hexdigest()[:24]
+    return f"{encoded}.{sig}"
+
+
+def _verify_state(state: str) -> Optional[Dict]:
+    """Verify signed OAuth state, return payload or None."""
+    parts = state.split(".", 1)
+    if len(parts) != 2:
+        return None
+
+    encoded, sig = parts
+    expected = hmac.new(
+        settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
+    ).hexdigest()[:24]
+
+    if not hmac.compare_digest(sig, expected):
+        return None
+
+    # WHY padding: urlsafe_b64decode needs correct padding
+    padded = encoded + "=" * (-len(encoded) % 4)
+    try:
+        payload = json.loads(urlsafe_b64decode(padded))
+    except Exception:
+        return None
+
+    if time.time() - payload.get("t", 0) > STATE_TTL:
+        return None
+
+    return payload
 
 
 # ── URL helpers ───────────────────────────────────────────────────────────────
@@ -48,11 +96,7 @@ def get_amazon_authorize_url() -> Dict:
     if not settings.amazon_client_id:
         return {"error": "Amazon client_id not configured"}
 
-    state = secrets.token_urlsafe(32)
-    _pending_states[state] = {"marketplace": "amazon", "created_at": datetime.now(timezone.utc)}
-
-    # WHY: redirect_uri goes directly to backend (bypasses proxy) because
-    # proxy's fetch() follows redirects, breaking the browser redirect flow
+    state = _sign_state("amazon")
     redirect_uri = f"{_backend_url()}/api/oauth/amazon/callback"
 
     params = {
@@ -72,16 +116,14 @@ async def handle_amazon_callback(
     db: Session,
 ) -> Dict:
     """Exchange Amazon authorization code for refresh token."""
-    # Validate CSRF state
-    pending = _pending_states.pop(state, None)
-    if not pending:
+    payload = _verify_state(state)
+    if not payload or payload.get("m") != "amazon":
         return {"error": "Invalid or expired state parameter"}
 
     if not settings.amazon_client_id or not settings.amazon_client_secret:
         return {"error": "Amazon credentials not configured"}
 
-    # Exchange code for tokens
-    payload = {
+    data = {
         "grant_type": "authorization_code",
         "code": code,
         "client_id": settings.amazon_client_id,
@@ -89,7 +131,7 @@ async def handle_amazon_callback(
     }
 
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(AMAZON_TOKEN_URL, data=payload)
+        resp = await client.post(AMAZON_TOKEN_URL, data=data)
 
     if resp.status_code != 200:
         logger.error("amazon_oauth_token_failed", status=resp.status_code, body=resp.text[:200])
@@ -98,7 +140,6 @@ async def handle_amazon_callback(
     data = resp.json()
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
 
-    # Upsert connection
     conn = db.query(OAuthConnection).filter(
         OAuthConnection.user_id == "default",
         OAuthConnection.marketplace == "amazon",
@@ -133,9 +174,7 @@ def get_allegro_authorize_url() -> Dict:
     if not settings.allegro_client_id:
         return {"error": "Allegro client_id not configured"}
 
-    state = secrets.token_urlsafe(32)
-    _pending_states[state] = {"marketplace": "allegro", "created_at": datetime.now(timezone.utc)}
-
+    state = _sign_state("allegro")
     redirect_uri = f"{_backend_url()}/api/oauth/allegro/callback"
 
     params = {
@@ -155,8 +194,8 @@ async def handle_allegro_callback(
     db: Session,
 ) -> Dict:
     """Exchange Allegro authorization code for tokens."""
-    pending = _pending_states.pop(state, None)
-    if not pending:
+    payload = _verify_state(state)
+    if not payload or payload.get("m") != "allegro":
         return {"error": "Invalid or expired state parameter"}
 
     if not settings.allegro_client_id or not settings.allegro_client_secret:
