@@ -19,7 +19,7 @@ import structlog
 from config import settings
 from database import get_db
 from services.allegro_api import (
-    fetch_seller_offers, fetch_offer_details,
+    fetch_seller_offers, fetch_offer_details, fetch_public_offer_details,
     get_access_token,
 )
 
@@ -211,41 +211,50 @@ class ConvertResponse(BaseModel):
 async def _fetch_products_smart(
     urls: List[str], delay: float, db: Session
 ) -> List[AllegroProduct]:
-    """Fetch Allegro products: OAuth API → Scrape.do fallback.
+    """Fetch Allegro products: Public API (main) → User OAuth → Scrape.do.
 
-    WHY API first: Free, fast (<1s vs 5s), structured JSON, no Scrape.do
-    monthly limits. Falls back to scraper only if no OAuth token.
-    WHY no Client Credentials: Allegro requires verified app for public
-    offer endpoints — Mateusz's app isn't verified. User OAuth works fine
-    and refresh tokens auto-renew (ALLEGRO_CLIENT_SECRET is now on Render).
+    WHY Public API first: Uses Client Credentials token (app-level, no user
+    login needed). Free, fast (<1s), structured JSON, no monthly limits.
+    Falls back to user OAuth if public endpoint fails, Scrape.do as last resort.
     """
-    allegro_token = await get_access_token(db)
+    products: List[AllegroProduct] = []
 
-    if allegro_token:
-        logger.info("fetch_products_via_api", count=len(urls))
-        products: List[AllegroProduct] = []
-        for url in urls:
-            offer_id = extract_offer_id(url)
-            if not offer_id:
-                products.append(AllegroProduct(
-                    source_url=url, error="Cannot extract offer ID from URL"
-                ))
-                continue
+    for url in urls:
+        offer_id = extract_offer_id(url)
+        if not offer_id:
+            products.append(AllegroProduct(
+                source_url=url, error="Cannot extract offer ID from URL"
+            ))
+            continue
 
+        # 1) Public API via Client Credentials (main — no OAuth needed)
+        data = await fetch_public_offer_details(offer_id)
+        if data and not data.get("error"):
+            products.append(AllegroProduct(**{
+                k: v for k, v in data.items() if k != "error"
+            }))
+            continue
+
+        # 2) User OAuth API (if connected)
+        allegro_token = await get_access_token(db)
+        if allegro_token:
             data = await fetch_offer_details(offer_id, allegro_token)
-            if data.get("error"):
-                products.append(AllegroProduct(
-                    source_url=url, source_id=offer_id, error=data["error"]
-                ))
-            else:
+            if data and not data.get("error"):
                 products.append(AllegroProduct(**{
                     k: v for k, v in data.items() if k != "error"
                 }))
-        return products
+                continue
 
-    # Fallback: Scrape.do (paid, slow, monthly limits)
-    logger.info("fetch_products_via_scraper", count=len(urls))
-    return await scrape_allegro_batch(urls, delay=delay)
+        # 3) Scrape.do (last resort — paid, slow, monthly limits)
+        fallback = await scrape_allegro_product(url)
+        products.append(fallback)
+
+    if products:
+        api_count = sum(1 for p in products if not p.error)
+        logger.info("fetch_products_smart_done", total=len(products),
+                     success=api_count, failed=len(products) - api_count)
+
+    return products
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
