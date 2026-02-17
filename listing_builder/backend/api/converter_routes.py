@@ -18,7 +18,7 @@ import structlog
 
 from config import settings
 from database import get_db
-from services.allegro_api import fetch_seller_offers, get_access_token
+from services.allegro_api import fetch_seller_offers, fetch_offer_details, get_access_token
 
 limiter = Limiter(key_func=get_remote_address)
 from services.scraper.allegro_scraper import (
@@ -26,6 +26,7 @@ from services.scraper.allegro_scraper import (
     scrape_allegro_batch,
     scrape_allegro_store_urls,
     AllegroProduct,
+    extract_offer_id,
 )
 from services.converter.ai_translator import AITranslator
 from services.converter.converter_service import (
@@ -202,20 +203,61 @@ class ConvertResponse(BaseModel):
     warnings: List[str]
 
 
+# ── Helpers ────────────────────────────────────────────────────────────────
+
+async def _fetch_products_smart(
+    urls: List[str], delay: float, db: Session
+) -> List[AllegroProduct]:
+    """Fetch Allegro products via REST API if OAuth connected, else scrape.
+
+    WHY API first: Free, fast (<1s vs 5s), structured JSON, no Scrape.do
+    monthly limits. Falls back to scraper only if no OAuth token.
+    """
+    allegro_token = await get_access_token(db)
+
+    if not allegro_token:
+        logger.info("fetch_products_via_scraper", count=len(urls))
+        return await scrape_allegro_batch(urls, delay=delay)
+
+    logger.info("fetch_products_via_api", count=len(urls))
+    products: List[AllegroProduct] = []
+
+    for url in urls:
+        offer_id = extract_offer_id(url)
+        if not offer_id:
+            products.append(AllegroProduct(
+                source_url=url, error="Cannot extract offer ID from URL"
+            ))
+            continue
+
+        data = await fetch_offer_details(offer_id, allegro_token)
+        if data.get("error"):
+            products.append(AllegroProduct(
+                source_url=url, source_id=offer_id, error=data["error"]
+            ))
+        else:
+            products.append(AllegroProduct(**{
+                k: v for k, v in data.items() if k != "error"
+            }))
+
+    return products
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.post("/scrape", response_model=ScrapeResponse)
 @limiter.limit("5/minute")
-async def scrape_allegro(request: Request, body: ScrapeRequest = None):
-    """Scrape product data from Allegro URLs.
+async def scrape_allegro(
+    request: Request, body: ScrapeRequest = None, db: Session = Depends(get_db)
+):
+    """Fetch product data from Allegro (API if OAuth connected, else scrape).
 
     Returns structured product data (title, EAN, description, images,
-    parameters) for each URL. Use this to preview scraped data before
-    converting to a marketplace template.
+    parameters) for each URL. Use this to preview data before converting.
     """
     logger.info("scrape_request", urls_count=len(body.urls))
 
-    products = await scrape_allegro_batch(body.urls, delay=body.delay)
+    products = await _fetch_products_smart(body.urls, body.delay, db)
 
     succeeded = sum(1 for p in products if not p.error)
 
@@ -229,11 +271,13 @@ async def scrape_allegro(request: Request, body: ScrapeRequest = None):
 
 @router.post("/convert", response_model=ConvertResponse)
 @limiter.limit("5/minute")
-async def convert_to_marketplace(request: Request, body: ConvertRequest = None):
-    """Full pipeline: Scrape Allegro → Translate → Map → Return JSON.
+async def convert_to_marketplace(
+    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db)
+):
+    """Full pipeline: Fetch Allegro (API or scrape) → Translate → Map → JSON.
 
-    Use this endpoint to preview converted data before downloading
-    the template file. Returns all mapped fields and warnings.
+    WHY API first: Uses Allegro REST API (free, fast) when OAuth connected.
+    Falls back to Scrape.do only if no OAuth token available.
     """
     logger.info(
         "convert_request",
@@ -241,8 +285,8 @@ async def convert_to_marketplace(request: Request, body: ConvertRequest = None):
         marketplace=body.marketplace,
     )
 
-    # Step 1: Scrape
-    scraped = await scrape_allegro_batch(body.urls, delay=body.delay)
+    # Step 1: Fetch products (API if OAuth connected, else scrape)
+    scraped = await _fetch_products_smart(body.urls, body.delay, db)
 
     # Step 2: Initialize AI translator
     translator = AITranslator(groq_api_key=settings.groq_api_key)
@@ -282,13 +326,13 @@ async def convert_to_marketplace(request: Request, body: ConvertRequest = None):
 
 @router.post("/download")
 @limiter.limit("3/minute")
-async def download_template(request: Request, body: ConvertRequest = None):
-    """Full pipeline: Scrape → Translate → Map → Download CSV/TSV file.
+async def download_template(
+    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db)
+):
+    """Full pipeline: Fetch (API/scrape) → Translate → Map → Download file.
 
-    Returns a downloadable file:
-    - Amazon: Tab-separated .tsv (flat file format)
-    - eBay: Comma-separated .csv
-    - Kaufland: Semicolon-separated .csv (UTF-8-BOM)
+    WHY API first: Uses Allegro REST API when OAuth connected.
+    Returns a downloadable file (TSV/CSV depending on marketplace).
     """
     logger.info(
         "download_request",
@@ -296,8 +340,8 @@ async def download_template(request: Request, body: ConvertRequest = None):
         marketplace=body.marketplace,
     )
 
-    # Step 1: Scrape
-    scraped = await scrape_allegro_batch(body.urls, delay=body.delay)
+    # Step 1: Fetch products (API if OAuth connected, else scrape)
+    scraped = await _fetch_products_smart(body.urls, body.delay, db)
 
     # Step 2: Translate + Convert
     translator = AITranslator(groq_api_key=settings.groq_api_key)
