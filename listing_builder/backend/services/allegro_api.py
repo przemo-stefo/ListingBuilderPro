@@ -206,6 +206,10 @@ async def _refresh_token_if_needed(conn: OAuthConnection, db: Session) -> bool:
 
         if resp.status_code != 200:
             logger.error("allegro_token_refresh_failed", status=resp.status_code)
+            # WHY: Mark connection as expired so frontend shows reconnect button
+            conn.status = "expired"
+            conn.updated_at = datetime.now(timezone.utc)
+            db.commit()
             return False
 
         data = resp.json()

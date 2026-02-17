@@ -7,7 +7,7 @@ from models import Product, ImportJob, ProductStatus, JobStatus
 from schemas import ProductImport
 from typing import List, Dict, Any
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = structlog.get_logger()
 
@@ -121,7 +121,7 @@ class ImportService:
 
         # Complete job
         job.status = JobStatus.COMPLETED if failed_count == 0 else JobStatus.FAILED
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc)
         job.error_log = errors
         self.db.commit()
 
