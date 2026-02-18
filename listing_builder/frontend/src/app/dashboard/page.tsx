@@ -4,12 +4,12 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { formatNumber } from '@/lib/utils'
-import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight } from 'lucide-react'
+import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight, Link2 } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const DASHBOARD_FAQ = [
@@ -28,6 +28,21 @@ export default function DashboardPage() {
   const { data: stats, isLoading, error } = useDashboardStats()
   const router = useRouter()
   const [expertQuestion, setExpertQuestion] = useState('')
+  const [expiredConnections, setExpiredConnections] = useState<string[]>([])
+
+  // WHY: Check OAuth status on mount — show reconnect banner for expired connections
+  useEffect(() => {
+    fetch('/api/proxy/oauth/status')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.connections) return
+        const expired = Object.entries(data.connections)
+          .filter(([_, v]: [string, any]) => v.status === 'expired')
+          .map(([k]) => k)
+        setExpiredConnections(expired)
+      })
+      .catch(() => {})
+  }, [])
 
   if (isLoading) {
     return (
@@ -120,6 +135,24 @@ export default function DashboardPage() {
           Przegląd Twojego panelu OctoHelper
         </p>
       </div>
+
+      {expiredConnections.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-yellow-800 bg-yellow-900/20 p-4">
+          <Link2 className="h-5 w-5 shrink-0 text-yellow-500" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-yellow-400">
+              {expiredConnections.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')} wymaga ponownego połączenia
+            </p>
+            <p className="text-xs text-yellow-600 mt-0.5">Token wygasł. Połącz ponownie w Integracje.</p>
+          </div>
+          <a
+            href="/compliance?tab=integrations"
+            className="rounded-lg bg-yellow-900/40 px-3 py-1.5 text-xs font-medium text-yellow-400 hover:bg-yellow-900/60 transition-colors"
+          >
+            Połącz ponownie
+          </a>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat) => {

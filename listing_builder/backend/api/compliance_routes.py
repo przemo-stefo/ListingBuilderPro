@@ -16,8 +16,13 @@ from schemas.compliance import (
     ComplianceReportSummary,
 )
 from schemas.audit import AuditRequest, AuditResult
-from services.audit_service import audit_product
+from services.audit_service import audit_product, audit_product_from_data
+from services.allegro_api import fetch_seller_offers, fetch_offer_details
+from api.dependencies import get_user_id
+from models.compliance import ComplianceReport, ComplianceReportItem
+from models.oauth_connection import OAuthConnection
 from typing import Optional
+import asyncio
 import structlog
 
 logger = structlog.get_logger()
@@ -193,6 +198,99 @@ async def audit_product_card(request: Request, body: AuditRequest):
         logger.error("audit_failed", url=url, error=str(e))
         # SECURITY: Don't leak internal error details to client
         raise HTTPException(status_code=500, detail="Audit failed")
+
+
+MAX_STORE_SCAN = 50  # WHY: 50 parallel API calls is safe for Allegro rate limits
+
+
+@router.post("/audit-store", response_model=ComplianceReportResponse)
+@limiter.limit("2/minute")
+async def audit_store(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+    """Scan connected Allegro store — fetch offers via API, audit each, save report."""
+
+    # Step 1: Verify Allegro OAuth is active + get access token
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
+        OAuthConnection.marketplace == "allegro",
+    ).first()
+
+    if not conn or conn.status != "active":
+        raise HTTPException(status_code=400, detail="Allegro nie jest połączone")
+
+    # Step 2: Fetch seller offers (list of URLs)
+    offers_data = await fetch_seller_offers(db, user_id)
+    if offers_data.get("error"):
+        raise HTTPException(status_code=400, detail=offers_data["error"])
+
+    urls = offers_data.get("urls", [])
+    if not urls:
+        raise HTTPException(status_code=400, detail="Brak aktywnych ofert na koncie Allegro")
+
+    # WHY: Cap at 50 — more would be slow and hit Allegro rate limits
+    capped_urls = urls[:MAX_STORE_SCAN]
+    offer_ids = [url.split("/")[-1] for url in capped_urls]
+
+    logger.info("audit_store_start", total_offers=len(urls), scanning=len(offer_ids))
+
+    # Step 3: Fetch details for each offer (parallel, batched)
+    access_token = conn.access_token
+
+    async def fetch_and_audit(oid: str) -> dict:
+        detail = await fetch_offer_details(oid, access_token)
+        if detail.get("error"):
+            return {
+                "source_id": oid, "product_title": f"Oferta {oid}",
+                "overall_status": "error", "score": 0,
+                "issues": [{"field": "api", "severity": "error",
+                            "message": detail["error"]}],
+            }
+        return audit_product_from_data(detail)
+
+    # WHY: semaphore limits concurrent Allegro API calls to avoid 429
+    sem = asyncio.Semaphore(10)
+
+    async def limited_fetch(oid: str) -> dict:
+        async with sem:
+            return await fetch_and_audit(oid)
+
+    results = await asyncio.gather(*[limited_fetch(oid) for oid in offer_ids])
+
+    # Step 4: Calculate aggregate stats
+    compliant = sum(1 for r in results if r["overall_status"] == "compliant")
+    warnings = sum(1 for r in results if r["overall_status"] == "warning")
+    errors = sum(1 for r in results if r["overall_status"] == "error")
+    avg_score = round(sum(r["score"] for r in results) / max(len(results), 1), 1)
+
+    # Step 5: Save as ComplianceReport + items
+    report = ComplianceReport(
+        marketplace="allegro",
+        filename=f"Skan sklepu Allegro ({len(results)} produktów)",
+        total_products=len(results),
+        compliant_count=compliant,
+        warning_count=warnings,
+        error_count=errors,
+        overall_score=avg_score,
+    )
+    db.add(report)
+
+    for idx, r in enumerate(results, start=1):
+        item = ComplianceReportItem(
+            report_id=report.id,
+            row_number=idx,
+            sku=r.get("source_id", ""),
+            product_title=r.get("product_title", ""),
+            compliance_status=r["overall_status"],
+            issues=r.get("issues", []),
+        )
+        db.add(item)
+
+    db.commit()
+    db.refresh(report)
+
+    logger.info("audit_store_done", report_id=report.id, score=avg_score,
+                compliant=compliant, warnings=warnings, errors=errors)
+
+    return _report_to_response(report)
 
 
 def _get_extension(filename: str) -> str:

@@ -14,6 +14,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
+from api.dependencies import get_user_id
 from services.allegro_api import get_access_token, fetch_offer_details, ALLEGRO_API_BASE
 
 logger = structlog.get_logger()
@@ -73,9 +74,9 @@ def _allegro_headers(access_token: str, with_content_type: bool = True) -> dict:
     return headers
 
 
-async def _require_token(db: Session) -> str:
+async def _require_token(db: Session, user_id: str = "default") -> str:
     """Get valid Allegro token or raise 400."""
-    token = await get_access_token(db)
+    token = await get_access_token(db, user_id)
     if not token:
         raise HTTPException(status_code=400, detail="Allegro nie jest połączone. Połącz konto w ustawieniach.")
     return token
@@ -103,9 +104,10 @@ async def list_offers(
     status: Optional[Literal["ACTIVE", "INACTIVE", "ENDED"]] = None,
     search: Optional[str] = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """List seller's offers from Allegro with pagination and filtering."""
-    access_token = await _require_token(db)
+    access_token = await _require_token(db, user_id)
 
     params: dict = {
         "limit": limit,
@@ -170,12 +172,13 @@ async def get_offer_detail(
     request: Request,
     offer_id: str,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """Get full details of a single offer. Reuses existing fetch_offer_details()."""
     if not OFFER_ID_PATTERN.match(offer_id):
         raise HTTPException(status_code=400, detail="Nieprawidłowe ID oferty (8-14 cyfr)")
 
-    access_token = await _require_token(db)
+    access_token = await _require_token(db, user_id)
     result = await fetch_offer_details(offer_id, access_token)
 
     if result.get("error"):
@@ -191,12 +194,13 @@ async def update_offer(
     offer_id: str,
     body: OfferManagerUpdateRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """Partial update of a single offer — name, price, description."""
     if not OFFER_ID_PATTERN.match(offer_id):
         raise HTTPException(status_code=400, detail="Nieprawidłowe ID oferty (8-14 cyfr)")
 
-    access_token = await _require_token(db)
+    access_token = await _require_token(db, user_id)
 
     # WHY: Build payload with only the fields the user wants to change
     payload: dict = {}
@@ -248,9 +252,10 @@ async def bulk_change_status(
     request: Request,
     body: BulkStatusRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """Bulk ACTIVATE or END offers. Allegro processes this async via command ID."""
-    access_token = await _require_token(db)
+    access_token = await _require_token(db, user_id)
 
     # WHY: Allegro requires client-generated UUID as command ID (idempotency key)
     command_id = str(uuid.uuid4())
@@ -291,9 +296,10 @@ async def bulk_change_price(
     request: Request,
     body: BulkPriceRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """Bulk price change for multiple offers. Allegro processes async."""
-    access_token = await _require_token(db)
+    access_token = await _require_token(db, user_id)
 
     command_id = str(uuid.uuid4())
 

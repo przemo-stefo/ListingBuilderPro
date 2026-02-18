@@ -2,6 +2,7 @@
 # Purpose: Allegro REST API client — fetch offers + product details via OAuth or Client Credentials
 # NOT for: OAuth flow (that's oauth_service.py) or HTML scraping (allegro_scraper.py)
 
+import asyncio
 import httpx
 import structlog
 from datetime import datetime, timezone, timedelta
@@ -180,11 +181,16 @@ async def fetch_public_offer_details(offer_id: str) -> Dict:
         return {"error": f"Allegro API error: {str(e)}"}
 
 
-async def _refresh_token_if_needed(conn: OAuthConnection, db: Session) -> bool:
-    """Refresh Allegro access token if expired.
+RETRYABLE_STATUSES = {429, 500, 502, 503}
+REFRESH_MAX_RETRIES = 3
+REFRESH_BACKOFF_BASE = 1  # seconds: 1, 3, 9
 
-    WHY auto-refresh: Allegro tokens expire in ~12h. Using refresh_token
-    means the user doesn't have to re-authorize every time.
+
+async def _refresh_token_if_needed(conn: OAuthConnection, db: Session) -> bool:
+    """Refresh Allegro access token if expired, with retry on transient errors.
+
+    WHY retry: Single network blip (429, timeout) used to mark connection "expired",
+    forcing Mateusz to re-authorize. 3 retries with exponential backoff fixes this.
     """
     if conn.token_expires_at and conn.token_expires_at > datetime.now(timezone.utc) + timedelta(minutes=5):
         return True
@@ -193,43 +199,68 @@ async def _refresh_token_if_needed(conn: OAuthConnection, db: Session) -> bool:
         logger.warning("allegro_no_refresh_token")
         return False
 
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                ALLEGRO_TOKEN_URL,
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": conn.refresh_token,
-                },
-                auth=(settings.allegro_client_id, settings.allegro_client_secret),
-            )
+    last_error = None
+    for attempt in range(REFRESH_MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    ALLEGRO_TOKEN_URL,
+                    data={
+                        "grant_type": "refresh_token",
+                        "refresh_token": conn.refresh_token,
+                    },
+                    auth=(settings.allegro_client_id, settings.allegro_client_secret),
+                )
 
-        if resp.status_code != 200:
-            logger.error("allegro_token_refresh_failed", status=resp.status_code)
-            # WHY: Mark connection as expired so frontend shows reconnect button
-            conn.status = "expired"
-            conn.updated_at = datetime.now(timezone.utc)
-            db.commit()
-            return False
+            if resp.status_code == 200:
+                data = resp.json()
+                conn.access_token = data["access_token"]
+                conn.refresh_token = data.get("refresh_token", conn.refresh_token)
+                conn.token_expires_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=data.get("expires_in", 43200)
+                )
+                conn.updated_at = datetime.now(timezone.utc)
+                db.commit()
 
-        data = resp.json()
-        conn.access_token = data["access_token"]
-        conn.refresh_token = data.get("refresh_token", conn.refresh_token)
-        conn.token_expires_at = datetime.now(timezone.utc) + timedelta(
-            seconds=data.get("expires_in", 43200)
-        )
-        conn.updated_at = datetime.now(timezone.utc)
-        db.commit()
+                if attempt > 0:
+                    logger.info("allegro_token_refreshed", retries=attempt)
+                else:
+                    logger.info("allegro_token_refreshed")
+                return True
 
-        logger.info("allegro_token_refreshed")
-        return True
+            # WHY: 400/401 = invalid refresh token (real expiry) — no point retrying
+            if resp.status_code not in RETRYABLE_STATUSES:
+                logger.error("allegro_token_refresh_failed",
+                             status=resp.status_code, body=resp.text[:200], attempt=attempt + 1)
+                break
 
-    except Exception as e:
-        logger.error("allegro_token_refresh_error", error=str(e))
-        return False
+            # WHY: Retryable status — wait and try again
+            last_error = f"HTTP {resp.status_code}"
+            logger.warning("allegro_token_refresh_retrying",
+                           status=resp.status_code, attempt=attempt + 1)
+
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as e:
+            last_error = str(e)
+            logger.warning("allegro_token_refresh_retrying",
+                           error=str(e), attempt=attempt + 1)
+
+        except Exception as e:
+            logger.error("allegro_token_refresh_error", error=str(e))
+            break
+
+        # WHY: Exponential backoff — 1s, 3s, 9s
+        if attempt < REFRESH_MAX_RETRIES - 1:
+            await asyncio.sleep(REFRESH_BACKOFF_BASE * (3 ** attempt))
+
+    # All retries exhausted or non-retryable error
+    logger.error("allegro_token_refresh_exhausted", last_error=last_error)
+    conn.status = "expired"
+    conn.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return False
 
 
-async def fetch_seller_offers(db: Session) -> Dict:
+async def fetch_seller_offers(db: Session, user_id: str = "default") -> Dict:
     """Fetch all active offers from connected Allegro seller account.
 
     WHY API not scraping: Official API is free, fast (<1s vs 5s/product),
@@ -239,7 +270,7 @@ async def fetch_seller_offers(db: Session) -> Dict:
     with existing converter pipeline.
     """
     conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == "default",
+        OAuthConnection.user_id == user_id,
         OAuthConnection.marketplace == "allegro",
     ).first()
 
@@ -468,14 +499,14 @@ async def fetch_offer_details(
         return {"error": f"Allegro API error: {str(e)}"}
 
 
-async def get_access_token(db: Session) -> Optional[str]:
+async def get_access_token(db: Session, user_id: str = "default") -> Optional[str]:
     """Get valid Allegro access token (refresh if needed).
 
     WHY separate function: converter_service needs the token directly
     without importing OAuthConnection model.
     """
     conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == "default",
+        OAuthConnection.user_id == user_id,
         OAuthConnection.marketplace == "allegro",
     ).first()
 

@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     stripe_price_monthly: str = ""  # WHY: 49 PLN/month subscription
     stripe_webhook_secret: str = ""  # WHY: Stripe signs webhooks with this
 
+    # Supabase Auth (JWT verification)
+    supabase_jwt_secret: str = ""  # WHY: Empty = JWT auth disabled (backward compat)
+
     # Webhook Security
     webhook_secret: str  # REQUIRED - no default value
 

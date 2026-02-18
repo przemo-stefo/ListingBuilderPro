@@ -29,6 +29,7 @@ import {
   FileDown,
   Settings,
   Info,
+  UserCircle,
 } from 'lucide-react'
 
 interface NavItem {
@@ -222,8 +223,20 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* WHY: Settings separated — not part of seller workflow, utility */}
-        <div className="pt-2 border-t border-gray-800/50">
+        {/* WHY: Settings + Account separated — not part of seller workflow, utility */}
+        <div className="pt-2 border-t border-gray-800/50 space-y-0.5">
+          <Link
+            href="/account"
+            className={cn(
+              'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
+              pathname === '/account'
+                ? 'bg-white text-black'
+                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+            )}
+          >
+            <UserCircle className="h-4 w-4" />
+            Konto
+          </Link>
           <Link
             href="/settings"
             className={cn(

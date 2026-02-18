@@ -11,6 +11,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db
+from api.dependencies import get_user_id
 from schemas import (
     SettingsResponse,
     GeneralSettings,
@@ -22,7 +23,7 @@ import structlog
 
 logger = structlog.get_logger()
 
-USER_ID = "default"  # WHY: Single-user for now; swap to auth user_id later
+# WHY: USER_ID constant removed — now comes from get_user_id() dependency
 
 
 class SettingsUpdateRequest(BaseModel):
@@ -66,18 +67,18 @@ _DEFAULT_SETTINGS = {
 }
 
 
-def _load_settings(db: Session) -> dict:
+def _load_settings(db: Session, user_id: str) -> dict:
     """Load settings from DB, falling back to defaults."""
     row = db.execute(
         text("SELECT settings FROM user_settings WHERE user_id = :uid"),
-        {"uid": USER_ID},
+        {"uid": user_id},
     ).fetchone()
     if row and row[0]:
         return row[0]
     return dict(_DEFAULT_SETTINGS)
 
 
-def _save_settings(db: Session, data: dict) -> None:
+def _save_settings(db: Session, data: dict, user_id: str) -> None:
     """Upsert settings to DB."""
     db.execute(
         text(
@@ -85,7 +86,7 @@ def _save_settings(db: Session, data: dict) -> None:
             "VALUES (:uid, CAST(:data AS jsonb), NOW()) "
             "ON CONFLICT (user_id) DO UPDATE SET settings = CAST(:data AS jsonb), updated_at = NOW()"
         ),
-        {"uid": USER_ID, "data": json.dumps(data)},
+        {"uid": user_id, "data": json.dumps(data)},
     )
     db.commit()
 
@@ -103,9 +104,9 @@ def _build_response(data: dict) -> SettingsResponse:
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings(db: Session = Depends(get_db)):
+async def get_settings(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """Get all application settings (from DB)."""
-    data = _load_settings(db)
+    data = _load_settings(db, user_id)
     return _build_response(data)
 
 
@@ -115,12 +116,13 @@ async def update_settings(
     request: Request,
     payload: SettingsUpdateRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """
     Update settings — merges each section independently.
     Persisted to Supabase so they survive restarts.
     """
-    data = _load_settings(db)
+    data = _load_settings(db, user_id)
 
     if payload.general is not None:
         data["general"].update(payload.general.model_dump(exclude_unset=True))
@@ -136,6 +138,6 @@ async def update_settings(
     if payload.data_export is not None:
         data["data_export"].update(payload.data_export.model_dump(exclude_unset=True))
 
-    _save_settings(db, data)
-    logger.info("settings_saved", user_id=USER_ID)
+    _save_settings(db, data, user_id)
+    logger.info("settings_saved", user_id=user_id)
     return _build_response(data)

@@ -144,6 +144,53 @@ def get_license_by_session(session_id: str, db: Session) -> str | None:
     return license_obj.license_key if license_obj else None
 
 
+def create_portal_session(customer_id: str) -> str:
+    """Create Stripe Customer Portal session — user manages subscription/billing.
+
+    WHY Customer Portal: Stripe handles cancellation, card updates, invoice history.
+    We don't need to build billing management UI ourselves.
+    """
+    if not customer_id:
+        raise ValueError("No Stripe customer ID found")
+
+    session = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=f"{FRONTEND_URL}/account",
+    )
+    return session.url
+
+
+def get_subscription_status(email: str, db: Session) -> dict:
+    """Get subscription status by email — plan, renewal date, Stripe customer ID.
+
+    WHY by email: PremiumLicense stores email (from Stripe checkout),
+    which matches the user's Supabase email.
+    """
+    license_obj = db.query(PremiumLicense).filter(
+        PremiumLicense.email == email,
+        PremiumLicense.status == "active",
+    ).order_by(PremiumLicense.created_at.desc()).first()
+
+    if not license_obj:
+        return {"plan": "free", "status": "active", "customer_id": None, "renewal_date": None}
+
+    renewal_date = None
+    if license_obj.stripe_subscription_id:
+        try:
+            sub = stripe.Subscription.retrieve(license_obj.stripe_subscription_id)
+            renewal_date = sub.current_period_end
+        except Exception:
+            pass
+
+    return {
+        "plan": license_obj.plan_type or "monthly",
+        "status": license_obj.status,
+        "customer_id": license_obj.stripe_customer_id,
+        "renewal_date": renewal_date,
+        "email": license_obj.email,
+    }
+
+
 def handle_webhook_event(payload: bytes, sig_header: str, db: Session) -> str:
     """
     Verify Stripe webhook signature and process the event.

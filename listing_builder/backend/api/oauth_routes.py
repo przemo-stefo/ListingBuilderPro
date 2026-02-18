@@ -11,6 +11,7 @@ import structlog
 
 from config import settings
 from database import get_db
+from api.dependencies import get_user_id
 from services.oauth_service import (
     get_amazon_authorize_url,
     handle_amazon_callback,
@@ -28,9 +29,9 @@ router = APIRouter(prefix="/api/oauth", tags=["OAuth"])
 # ── Connection status ─────────────────────────────────────────────────────────
 
 @router.get("/connections")
-async def list_connections(db: Session = Depends(get_db)):
+async def list_connections(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """List all OAuth connections with status."""
-    conns = get_connections(db)
+    conns = get_connections(db, user_id)
     return {
         "connections": [
             {
@@ -50,9 +51,9 @@ async def list_connections(db: Session = Depends(get_db)):
 
 @router.get("/amazon/authorize")
 @limiter.limit("10/minute")
-async def amazon_authorize(request: Request):
+async def amazon_authorize(request: Request, user_id: str = Depends(get_user_id)):
     """Generate Amazon Seller Central OAuth URL."""
-    result = get_amazon_authorize_url()
+    result = get_amazon_authorize_url(user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -88,9 +89,9 @@ async def amazon_callback(
 
 @router.get("/allegro/authorize")
 @limiter.limit("10/minute")
-async def allegro_authorize(request: Request):
+async def allegro_authorize(request: Request, user_id: str = Depends(get_user_id)):
     """Generate Allegro OAuth URL."""
-    result = get_allegro_authorize_url()
+    result = get_allegro_authorize_url(user_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -117,11 +118,33 @@ async def allegro_callback(
     return RedirectResponse(f"{frontend}/converter?allegro=connected")
 
 
+# ── Connection status (all marketplaces) ──────────────────────────────────
+
+@router.get("/status")
+async def connection_status(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+    """Return status of all OAuth connections — frontend uses for reconnect banners."""
+    from datetime import datetime as dt, timezone as tz, timedelta as td
+    conns = get_connections(db, user_id)
+    return {
+        "connections": {
+            c.marketplace: {
+                "status": c.status,
+                "expires_soon": (
+                    c.token_expires_at is not None
+                    and c.token_expires_at.tzinfo is not None
+                    and c.token_expires_at < dt.now(tz.utc) + td(hours=1)
+                ) if c.status == "active" else False,
+            }
+            for c in conns
+        }
+    }
+
+
 # ── Disconnect ────────────────────────────────────────────────────────────────
 
 @router.delete("/{marketplace}")
-async def disconnect_marketplace(marketplace: str, db: Session = Depends(get_db)):
+async def disconnect_marketplace(request: Request, marketplace: str, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """Remove an OAuth connection."""
-    if not disconnect(db, marketplace):
+    if not disconnect(db, marketplace, user_id):
         raise HTTPException(status_code=404, detail=f"No connection for {marketplace}")
     return {"status": "disconnected", "marketplace": marketplace}

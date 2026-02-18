@@ -26,14 +26,18 @@ STATE_TTL = 600  # 10 minutes
 
 # ── Stateless CSRF state (survives Render free tier restarts) ────────────────
 
-def _sign_state(marketplace: str) -> str:
+def _sign_state(marketplace: str, user_id: str = "default") -> str:
     """Generate signed OAuth state token.
 
     WHY stateless: Render free tier sleeps after 15 min — in-memory dict would
     lose state between authorize and callback. HMAC-signed token encodes
-    marketplace + timestamp, verified on callback without any storage.
+    marketplace + timestamp + user_id, verified on callback without any storage.
+
+    WHY user_id in state: OAuth callbacks are PUBLIC_PATHS (no JWT) because
+    the browser redirects from Allegro/Amazon. We encode user_id here so the
+    callback can associate the connection with the correct user.
     """
-    payload = json.dumps({"m": marketplace, "t": int(time.time())})
+    payload = json.dumps({"m": marketplace, "t": int(time.time()), "u": user_id})
     encoded = urlsafe_b64encode(payload.encode()).decode().rstrip("=")
     sig = hmac.new(
         settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
@@ -91,12 +95,12 @@ AMAZON_AUTH_URL = "https://sellercentral.amazon.de/apps/authorize/consent"
 AMAZON_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
 
 
-def get_amazon_authorize_url() -> Dict:
+def get_amazon_authorize_url(user_id: str = "default") -> Dict:
     """Generate Amazon Seller Central OAuth URL with CSRF state."""
     if not settings.amazon_client_id:
         return {"error": "Amazon client_id not configured"}
 
-    state = _sign_state("amazon")
+    state = _sign_state("amazon", user_id)
     redirect_uri = f"{_backend_url()}/api/oauth/amazon/callback"
 
     params = {
@@ -120,6 +124,9 @@ async def handle_amazon_callback(
     if not payload or payload.get("m") != "amazon":
         return {"error": "Invalid or expired state parameter"}
 
+    # WHY: user_id encoded in state during authorize step (callbacks have no JWT)
+    user_id = payload.get("u", "default")
+
     if not settings.amazon_client_id or not settings.amazon_client_secret:
         return {"error": "Amazon credentials not configured"}
 
@@ -141,12 +148,12 @@ async def handle_amazon_callback(
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
 
     conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == "default",
+        OAuthConnection.user_id == user_id,
         OAuthConnection.marketplace == "amazon",
     ).first()
 
     if not conn:
-        conn = OAuthConnection(user_id="default", marketplace="amazon")
+        conn = OAuthConnection(user_id=user_id, marketplace="amazon")
         db.add(conn)
 
     conn.status = "active"
@@ -169,12 +176,12 @@ ALLEGRO_AUTH_URL = "https://allegro.pl/auth/oauth/authorize"
 ALLEGRO_TOKEN_URL = "https://allegro.pl/auth/oauth/token"
 
 
-def get_allegro_authorize_url() -> Dict:
+def get_allegro_authorize_url(user_id: str = "default") -> Dict:
     """Generate Allegro OAuth URL with CSRF state."""
     if not settings.allegro_client_id:
         return {"error": "Allegro client_id not configured"}
 
-    state = _sign_state("allegro")
+    state = _sign_state("allegro", user_id)
     redirect_uri = f"{_backend_url()}/api/oauth/allegro/callback"
 
     params = {
@@ -197,6 +204,9 @@ async def handle_allegro_callback(
     payload = _verify_state(state)
     if not payload or payload.get("m") != "allegro":
         return {"error": "Invalid or expired state parameter"}
+
+    # WHY: user_id encoded in state during authorize step (callbacks have no JWT)
+    user_id = payload.get("u", "default")
 
     if not settings.allegro_client_id or not settings.allegro_client_secret:
         return {"error": "Allegro credentials not configured"}
@@ -223,12 +233,12 @@ async def handle_allegro_callback(
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 43200))
 
     conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == "default",
+        OAuthConnection.user_id == user_id,
         OAuthConnection.marketplace == "allegro",
     ).first()
 
     if not conn:
-        conn = OAuthConnection(user_id="default", marketplace="allegro")
+        conn = OAuthConnection(user_id=user_id, marketplace="allegro")
         db.add(conn)
 
     conn.status = "active"
@@ -247,25 +257,27 @@ async def handle_allegro_callback(
 
 # ── Connection status ────────────────────────────────────────────────────────
 
-def get_connections(db: Session) -> list:
-    """List all OAuth connections with their status."""
-    return db.query(OAuthConnection).order_by(OAuthConnection.marketplace).all()
-
-
-def get_connection(db: Session, marketplace: str) -> Optional[OAuthConnection]:
-    """Get OAuth connection for a specific marketplace."""
+def get_connections(db: Session, user_id: str = "default") -> list:
+    """List all OAuth connections for a user."""
     return db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == "default",
+        OAuthConnection.user_id == user_id,
+    ).order_by(OAuthConnection.marketplace).all()
+
+
+def get_connection(db: Session, marketplace: str, user_id: str = "default") -> Optional[OAuthConnection]:
+    """Get OAuth connection for a specific marketplace + user."""
+    return db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
         OAuthConnection.marketplace == marketplace,
     ).first()
 
 
-def disconnect(db: Session, marketplace: str) -> bool:
+def disconnect(db: Session, marketplace: str, user_id: str = "default") -> bool:
     """Revoke/delete an OAuth connection."""
-    conn = get_connection(db, marketplace)
+    conn = get_connection(db, marketplace, user_id)
     if not conn:
         return False
     db.delete(conn)
     db.commit()
-    logger.info("oauth_disconnected", marketplace=marketplace)
+    logger.info("oauth_disconnected", marketplace=marketplace, user_id=user_id)
     return True

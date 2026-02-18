@@ -78,6 +78,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/api/oauth/amazon/callback",  # WHY: Amazon redirects user here without our API key
         "/api/oauth/allegro/callback",  # WHY: Allegro redirects user here without our API key
         "/api/import/webhook",  # WHY: n8n calls with X-Webhook-Secret, not X-API-Key
+        "/api/auth/me",  # WHY: Uses JWT directly, no API key needed
     }
 
     async def dispatch(self, request: Request, call_next):
@@ -99,12 +100,22 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if settings.app_debug and (path.startswith("/docs") or path.startswith("/redoc")):
             return await call_next(request)
 
-        # Verify API key
+        # WHY: Try JWT first (Supabase Auth), then fall back to API key (proxy)
+        from middleware.supabase_auth import get_user_id_from_jwt
+        user_id = get_user_id_from_jwt(request)
+        if user_id:
+            # WHY: Store user_id on request state so dependencies can access it
+            request.state.user_id = user_id
+            logger.debug("jwt_auth_ok", path=path, user_id=user_id[:8])
+            response = await call_next(request)
+            return response
+
+        # Verify API key (fallback for proxy requests)
         api_key = request.headers.get("X-API-Key")
 
         if not api_key:
-            logger.warning("api_key_missing", path=path, ip=request.client.host)
-            return self._unauthorized_response("Missing API key. Include X-API-Key header.")
+            logger.warning("auth_missing", path=path, ip=request.client.host)
+            return self._unauthorized_response("Missing authentication. Include Authorization or X-API-Key header.")
 
         if not hmac.compare_digest(api_key, settings.api_secret_key):
             logger.warning(
@@ -115,7 +126,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             )
             return self._unauthorized_response("Invalid API key")
 
-        # Valid API key - proceed
+        # Valid API key - proceed (user_id = "default" for backward compat)
+        request.state.user_id = "default"
         logger.debug("api_key_validated", path=path)
         response = await call_next(request)
         return response

@@ -37,6 +37,7 @@ const ALLOWED_PATH_PREFIXES = [
   'news',
   'allegro',
   'research',
+  'auth',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
@@ -76,6 +77,12 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   const headers: Record<string, string> = {
     'Content-Type': isMultipart ? incomingContentType : 'application/json',
     'X-API-Key': API_KEY,
+  }
+
+  // WHY: Forward JWT so backend can identify the user (Supabase Auth)
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader) {
+    headers['Authorization'] = authHeader
   }
 
   // Forward webhook secret if present (for import endpoints)

@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
+from api.dependencies import get_user_id
 from services.allegro_api import get_access_token, ALLEGRO_API_BASE
 
 logger = structlog.get_logger()
@@ -35,6 +36,7 @@ async def update_allegro_offer(
     offer_id: str,
     body: OfferUpdateRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """PATCH an existing Allegro offer — updates title + description only.
 
@@ -44,7 +46,7 @@ async def update_allegro_offer(
     if not OFFER_ID_PATTERN.match(offer_id):
         raise HTTPException(status_code=400, detail="Nieprawidlowe ID oferty (8-14 cyfr)")
 
-    access_token = await get_access_token(db)
+    access_token = await get_access_token(db, user_id)
     if not access_token:
         raise HTTPException(status_code=400, detail="Allegro nie jest polaczone. Polacz konto w ustawieniach.")
 

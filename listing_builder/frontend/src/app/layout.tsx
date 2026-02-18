@@ -3,13 +3,12 @@
 // NOT for: Page-specific layouts or business logic
 
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { QueryProvider } from '@/components/providers/QueryProvider'
-import { TierProvider } from '@/components/providers/TierProvider'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { Toaster } from '@/components/ui/toaster'
+import { AuthProvider } from '@/components/providers/AuthProvider'
+import { AuthGuard } from '@/components/providers/AuthGuard'
+import { AppShell } from '@/components/layout/AppShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -28,17 +27,13 @@ export default function RootLayout({
     <html lang="pl" className="dark">
       <body className={inter.className}>
         <QueryProvider>
-          <TierProvider>
-            <div className="flex h-screen bg-[#1A1A1A]">
-              <Suspense>
-                <Sidebar />
-              </Suspense>
-              <main className="flex-1 overflow-y-auto p-8">
+          <AuthProvider>
+            <AuthGuard>
+              <AppShell>
                 {children}
-              </main>
-            </div>
-            <Toaster />
-          </TierProvider>
+              </AppShell>
+            </AuthGuard>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

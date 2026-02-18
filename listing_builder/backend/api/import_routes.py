@@ -5,6 +5,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 from database import get_db
+from api.dependencies import get_user_id
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
 from services.import_service import ImportService
 from config import settings
@@ -102,6 +103,7 @@ async def scrape_product_url(
     request: Request,
     body: ScrapeRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """
     Scrape product data from a marketplace URL.
@@ -139,7 +141,7 @@ async def scrape_product_url(
     from services.allegro_api import get_access_token, fetch_offer_details
 
     offer_id = extract_offer_id(body.url)
-    allegro_token = await get_access_token(db)
+    allegro_token = await get_access_token(db, user_id)
 
     if allegro_token and offer_id:
         data = await fetch_offer_details(offer_id, allegro_token)

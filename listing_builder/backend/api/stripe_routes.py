@@ -24,7 +24,10 @@ from services.stripe_service import (
     validate_license,
     get_license_by_email,
     get_license_by_session,
+    create_portal_session,
+    get_subscription_status,
 )
+from middleware.supabase_auth import get_user_id_from_jwt
 
 logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
@@ -99,3 +102,61 @@ async def session_license(request: Request, session_id: str, db: Session = Depen
         return SessionLicenseResponse(license_key=key, status="ready")
     # WHY: Webhook may not have fired yet — tell frontend to poll
     return SessionLicenseResponse(status="pending")
+
+
+@router.get("/subscription")
+@limiter.limit("30/minute")
+async def subscription_status(request: Request, db: Session = Depends(get_db)):
+    """Get current user's subscription status (plan, renewal date)."""
+    import jwt as pyjwt
+    # WHY: Extract email from JWT to look up subscription
+    auth_header = request.headers.get("Authorization", "")
+    email = None
+    if auth_header.startswith("Bearer "):
+        try:
+            from config import settings
+            payload = pyjwt.decode(
+                auth_header[7:], settings.supabase_jwt_secret,
+                algorithms=["HS256"], audience="authenticated",
+            )
+            email = payload.get("email")
+        except Exception:
+            pass
+
+    if not email:
+        return {"plan": "free", "status": "active", "customer_id": None, "renewal_date": None}
+
+    return get_subscription_status(email, db)
+
+
+@router.post("/portal-session")
+@limiter.limit("5/minute")
+async def portal_session(request: Request, db: Session = Depends(get_db)):
+    """Create Stripe Customer Portal session — manage billing, cancel, invoices."""
+    import jwt as pyjwt
+    auth_header = request.headers.get("Authorization", "")
+    email = None
+    if auth_header.startswith("Bearer "):
+        try:
+            from config import settings
+            payload = pyjwt.decode(
+                auth_header[7:], settings.supabase_jwt_secret,
+                algorithms=["HS256"], audience="authenticated",
+            )
+            email = payload.get("email")
+        except Exception:
+            pass
+
+    if not email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    status = get_subscription_status(email, db)
+    if not status.get("customer_id"):
+        raise HTTPException(status_code=400, detail="Brak aktywnej subskrypcji Stripe")
+
+    try:
+        url = create_portal_session(status["customer_id"])
+        return {"portal_url": url}
+    except Exception as e:
+        logger.error("stripe_portal_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to create portal session")

@@ -18,6 +18,7 @@ import structlog
 
 from config import settings
 from database import get_db
+from api.dependencies import get_user_id
 from services.allegro_api import (
     fetch_seller_offers, fetch_offer_details,
     get_access_token,
@@ -209,7 +210,7 @@ class ConvertResponse(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 async def _fetch_products_smart(
-    urls: List[str], delay: float, db: Session
+    urls: List[str], delay: float, db: Session, user_id: str = "default"
 ) -> List[AllegroProduct]:
     """Fetch Allegro products: OAuth API (main) → Scrape.do fallback.
 
@@ -217,7 +218,7 @@ async def _fetch_products_smart(
     to connect Allegro account via OAuth. Client Credentials doesn't work
     because Mateusz's app isn't verified by Allegro.
     """
-    allegro_token = await get_access_token(db)
+    allegro_token = await get_access_token(db, user_id)
 
     if allegro_token:
         logger.info("fetch_products_via_api", count=len(urls))
@@ -263,7 +264,7 @@ async def _fetch_products_smart(
 @router.post("/scrape", response_model=ScrapeResponse)
 @limiter.limit("5/minute")
 async def scrape_allegro(
-    request: Request, body: ScrapeRequest = None, db: Session = Depends(get_db)
+    request: Request, body: ScrapeRequest = None, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Fetch product data from Allegro (API if OAuth connected, else scrape).
 
@@ -272,7 +273,7 @@ async def scrape_allegro(
     """
     logger.info("scrape_request", urls_count=len(body.urls))
 
-    products = await _fetch_products_smart(body.urls, body.delay, db)
+    products = await _fetch_products_smart(body.urls, body.delay, db, user_id)
 
     succeeded = sum(1 for p in products if not p.error)
 
@@ -287,7 +288,7 @@ async def scrape_allegro(
 @router.post("/convert", response_model=ConvertResponse)
 @limiter.limit("5/minute")
 async def convert_to_marketplace(
-    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db)
+    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Full pipeline: Fetch Allegro (API or scrape) → Translate → Map → JSON.
 
@@ -301,7 +302,7 @@ async def convert_to_marketplace(
     )
 
     # Step 1: Fetch products (API if OAuth connected, else scrape)
-    scraped = await _fetch_products_smart(body.urls, body.delay, db)
+    scraped = await _fetch_products_smart(body.urls, body.delay, db, user_id)
 
     # Step 2: Initialize AI translator
     translator = AITranslator(groq_api_key=settings.groq_api_key)
@@ -342,7 +343,7 @@ async def convert_to_marketplace(
 @router.post("/download")
 @limiter.limit("3/minute")
 async def download_template(
-    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db)
+    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Full pipeline: Fetch (API/scrape) → Translate → Map → Download file.
 
@@ -356,7 +357,7 @@ async def download_template(
     )
 
     # Step 1: Fetch products (API if OAuth connected, else scrape)
-    scraped = await _fetch_products_smart(body.urls, body.delay, db)
+    scraped = await _fetch_products_smart(body.urls, body.delay, db, user_id)
 
     # Step 2: Translate + Convert
     translator = AITranslator(groq_api_key=settings.groq_api_key)
@@ -438,6 +439,7 @@ async def start_store_convert(
     request: Request,
     body: StoreConvertRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """Start async conversion of store products.
 
@@ -445,7 +447,7 @@ async def start_store_convert(
     instead of Scrape.do — free, faster, no monthly limits.
     """
     # WHY try API first: Allegro API = free + fast, Scrape.do = paid + slow
-    allegro_token = await get_access_token(db)
+    allegro_token = await get_access_token(db, user_id)
 
     job_id = create_store_job(body.urls, body.marketplace)
     logger.info("store_convert_started", job_id=job_id,
@@ -518,6 +520,7 @@ async def download_store_job(job_id: str):
 async def get_allegro_offers(
     request: Request,
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
 ):
     """Fetch seller's offers via Allegro REST API (requires OAuth connection).
 
@@ -525,7 +528,7 @@ async def get_allegro_offers(
     while store-urls uses web scraping (paid, slower). Both return
     the same response format for frontend compatibility.
     """
-    result = await fetch_seller_offers(db)
+    result = await fetch_seller_offers(db, user_id)
     return StoreUrlsResponse(**result)
 
 
