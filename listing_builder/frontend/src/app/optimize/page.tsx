@@ -38,7 +38,7 @@ function OptimizeContent() {
     if (!isPremium) {
       toast({
         title: 'Historia — Premium',
-        description: 'Historia optymalizacji jest dostepna w planie Premium.',
+        description: 'Historia optymalizacji jest dostępna w planie Premium.',
         variant: 'destructive',
       })
       return
@@ -51,9 +51,9 @@ function OptimizeContent() {
       {/* Page header + tab toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Optymalizator listingow</h1>
+          <h1 className="text-2xl font-bold text-white">Optymalizator listingów</h1>
           <p className="text-sm text-gray-400">
-            Generuj zoptymalizowane tytuly, bullety, opisy i slowa kluczowe backend
+            Generuj zoptymalizowane tytuły, bullety, opisy i słowa kluczowe backend
           </p>
         </div>
 
@@ -106,13 +106,13 @@ function OptimizeContent() {
 
       <FaqSection
         title="FAQ — Optymalizator"
-        subtitle="Najczesciej zadawane pytania o optymalizacji listingow"
+        subtitle="Najczęściej zadawane pytania o optymalizacji listingów"
         items={[
-          { question: 'Jak dziala optymalizator?', answer: 'Wpisujesz tytul produktu (lub importujesz z CSV/Allegro), wybierasz marketplace i jezyk, a AI generuje zoptymalizowany tytul, 5 bullet pointow, opis i backend keywords. Kazdy element jest dostosowany do wymagan danego marketplace.' },
-          { question: 'Co to jest Ranking Juice?', answer: 'Ranking Juice to wynik 0-100 oceniajacy jakosc Twojego listingu. Analizuje tytul (dlugosc, slowa kluczowe), bullety (struktura, benefity), opis (SEO, czytelnosc) i backend keywords (unikatowe frazy). Im wyzszy wynik, tym lepsza widocznosc w wyszukiwarce marketplace.' },
-          { question: 'Jaka jest roznica miedzy trybem agresywnym a standardowym?', answer: 'Tryb standardowy generuje naturalne, czytelne listingi. Tryb agresywny maksymalizuje nasycenie slow kluczowych — tytul i bullety sa bardziej "keyword-stuffed". Uzyj agresywnego dla produktow w konkurencyjnych kategoriach.' },
-          { question: 'Ile kosztuje jedna optymalizacja?', answer: 'Plan darmowy: 3 optymalizacje dziennie (tylko Amazon). Plan Premium (49 PLN/mies): nieograniczone optymalizacje na wszystkich marketplace (Amazon, eBay, Kaufland, Allegro).' },
-          { question: 'Jak pobrac wynik jako CSV?', answer: 'Po optymalizacji kliknij przycisk "Eksportuj CSV" nad wynikiem. Plik zawiera tytul, bullety, opis i backend keywords — gotowy do uploadu na marketplace lub do flat file.' },
+          { question: 'Jak działa optymalizator?', answer: 'Wpisujesz tytuł produktu (lub importujesz z CSV/Allegro), wybierasz marketplace i język, a AI generuje zoptymalizowany tytuł, 5 bullet pointów, opis i backend keywords. Każdy element jest dostosowany do wymagań danego marketplace.' },
+          { question: 'Co to jest Ranking Juice?', answer: 'Ranking Juice to wynik 0-100 oceniający jakość Twojego listingu. Analizuje tytuł (długość, słowa kluczowe), bullety (struktura, benefity), opis (SEO, czytelność) i backend keywords (unikatowe frazy). Im wyższy wynik, tym lepsza widoczność w wyszukiwarce marketplace.' },
+          { question: 'Jaka jest różnica między trybem agresywnym a standardowym?', answer: 'Tryb standardowy generuje naturalne, czytelne listingi. Tryb agresywny maksymalizuje nasycenie słów kluczowych — tytuł i bullety są bardziej "keyword-stuffed". Użyj agresywnego dla produktów w konkurencyjnych kategoriach.' },
+          { question: 'Ile kosztuje jedna optymalizacja?', answer: 'Plan darmowy: 3 optymalizacje dziennie (tylko Amazon). Plan Premium (49 PLN/mieś): nieograniczone optymalizacje na wszystkich marketplace (Amazon, eBay, Kaufland, Allegro).' },
+          { question: 'Jak pobrać wynik jako CSV?', answer: 'Po optymalizacji kliknij przycisk "Eksportuj CSV" nad wynikiem. Plik zawiera tytuł, bullety, opis i backend keywords — gotowy do uploadu na marketplace lub do flat file.' },
         ]}
       />
     </div>

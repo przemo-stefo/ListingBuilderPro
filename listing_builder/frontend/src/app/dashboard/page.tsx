@@ -13,15 +13,15 @@ import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRi
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const DASHBOARD_FAQ = [
-  { question: 'Co pokazuje Pulpit?', answer: 'Pulpit wyswietla statystyki Twojego konta: liczbe produktow, status optymalizacji, sredni wynik AI i ostatnie importy. To przeglad calego systemu w jednym miejscu.' },
-  { question: 'Co oznacza "Do optymalizacji"?', answer: 'To produkty zaimportowane do systemu, ktore jeszcze nie zostaly przetworzone przez AI. Kliknij "Optymalizuj listingi" aby je przetworzyc.' },
-  { question: 'Jak dziala Ekspert AI na Pulpicie?', answer: 'Widget Eksperta AI pozwala szybko zadac pytanie o sprzedazy na marketplace bez opuszczania Pulpitu. Wynik otwiera pelna strone Eksperta AI z odpowiedzia opartego na wiedzy eksperckiej.' },
+  { question: 'Co pokazuje Pulpit?', answer: 'Pulpit wyświetla statystyki Twojego konta: liczbę produktów, status optymalizacji, średni wynik AI i ostatnie importy. To przegląd całego systemu w jednym miejscu.' },
+  { question: 'Co oznacza "Do optymalizacji"?', answer: 'To produkty zaimportowane do systemu, które jeszcze nie zostały przetworzone przez AI. Kliknij "Optymalizuj listingi" aby je przetworzyć.' },
+  { question: 'Jak działa Ekspert AI na Pulpicie?', answer: 'Widget Eksperta AI pozwala szybko zadać pytanie o sprzedaży na marketplace bez opuszczania Pulpitu. Wynik otwiera pełną stronę Eksperta AI z odpowiedzią opartego na wiedzy eksperckiej.' },
 ]
 
 const SUGGESTED_QUESTIONS = [
-  'Jak znalezc najlepsze slowa kluczowe?',
-  'Jak zoptymalizowac tytul na Amazon DE?',
-  'Jak dziala algorytm A9/COSMO?',
+  'Jak znaleźć najlepsze słowa kluczowe?',
+  'Jak zoptymalizować tytuł na Amazon DE?',
+  'Jak działa algorytm A9/COSMO?',
 ]
 
 export default function DashboardPage() {
@@ -55,8 +55,8 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <Card className="border-red-500">
           <CardHeader>
-            <CardTitle className="text-red-500">Blad ladowania danych</CardTitle>
-            <CardDescription>Nie udalo sie pobrac statystyk pulpitu</CardDescription>
+            <CardTitle className="text-red-500">Błąd ładowania danych</CardTitle>
+            <CardDescription>Nie udało się pobrać statystyk pulpitu</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -75,7 +75,7 @@ export default function DashboardPage() {
       title: 'Do optymalizacji',
       value: stats?.pending_optimization || 0,
       icon: Clock,
-      description: 'Czekajace na optymalizacje AI',
+      description: 'Czekające na optymalizację AI',
       color: 'text-yellow-500',
     },
     {
@@ -86,14 +86,14 @@ export default function DashboardPage() {
       color: 'text-blue-500',
     },
     {
-      title: 'Sredni wynik',
+      title: 'Średni wynik',
       value: `${Math.round(stats?.average_optimization_score || 0)}%`,
       icon: TrendingUp,
-      description: 'Srednia ocena optymalizacji',
+      description: 'Średnia ocena optymalizacji',
       color: 'text-green-500',
     },
     {
-      title: 'Bledy',
+      title: 'Błędy',
       value: stats?.failed_products || 0,
       icon: AlertCircle,
       description: 'Produkty z problemami',
@@ -117,7 +117,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold text-white">Pulpit</h1>
         <p className="text-gray-400 mt-2">
-          Przeglad Twojego panelu OctoHelper
+          Przegląd Twojego panelu OctoHelper
         </p>
       </div>
 
@@ -149,7 +149,7 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Szybkie akcje</CardTitle>
           <CardDescription>
-            Najczesciej uzywane funkcje
+            Najczęściej używane funkcje
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               value={expertQuestion}
               onChange={e => setExpertQuestion(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleExpertSubmit()}
-              placeholder="Np. Jak zoptymalizowac backend keywords?"
+              placeholder="Np. Jak zoptymalizować backend keywords?"
               className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-green-800"
             />
             <button
@@ -223,7 +223,7 @@ export default function DashboardPage() {
       </Card>
 
       <FaqSection
-        title="Najczesciej zadawane pytania"
+        title="Najczęściej zadawane pytania"
         subtitle="Pulpit i nawigacja"
         items={DASHBOARD_FAQ}
       />

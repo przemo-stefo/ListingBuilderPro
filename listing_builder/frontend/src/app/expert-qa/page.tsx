@@ -20,19 +20,19 @@ interface Message {
 
 // WHY: RAG behavior modes control how strictly the LLM sticks to transcript knowledge
 const RAG_MODES = [
-  { value: 'strict', label: 'Scisly', desc: 'Tylko wiedza z transkrypcji' },
-  { value: 'balanced', label: 'Zbalansowany', desc: 'Transkrypcje + ogolne porady' },
-  { value: 'flexible', label: 'Elastyczny', desc: 'Laczy wszystkie zrodla' },
+  { value: 'strict', label: 'Ścisły', desc: 'Tylko wiedza z transkrypcji' },
+  { value: 'balanced', label: 'Zbalansowany', desc: 'Transkrypcje + ogólne porady' },
+  { value: 'flexible', label: 'Elastyczny', desc: 'Łączy wszystkie źródła' },
   { value: 'bypass', label: 'Bez RAG', desc: 'Czysty LLM, bez transkrypcji' },
 ] as const
 
 const SUGGESTED_QUESTIONS = [
-  'Jak znalezc najlepsze slowa kluczowe dla mojego listingu na Amazon?',
-  'Jaka jest idealna struktura tytulu na Amazon DE?',
-  'Jak dziala algorytm A9/COSMO i jak rankuje listingi?',
-  'Jakie sa najlepsze praktyki dla backend keywords?',
-  'Jak optymalizowac kampanie PPC dla nowych produktow?',
-  'Jak tworzyc skuteczne reklamy wideo na Amazon?',
+  'Jak znaleźć najlepsze słowa kluczowe dla mojego listingu na Amazon?',
+  'Jaka jest idealna struktura tytułu na Amazon DE?',
+  'Jak działa algorytm A9/COSMO i jak rankuje listingi?',
+  'Jakie są najlepsze praktyki dla backend keywords?',
+  'Jak optymalizować kampanie PPC dla nowych produktów?',
+  'Jak tworzyć skuteczne reklamy wideo na Amazon?',
 ]
 
 // WHY: Next.js 14 requires Suspense boundary around useSearchParams()
@@ -93,7 +93,7 @@ function ExpertQAContent() {
     } catch {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: 'Nie udalo sie uzyskac odpowiedzi. Sprobuj ponownie.' },
+        { role: 'assistant', content: 'Nie udało się uzyskać odpowiedzi. Spróbuj ponownie.' },
       ])
     } finally {
       setIsLoading(false)
@@ -110,7 +110,7 @@ function ExpertQAContent() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Ekspert AI</h1>
-            <p className="text-xs text-green-400">Twoj osobisty doradca e-commerce</p>
+            <p className="text-xs text-green-400">Twój osobisty doradca e-commerce</p>
           </div>
           {/* WHY: Mode selector toggle — small gear icon keeps header clean */}
           <button
@@ -126,7 +126,7 @@ function ExpertQAContent() {
         <div className="mt-3 flex flex-wrap gap-3">
           <div className="flex items-center gap-1.5 rounded-md bg-green-900/20 border border-green-900/30 px-2.5 py-1">
             <Database className="h-3 w-3 text-green-400" />
-            <span className="text-[11px] text-green-400 font-medium">10 266 fragmentow wiedzy</span>
+            <span className="text-[11px] text-green-400 font-medium">10 266 fragmentów wiedzy</span>
           </div>
           <div className="flex items-center gap-1.5 rounded-md bg-gray-800/50 border border-gray-700/50 px-2.5 py-1">
             <BookOpen className="h-3 w-3 text-gray-400" />
@@ -134,7 +134,7 @@ function ExpertQAContent() {
           </div>
           <div className="flex items-center gap-1.5 rounded-md bg-gray-800/50 border border-gray-700/50 px-2.5 py-1">
             <Zap className="h-3 w-3 text-gray-400" />
-            <span className="text-[11px] text-gray-400">Groq AI — odpowiedz w sekundy</span>
+            <span className="text-[11px] text-gray-400">Groq AI — odpowiedź w sekundy</span>
           </div>
         </div>
 
@@ -171,11 +171,11 @@ function ExpertQAContent() {
                 <Sparkles className="h-10 w-10 text-green-400" />
               </div>
               <h2 className="text-xl font-bold text-white">
-                Wiedza ekspertow w zasiegu pytania
+                Wiedza ekspertów w zasięgu pytania
               </h2>
               <p className="text-sm text-gray-400 max-w-md">
-                Baza wiedzy budowana latami z kursow najlepszych praktykow Amazon, PPC i e-commerce.
-                Zadaj pytanie — dostaniesz konkretna odpowiedz z podaniem zrodel.
+                Baza wiedzy budowana latami z kursów najlepszych praktyków Amazon, PPC i e-commerce.
+                Zadaj pytanie — dostaniesz konkretną odpowiedź z podaniem źródeł.
               </p>
             </div>
             <div className="grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -214,7 +214,7 @@ function ExpertQAContent() {
                     <div className="mt-3 border-t border-gray-800 pt-2">
                       <div className="flex items-center gap-1.5 text-[10px] text-green-500 font-medium mb-1">
                         <FileText className="h-3 w-3" />
-                        Zrodla ({msg.sourcesUsed})
+                        Źródła ({msg.sourcesUsed})
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {msg.sources.map((s, j) => (
@@ -235,7 +235,7 @@ function ExpertQAContent() {
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin text-green-400" />
-                  {mode === 'bypass' ? 'Mysle...' : 'Przeszukuje baze wiedzy...'}
+                  {mode === 'bypass' ? 'Myślę...' : 'Przeszukuję bazę wiedzy...'}
                 </div>
               </div>
             )}
@@ -251,7 +251,7 @@ function ExpertQAContent() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Zapytaj o slowa kluczowe, listingi, PPC, ranking, reklamy..."
+          placeholder="Zapytaj o słowa kluczowe, listingi, PPC, ranking, reklamy..."
           className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-green-800"
           disabled={isLoading}
         />
@@ -272,12 +272,12 @@ function ExpertQAContent() {
       {messages.length === 0 && (
         <FaqSection
           title="FAQ — Ekspert AI"
-          subtitle="Jak korzystac z bazy wiedzy eksperckiej"
+          subtitle="Jak korzystać z bazy wiedzy eksperckiej"
           items={[
-            { question: 'Co to jest Ekspert AI?', answer: 'Chatbot AI z dostepem do bazy wiedzy o sprzedazy na marketplace. Odpowiada na pytania o Amazon, eBay, Kaufland — slowa kluczowe, listingi, PPC, strategie cenowe, backend keywords i wiele wiecej.' },
-            { question: 'Skad pochodzi wiedza?', answer: 'Baza wiedzy zawiera ponad 10 000 fragmentow z kursow ekspertow marketplace, poradnikow e-commerce i sprawdzonych strategii sprzedazowych. Wiedza jest regularnie aktualizowana.' },
-            { question: 'Co oznaczaja tryby RAG?', answer: 'Scisly = odpowiedzi tylko z bazy wiedzy. Zbalansowany = baza + ogolna wiedza AI. Elastyczny = laczy wszystkie zrodla. Bez RAG = czysty LLM bez bazy wiedzy. Domyslnie: Zbalansowany.' },
-            { question: 'Jakie pytania moge zadawac?', answer: 'Wszystko o sprzedazy online: jak pisac tytuly, jak dobierac slowa kluczowe, jak optymalizowac PPC, jak tworzyc reklamy wideo, jak budowac marke na Amazon, jakie sa najlepsze praktyki dla backend keywords, itp.' },
+            { question: 'Co to jest Ekspert AI?', answer: 'Chatbot AI z dostępem do bazy wiedzy o sprzedaży na marketplace. Odpowiada na pytania o Amazon, eBay, Kaufland — słowa kluczowe, listingi, PPC, strategie cenowe, backend keywords i wiele więcej.' },
+            { question: 'Skąd pochodzi wiedza?', answer: 'Baza wiedzy zawiera ponad 10 000 fragmentów z kursów ekspertów marketplace, poradników e-commerce i sprawdzonych strategii sprzedażowych. Wiedza jest regularnie aktualizowana.' },
+            { question: 'Co oznaczają tryby RAG?', answer: 'Ścisły = odpowiedzi tylko z bazy wiedzy. Zbalansowany = baza + ogólna wiedza AI. Elastyczny = łączy wszystkie źródła. Bez RAG = czysty LLM bez bazy wiedzy. Domyślnie: Zbalansowany.' },
+            { question: 'Jakie pytania mogę zadawać?', answer: 'Wszystko o sprzedaży online: jak pisać tytuły, jak dobierać słowa kluczowe, jak optymalizować PPC, jak tworzyć reklamy wideo, jak budować markę na Amazon, jakie są najlepsze praktyki dla backend keywords, itp.' },
           ]}
         />
       )}

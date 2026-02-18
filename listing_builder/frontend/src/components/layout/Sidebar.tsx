@@ -50,9 +50,9 @@ interface NavSection {
 // Hidden pages (products, inventory, allegro-manager, keywords, etc.) still accessible via URL
 const navSections: NavSection[] = [
   {
-    label: 'Glowne',
+    label: 'Główne',
     items: [
-      { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przeglad statystyk i szybkie akcje' },
+      { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przegląd statystyk i szybkie akcje' },
       { title: 'Import', href: '/products/import', icon: Upload, desc: 'Importuj produkty z CSV lub Allegro' },
       { title: 'Konwerter', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty Allegro na Amazon/eBay/Kaufland' },
     ],
@@ -60,9 +60,9 @@ const navSections: NavSection[] = [
   {
     label: 'Optymalizacja AI',
     items: [
-      { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytul, bullety, opis i slowa kluczowe backend' },
+      { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytuł, bullety, opis i słowa kluczowe backend' },
       { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace' },
-      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedazy na marketplace', highlight: true },
+      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedaży na marketplace', highlight: true },
       { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo' },
     ],
   },
@@ -70,12 +70,12 @@ const navSections: NavSection[] = [
 
 // WHY: Compliance sub-tabs defined here so sidebar shows them as expandable menu
 const complianceSubItems = [
-  { key: 'dashboard', label: 'Panel Glowny', icon: BarChart3, desc: 'Przeglad zgodnosci i statusu regulacji' },
-  { key: 'audit', label: 'Audyt', icon: Search, desc: 'Sprawdz zgodnosc produktow z regulacjami' },
-  { key: 'settings', label: 'Aktywacja Alertow', icon: Bell, desc: 'Wlacz/wylacz powiadomienia o zmianach regulacji' },
-  { key: 'alerts', label: 'Alerty', icon: AlertTriangle, desc: 'Lista alertow i zmian regulacji' },
-  { key: 'integrations', label: 'Integracje', icon: Link2, desc: 'Polaczenia z marketplace i serwisami zewnetrznymi' },
-  { key: 'upload', label: 'Upload', icon: Upload, desc: 'Wgraj dokumenty zgodnosci i certyfikaty' },
+  { key: 'dashboard', label: 'Panel Główny', icon: BarChart3, desc: 'Przegląd zgodności i statusu regulacji' },
+  { key: 'audit', label: 'Audyt', icon: Search, desc: 'Sprawdź zgodność produktów z regulacjami' },
+  { key: 'settings', label: 'Aktywacja Alertów', icon: Bell, desc: 'Włącz/wyłącz powiadomienia o zmianach regulacji' },
+  { key: 'alerts', label: 'Alerty', icon: AlertTriangle, desc: 'Lista alertów i zmian regulacji' },
+  { key: 'integrations', label: 'Integracje', icon: Link2, desc: 'Połączenia z marketplace i serwisami zewnętrznymi' },
+  { key: 'upload', label: 'Upload', icon: Upload, desc: 'Wgraj dokumenty zgodności i certyfikaty' },
   { key: 'epr', label: 'Raporty EPR', icon: FileBarChart, desc: 'Raporty EPR wymagane przez regulacje UE' },
 ]
 
@@ -217,7 +217,7 @@ export function Sidebar() {
               )}
             >
               <Newspaper className="h-4 w-4" />
-              Wiadomosci
+              Wiadomości
             </Link>
           </div>
         </div>
@@ -254,7 +254,7 @@ export function Sidebar() {
         </div>
         <div className="flex justify-center gap-3 text-[10px] text-gray-600">
           <Link href="/privacy" className="hover:text-gray-400 transition-colors">
-            Prywatnosc
+            Prywatność
           </Link>
           <span>·</span>
           <Link href="/terms" className="hover:text-gray-400 transition-colors">

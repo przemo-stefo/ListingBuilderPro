@@ -6,40 +6,24 @@
 
 import { use } from 'react'
 import { useRouter } from 'next/navigation'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useProduct } from '@/lib/hooks/useProducts'
-import { optimizeProduct } from '@/lib/api/ai'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/lib/hooks/useToast'
 import { formatDate, getStatusColor, cn, getScoreColor } from '@/lib/utils'
-import { ArrowLeft, Sparkles, Send, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Sparkles, Send } from 'lucide-react'
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
   const { data: product, isLoading, error } = useProduct(resolvedParams.id)
 
-  const optimizeMutation = useMutation({
-    mutationFn: () => optimizeProduct(resolvedParams.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['product', resolvedParams.id] })
-      toast({
-        title: 'Optymalizacja zakonczona',
-        description: 'Produkt zostal zoptymalizowany przez AI',
-      })
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Blad optymalizacji',
-        description: error.message,
-        variant: 'destructive',
-      })
-    },
-  })
+  // WHY: Navigate to optimizer with product title pre-filled instead of
+  // calling a broken /ai/optimize endpoint that doesn't exist on backend.
+  const handleOptimize = () => {
+    const title = product?.title || ''
+    router.push(`/optimize?product=${encodeURIComponent(title)}`)
+  }
 
   if (isLoading) {
     return (
@@ -67,7 +51,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         <Card className="border-red-500">
           <CardHeader>
             <CardTitle className="text-red-500">Produkt nie znaleziony</CardTitle>
-            <CardDescription>Produkt ktorego szukasz nie istnieje</CardDescription>
+            <CardDescription>Produkt, którego szukasz, nie istnieje</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -79,16 +63,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Wstecz do produktow
+          Wstecz do produktów
         </Button>
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => optimizeMutation.mutate()}
-            disabled={optimizeMutation.isPending}
+            onClick={handleOptimize}
           >
             <Sparkles className="h-4 w-4 mr-2" />
-            {optimizeMutation.isPending ? 'Optymalizuje...' : 'Optymalizuj'}
+            Optymalizuj
           </Button>
           <Button onClick={() => router.push('/publish')}>
             <Send className="h-4 w-4 mr-2" />
@@ -162,7 +145,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {/* SEO Keywords */}
           {product.seo_keywords && product.seo_keywords.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Slowa kluczowe SEO</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Słowa kluczowe SEO</h3>
               <div className="flex flex-wrap gap-2">
                 {product.seo_keywords.map((keyword, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
