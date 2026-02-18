@@ -277,6 +277,8 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
                 product_line=product.product_line or "",
                 language=product.language,
                 db=db,
+                account_type=product.account_type,
+                category=product.category or "",
             )
 
             results.append(BatchOptimizerResult(

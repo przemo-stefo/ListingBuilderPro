@@ -167,7 +167,7 @@ function ProductResultCard({
       {/* WHY: Expanded view reuses the shared display components */}
       {isExpanded && isSuccess && item.result && (
         <CardContent className="space-y-4 border-t border-gray-800 pt-4">
-          <ScoresCard scores={item.result.scores} intel={item.result.keyword_intel} />
+          <ScoresCard scores={item.result.scores} intel={item.result.keyword_intel} coverageBreakdown={item.result.coverage_breakdown} />
           <ListingCard
             listing={item.result.listing}
             compliance={item.result.compliance}
