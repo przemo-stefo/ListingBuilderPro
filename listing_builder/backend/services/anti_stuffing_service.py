@@ -24,10 +24,11 @@ STOP_WORDS = {
     "this", "that", "your", "our", "its", "their", "all", "also", "more",
     # German
     "der", "die", "das", "den", "dem", "des", "und", "oder", "mit", "von",
-    "fur", "ein", "eine", "einen", "einem", "einer", "ist", "sind", "hat",
+    "fur", "für", "ein", "eine", "einen", "einem", "einer", "ist", "sind", "hat",
     "sie", "er", "es", "wir", "ihr", "nicht", "auch", "noch", "nur",
     "wird", "werden", "kann", "aus", "bei", "nach", "auf", "sich", "wie",
-    "durch", "diese", "dieser", "dieses", "mehr", "sehr", "ihre", "ihre",
+    "durch", "diese", "dieser", "dieses", "mehr", "sehr", "ihre", "ihren",
+    "unsere", "unserer", "unserem", "unseren", "dank", "ihrer",
     # Polish
     "z", "w", "na", "do", "i", "lub", "od", "dla", "ze", "po", "nie",
     "to", "jest", "sie", "jak", "co", "ten", "ta", "te", "ich", "tym",
