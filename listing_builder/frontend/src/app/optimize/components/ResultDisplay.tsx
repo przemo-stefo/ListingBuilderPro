@@ -4,6 +4,7 @@
 
 'use client'
 
+import DOMPurify from 'dompurify'
 import { Copy, Check } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,13 +36,17 @@ export function downloadEbayCsv(response: OptimizerResponse) {
 }
 
 // WHY: Client-side CSV export — no backend needed, data already in memory
+// Supports both Seller (5 bullets) and Vendor (10 bullets) dynamically
 export function downloadCSV(response: OptimizerResponse) {
   const { listing, scores, compliance, marketplace, brand } = response
-  const headers = ['Title', 'Bullet 1', 'Bullet 2', 'Bullet 3', 'Bullet 4', 'Bullet 5', 'Description', 'Backend Keywords', 'Coverage %', 'Compliance', 'Marketplace', 'Brand']
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+  // WHY: Dynamic bullet count — vendor has 10 bullets, seller has 5
+  const bulletCount = listing.bullet_points.length || 5
+  const bulletHeaders = Array.from({ length: bulletCount }, (_, i) => `Bullet ${i + 1}`)
+  const headers = ['Title', ...bulletHeaders, 'Description', 'Backend Keywords', 'Coverage %', 'Compliance', 'Marketplace', 'Brand']
   const bullets = [...listing.bullet_points]
-  while (bullets.length < 5) bullets.push('')
-  const row = [listing.title, ...bullets.slice(0, 5), listing.description, listing.backend_keywords, String(scores.coverage_pct), compliance.status, marketplace, brand].map(esc)
+  while (bullets.length < bulletCount) bullets.push('')
+  const row = [listing.title, ...bullets, listing.description, listing.backend_keywords, String(scores.coverage_pct), compliance.status, marketplace, brand].map(esc)
   const csv = [headers.join(','), row.join(',')].join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -185,7 +190,8 @@ export function ListingSection({
       {isHtml && content ? (
         <div
           className="listing-html rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_b]:font-semibold [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1"
-          dangerouslySetInnerHTML={{ __html: content }}
+          // WHY: DOMPurify strips <script>, onerror, etc. — LLM output could contain XSS via prompt injection
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content, { ALLOWED_TAGS: ['p', 'ul', 'ol', 'li', 'b', 'strong', 'em', 'br', 'h2', 'h3'] }) }}
         />
       ) : (
         <div

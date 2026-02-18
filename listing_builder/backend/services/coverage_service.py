@@ -4,35 +4,66 @@
 
 from __future__ import annotations
 
-from typing import List, Dict, Any, Tuple
+import re
+from typing import List, Dict, Any, Tuple, Set
+import structlog
+
+logger = structlog.get_logger()
 
 # WHY: DataDive target is 95% — listings below this leave money on the table
 COVERAGE_TARGET = 95.0
 
 
-def _coverage_for_text(
-    keywords: List[Dict[str, Any]], text: str,
-) -> Tuple[float, int, int]:
+def _extract_words(text: str) -> Set[str]:
+    """Extract unique words from text using word boundaries.
+
+    WHY: Simple `w in text` is substring matching — "cap" matches "capsule".
+    Using regex word extraction gives us a proper word set for O(1) lookup.
     """
-    Calculate what % of keywords have >= 70% of their words in the text.
+    # WHY: Include digits — keywords often contain numbers ("750ml", "1 liter")
+    return set(re.findall(r"[a-zA-Z0-9äöüßÄÖÜąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+", text.lower()))
+
+
+def _keyword_covered(phrase: str, word_set: Set[str]) -> bool:
+    """Check if >= 70% of a keyword's words appear in the word set."""
+    words = phrase.lower().split()
+    if not words:
+        return False
+    matches = sum(1 for w in words if w in word_set)
+    return matches / len(words) >= 0.7
+
+
+def _coverage_for_word_set(
+    keywords: List[Dict[str, Any]], word_set: Set[str],
+) -> Tuple[float, int, int]:
+    """Calculate coverage against a precomputed word set.
+
+    WHY: Avoids recomputing _extract_words when we already have the word set.
     Returns (pct, covered_count, total_count).
     """
     if not keywords:
         return 0.0, 0, 0
-
-    text_lower = text.lower()
-    covered = 0
-    for kw in keywords:
-        words = kw["phrase"].lower().split()
-        if not words:
-            continue
-        matches = sum(1 for w in words if w in text_lower)
-        if matches / len(words) >= 0.7:
-            covered += 1
-
+    covered = sum(1 for kw in keywords if _keyword_covered(kw["phrase"], word_set))
     total = len(keywords)
     pct = round((covered / total) * 100, 1) if total > 0 else 0.0
     return pct, covered, total
+
+
+def _coverage_for_text(
+    keywords: List[Dict[str, Any]], text: str,
+) -> Tuple[float, int, int]:
+    """Convenience wrapper — extracts words then delegates to _coverage_for_word_set."""
+    return _coverage_for_word_set(keywords, _extract_words(text))
+
+
+def count_exact_matches(keywords: List[Dict[str, Any]], text: str) -> int:
+    """Count keywords whose full phrase appears verbatim in text.
+
+    WHY: Exact phrase matches are stronger ranking signals than partial word matches.
+    Used by optimizer_service for the 'exact_matches_in_title' score.
+    """
+    text_lower = text.lower()
+    return sum(1 for kw in keywords if kw["phrase"].lower() in text_lower)
 
 
 def _grade(pct: float) -> str:
@@ -61,14 +92,32 @@ def calculate_multi_tier_coverage(
     bullets_text = " ".join(bullets)
     full_text = f"{title} {bullets_text} {description} {backend}"
 
-    overall_pct, overall_covered, overall_total = _coverage_for_text(keywords, full_text)
-    title_pct, _, _ = _coverage_for_text(keywords, title)
-    bullets_pct, _, _ = _coverage_for_text(keywords, bullets_text)
-    backend_pct, _, _ = _coverage_for_text(keywords, backend)
-    desc_pct, _, _ = _coverage_for_text(keywords, description)
+    # WHY: Precompute all word sets once — avoids 5x redundant regex extraction
+    full_ws = _extract_words(full_text)
+    title_ws = _extract_words(title)
+    bullets_ws = _extract_words(bullets_text)
+    backend_ws = _extract_words(backend)
+    desc_ws = _extract_words(description)
 
-    # WHY: Find keywords not covered anywhere in the listing
-    missing = _find_missing(keywords, full_text)
+    overall_pct, overall_covered, overall_total = _coverage_for_word_set(keywords, full_ws)
+    title_pct, _, _ = _coverage_for_word_set(keywords, title_ws)
+    bullets_pct, _, _ = _coverage_for_word_set(keywords, bullets_ws)
+    backend_pct, _, _ = _coverage_for_word_set(keywords, backend_ws)
+    desc_pct, _, _ = _coverage_for_word_set(keywords, desc_ws)
+
+    # WHY: Find keywords not covered anywhere — reuses precomputed full_ws
+    missing = [
+        kw["phrase"] for kw in keywords
+        if not _keyword_covered(kw["phrase"], full_ws)
+    ]
+
+    logger.debug(
+        "coverage_calculated",
+        overall_pct=overall_pct,
+        title_pct=title_pct,
+        bullets_pct=bullets_pct,
+        missing_count=len(missing),
+    )
 
     return {
         "overall_pct": overall_pct,
@@ -85,19 +134,3 @@ def calculate_multi_tier_coverage(
         },
         "missing_keywords": missing[:20],
     }
-
-
-def _find_missing(
-    keywords: List[Dict[str, Any]], text: str,
-) -> List[str]:
-    """Keywords where < 70% of words appear in the full listing."""
-    text_lower = text.lower()
-    missing = []
-    for kw in keywords:
-        words = kw["phrase"].lower().split()
-        if not words:
-            continue
-        matches = sum(1 for w in words if w in text_lower)
-        if matches / len(words) < 0.7:
-            missing.append(kw["phrase"])
-    return missing

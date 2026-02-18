@@ -4,16 +4,20 @@
 
 import pytest
 from services.optimizer_service import (
-    _prepare_keywords,
     _extract_root_words,
     _pack_backend_keywords,
-    _calculate_coverage,
-    _find_missing_keywords,
     _check_compliance,
     _sanitize_llm_input,
     _strip_promo_words,
     _get_limits,
     _detect_language,
+)
+from services.keyword_placement_service import prepare_keywords_with_fallback
+from services.coverage_service import (
+    calculate_multi_tier_coverage,
+    _coverage_for_text,
+    count_exact_matches,
+    _grade,
 )
 
 
@@ -45,30 +49,30 @@ def full_listing_text():
     )
 
 
-# --- _prepare_keywords ---
+# --- prepare_keywords_with_fallback (was _prepare_keywords) ---
 
 class TestPrepareKeywords:
     def test_sorts_by_volume_desc(self, keywords_with_volume):
-        all_kw, _, _, _ = _prepare_keywords(keywords_with_volume)
+        all_kw, _, _, _ = prepare_keywords_with_fallback(keywords_with_volume)
         volumes = [k["search_volume"] for k in all_kw]
         assert volumes == sorted(volumes, reverse=True)
 
-    def test_tier_sizes(self, keywords_with_volume):
-        _, t1, t2, t3 = _prepare_keywords(keywords_with_volume)
-        assert len(t1) == 3   # 30% of 10
-        assert len(t2) == 4   # 40% of 10
-        assert len(t3) == 3   # remaining 30%
-        assert len(t1) + len(t2) + len(t3) == 10
+    def test_seller_tier_sizes(self, keywords_with_volume):
+        all_kw, t1, t2, t3 = prepare_keywords_with_fallback(keywords_with_volume, "seller")
+        # WHY: Seller ranges — title(0,7), bullets(7,32), backend+desc(32+)
+        assert len(t1) == 7  # title tier
+        assert len(t2) == 3  # bullets tier (keywords 7-10, only 3 left)
+        assert len(all_kw) == 10
 
-    def test_tier1_has_highest_volume(self, keywords_with_volume):
-        _, t1, t2, _ = _prepare_keywords(keywords_with_volume)
-        min_t1_vol = min(k["search_volume"] for k in t1)
-        max_t2_vol = max(k["search_volume"] for k in t2)
-        assert min_t1_vol >= max_t2_vol
+    def test_vendor_has_more_bullet_keywords(self, keywords_with_volume):
+        _, _, t2_seller, _ = prepare_keywords_with_fallback(keywords_with_volume, "seller")
+        _, _, t2_vendor, _ = prepare_keywords_with_fallback(keywords_with_volume, "vendor")
+        # WHY: Vendor gets broader bullet range (7-52 vs 7-32)
+        assert len(t2_vendor) >= len(t2_seller)
 
     def test_single_keyword(self):
         kws = [{"phrase": "test", "search_volume": 100}]
-        all_kw, t1, t2, t3 = _prepare_keywords(kws)
+        all_kw, t1, t2, t3 = prepare_keywords_with_fallback(kws)
         assert len(t1) >= 1
         assert len(all_kw) == 1
 
@@ -136,54 +140,71 @@ class TestPackBackendKeywords:
         assert "newterm" in packed_lower
 
 
-# --- _calculate_coverage ---
+# --- coverage_service (was _calculate_coverage) ---
 
 class TestCalculateCoverage:
     def test_full_coverage(self, keywords_with_volume, full_listing_text):
-        pct, _, mode = _calculate_coverage(keywords_with_volume, full_listing_text)
+        pct, _, _ = _coverage_for_text(keywords_with_volume, full_listing_text)
         assert pct >= 90
-        assert mode == "EXCELLENT"
+        assert _grade(pct) == "EXCELLENT"
 
     def test_zero_coverage(self, keywords_with_volume):
-        pct, _, mode = _calculate_coverage(keywords_with_volume, "completely unrelated text xyz")
+        pct, _, _ = _coverage_for_text(keywords_with_volume, "completely unrelated text xyz")
         assert pct < 20
 
     def test_empty_keywords(self):
-        pct, _, mode = _calculate_coverage([], "some text")
+        pct, _, _ = _coverage_for_text([], "some text")
         assert pct == 0
-        assert mode == "NONE"
 
     def test_exact_match_counted(self):
         kws = [{"phrase": "exact match", "search_volume": 100}]
-        _, exact, _ = _calculate_coverage(kws, "this has exact match in it")
+        exact = count_exact_matches(kws, "this has exact match in it")
         assert exact == 1
 
-    def test_coverage_modes(self):
+    def test_coverage_grades(self):
         # WHY: Test all threshold boundaries
         kws = [{"phrase": f"kw{i}", "search_volume": 100} for i in range(10)]
-        text_90 = " ".join(f"kw{i}" for i in range(9))  # 9/10 = 90%
-        text_70 = " ".join(f"kw{i}" for i in range(7))  # 7/10 = 70%
-        text_50 = " ".join(f"kw{i}" for i in range(5))  # 5/10 = 50%
-        text_30 = " ".join(f"kw{i}" for i in range(3))  # 3/10 = 30%
+        text_95 = " ".join(f"kw{i}" for i in range(10))  # 10/10 = 100%
+        text_85 = " ".join(f"kw{i}" for i in range(9))   # 9/10 = 90%
+        text_70 = " ".join(f"kw{i}" for i in range(7))   # 7/10 = 70%
+        text_30 = " ".join(f"kw{i}" for i in range(3))   # 3/10 = 30%
 
-        assert _calculate_coverage(kws, text_90)[2] == "EXCELLENT"
-        assert _calculate_coverage(kws, text_70)[2] == "GOOD"
-        assert _calculate_coverage(kws, text_50)[2] == "MODERATE"
-        assert _calculate_coverage(kws, text_30)[2] == "LOW"
+        assert _grade(_coverage_for_text(kws, text_95)[0]) == "EXCELLENT"
+        assert _grade(_coverage_for_text(kws, text_85)[0]) == "GOOD"
+        assert _grade(_coverage_for_text(kws, text_70)[0]) == "MODERATE"
+        assert _grade(_coverage_for_text(kws, text_30)[0]) == "LOW"
 
 
-# --- _find_missing_keywords ---
+# --- calculate_multi_tier_coverage (was _find_missing_keywords) ---
 
-class TestFindMissingKeywords:
+class TestCoverageService:
     def test_finds_missing(self, keywords_with_volume):
-        missing = _find_missing_keywords(keywords_with_volume, "trinkflasche edelstahl")
-        phrases = [k["phrase"] for k in keywords_with_volume]
-        assert len(missing) < len(phrases)  # At least one covered
+        result = calculate_multi_tier_coverage(
+            keywords_with_volume, "trinkflasche edelstahl", [], "", "",
+        )
+        missing = result["missing_keywords"]
+        assert len(missing) < len(keywords_with_volume)  # At least one covered
         assert len(missing) > 0  # Not all covered
 
     def test_none_missing_when_all_covered(self, keywords_with_volume, full_listing_text):
-        missing = _find_missing_keywords(keywords_with_volume, full_listing_text)
-        assert len(missing) == 0
+        result = calculate_multi_tier_coverage(
+            keywords_with_volume, full_listing_text, [], "", "",
+        )
+        assert len(result["missing_keywords"]) == 0
+
+    def test_per_placement_breakdown(self, keywords_with_volume):
+        result = calculate_multi_tier_coverage(
+            keywords_with_volume,
+            title="trinkflasche edelstahl",
+            bullets=["wasserflasche liter"],
+            backend="thermosflasche sport",
+            description="isolierflasche kinder",
+        )
+        breakdown = result["breakdown"]
+        assert "title_pct" in breakdown
+        assert "bullets_pct" in breakdown
+        assert "backend_pct" in breakdown
+        assert "description_pct" in breakdown
 
 
 # --- _check_compliance ---

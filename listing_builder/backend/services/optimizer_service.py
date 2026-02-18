@@ -18,7 +18,10 @@ from services.n8n_orchestrator_service import call_n8n_optimizer, build_n8n_payl
 from services.trace_service import new_trace, span, record_llm_usage, finalize_trace
 from services.anti_stuffing_service import run_anti_stuffing_check
 from services.keyword_placement_service import prepare_keywords_with_fallback, get_bullet_count, get_bullet_limit
-from services.coverage_service import calculate_multi_tier_coverage
+from services.coverage_service import (
+    calculate_multi_tier_coverage, _extract_words, _coverage_for_text,
+    count_exact_matches, _grade,
+)
 from services.ppc_service import generate_ppc_recommendations
 import structlog
 
@@ -77,28 +80,6 @@ def _detect_language(marketplace: str, explicit_lang: str | None) -> str:
 
 # --- Keyword preparation ---
 
-def _prepare_keywords(
-    keywords: List[Dict[str, Any]],
-) -> Tuple[List[dict], List[dict], List[dict], List[dict]]:
-    """
-    Sort by search_volume desc, assign tiers.
-    Returns (all_sorted, tier1, tier2, tier3).
-    Tier1 = top 30% → must go in title.
-    Tier2 = next 40% → bullets/description.
-    Tier3 = rest → backend keywords.
-    """
-    sorted_kw = sorted(keywords, key=lambda k: k.get("search_volume", 0), reverse=True)
-    total = len(sorted_kw)
-    t1_end = max(1, int(total * 0.3))
-    t2_end = max(t1_end + 1, int(total * 0.7))
-
-    tier1 = sorted_kw[:t1_end]
-    tier2 = sorted_kw[t1_end:t2_end]
-    tier3 = sorted_kw[t2_end:]
-
-    return sorted_kw, tier1, tier2, tier3
-
-
 def _extract_root_words(keywords: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Extract unique root words (2+ chars) with aggregate search volume."""
     roots: Dict[str, int] = {}
@@ -129,7 +110,8 @@ def _pack_backend_keywords(
     if max_bytes <= 0:
         return ""
 
-    listing_lower = listing_text.lower()
+    # WHY: Word-set for consistent matching with coverage_service — "cap" won't match "capsule"
+    listing_word_set = _extract_words(listing_text)
     packed: List[str] = []
     packed_words: set = set()
     current_bytes = 0
@@ -149,7 +131,7 @@ def _pack_backend_keywords(
     for kw in keywords:
         phrase = kw["phrase"].strip()
         phrase_words = phrase.lower().split()
-        if all(w in listing_lower for w in phrase_words):
+        if all(w in listing_word_set for w in phrase_words):
             continue
         _try_add(phrase)
 
@@ -164,7 +146,7 @@ def _pack_backend_keywords(
                 all_roots[w] = all_roots.get(w, 0) + kw.get("search_volume", 0)
 
     for word, _ in sorted(all_roots.items(), key=lambda x: x[1], reverse=True):
-        if word in listing_lower or word in packed_words:
+        if word in listing_word_set or word in packed_words:
             continue
         _try_add(word)
 
@@ -179,7 +161,8 @@ def _pack_backend_keywords(
         "safe", "portable", "durable", "large", "small",
         "cold", "warm", "with", "from", "pour", "pour",
     }
-    combined = listing_lower + " " + " ".join(packed).lower()
+    # WHY: Rebuild word set including packed words for variant dedup
+    combined_words = listing_word_set | packed_words
     variants: List[str] = []
     for word in list(all_roots.keys()):
         if len(word) < 4 or word in skip_variant or any(c.isdigit() for c in word):
@@ -188,18 +171,18 @@ def _pack_backend_keywords(
         if word.endswith("s") and len(word) > 4 and len(word) <= 9:
             # Plural → singular (bottles→bottle)
             singular = word[:-1]
-            if singular not in combined and singular not in packed_words:
+            if singular not in combined_words and singular not in packed_words:
                 variants.append(singular)
         elif not word.endswith("s") and len(word) <= 8:
             # Singular → plural (bottle→bottles, flask→flasks)
             plural = word + "s"
-            if plural not in combined and plural not in packed_words:
+            if plural not in combined_words and plural not in packed_words:
                 variants.append(plural)
         # German: -e endings → -en plural (Flasche→Flaschen, Kanne→Kannen)
         # WHY: German compound nouns are long (>8 chars), so this won't clash with English
         if word.endswith("e") and len(word) >= 8:
             de_plural = word + "n"
-            if de_plural not in combined and de_plural not in packed_words:
+            if de_plural not in combined_words and de_plural not in packed_words:
                 variants.append(de_plural)
 
     for v in variants:
@@ -210,72 +193,15 @@ def _pack_backend_keywords(
     # The LLM suggests related terms shoppers actually search for (synonyms,
     # category terms, use-case words) that aren't in the keyword research data.
     if llm_suggestions:
-        combined_check = listing_lower + " " + " ".join(packed).lower()
+        # WHY: Rebuild combined set after passes 1-3 added new words
+        all_known_words = listing_word_set | packed_words
         for term in llm_suggestions.lower().split():
             term = term.strip(".,;:-()[]\"'")
-            if len(term) < 2 or term in combined_check or term in packed_words:
+            if len(term) < 2 or term in all_known_words or term in packed_words:
                 continue
             _try_add(term)
 
     return " ".join(packed)
-
-
-# --- Coverage calculation ---
-
-def _calculate_coverage(
-    keywords: List[Dict[str, Any]], listing_text: str
-) -> Tuple[float, int, str]:
-    """
-    Returns (coverage_pct, exact_matches_in_title_area, coverage_mode).
-    A keyword is "covered" if >= 70% of its words appear in the full listing.
-    """
-    if not keywords:
-        return 0.0, 0, "NONE"
-
-    listing_lower = listing_text.lower()
-    covered = 0
-    exact_in_title = 0
-
-    for kw in keywords:
-        phrase_words = kw["phrase"].lower().split()
-        if not phrase_words:
-            continue
-        matches = sum(1 for w in phrase_words if w in listing_lower)
-        ratio = matches / len(phrase_words)
-        if ratio >= 0.7:
-            covered += 1
-        # WHY: exact match = full phrase appears verbatim
-        if kw["phrase"].lower() in listing_lower:
-            exact_in_title += 1
-
-    pct = round((covered / len(keywords)) * 100, 1)
-
-    if pct >= 90:
-        mode = "EXCELLENT"
-    elif pct >= 70:
-        mode = "GOOD"
-    elif pct >= 50:
-        mode = "MODERATE"
-    else:
-        mode = "LOW"
-
-    return pct, exact_in_title, mode
-
-
-def _find_missing_keywords(
-    keywords: List[Dict[str, Any]], listing_text: str
-) -> List[str]:
-    """Keywords where < 70% of words appear in the listing."""
-    listing_lower = listing_text.lower()
-    missing = []
-    for kw in keywords:
-        words = kw["phrase"].lower().split()
-        if not words:
-            continue
-        matches = sum(1 for w in words if w in listing_lower)
-        if matches / len(words) < 0.7:
-            missing.append(kw["phrase"])
-    return missing
 
 
 # --- Compliance check ---
@@ -776,9 +702,12 @@ async def optimize_listing(
         backend_bytes = len(backend_kw.encode("utf-8"))
 
         full_text_with_backend = full_listing_text + " " + backend_kw
-        coverage_pct, exact_matches, coverage_mode = _calculate_coverage(all_kw, full_text_with_backend)
-        title_cov, _, _ = _calculate_coverage(tier1, title_text)
-        missing = _find_missing_keywords(all_kw, full_text_with_backend)
+        # WHY: Reuse coverage_service functions — single source of truth for coverage logic
+        cov_pct, cov_count, cov_total = _coverage_for_text(all_kw, full_text_with_backend)
+        coverage_pct = cov_pct
+        exact_matches = count_exact_matches(all_kw, full_text_with_backend)
+        coverage_mode = _grade(cov_pct)
+        title_cov, _, _ = _coverage_for_text(tier1, title_text)
 
         compliance = _check_compliance(title_text, bullet_lines, desc_text, brand, limits)
 
@@ -797,6 +726,8 @@ async def optimize_listing(
         coverage_breakdown = calculate_multi_tier_coverage(
             all_kw, title_text, bullet_lines, backend_kw, desc_text,
         )
+        # WHY: Reuse missing list from coverage_breakdown — avoids duplicate computation
+        missing = coverage_breakdown.get("missing_keywords", [])
 
         # WHY: PPC recommendations are pure post-processing — zero LLM cost
         ppc = generate_ppc_recommendations(all_kw, full_text_with_backend)
