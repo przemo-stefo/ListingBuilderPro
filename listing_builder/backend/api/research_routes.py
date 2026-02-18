@@ -22,7 +22,13 @@ router = APIRouter(prefix="/api/research", tags=["research"])
 # WHY: n8n webhook on izabela166 runs OV Skills (Groq free tier)
 N8N_WEBHOOK_URL = "https://n8n.feedmasters.org/webhook/ov-skills"
 
-ALLOWED_SKILLS = {"deep-customer-research", "icp-discovery", "creative-brief"}
+# WHY: n8n workflow supports 10 OV Skills — all validated server-side
+ALLOWED_SKILLS = {
+    "deep-customer-research", "icp-discovery", "creative-brief",
+    "creative-testing", "facebook-ad-copy", "google-ad-copy",
+    "video-script", "landing-page-optimization", "email-campaign",
+    "idea-validation",
+}
 
 # WHY: Free tier = 1 research/day per IP, premium = unlimited
 FREE_DAILY_LIMIT = 1
@@ -32,6 +38,11 @@ class AudienceResearchRequest(BaseModel):
     product: str = Field(..., min_length=3, max_length=500)
     audience: Optional[str] = Field(default="", max_length=500)
     skill: Optional[str] = Field(default="deep-customer-research", max_length=50)
+    # WHY: Extra fields used by specific skills (n8n extracts what it needs)
+    objective: Optional[str] = Field(default="", max_length=200)
+    price: Optional[str] = Field(default="", max_length=100)
+    keywords: Optional[str] = Field(default="", max_length=500)
+    offer: Optional[str] = Field(default="", max_length=300)
 
 
 class AudienceResearchResponse(BaseModel):
@@ -83,22 +94,29 @@ async def research_audience(
 
     try:
         async with httpx.AsyncClient(timeout=90.0) as client:
-            resp = await client.post(
-                N8N_WEBHOOK_URL,
-                json={
-                    "skill": skill,
-                    "product": body.product,
-                    "audience": audience,
-                },
-            )
+            # WHY: Pass all fields — n8n Code node extracts what each skill needs
+            payload = {
+                "skill": skill,
+                "product": body.product,
+                "audience": audience,
+            }
+            if body.objective:
+                payload["objective"] = body.objective
+            if body.price:
+                payload["price"] = body.price
+            if body.keywords:
+                payload["keywords"] = body.keywords
+            if body.offer:
+                payload["offer"] = body.offer
+            resp = await client.post(N8N_WEBHOOK_URL, json=payload)
             resp.raise_for_status()
             data = resp.json()
     except httpx.TimeoutException:
         logger.error("research_audience_timeout", product=body.product[:50])
         raise HTTPException(status_code=504, detail="Research timeout — try again")
     except Exception as e:
-        logger.error("research_audience_error", error=str(e))
-        raise HTTPException(status_code=502, detail="Research service unavailable")
+        logger.error("research_audience_error", error=str(e), error_type=type(e).__name__)
+        raise HTTPException(status_code=502, detail=f"Research service unavailable: {type(e).__name__}: {str(e)[:200]}")
 
     logger.info(
         "research_audience_done",
