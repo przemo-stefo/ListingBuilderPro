@@ -173,8 +173,8 @@ class StoreConvertRequest(BaseModel):
     def validate_urls(cls, v):
         if not v:
             raise ValueError("At least one URL required")
-        if len(v) > 300:
-            raise ValueError("Max 300 URLs per store conversion")
+        if len(v) > 500:
+            raise ValueError("Max 500 URLs per store conversion")
         return v
 
 
