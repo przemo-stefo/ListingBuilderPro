@@ -45,7 +45,7 @@ const SKILLS = [
       { id: 'email-campaign', label: 'Email kampania', icon: Mail, desc: '15 subject lines + 5 wariantow maila z A/B planem' },
     ],
   },
-] as const
+]
 
 // WHY: Extra fields only for skills that need them (n8n extracts per-skill)
 const EXTRA_FIELDS: Record<string, { key: string; label: string; placeholder: string }[]> = {
