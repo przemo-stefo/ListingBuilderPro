@@ -19,7 +19,7 @@ import structlog
 from config import settings
 from database import get_db
 from services.allegro_api import (
-    fetch_seller_offers, fetch_offer_details, fetch_public_offer_details,
+    fetch_seller_offers, fetch_offer_details,
     get_access_token,
 )
 
@@ -231,9 +231,6 @@ async def _fetch_products_smart(
                 continue
 
             data = await fetch_offer_details(offer_id, allegro_token)
-            if data.get("error"):
-                # WHY: Seller API 404 = not own offer, try public API
-                data = await fetch_public_offer_details(offer_id)
             if data.get("error"):
                 products.append(AllegroProduct(
                     source_url=url, source_id=offer_id, error=data["error"]

@@ -483,7 +483,7 @@ async def process_store_job(
     no Scrape.do limits. Falls back to scraper only if no OAuth token.
     """
     from services.converter.template_generator import generate_template
-    from services.allegro_api import fetch_offer_details, fetch_public_offer_details
+    from services.allegro_api import fetch_offer_details
 
     job = _store_jobs[job_id]
     translator = AITranslator(groq_api_key=groq_api_key)
@@ -494,25 +494,17 @@ async def process_store_job(
             offer_id = re.search(r'(\d{8,14})$', url.split("?")[0].rstrip("/"))
             oid = offer_id.group(1) if offer_id else ""
 
-            # WHY 3-tier: seller API → public API → Scrape.do
-            product = None
+            # WHY: Seller API → Scrape.do fallback
+            # Public API (Client Credentials) doesn't work — Allegro requires verified app
             if allegro_token and oid:
                 data = await fetch_offer_details(oid, allegro_token)
                 if not data.get("error"):
                     product = AllegroProduct(**{
                         k: v for k, v in data.items() if k != "error"
                     })
-
-            # Tier 2: Public API (any offer, Client Credentials)
-            if not product and oid:
-                data = await fetch_public_offer_details(oid)
-                if not data.get("error"):
-                    product = AllegroProduct(**{
-                        k: v for k, v in data.items() if k != "error"
-                    })
-
-            # Tier 3: Scrape.do fallback
-            if not product:
+                else:
+                    product = await scrape_allegro_product(url)
+            else:
                 product = await scrape_allegro_product(url)
 
             job["scraped"] = i + 1
