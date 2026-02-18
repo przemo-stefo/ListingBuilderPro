@@ -1,6 +1,6 @@
 # backend/api/research_routes.py
-# Purpose: Audience research endpoint — calls n8n OV Skills webhook
-# NOT for: LLM prompts or optimizer logic (that's optimizer_service.py)
+# Purpose: Audience research endpoint — calls Groq directly with key rotation
+# NOT for: LLM prompts (that's ov_skills.py) or optimizer logic (optimizer_service.py)
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
@@ -8,10 +8,12 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-import httpx
+from groq import Groq
 import structlog
 
+from config import settings
 from services.stripe_service import validate_license
+from services.ov_skills import build_skill_prompt
 from database import get_db
 
 limiter = Limiter(key_func=get_remote_address)
@@ -19,10 +21,9 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/research", tags=["research"])
 
-# WHY: n8n webhook on izabela166 runs OV Skills (Groq free tier)
-N8N_WEBHOOK_URL = "https://n8n.feedmasters.org/webhook/ov-skills"
+MODEL = "llama-3.3-70b-versatile"
 
-# WHY: n8n workflow supports 10 OV Skills — all validated server-side
+# WHY: All 10 OV Skills validated server-side
 ALLOWED_SKILLS = {
     "deep-customer-research", "icp-discovery", "creative-brief",
     "creative-testing", "facebook-ad-copy", "google-ad-copy",
@@ -30,7 +31,6 @@ ALLOWED_SKILLS = {
     "idea-validation",
 }
 
-# WHY: Free tier = 1 research/day per IP, premium = unlimited
 FREE_DAILY_LIMIT = 1
 
 
@@ -38,7 +38,6 @@ class AudienceResearchRequest(BaseModel):
     product: str = Field(..., min_length=3, max_length=500)
     audience: Optional[str] = Field(default="", max_length=500)
     skill: Optional[str] = Field(default="deep-customer-research", max_length=50)
-    # WHY: Extra fields used by specific skills (n8n extracts what it needs)
     objective: Optional[str] = Field(default="", max_length=200)
     price: Optional[str] = Field(default="", max_length=100)
     keywords: Optional[str] = Field(default="", max_length=500)
@@ -60,11 +59,38 @@ def _check_research_limit(request: Request, db: Session):
     license_key = request.headers.get("X-License-Key", "")
     if license_key and validate_license(license_key, db):
         return
-
-    # WHY: Simple in-memory approach — research results aren't saved to DB,
-    # so we use a lightweight check via request IP + date header
-    # For v1, rate limiter handles abuse; per-IP daily count is a future enhancement
+    # WHY: Rate limiter handles abuse for v1; per-IP daily count is future enhancement
     pass
+
+
+def _call_groq_research(system_prompt: str, user_prompt: str) -> dict:
+    """Call Groq with key rotation. Returns {text, tokens_used, model}."""
+    keys = settings.groq_api_keys
+    last_error = None
+
+    for i, key in enumerate(keys):
+        try:
+            client = Groq(api_key=key)
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_tokens=4096,
+            )
+            text = response.choices[0].message.content.strip()
+            total = response.usage.total_tokens if response.usage else 0
+            return {"text": text, "tokens_used": total, "model": MODEL}
+        except Exception as e:
+            last_error = e
+            if "429" in str(e) or "rate_limit" in str(e):
+                logger.warning("research_groq_rate_limit", key_index=i, remaining=len(keys) - i - 1)
+                continue
+            raise
+
+    raise last_error or RuntimeError("All Groq keys exhausted")
 
 
 @router.post("/audience", response_model=AudienceResearchResponse)
@@ -75,8 +101,8 @@ async def research_audience(
     db: Session = Depends(get_db),
 ):
     """
-    Run audience research via n8n OV Skills webhook.
-    WHY: Gives the optimizer buyer-language context for better listings.
+    Run audience research via Groq directly (6-key rotation).
+    WHY: Direct call is more reliable than n8n single-key webhook.
     """
     skill = body.skill or "deep-customer-research"
     if skill not in ALLOWED_SKILLS:
@@ -86,62 +112,32 @@ async def research_audience(
 
     audience = body.audience or f"buyers interested in {body.product}"
 
-    logger.info(
-        "research_audience_start",
-        product=body.product[:50],
-        skill=skill,
+    prompts = build_skill_prompt(
+        skill, body.product, audience,
+        objective=body.objective or "",
+        price=body.price or "",
+        keywords=body.keywords or "",
+        offer=body.offer or "",
     )
+    if not prompts:
+        raise HTTPException(status_code=400, detail=f"Unknown skill: {skill}")
+
+    logger.info("research_audience_start", product=body.product[:50], skill=skill)
 
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
-            # WHY: Pass all fields — n8n Code node extracts what each skill needs
-            payload = {
-                "skill": skill,
-                "product": body.product,
-                "audience": audience,
-            }
-            if body.objective:
-                payload["objective"] = body.objective
-            if body.price:
-                payload["price"] = body.price
-            if body.keywords:
-                payload["keywords"] = body.keywords
-            if body.offer:
-                payload["offer"] = body.offer
-            resp = await client.post(N8N_WEBHOOK_URL, json=payload)
-            resp.raise_for_status()
-
-            # WHY: n8n webhook may return empty body if set to "Respond Immediately"
-            # or if workflow execution failed silently
-            raw_body = resp.text
-            if not raw_body or not raw_body.strip():
-                logger.error("research_audience_empty_response", product=body.product[:50])
-                raise HTTPException(
-                    status_code=502,
-                    detail="n8n returned empty response — check webhook node is set to 'When Last Node Finishes'",
-                )
-            data = resp.json()
-    except HTTPException:
-        raise  # re-raise our own HTTPExceptions
-    except httpx.TimeoutException:
-        logger.error("research_audience_timeout", product=body.product[:50])
-        raise HTTPException(status_code=504, detail="Research timeout — try again")
+        result = _call_groq_research(prompts["system"], prompts["user"])
     except Exception as e:
         logger.error("research_audience_error", error=str(e), error_type=type(e).__name__)
-        raise HTTPException(status_code=502, detail=f"Research error: {type(e).__name__}: {str(e)[:200]}")
+        raise HTTPException(status_code=502, detail=f"Research error: {str(e)[:200]}")
 
-    logger.info(
-        "research_audience_done",
-        product=body.product[:50],
-        result_len=len(data.get("result", "")),
-    )
+    logger.info("research_audience_done", product=body.product[:50], result_len=len(result["text"]))
 
     return AudienceResearchResponse(
         skill=skill,
         product=body.product,
         audience=audience,
-        result=data.get("result", ""),
-        tokens_used=data.get("tokens_used", 0),
-        model=data.get("model", ""),
-        cost=data.get("cost", "$0.00"),
+        result=result["text"],
+        tokens_used=result["tokens_used"],
+        model=result["model"],
+        cost="$0.00",
     )
