@@ -377,6 +377,16 @@ EXPERT KNOWLEDGE (use these best practices):
 {expert_context}
 
 """
+    # WHY: Vendor (10 bullets) needs different guidance — more keywords to spread,
+    # each bullet should be substantial (120-200 chars) with real benefit copy
+    vendor_guidance = ""
+    if bullet_count > 5:
+        vendor_guidance = f"""
+- You have {bullet_count} bullets — spread keywords evenly, 1-2 phrases per bullet
+- Each bullet MUST be 120-{max_chars} characters — write full sentences with real product benefits
+- DO NOT write short keyword-only bullets — Amazon penalizes thin content
+- Group bullets by theme: material, durability, design, use cases, care instructions, specs"""
+
     return f"""You are an expert Amazon listing optimizer.
 {context_block}Product: {product_title}
 Brand: {brand}
@@ -389,12 +399,12 @@ Rules:
 - IMPORTANT: If any keyword is NOT in {lang}, TRANSLATE it to {lang} first, then use the translated version
 - Write exactly {bullet_count} bullet points
 - Start each bullet with a CAPITALIZED benefit keyword
-- CRITICAL: Include keyword phrases as EXACT matches — weave each phrase verbatim into bullet text
-- Each bullet should contain 2-3 keyword phrases naturally integrated
-- Focus on benefits, not just features
-- Each bullet under {max_chars} characters
+- Include keyword phrases naturally — weave each phrase into real benefit-driven copy
+- Each bullet should contain 1-3 keyword phrases integrated into meaningful sentences
+- Focus on benefits, not just features — explain WHY the feature matters to the buyer
+- Each bullet MUST be between 100 and {max_chars} characters — use the full space
 - The ENTIRE text must be in {lang} — no words in other languages
-- No promotional words
+- No promotional words{vendor_guidance}
 
 Return ONLY {bullet_count} bullet points, one per line, no numbering or bullet symbols."""
 

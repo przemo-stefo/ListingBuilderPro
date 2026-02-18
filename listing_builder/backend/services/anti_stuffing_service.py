@@ -14,12 +14,32 @@ MAX_DENSITY_PCT = 3.0
 TITLE_MAX_REPEATS = 2
 # WHY: Across the full listing, 3x is the safe ceiling per DataDive analysis
 LISTING_MAX_REPEATS = 3
-# WHY: Skip common filler words — they inflate density but aren't keyword stuffing
+# WHY: Skip common function words — they inflate density but aren't keyword stuffing.
+# Covers EN/DE/PL/FR/IT/ES since listings are generated in marketplace language.
 STOP_WORDS = {
+    # English
     "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
     "of", "with", "by", "from", "is", "it", "as", "be", "was", "are",
-    "der", "die", "das", "und", "oder", "mit", "von", "fur", "ein", "eine",
-    "z", "w", "na", "do", "i", "lub", "od", "dla", "ze", "po",
+    "not", "no", "can", "will", "has", "have", "do", "does", "so", "if",
+    "this", "that", "your", "our", "its", "their", "all", "also", "more",
+    # German
+    "der", "die", "das", "den", "dem", "des", "und", "oder", "mit", "von",
+    "fur", "ein", "eine", "einen", "einem", "einer", "ist", "sind", "hat",
+    "sie", "er", "es", "wir", "ihr", "nicht", "auch", "noch", "nur",
+    "wird", "werden", "kann", "aus", "bei", "nach", "auf", "sich", "wie",
+    "durch", "diese", "dieser", "dieses", "mehr", "sehr", "ihre", "ihre",
+    # Polish
+    "z", "w", "na", "do", "i", "lub", "od", "dla", "ze", "po", "nie",
+    "to", "jest", "sie", "jak", "co", "ten", "ta", "te", "ich", "tym",
+    # French
+    "le", "la", "les", "un", "une", "des", "et", "ou", "de", "du", "en",
+    "est", "ce", "qui", "que", "pas", "par", "sur", "son", "ses", "aux",
+    # Italian
+    "il", "lo", "la", "li", "le", "un", "una", "di", "da", "per", "con",
+    "che", "non", "del", "dei", "nel", "sul", "suo", "sua",
+    # Spanish
+    "el", "la", "los", "las", "un", "una", "de", "en", "con", "por",
+    "del", "que", "es", "no", "su", "sus", "al", "se", "lo",
 }
 
 
