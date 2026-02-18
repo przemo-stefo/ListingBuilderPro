@@ -290,9 +290,9 @@ export default function ConverterPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">Konwerter</h1>
+        <h1 className="text-2xl font-bold text-white">Konwerter Allegro → Marketplace</h1>
         <p className="text-sm text-gray-400">
-          Konwertuj produkty z Allegro na szablony Amazon, eBay lub Kaufland
+          Przenieś produkty z Allegro na Amazon, eBay lub Kaufland w 3 krokach
         </p>
       </div>
 
@@ -300,10 +300,10 @@ export default function ConverterPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <ArrowRightLeft className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">URLe Allegro</CardTitle>
+            <Badge variant="secondary" className="bg-white/10 text-white text-xs px-2 py-0.5">Krok 1</Badge>
+            <CardTitle className="text-lg">Produkty z Allegro</CardTitle>
           </div>
-          <CardDescription>Pobierz ze sklepu lub wklej URLe recznie (max 300)</CardDescription>
+          <CardDescription>Połącz konto, wpisz nazwę sklepu lub wklej linki ręcznie</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Allegro API connection */}
@@ -315,7 +315,7 @@ export default function ConverterPage() {
                 <XCircle className="h-4 w-4 text-gray-500" />
               )}
               <span className="text-sm text-gray-300">
-                {allegroConnected ? 'Allegro połączone' : 'Allegro niepołączone'}
+                {allegroConnected ? 'Konto Allegro połączone' : 'Konto Allegro niepołączone'}
               </span>
             </div>
             <div className="flex gap-2">
@@ -331,7 +331,7 @@ export default function ConverterPage() {
                     ) : (
                       <Download className="mr-2 h-3 w-3" />
                     )}
-                    Pobierz moje oferty (API)
+                    Pobierz moje oferty
                   </Button>
                   <Button
                     onClick={handleDisconnectAllegro}
@@ -354,20 +354,20 @@ export default function ConverterPage() {
           {/* Divider */}
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-gray-800" />
-            <span className="text-xs text-gray-500">lub wpisz nazwę sklepu</span>
+            <span className="text-xs text-gray-500">lub pobierz z innego sklepu</span>
             <div className="h-px flex-1 bg-gray-800" />
           </div>
 
           {/* Store input */}
           <div>
             <label className="mb-1 block text-sm text-gray-400">
-              Sklep Allegro
+              Nazwa sklepu lub link do sprzedawcy
             </label>
             <div className="flex gap-2">
               <Input
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                placeholder="nazwa-sklepu lub https://allegro.pl/uzytkownik/nazwa"
+                placeholder="np. electronics-shop-pl lub https://allegro.pl/uzytkownik/nazwa"
                 onKeyDown={(e) => e.key === 'Enter' && handleFetchStore()}
                 disabled={storeLoading}
               />
@@ -398,7 +398,7 @@ export default function ConverterPage() {
           {/* Divider */}
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-gray-800" />
-            <span className="text-xs text-gray-500">lub wklej URLe ręcznie</span>
+            <span className="text-xs text-gray-500">lub wklej linki ręcznie</span>
             <div className="h-px flex-1 bg-gray-800" />
           </div>
 
@@ -411,7 +411,9 @@ export default function ConverterPage() {
             className="w-full rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-600"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Wprowadzono {parseUrls().length} URL{parseUrls().length !== 1 ? 'i' : ''}
+            {parseUrls().length > 0
+              ? `Znaleziono ${parseUrls().length} ${parseUrls().length === 1 ? 'produkt' : parseUrls().length < 5 ? 'produkty' : 'produktów'} (max 500)`
+              : 'Wklej linki do produktów Allegro, po jednym w linii'}
           </p>
         </CardContent>
       </Card>
@@ -419,14 +421,17 @@ export default function ConverterPage() {
       {/* Section 2: Target Marketplace */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Docelowy marketplace</CardTitle>
-          <CardDescription>Wybierz gdzie chcesz wystawic produkty</CardDescription>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="bg-white/10 text-white text-xs px-2 py-0.5">Krok 2</Badge>
+            <CardTitle className="text-lg">Gdzie wystawić?</CardTitle>
+          </div>
+          <CardDescription>Wybierz marketplace, na który chcesz przenieść produkty</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingMarketplaces ? (
             <div className="flex items-center gap-2 text-gray-400">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Ladowanie marketplace...
+              Ładowanie...
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -463,7 +468,7 @@ export default function ConverterPage() {
         >
           <div>
             <h3 className="text-lg font-semibold text-white">Ustawienia</h3>
-            <p className="text-sm text-gray-400">Kurs wymiany i opoznienie scrapowania</p>
+            <p className="text-sm text-gray-400">Kurs wymiany PLN → EUR i prędkość pobierania</p>
           </div>
           {showSettings ? (
             <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -486,7 +491,7 @@ export default function ConverterPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm text-gray-400">
-                Opoznienie miedzy zapytaniami (sekundy)
+                Opóźnienie między produktami (sekundy)
               </label>
               <Input
                 type="number"
@@ -507,8 +512,8 @@ export default function ConverterPage() {
           className="flex w-full items-center justify-between p-6"
         >
           <div>
-            <h3 className="text-lg font-semibold text-white">GPSR / Dane kategorii</h3>
-            <p className="text-sm text-gray-400">Producent, osoba odpowiedzialna i ID kategorii</p>
+            <h3 className="text-lg font-semibold text-white">Dane producenta (opcjonalne)</h3>
+            <p className="text-sm text-gray-400">GPSR, osoba odpowiedzialna w UE i kategorie — wypełnij raz dla wszystkich produktów</p>
           </div>
           {showGpsr ? (
             <ChevronDown className="h-5 w-5 text-gray-400" />
@@ -559,7 +564,7 @@ export default function ConverterPage() {
 
             {/* Origin & Safety */}
             <div>
-              <h4 className="mb-3 text-sm font-medium text-gray-300">Pochodzenie i bezpieczenstwo</h4>
+              <h4 className="mb-3 text-sm font-medium text-gray-300">Pochodzenie i bezpieczeństwo</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs text-gray-500">Kraj pochodzenia</label>
@@ -570,7 +575,7 @@ export default function ConverterPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-gray-500">Atest bezpieczenstwa</label>
+                  <label className="mb-1 block text-xs text-gray-500">Atest bezpieczeństwa</label>
                   <Input
                     value={gpsr.safety_attestation}
                     onChange={(e) => updateGpsr('safety_attestation', e.target.value)}
@@ -605,7 +610,7 @@ export default function ConverterPage() {
                   <Input
                     value={gpsr.responsible_person_address}
                     onChange={(e) => updateGpsr('responsible_person_address', e.target.value)}
-                    placeholder="Pelny adres"
+                    placeholder="Pełny adres"
                   />
                 </div>
                 <div>
@@ -739,36 +744,39 @@ export default function ConverterPage() {
       </Card>
 
       {/* Action Bar */}
-      <div className="flex items-center gap-3">
-        <Button
-          onClick={handlePreview}
-          disabled={!canSubmit || isLoading}
-          variant="outline"
-        >
-          {convertMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Eye className="mr-2 h-4 w-4" />
+      <Card className={cn(!canSubmit && 'opacity-60')}>
+        <CardContent className="flex items-center gap-3 py-4">
+          <Badge variant="secondary" className="bg-white/10 text-white text-xs px-2 py-0.5 shrink-0">Krok 3</Badge>
+          <Button
+            onClick={handlePreview}
+            disabled={!canSubmit || isLoading}
+            variant="outline"
+          >
+            {convertMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Eye className="mr-2 h-4 w-4" />
+            )}
+            Podgląd danych
+          </Button>
+          <Button
+            onClick={handleDownload}
+            disabled={!canSubmit || isLoading}
+          >
+            {downloadMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Pobierz plik do importu
+          </Button>
+          {isLoading && !jobId && (
+            <span className="text-xs text-gray-500">
+              Tłumaczenie i konwersja — to może chwilę potrwać...
+            </span>
           )}
-          Podglad
-        </Button>
-        <Button
-          onClick={handleDownload}
-          disabled={!canSubmit || isLoading}
-        >
-          {downloadMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="mr-2 h-4 w-4" />
-          )}
-          Pobierz szablon
-        </Button>
-        {isLoading && !jobId && (
-          <span className="text-xs text-gray-500">
-            To moze chwile potrwac przy wielu URLach...
-          </span>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Progress bar for async store conversion */}
       {jobStatus && jobId && (
@@ -776,11 +784,11 @@ export default function ConverterPage() {
           <CardContent className="py-4 space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">
-                Przetwarzam... {jobStatus.scraped}/{jobStatus.total}
+                Przetwarzam produkt {jobStatus.scraped} z {jobStatus.total}...
               </span>
               <span className="text-gray-500">
-                {jobStatus.converted} skonwertowano
-                {jobStatus.failed > 0 && `, ${jobStatus.failed} błędów`}
+                {jobStatus.converted} gotowych
+                {jobStatus.failed > 0 && `, ${jobStatus.failed} nie udało się`}
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-gray-800">
@@ -806,7 +814,7 @@ export default function ConverterPage() {
           <CardHeader>
             <CardTitle className="text-lg">Wyniki</CardTitle>
             <CardDescription>
-              Skonwertowano {results.succeeded} z {results.total} produktow dla{' '}
+              Skonwertowano {results.succeeded} z {results.total} produktów dla{' '}
               {results.marketplace}
             </CardDescription>
           </CardHeader>
@@ -820,13 +828,13 @@ export default function ConverterPage() {
               {results.failed > 0 && (
                 <div className="flex items-center gap-1 rounded-full bg-red-500/10 px-3 py-1 text-xs text-red-400">
                   <XCircle className="h-3 w-3" />
-                  {results.failed} bledow
+                  {results.failed} błędów
                 </div>
               )}
               {results.warnings.length > 0 && (
                 <div className="flex items-center gap-1 rounded-full bg-yellow-500/10 px-3 py-1 text-xs text-yellow-400">
                   <AlertTriangle className="h-3 w-3" />
-                  {results.warnings.length} ostrzezen
+                  {results.warnings.length} ostrzeżeń
                 </div>
               )}
             </div>
@@ -897,7 +905,7 @@ function ProductResultCard({
         <div className="flex items-center gap-2">
           {hasWarnings && (
             <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-400 text-[10px]">
-              {product.warnings.length} ostrzezen
+              {product.warnings.length} ostrzeżeń
             </Badge>
           )}
           {expanded ? (
@@ -939,7 +947,7 @@ function ProductResultCard({
                 <thead>
                   <tr className="border-b border-gray-800">
                     <th className="pb-2 pr-4 text-left font-medium text-gray-400">Pole</th>
-                    <th className="pb-2 text-left font-medium text-gray-400">Wartosc</th>
+                    <th className="pb-2 text-left font-medium text-gray-400">Wartość</th>
                   </tr>
                 </thead>
                 <tbody>
