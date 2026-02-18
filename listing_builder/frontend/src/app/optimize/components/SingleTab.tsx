@@ -31,6 +31,7 @@ import { RankingJuiceCard } from './RankingJuiceCard'
 import { FeedbackWidget } from './FeedbackWidget'
 import { KeywordIntelCard } from './KeywordIntelCard'
 import AudienceResearchCard from './AudienceResearchCard'
+import { PPCRecommendationsCard } from './PPCRecommendationsCard'
 import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword } from '@/lib/types'
 
 // WHY: Marketplace options match what the n8n workflow supports
@@ -56,6 +57,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
   const [keywordsText, setKeywordsText] = useState('')
   const [marketplace, setMarketplace] = useState('amazon_de')
   const [mode, setMode] = useState<'aggressive' | 'standard'>('aggressive')
+  const [accountType, setAccountType] = useState<'seller' | 'vendor'>('seller')
 
   // Results — use loaded result from history if provided
   const [results, setResults] = useState<OptimizerResponse | null>(null)
@@ -128,6 +130,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
       asin: asin || undefined,
       category: category || undefined,
       audience_context: audienceContext || undefined,
+      account_type: accountType,
     }
 
     generateMutation.mutate(payload, {
@@ -298,6 +301,37 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
               </button>
             </div>
           </div>
+
+          {/* WHY: Vendor accounts get 10 bullet points instead of 5 */}
+          <div>
+            <label className="mb-2 block text-sm text-gray-400">Typ konta Amazon</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAccountType('seller')}
+                className={cn(
+                  'rounded-lg border px-4 py-2 text-sm transition-colors',
+                  accountType === 'seller'
+                    ? 'border-white bg-white/5 text-white'
+                    : 'border-gray-800 text-gray-400 hover:border-gray-600'
+                )}
+              >
+                Seller
+                <span className="ml-1 text-[10px] text-gray-500">5 bulletow</span>
+              </button>
+              <button
+                onClick={() => setAccountType('vendor')}
+                className={cn(
+                  'rounded-lg border px-4 py-2 text-sm transition-colors',
+                  accountType === 'vendor'
+                    ? 'border-white bg-white/5 text-white'
+                    : 'border-gray-800 text-gray-400 hover:border-gray-600'
+                )}
+              >
+                Vendor
+                <span className="ml-1 text-[10px] text-gray-500">10 bulletow</span>
+              </button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -373,7 +407,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
               optimizationSource={displayResults.optimization_source}
             />
           )}
-          <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} />
+          <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} coverageBreakdown={displayResults.coverage_breakdown} />
           <ListingCard
             listing={displayResults.listing}
             compliance={displayResults.compliance}
@@ -383,6 +417,9 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
             isAllegroConnected={isAllegroConnected}
           />
           <KeywordIntelCard intel={displayResults.keyword_intel} />
+          {displayResults.ppc_recommendations && (
+            <PPCRecommendationsCard ppc={displayResults.ppc_recommendations} />
+          )}
           <FeedbackWidget listingHistoryId={displayResults.listing_history_id} />
         </div>
       )}

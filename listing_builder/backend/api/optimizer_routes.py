@@ -77,6 +77,7 @@ class OptimizerRequest(BaseModel):
     asin: Optional[str] = Field(default="", max_length=20)
     category: Optional[str] = Field(default="", max_length=200)
     audience_context: Optional[str] = Field(default="", max_length=5000)
+    account_type: str = Field(default="seller", pattern="^(seller|vendor)$")
 
 
 class OptimizerScores(BaseModel):
@@ -121,6 +122,13 @@ class RankingJuiceResponse(BaseModel):
     weights: Dict[str, float] = {}
 
 
+class CoverageBreakdown(BaseModel):
+    title_pct: float = 0
+    bullets_pct: float = 0
+    backend_pct: float = 0
+    description_pct: float = 0
+
+
 class OptimizerResponse(BaseModel):
     status: str
     marketplace: str = ""
@@ -135,6 +143,11 @@ class OptimizerResponse(BaseModel):
     optimization_source: str = "direct"
     listing_history_id: Optional[str] = None  # WHY: Used by frontend feedback widget
     trace: Optional[Dict[str, Any]] = None  # WHY: Observability — tokens, latency, cost per run
+    coverage_breakdown: Optional[CoverageBreakdown] = None  # WHY: Per-placement coverage bars
+    coverage_target: float = 95.0
+    meets_coverage_target: bool = False
+    ppc_recommendations: Optional[Dict[str, Any]] = None  # WHY: PPC match-type suggestions
+    account_type: str = "seller"
 
 
 @router.post("/generate", response_model=OptimizerResponse)
@@ -171,6 +184,8 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
             language=body.language,
             db=db,
             audience_context=body.audience_context or "",
+            account_type=body.account_type,
+            category=body.category or "",
         )
 
         logger.info(
@@ -474,3 +489,30 @@ async def trace_stats(db: Session = Depends(get_db)):
         "total_cost_usd": round(float(row[3]), 4),
         "total_tokens": int(row[4]),
     }
+
+
+# --- Grey Market Risk Scoring ---
+
+class GreyMarketRequest(BaseModel):
+    """Grey market risk scoring inputs — requires SP-API data"""
+    unauthorized_sellers: int = Field(default=0, ge=0)
+    buy_box_rate: float = Field(default=100.0, ge=0, le=100)
+    suppressed_asins: int = Field(default=0, ge=0)
+    hijack_reports: int = Field(default=0, ge=0)
+
+
+@router.post("/grey-market-score")
+@limiter.limit("10/minute")
+async def grey_market_score(request: Request, body: GreyMarketRequest):
+    """
+    Calculate grey market risk score 0-100.
+    WHY: Standalone endpoint — doesn't need optimization data, just SP-API signals.
+    """
+    from services.grey_market_service import score_grey_market
+
+    return score_grey_market(
+        unauthorized_sellers=body.unauthorized_sellers,
+        buy_box_rate=body.buy_box_rate,
+        suppressed_asins=body.suppressed_asins,
+        hijack_reports=body.hijack_reports,
+    )

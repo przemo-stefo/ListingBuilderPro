@@ -1,0 +1,84 @@
+# backend/services/anti_stuffing_service.py
+# Purpose: Detect keyword stuffing — density caps and word repetition limits
+# NOT for: LLM calls or keyword placement strategy (that's keyword_placement_service.py)
+
+from __future__ import annotations
+
+import re
+from typing import List, Dict, Any
+
+
+# WHY: Amazon's A10 algorithm penalizes keyword density >3% per word
+MAX_DENSITY_PCT = 3.0
+# WHY: Repeating a word more than 2x in title looks spammy and triggers suppression
+TITLE_MAX_REPEATS = 2
+# WHY: Across the full listing, 3x is the safe ceiling per DataDive analysis
+LISTING_MAX_REPEATS = 3
+# WHY: Skip common filler words — they inflate density but aren't keyword stuffing
+STOP_WORDS = {
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "is", "it", "as", "be", "was", "are",
+    "der", "die", "das", "und", "oder", "mit", "von", "fur", "ein", "eine",
+    "z", "w", "na", "do", "i", "lub", "od", "dla", "ze", "po",
+}
+
+
+def _word_counts(text: str) -> Dict[str, int]:
+    """Count word occurrences, lowercased, stripped of punctuation."""
+    words = re.findall(r"[a-zA-ZäöüßÄÖÜąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+", text.lower())
+    counts: Dict[str, int] = {}
+    for w in words:
+        if len(w) >= 2 and w not in STOP_WORDS:
+            counts[w] = counts.get(w, 0) + 1
+    return counts
+
+
+def validate_keyword_density(text: str) -> List[str]:
+    """Check no single word exceeds MAX_DENSITY_PCT of total word count."""
+    warnings: List[str] = []
+    counts = _word_counts(text)
+    total = sum(counts.values())
+    if total == 0:
+        return warnings
+
+    for word, count in counts.items():
+        density = (count / total) * 100
+        if density > MAX_DENSITY_PCT:
+            warnings.append(
+                f"Keyword stuffing: '{word}' appears {count}x ({density:.1f}% density, max {MAX_DENSITY_PCT}%)"
+            )
+    return warnings
+
+
+def validate_word_repetition(title: str, bullets: List[str]) -> List[str]:
+    """Check word repetition limits — title and full listing separately."""
+    warnings: List[str] = []
+
+    # Title check
+    title_counts = _word_counts(title)
+    for word, count in title_counts.items():
+        if count > TITLE_MAX_REPEATS:
+            warnings.append(
+                f"Title repetition: '{word}' appears {count}x (max {TITLE_MAX_REPEATS}x in title)"
+            )
+
+    # Full listing check (title + bullets combined)
+    full_text = title + " " + " ".join(bullets)
+    listing_counts = _word_counts(full_text)
+    for word, count in listing_counts.items():
+        if count > LISTING_MAX_REPEATS:
+            warnings.append(
+                f"Listing repetition: '{word}' appears {count}x (max {LISTING_MAX_REPEATS}x in listing)"
+            )
+
+    return warnings
+
+
+def run_anti_stuffing_check(
+    title: str, bullets: List[str], description: str,
+) -> List[str]:
+    """Combined anti-stuffing check — returns list of warning strings."""
+    full_text = title + " " + " ".join(bullets) + " " + description
+    warnings = validate_keyword_density(full_text)
+    warnings.extend(validate_word_repetition(title, bullets))
+    return warnings

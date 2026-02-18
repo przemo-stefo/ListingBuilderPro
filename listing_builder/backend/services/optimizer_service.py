@@ -16,6 +16,10 @@ from services.ranking_juice_service import calculate_ranking_juice
 from services.learning_service import store_successful_listing, get_past_successes
 from services.n8n_orchestrator_service import call_n8n_optimizer, build_n8n_payload
 from services.trace_service import new_trace, span, record_llm_usage, finalize_trace
+from services.anti_stuffing_service import run_anti_stuffing_check
+from services.keyword_placement_service import prepare_keywords_with_fallback, get_bullet_count, get_bullet_limit
+from services.coverage_service import calculate_multi_tier_coverage
+from services.ppc_service import generate_ppc_recommendations
 import structlog
 
 logger = structlog.get_logger()
@@ -363,6 +367,7 @@ def _build_bullets_prompt(
     product_title: str, brand: str, tier2_phrases: List[str],
     lang: str, max_chars: int,
     expert_context: str = "",
+    bullet_count: int = 5,
 ) -> str:
     kw_list = ", ".join(tier2_phrases[:15])
     context_block = ""
@@ -382,7 +387,7 @@ KEYWORDS to weave in: {kw_list}
 
 Rules:
 - IMPORTANT: If any keyword is NOT in {lang}, TRANSLATE it to {lang} first, then use the translated version
-- Write exactly 5 bullet points
+- Write exactly {bullet_count} bullet points
 - Start each bullet with a CAPITALIZED benefit keyword
 - CRITICAL: Include keyword phrases as EXACT matches — weave each phrase verbatim into bullet text
 - Each bullet should contain 2-3 keyword phrases naturally integrated
@@ -391,7 +396,7 @@ Rules:
 - The ENTIRE text must be in {lang} — no words in other languages
 - No promotional words
 
-Return ONLY 5 bullet points, one per line, no numbering or bullet symbols."""
+Return ONLY {bullet_count} bullet points, one per line, no numbering or bullet symbols."""
 
 
 def _build_description_prompt(
@@ -569,6 +574,8 @@ async def optimize_listing(
     language: str | None = None,
     db: Session | None = None,
     audience_context: str = "",
+    account_type: str = "seller",
+    category: str = "",
     **kwargs,
 ) -> Dict[str, Any]:
     """
@@ -586,9 +593,13 @@ async def optimize_listing(
     for kw in keywords:
         kw["phrase"] = _sanitize_llm_input(kw["phrase"])
 
+    # WHY: DataDive keyword placement — uses RJ-based ranges instead of simple % tiers
+    bullet_count = get_bullet_count(account_type)
+    bullet_char_limit = get_bullet_limit(category) if category else limits["bullet"]
+
     # 1. Keyword preparation
     with span(trace, "keyword_prep"):
-        all_kw, tier1, tier2, tier3 = _prepare_keywords(keywords)
+        all_kw, tier1, tier2, tier3 = prepare_keywords_with_fallback(keywords, account_type)
         tier1_phrases = [k["phrase"] for k in tier1]
         tier2_phrases = [k["phrase"] for k in tier2]
         tier3_phrases = [k["phrase"] for k in tier3]
@@ -678,8 +689,9 @@ async def optimize_listing(
 
         # WHY: bullets, description, and backend suggestions are independent — run all 3 in parallel
         bullets_prompt = _build_bullets_prompt(
-            product_title, brand, tier2_phrases, lang, limits["bullet"],
+            product_title, brand, tier2_phrases, lang, bullet_char_limit,
             expert_context=bullets_context,
+            bullet_count=bullet_count,
         )
         desc_prompt = _build_description_prompt(
             product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
@@ -724,7 +736,7 @@ async def optimize_listing(
             re.sub(r"^[\d\.\-\*\•]+\s*", "", line).strip()
             for line in bullets_raw.split("\n")
             if line.strip() and len(line.strip()) > 10
-        ][:5]
+        ][:bullet_count]
 
         # WHY: LLM sometimes ignores "no promotional words" instruction — strip them
         title_text = _strip_promo_words(title_text)
@@ -759,8 +771,25 @@ async def optimize_listing(
         missing = _find_missing_keywords(all_kw, full_text_with_backend)
 
         compliance = _check_compliance(title_text, bullet_lines, desc_text, brand, limits)
+
+        # WHY: Anti-stuffing catches keyword repetition that compliance check misses
+        stuffing_warnings = run_anti_stuffing_check(title_text, bullet_lines, desc_text)
+        if stuffing_warnings:
+            compliance["warnings"].extend(stuffing_warnings)
+            compliance["warning_count"] = len(compliance["warnings"])
+            if compliance["status"] == "PASS":
+                compliance["status"] = "WARN"
+
         backend_util = round((backend_bytes / limits["backend"]) * 100, 1) if limits["backend"] > 0 else 0
         rj = calculate_ranking_juice(all_kw, title_text, bullet_lines, backend_kw, desc_text)
+
+        # WHY: Multi-tier coverage shows WHERE keywords are missing, not just overall %
+        coverage_breakdown = calculate_multi_tier_coverage(
+            all_kw, title_text, bullet_lines, backend_kw, desc_text,
+        )
+
+        # WHY: PPC recommendations are pure post-processing — zero LLM cost
+        ppc = generate_ppc_recommendations(all_kw, full_text_with_backend)
 
     # Self-learning — store if RJ >= 75, capture listing_id for feedback
     listing_history_id = None
@@ -832,4 +861,9 @@ async def optimize_listing(
         "optimization_source": optimization_source,
         "listing_history_id": listing_history_id,
         "trace": trace_data,
+        "coverage_breakdown": coverage_breakdown.get("breakdown", {}),
+        "coverage_target": coverage_breakdown.get("target_pct", 95.0),
+        "meets_coverage_target": coverage_breakdown.get("meets_target", False),
+        "ppc_recommendations": ppc,
+        "account_type": account_type,
     }

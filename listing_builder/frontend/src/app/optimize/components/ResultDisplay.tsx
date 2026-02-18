@@ -52,13 +52,29 @@ export function downloadCSV(response: OptimizerResponse) {
   URL.revokeObjectURL(url)
 }
 
+// WHY: Mini progress bar for per-placement coverage breakdown
+function CoverageBar({ label, pct }: { label: string; pct: number }) {
+  const color = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-20 text-[10px] text-gray-500">{label}</span>
+      <div className="h-1.5 flex-1 rounded-full bg-gray-800">
+        <div className={cn('h-1.5 rounded-full', color)} style={{ width: `${Math.min(pct, 100)}%` }} />
+      </div>
+      <span className="w-10 text-right text-[10px] text-gray-500">{pct}%</span>
+    </div>
+  )
+}
+
 // WHY: Separate component for scores to keep result display clean
 export function ScoresCard({
   scores,
   intel,
+  coverageBreakdown,
 }: {
   scores: OptimizerResponse['scores']
   intel: OptimizerResponse['keyword_intel']
+  coverageBreakdown?: OptimizerResponse['coverage_breakdown']
 }) {
   const coverageColor =
     scores.coverage_pct >= 96
@@ -122,6 +138,16 @@ export function ScoresCard({
             </p>
           </div>
         </div>
+        {/* WHY: Per-placement coverage shows WHERE keywords are missing */}
+        {coverageBreakdown && (
+          <div className="mt-4 space-y-1.5 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+            <p className="mb-2 text-xs font-medium text-gray-400">Pokrycie per sekcja</p>
+            <CoverageBar label="Tytul" pct={coverageBreakdown.title_pct} />
+            <CoverageBar label="Bullety" pct={coverageBreakdown.bullets_pct} />
+            <CoverageBar label="Backend" pct={coverageBreakdown.backend_pct} />
+            <CoverageBar label="Opis" pct={coverageBreakdown.description_pct} />
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -503,6 +503,7 @@ export interface OptimizerRequest {
   asin?: string
   category?: string
   audience_context?: string
+  account_type?: 'seller' | 'vendor'
 }
 
 export interface OptimizerListing {
@@ -547,6 +548,34 @@ export interface RankingJuice {
   weights: Record<string, number>
 }
 
+export interface CoverageBreakdown {
+  title_pct: number
+  bullets_pct: number
+  backend_pct: number
+  description_pct: number
+}
+
+export interface PPCRecommendation {
+  phrase: string
+  search_volume: number
+  indexed?: boolean
+  rationale?: string
+}
+
+export interface PPCRecommendations {
+  exact_match: PPCRecommendation[]
+  phrase_match: PPCRecommendation[]
+  broad_match: PPCRecommendation[]
+  negative_suggestions: string[]
+  summary: {
+    exact_count: number
+    phrase_count: number
+    broad_count: number
+    negative_count: number
+    estimated_daily_budget_usd: number
+  }
+}
+
 export interface OptimizerResponse {
   status: string
   marketplace: string
@@ -560,6 +589,11 @@ export interface OptimizerResponse {
   ranking_juice?: RankingJuice
   optimization_source?: 'n8n' | 'direct'
   listing_history_id?: string | null
+  coverage_breakdown?: CoverageBreakdown
+  coverage_target?: number
+  meets_coverage_target?: boolean
+  ppc_recommendations?: PPCRecommendations
+  account_type?: 'seller' | 'vendor'
 }
 
 // Batch Optimizer types — multiple products in one request

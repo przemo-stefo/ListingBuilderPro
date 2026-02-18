@@ -14,6 +14,7 @@ const ALLOWED_PATH_PREFIXES = [
   'optimizer/history',
   'optimizer/health',
   'optimizer/traces',
+  'optimizer/grey-market-score',
   'knowledge/chat',
   'knowledge/stats',
   'products',
