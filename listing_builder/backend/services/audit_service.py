@@ -147,6 +147,74 @@ Nie dodawaj numerów ani prefiksów — sama sugestia."""
     return issues
 
 
+def audit_product_from_data(data: Dict) -> Dict:
+    """Audit a product from Allegro API data (no scraping, no AI suggestions).
+
+    WHY separate from audit_product(): batch store scan needs speed —
+    no network scrape, no LLM call. Same rules, 10x faster per product.
+    """
+    product = AllegroProduct(
+        source_url=data.get("source_url", ""),
+        source_id=data.get("source_id", ""),
+        title=data.get("title", ""),
+        description=data.get("description", ""),
+        price=data.get("price", ""),
+        currency=data.get("currency", "PLN"),
+        ean=data.get("ean", ""),
+        images=data.get("images", []),
+        category=data.get("category", ""),
+        quantity=data.get("quantity", ""),
+        condition=data.get("condition", ""),
+        parameters=data.get("parameters", {}),
+        brand=data.get("brand", ""),
+        manufacturer=data.get("manufacturer", ""),
+    )
+
+    fields = _extract_audit_fields(product)
+    issues = _run_base_rules(fields, ALLEGRO_BASE_RULES)
+
+    param_issues = validate_allegro_parameters(
+        raw_params=product.parameters or {},
+        title=product.title or "",
+        category=product.category or "",
+    )
+
+    # WHY: Same dedup logic as audit_product — keep more specific param rule
+    base_fields = {i["field"] for i in issues}
+    for pi in param_issues:
+        if pi["field"] not in base_fields:
+            issues.append(pi)
+        elif pi["severity"] == "error" and any(
+            i["field"] == pi["field"] and i["severity"] != "error" for i in issues
+        ):
+            issues = [i for i in issues if i["field"] != pi["field"]]
+            issues.append(pi)
+
+    # WHY: No fix_suggestion key — batch mode skips LLM for speed
+    error_count = sum(1 for i in issues if i["severity"] == "error")
+    warning_count = sum(1 for i in issues if i["severity"] == "warning")
+
+    total_checks = len(ALLEGRO_BASE_RULES) + 8
+    penalty = (error_count * 2 + warning_count) / max(total_checks, 1) * 100
+    score = max(0, round(100 - penalty, 1))
+
+    if error_count > 0:
+        overall_status = "error"
+    elif warning_count > 0:
+        overall_status = "warning"
+    else:
+        overall_status = "compliant"
+
+    return {
+        "source_url": product.source_url,
+        "source_id": product.source_id,
+        "product_title": product.title,
+        "overall_status": overall_status,
+        "score": score,
+        "issues": issues,
+    }
+
+
 async def audit_product(url: str, marketplace: str) -> Dict:
     """
     Full audit pipeline: scrape → base rules → parameter rules → AI suggestions.

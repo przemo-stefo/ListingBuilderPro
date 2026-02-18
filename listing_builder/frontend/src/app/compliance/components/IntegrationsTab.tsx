@@ -1,10 +1,10 @@
 // frontend/src/app/compliance/components/IntegrationsTab.tsx
-// Purpose: Marketplace integration cards — OAuth connect/disconnect + connection status
+// Purpose: Marketplace integration cards — OAuth connect/disconnect + store scan
 // NOT for: Managing tracked products (that's in monitoring page)
 
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   Link2,
@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Loader2,
   Unplug,
+  Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTrackedProducts } from '@/lib/hooks/useMonitoring'
@@ -23,13 +24,13 @@ const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro'])
 
 const MARKETPLACES = [
   { id: 'amazon', name: 'Amazon Seller Central', desc: 'Europejskie rynki Amazon (DE, FR, IT, ES, PL)', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-orange-500/20' },
-  { id: 'allegro', name: 'Allegro', desc: 'Najwiekszy marketplace w Polsce', flag: '\u{1F1F5}\u{1F1F1}', color: 'border-orange-500/20' },
-  { id: 'ebay', name: 'eBay', desc: 'Globalna platforma aukcyjna i sprzedazowa', flag: '\u{1F1EC}\u{1F1E7}', color: 'border-blue-500/20' },
-  { id: 'kaufland', name: 'Kaufland.de', desc: 'Jeden z najwiekszych marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-red-500/20' },
-  { id: 'shopify', name: 'Shopify', desc: 'Wlasny sklep internetowy', flag: '\u{1F6D2}', color: 'border-green-500/20' },
-  { id: 'otto', name: 'Otto.de', desc: 'Drugi co do wielkosci marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-gray-500/20' },
-  { id: 'etsy', name: 'Etsy', desc: 'Platforma dla produktow handmade i vintage', flag: '\u{1F1FA}\u{1F1F8}', color: 'border-orange-500/20' },
-  { id: 'bol', name: 'Bol.com', desc: 'Najwiekszy marketplace w Holandii i Belgii', flag: '\u{1F1F3}\u{1F1F1}', color: 'border-blue-500/20' },
+  { id: 'allegro', name: 'Allegro', desc: 'Największy marketplace w Polsce', flag: '\u{1F1F5}\u{1F1F1}', color: 'border-orange-500/20' },
+  { id: 'ebay', name: 'eBay', desc: 'Globalna platforma aukcyjna i sprzedażowa', flag: '\u{1F1EC}\u{1F1E7}', color: 'border-blue-500/20' },
+  { id: 'kaufland', name: 'Kaufland.de', desc: 'Jeden z największych marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-red-500/20' },
+  { id: 'shopify', name: 'Shopify', desc: 'Własny sklep internetowy', flag: '\u{1F6D2}', color: 'border-green-500/20' },
+  { id: 'otto', name: 'Otto.de', desc: 'Drugi co do wielkości marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-gray-500/20' },
+  { id: 'etsy', name: 'Etsy', desc: 'Platforma dla produktów handmade i vintage', flag: '\u{1F1FA}\u{1F1F8}', color: 'border-orange-500/20' },
+  { id: 'bol', name: 'Bol.com', desc: 'Największy marketplace w Holandii i Belgii', flag: '\u{1F1F3}\u{1F1F1}', color: 'border-blue-500/20' },
 ]
 
 export default function IntegrationsTab() {
@@ -39,6 +40,7 @@ export default function IntegrationsTab() {
   const oauthQuery = useOAuthConnections()
   const authorizeMutation = useOAuthAuthorize()
   const disconnectMutation = useOAuthDisconnect()
+  const [scanning, setScanning] = useState(false)
 
   const tracked = trackedQuery.data?.items ?? []
   const oauthConns = oauthQuery.data?.connections ?? []
@@ -48,16 +50,46 @@ export default function IntegrationsTab() {
     const oauthResult = searchParams.get('oauth')
     if (oauthResult === 'success') {
       const mp = searchParams.get('marketplace') || ''
-      toast({ title: 'Polaczono!', description: `${mp} OAuth zakonczone pomyslnie` })
+      toast({ title: 'Połączono!', description: `${mp} OAuth zakończone pomyślnie` })
     } else if (oauthResult === 'error') {
-      const msg = searchParams.get('msg') || 'Nieznany blad'
-      toast({ title: 'Blad OAuth', description: msg, variant: 'destructive' })
+      const msg = searchParams.get('msg') || 'Nieznany błąd'
+      toast({ title: 'Błąd OAuth', description: msg, variant: 'destructive' })
     }
   }, [searchParams, toast])
 
   // WHY: Merge tracked products (legacy) + OAuth connections for status
   const connectedByOAuth = new Set(oauthConns.filter(c => c.status === 'active').map(c => c.marketplace))
   const connectedByTracking = new Set(tracked.map(p => p.marketplace))
+
+  async function handleStoreScan() {
+    setScanning(true)
+    try {
+      const resp = await fetch('/api/proxy/compliance/audit-store', { method: 'POST' })
+      const data = await resp.json()
+
+      if (!resp.ok) {
+        toast({
+          title: 'Błąd skanowania',
+          description: data.detail || 'Nie udało się przeskanować sklepu',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      toast({
+        title: `Skan zakończony — ${data.overall_score}%`,
+        description: `${data.total_products} produktów: ${data.compliant_count} OK, ${data.warning_count} ostrzeżeń, ${data.error_count} błędów`,
+      })
+    } catch {
+      toast({
+        title: 'Błąd połączenia',
+        description: 'Nie udało się połączyć z serwerem',
+        variant: 'destructive',
+      })
+    } finally {
+      setScanning(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -67,7 +99,7 @@ export default function IntegrationsTab() {
           Integracje Marketplace
         </h2>
         <p className="text-sm text-gray-400">
-          Polacz swoje konta, aby automatycznie monitorowac compliance
+          Połącz swoje konta, aby automatycznie monitorować compliance
         </p>
       </div>
 
@@ -109,16 +141,31 @@ export default function IntegrationsTab() {
                     </span>
                   ) : isTracked ? (
                     <span className="text-xs text-green-400">
-                      Polaczony &middot; {productCount} {productCount === 1 ? 'produkt' : 'produktow'}
+                      Połączony &middot; {productCount} {productCount === 1 ? 'produkt' : 'produktów'}
                     </span>
                   ) : (
                     <span className="text-xs text-gray-500">
-                      {hasOAuth ? 'Nie polaczony' : 'Wkrotce'}
+                      {hasOAuth ? 'Nie połączony' : 'Wkrótce'}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* WHY: Store scan button only for Allegro with active OAuth */}
+                  {mp.id === 'allegro' && isOAuthActive && (
+                    <button
+                      onClick={handleStoreScan}
+                      disabled={scanning}
+                      className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                    >
+                      {scanning ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Search className="h-3 w-3" />
+                      )}
+                      {scanning ? 'Skanowanie...' : 'Skanuj produkty'}
+                    </button>
+                  )}
                   {hasOAuth && isOAuthActive && (
                     <button
                       onClick={() => disconnectMutation.mutate(mp.id)}
@@ -126,7 +173,7 @@ export default function IntegrationsTab() {
                       className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                     >
                       <Unplug className="h-3 w-3" />
-                      Rozlacz
+                      Rozłącz
                     </button>
                   )}
                   <button
@@ -146,7 +193,7 @@ export default function IntegrationsTab() {
                     ) : isOAuthActive ? (
                       <>Ustawienia <ExternalLink className="h-3 w-3" /></>
                     ) : (
-                      'Polacz'
+                      'Połącz'
                     )}
                   </button>
                 </div>
