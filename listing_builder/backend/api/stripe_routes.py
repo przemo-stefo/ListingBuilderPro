@@ -34,6 +34,28 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/stripe", tags=["Stripe"])
 
 
+def _get_email_from_jwt(request: Request) -> str | None:
+    """Extract email from Supabase JWT. Shared by subscription + portal endpoints.
+
+    WHY not use get_user_id_from_jwt: We need email (not user_id) to look up
+    Stripe subscriptions — PremiumLicense stores email from Stripe checkout.
+    """
+    import jwt as pyjwt
+    from config import settings as cfg
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    try:
+        payload = pyjwt.decode(
+            auth_header[7:], cfg.supabase_jwt_secret,
+            algorithms=["HS256"], audience="authenticated",
+        )
+        return payload.get("email")
+    except Exception:
+        return None
+
+
 @router.post("/create-checkout", response_model=CheckoutResponse)
 @limiter.limit("10/minute")
 async def checkout(request: Request, body: CheckoutRequest, db: Session = Depends(get_db)):
@@ -108,21 +130,7 @@ async def session_license(request: Request, session_id: str, db: Session = Depen
 @limiter.limit("30/minute")
 async def subscription_status(request: Request, db: Session = Depends(get_db)):
     """Get current user's subscription status (plan, renewal date)."""
-    import jwt as pyjwt
-    # WHY: Extract email from JWT to look up subscription
-    auth_header = request.headers.get("Authorization", "")
-    email = None
-    if auth_header.startswith("Bearer "):
-        try:
-            from config import settings
-            payload = pyjwt.decode(
-                auth_header[7:], settings.supabase_jwt_secret,
-                algorithms=["HS256"], audience="authenticated",
-            )
-            email = payload.get("email")
-        except Exception:
-            pass
-
+    email = _get_email_from_jwt(request)
     if not email:
         return {"plan": "free", "status": "active", "customer_id": None, "renewal_date": None}
 
@@ -133,20 +141,7 @@ async def subscription_status(request: Request, db: Session = Depends(get_db)):
 @limiter.limit("5/minute")
 async def portal_session(request: Request, db: Session = Depends(get_db)):
     """Create Stripe Customer Portal session — manage billing, cancel, invoices."""
-    import jwt as pyjwt
-    auth_header = request.headers.get("Authorization", "")
-    email = None
-    if auth_header.startswith("Bearer "):
-        try:
-            from config import settings
-            payload = pyjwt.decode(
-                auth_header[7:], settings.supabase_jwt_secret,
-                algorithms=["HS256"], audience="authenticated",
-            )
-            email = payload.get("email")
-        except Exception:
-            pass
-
+    email = _get_email_from_jwt(request)
     if not email:
         raise HTTPException(status_code=401, detail="Not authenticated")
 

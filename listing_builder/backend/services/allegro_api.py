@@ -287,10 +287,12 @@ async def fetch_seller_offers(db: Session, user_id: str = "default") -> Dict:
     all_urls = []
     offset = 0
     limit = 1000
+    # WHY: Guard against infinite loop — 100 pages × 1000 = 100K offers max
+    max_pages = 100
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            while True:
+            for _page in range(max_pages):
                 resp = await client.get(
                     f"{ALLEGRO_API_BASE}/sale/offers",
                     params={
