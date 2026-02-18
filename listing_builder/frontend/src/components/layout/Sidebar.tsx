@@ -17,6 +17,7 @@ import {
   Sparkles,
   Shield,
   Brain,
+  Users,
   Newspaper,
   ChevronDown,
   BarChart3,
@@ -62,6 +63,7 @@ const navSections: NavSection[] = [
       { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytul, bullety, opis i slowa kluczowe backend' },
       { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace' },
       { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedazy na marketplace', highlight: true },
+      { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo' },
     ],
   },
 ]

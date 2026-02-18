@@ -110,13 +110,25 @@ async def research_audience(
                 payload["offer"] = body.offer
             resp = await client.post(N8N_WEBHOOK_URL, json=payload)
             resp.raise_for_status()
+
+            # WHY: n8n webhook may return empty body if set to "Respond Immediately"
+            # or if workflow execution failed silently
+            raw_body = resp.text
+            if not raw_body or not raw_body.strip():
+                logger.error("research_audience_empty_response", product=body.product[:50])
+                raise HTTPException(
+                    status_code=502,
+                    detail="n8n returned empty response — check webhook node is set to 'When Last Node Finishes'",
+                )
             data = resp.json()
+    except HTTPException:
+        raise  # re-raise our own HTTPExceptions
     except httpx.TimeoutException:
         logger.error("research_audience_timeout", product=body.product[:50])
         raise HTTPException(status_code=504, detail="Research timeout — try again")
     except Exception as e:
         logger.error("research_audience_error", error=str(e), error_type=type(e).__name__)
-        raise HTTPException(status_code=502, detail=f"Research service unavailable: {type(e).__name__}: {str(e)[:200]}")
+        raise HTTPException(status_code=502, detail=f"Research error: {type(e).__name__}: {str(e)[:200]}")
 
     logger.info(
         "research_audience_done",

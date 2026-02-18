@@ -1,0 +1,156 @@
+{
+  "id": "XWw1laKxbOZfdH9V",
+  "name": "OV Skills API (OpenClaw Integration)",
+  "active": true,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 400],
+      "webhookId": "ov-skills",
+      "parameters": {
+        "path": "ov-skills",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Build Skill Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 400],
+      "parameters": {
+        "jsCode": "// Webhook v2 may deliver body at $json.body or $json directly\nconst src = $json.body || $json;\nconst { skill, product, audience, objective, concepts, price, competitors, keywords, campaign_type, video_type, platform, target_length, landing_page_url, traffic_source, offer, tone } = src;\n\nif (!skill || !product) {\n  return [{ json: { error: 'Missing required fields: skill, product. Got keys: ' + Object.keys(src).join(','), status: 400 } }];\n}\n\nconst aud = audience || 'general consumers interested in ' + product;\n\nconst skills = {\n  'deep-customer-research': {\n    system: 'You are an expert audience researcher using the Original Voices Digital Twins methodology. You simulate deep qualitative research by answering questions AS IF you are the target audience. Use REAL language the audience would use. Be specific. Include contradictions and nuances.',\n    prompt: `Product: ${product}\\nTarget Audience: ${aud}\\n\\nAnswer these 12 research questions AS the target audience:\\n\\n1. Current Behavior: How do you currently deal with this problem?\\n2. Coping Mechanisms: What workarounds have you developed?\\n3. Pain Points: What frustrates you MOST about current solutions?\\n4. Emotional Drivers: How does this problem make you FEEL?\\n5. Priorities: When choosing a solution, rank: price, speed, quality, trust, convenience\\n6. Decision-Making: What would make you switch from your current approach?\\n7. Unmet Needs: What do you WISH existed but doesn't?\\n8. Ideal Outcome: If perfectly solved, what would your life look like?\\n9. Trust Signals: What would make you trust a new solution?\\n10. Social Influence: Who influences your decisions here?\\n11. Willingness to Pay: What would you pay? What feels too expensive?\\n12. Discovery: Where do you look for solutions?\\n\\nThen provide:\\n- Key Themes (top 3-5)\\n- Emotional Landscape\\n- Pain Point Analysis (ranked by severity)\\n- Language Bank (exact phrases the audience uses)\\n- Actionable Recommendations (3-5)`\n  },\n  'icp-discovery': {\n    system: 'You are an ICP discovery specialist. Test the same product across 5-7 diverse segments using identical questions. Score and rank by fit.',\n    prompt: `Product: ${product}\\nPrice: ${price || 'not specified'}\\n\\nTest across 6 segments. For each answer: gut reaction, problem relevance (1-10), expected price, 30-day purchase intent, concerns, referral target.\\nScore each: Interest, Problem Relevance, Purchase Intent, Emotional Resonance, WTP, Ease of Reach (1-10).\\nOutput: Ranking table, Winner analysis, Runner-Up, Surprising Finding, Strategic Recommendations.`\n  },\n  'creative-brief': {\n    system: 'You are a senior creative strategist. Create briefs grounded in REAL audience insight.',\n    prompt: `Product: ${product}\\nAudience: ${aud}\\nObjective: ${objective || 'conversion'}\\n\\nResearch audience (10 questions as target). Output Creative Brief: Background, Objective, Audience Profile, Key Insight, Single-Minded Message, Support Points (3), Tone guidance, Do's and Don'ts.`\n  },\n  'creative-testing': {\n    system: 'You are a creative testing specialist. Simulate audience reactions to concepts BEFORE spending ad money.',\n    prompt: `Product: ${product}\\nAudience: ${aud}\\nConcepts: ${concepts || 'not provided'}\\n\\nFor each concept score 1-10: Attention Grab, Clarity, Emotional Pull, Trust, Action Drive. Output: Winner, Concept breakdown, Head-to-Head, Top 3 improvements, Kill List.`\n  },\n  'facebook-ad-copy': {\n    system: 'You are a Facebook/Instagram ad copywriter. Use audience OWN language. Max 2 emojis per ad. No jargon.',\n    prompt: `Product: ${product}\\nAudience: ${aud}\\nObjective: ${objective || 'conversions'}\\nOffer: ${offer || 'not specified'}\\n\\nResearch audience (6 questions). Generate 14 ads: 3 Pain Point, 3 Benefit, 2 Social Proof, 2 Story, 2 Objection-Killer, 2 Urgency. Each with: Primary text (125w max), Headline (40 chars), Description (30 chars), CTA. Plus: Subject lines (5), A/B plan, Language Bank (15 phrases).`\n  },\n  'google-ad-copy': {\n    system: 'You are a Google Ads RSA copywriter. Headlines max 30 chars. Descriptions max 90 chars. No exclamation marks.',\n    prompt: `Product: ${product}\\nAudience: ${aud}\\nKeywords: ${keywords || 'not specified'}\\n\\nResearch audience (6 questions). Output: 15 Headlines (with char counts, types), 4 Descriptions (with char counts), Quality Score checklist, Top 3 combinations, Search Language Bank.`\n  },\n  'video-script': {\n    system: 'You are a video script specialist. Hook in first 2-3 seconds. Spoken language, not written.',\n    prompt: `Product: ${product}\\nAudience: ${aud}\\nType: ${video_type || 'UGC'}\\nPlatform: ${platform || 'TikTok'}\\nLength: ${target_length || '30s'}\\n\\nResearch audience (12 questions on viewing preferences). Output: Script with timing markers, 3 Hook alternatives, Pacing Guide, Tone Notes, Production Notes.`\n  },\n  'landing-page-optimization': {\n    system: 'You are a landing page optimizer. Redesign based on audience behavioral data.',\n    prompt: `Page: ${landing_page_url || product}\\nAudience: ${aud}\\nGoal: ${objective || 'purchase'}\\nTraffic: ${traffic_source || 'paid'}\\n\\nResearch audience (12 questions). Output: Above-the-Fold recs, Page Structure (7 sections), 3-5 A/B variants, Quick Wins, Common Pitfalls, Form Optimization.`\n  },\n  'email-campaign': {\n    system: 'You are an email marketing specialist. Subject lines under 50 chars. One CTA per email.',\n    prompt: `Product: ${product}\\nAudience: ${aud}\\nType: ${campaign_type || 'promotional'}\\nOffer: ${offer || 'not specified'}\\n\\nResearch audience (10 questions). Output: 15 Subject Lines, 5 Email Variations, A/B plan, Sequence Timing, Do's and Don'ts.`\n  },\n  'idea-validation': {\n    system: 'You are a startup idea validator. BRUTALLY HONEST. Nice-to-have is NOT validation.',\n    prompt: `Idea: ${product}\\nAudience: ${aud}\\nPrice: ${price || 'TBD'}\\n\\nAnswer 12 progressive questions AS audience. Score using Evidence Matrix. Output: VERDICT (Go/Pivot/Kill), Evidence Matrix, Strongest Signals, Biggest Risks, Improvements, Pivot Options, Next Steps.`\n  }\n};\n\nconst selected = skills[skill];\nif (!selected) {\n  return [{ json: { error: 'Unknown skill: ' + skill + '. Available: ' + Object.keys(skills).join(', '), status: 400 } }];\n}\n\nreturn [{ json: {\n  request_body: {\n    model: 'llama-3.3-70b-versatile',\n    messages: [\n      { role: 'system', content: selected.system },\n      { role: 'user', content: selected.prompt }\n    ],\n    temperature: 0.3,\n    max_tokens: 4096\n  },\n  skill_name: skill,\n  product: product,\n  audience: aud\n} }];"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Check Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [520, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [780, 280],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.error }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Groq AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 520],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "C7rCGxYpPl6HJgkv",
+          "name": "Groq API (Primary)"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 520],
+      "parameters": {
+        "jsCode": "const prev = $('Build Skill Prompt').first().json;\nconst content = $json.choices[0].message.content;\nconst tokens = $json.usage || {};\n\nreturn [{ json: {\n  skill: prev.skill_name,\n  product: prev.product,\n  audience: prev.audience,\n  result: content,\n  tokens_used: tokens.total_tokens || 0,\n  model: 'llama-3.3-70b-versatile',\n  cost: '$0.00'\n} }];"
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1300, 520],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-280, 120],
+      "parameters": {
+        "color": 6,
+        "width": 500,
+        "height": 480,
+        "content": "## OV Skills API for OpenClaw\n\n### Endpoint:\nPOST /webhook/ov-skills\n\n### Request Body:\n```json\n{\n  \"skill\": \"deep-customer-research\",\n  \"product\": \"organic dog treats\",\n  \"audience\": \"health-conscious dog owners 30-50\"\n}\n```\n\n### Available Skills:\n- deep-customer-research\n- icp-discovery\n- creative-brief\n- creative-testing\n- facebook-ad-copy\n- google-ad-copy\n- video-script\n- landing-page-optimization\n- email-campaign\n- idea-validation\n\n### Cost: $0.00/month (Groq free tier)"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Build Skill Prompt", "type": "main", "index": 0}]]},
+    "Build Skill Prompt": {"main": [[{"node": "Check Error", "type": "main", "index": 0}]]},
+    "Check Error": {"main": [[{"node": "Error Response", "type": "main", "index": 0}], [{"node": "Groq AI", "type": "main", "index": 0}]]},
+    "Groq AI": {"main": [[{"node": "Format Result", "type": "main", "index": 0}]]},
+    "Format Result": {"main": [[{"node": "Send Response", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1", "timezone": "Europe/Warsaw"}
+}
