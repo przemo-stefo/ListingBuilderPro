@@ -17,9 +17,9 @@ import { Send, CheckCircle2, Globe } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const PUBLISH_FAQ = [
-  { question: 'Co oznacza "Publikacja"?', answer: 'Publikacja eksportuje Twoje zoptymalizowane produkty na wybrany marketplace. Tylko produkty o statusie "zoptymalizowane" sa gotowe do publikacji.' },
-  { question: 'Jak wybrac produkty do publikacji?', answer: 'Kliknij na kartach produktow aby je zaznaczyc (pojawi sie ptaszek). Mozesz tez uzyc "Zaznacz wszystkie" aby wybrac wszystko naraz.' },
-  { question: 'Co jesli publikacja sie nie powiedzie?', answer: 'System pokaze ktore produkty sie nie opublikowaly i dlaczego. Najczesciej przyczyna jest brak wymaganych pol (np. kategorii lub ceny). Popraw dane i sprobuj ponownie.' },
+  { question: 'Co oznacza "Publikacja"?', answer: 'Publikacja eksportuje Twoje zoptymalizowane produkty na wybrany marketplace. Tylko produkty o statusie "zoptymalizowane" są gotowe do publikacji.' },
+  { question: 'Jak wybrać produkty do publikacji?', answer: 'Kliknij na kartach produktów aby je zaznaczyć (pojawi się ptaszek). Możesz też użyć "Zaznacz wszystkie" aby wybrać wszystko naraz.' },
+  { question: 'Co jeśli publikacja się nie powiedzie?', answer: 'System pokaże które produkty się nie opublikowały i dlaczego. Najczęściej przyczyną jest brak wymaganych pól (np. kategorii lub ceny). Popraw dane i spróbuj ponownie.' },
 ]
 
 export default function PublishPage() {
@@ -54,13 +54,13 @@ export default function PublishPage() {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toast({
-        title: 'Publikacja zakonczona',
-        description: `Pomyslnie opublikowano ${result.successful.length} produktow`,
+        title: 'Publikacja zakończona',
+        description: `Pomyślnie opublikowano ${result.successful.length} produktów`,
       })
       if (result.failed.length > 0) {
         toast({
-          title: 'Niektore produkty nie zostaly opublikowane',
-          description: `${result.failed.length} produktow nie udalo sie opublikowac`,
+          title: 'Niektóre produkty nie zostały opublikowane',
+          description: `${result.failed.length} produktów nie udało się opublikować`,
           variant: 'destructive',
         })
       }
@@ -68,7 +68,7 @@ export default function PublishPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Publikacja nie powiodla sie',
+        title: 'Publikacja nie powiodła się',
         description: error.message,
         variant: 'destructive',
       })
@@ -94,7 +94,7 @@ export default function PublishPage() {
   const handlePublish = () => {
     if (selectedIds.length === 0) {
       toast({
-        title: 'Nie zaznaczono produktow',
+        title: 'Nie zaznaczono produktów',
         description: 'Zaznacz co najmniej jeden produkt do publikacji',
         variant: 'destructive',
       })
@@ -175,7 +175,7 @@ export default function PublishPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400">Brak dostepnych marketplace&apos;ow</p>
+              <p className="text-sm text-gray-400">Brak dostępnych marketplace&apos;ów</p>
             )}
           </CardContent>
         </Card>
@@ -198,7 +198,7 @@ export default function PublishPage() {
           <Send className="h-4 w-4 mr-2" />
           {publishMutation.isPending
             ? 'Publikowanie...'
-            : `Publikuj ${selectedIds.length} produktow`}
+            : `Publikuj ${selectedIds.length} produktów`}
         </Button>
       </div>
 
@@ -270,16 +270,16 @@ export default function PublishPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Brak gotowych produktow</CardTitle>
+            <CardTitle>Brak gotowych produktów</CardTitle>
             <CardDescription>
-              Najpierw zoptymalizuj produkty przed publikacja na marketplace&apos;y.
+              Najpierw zoptymalizuj produkty przed publikacją na marketplace&apos;y.
             </CardDescription>
           </CardHeader>
         </Card>
       )}
 
       <FaqSection
-        title="Najczesciej zadawane pytania"
+        title="Najczęściej zadawane pytania"
         subtitle="Eksport i publikacja"
         items={PUBLISH_FAQ}
       />

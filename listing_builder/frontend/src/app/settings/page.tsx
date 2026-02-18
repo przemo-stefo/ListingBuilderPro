@@ -9,10 +9,10 @@ import { Settings as SettingsIcon, Link, Bell, Download, Save } from 'lucide-rea
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const SETTINGS_FAQ = [
-  { question: 'Jak zmienic domyslny marketplace?', answer: 'W sekcji "Ustawienia ogolne" wybierz nowy marketplace z listy i kliknij "Zapisz". Wszystkie nowe optymalizacje beda domyslnie tworzone dla wybranego rynku.' },
-  { question: 'Jak polaczyc klucz API marketplace?', answer: 'W sekcji "Polaczenia z marketplace" wpisz klucz API w pole obok nazwy marketplace i kliknij "Polacz". Status zmieni sie na "Polaczony" po weryfikacji klucza.' },
-  { question: 'Jakie powiadomienia sa dostepne?', answer: 'Mozesz wlaczyc alerty email, powiadomienia o niskim stanie magazynowym, zmianach cen konkurencji i ostrzezeniach o zgodnosci (compliance). Kazdy typ mozna wlaczac/wylaczac niezaleznie.' },
-  { question: 'Jak zmienic format eksportu?', answer: 'W sekcji "Dane i eksport" wybierz preferowany format (CSV, JSON, Excel). Wszystkie pobrania z systemu beda uzywaly wybranego formatu.' },
+  { question: 'Jak zmienić domyślny marketplace?', answer: 'W sekcji "Ustawienia ogólne" wybierz nowy marketplace z listy i kliknij "Zapisz". Wszystkie nowe optymalizacje będą domyślnie tworzone dla wybranego rynku.' },
+  { question: 'Jak połączyć klucz API marketplace?', answer: 'W sekcji "Połączenia z marketplace" wpisz klucz API w pole obok nazwy marketplace i kliknij "Połącz". Status zmieni się na "Połączony" po weryfikacji klucza.' },
+  { question: 'Jakie powiadomienia są dostępne?', answer: 'Możesz włączyć alerty email, powiadomienia o niskim stanie magazynowym, zmianach cen konkurencji i ostrzeżeniach o zgodności (compliance). Każdy typ można włączać/wyłączać niezależnie.' },
+  { question: 'Jak zmienić format eksportu?', answer: 'W sekcji "Dane i eksport" wybierz preferowany format (CSV, JSON, Excel). Wszystkie pobrania z systemu będą używały wybranego formatu.' },
 ]
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,7 +49,7 @@ const EXPORT_OPTIONS: { id: ExportFormat; label: string }[] = [
 ]
 
 const SYNC_OPTIONS: { id: SyncFrequency; label: string }[] = [
-  { id: 'manual', label: 'Reczna' },
+  { id: 'manual', label: 'Ręczna' },
   { id: '1h', label: '1h' },
   { id: '6h', label: '6h' },
   { id: '12h', label: '12h' },
@@ -105,9 +105,9 @@ export default function SettingsPage() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <p className="text-gray-400">Nie udalo sie zaladowac ustawien</p>
+        <p className="text-gray-400">Nie udało się załadować ustawień</p>
         <Button variant="outline" onClick={() => refetch()}>
-          Ponow
+          Ponów
         </Button>
       </div>
     )
@@ -119,7 +119,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Ustawienia</h1>
         <p className="text-sm text-gray-400">
-          Konfiguracja sklepu, polaczenia z marketplace&apos;ami i preferencje. Ustaw domyslny rynek, powiadomienia i format eksportu.
+          Konfiguracja sklepu, połączenia z marketplace&apos;ami i preferencje. Ustaw domyślny rynek, powiadomienia i format eksportu.
         </p>
       </div>
 
@@ -128,7 +128,7 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <SettingsIcon className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Ustawienia ogolne</CardTitle>
+            <CardTitle className="text-lg">Ustawienia ogólne</CardTitle>
           </div>
           <CardDescription>Podstawowa konfiguracja sklepu</CardDescription>
         </CardHeader>
@@ -145,7 +145,7 @@ export default function SettingsPage() {
 
           {/* Domyslny marketplace */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Domyslny marketplace</label>
+            <label className="mb-1 block text-sm text-gray-400">Domyślny marketplace</label>
             <div className="flex flex-wrap gap-2">
               {MARKETPLACE_OPTIONS.map((mp) => (
                 <Button
@@ -203,9 +203,9 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Link className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Polaczenia z marketplace&apos;ami</CardTitle>
+            <CardTitle className="text-lg">Połączenia z marketplace&apos;ami</CardTitle>
           </div>
-          <CardDescription>Zarzadzaj polaczeniami API do marketplace&apos;ow</CardDescription>
+          <CardDescription>Zarządzaj połączeniami API do marketplace&apos;ów</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
@@ -223,7 +223,7 @@ export default function SettingsPage() {
                         : 'bg-gray-700 text-gray-400'
                     }`}
                   >
-                    {conn.connected ? 'Polaczony' : 'Rozlaczony'}
+                    {conn.connected ? 'Połączony' : 'Rozłączony'}
                   </span>
                 </div>
 
@@ -235,7 +235,7 @@ export default function SettingsPage() {
                     updated[idx] = { ...updated[idx], api_key: e.target.value }
                     setConnections(updated)
                   }}
-                  placeholder="Wprowadz klucz API"
+                  placeholder="Wprowadź klucz API"
                 />
 
                 <Button
@@ -255,7 +255,7 @@ export default function SettingsPage() {
                     setConnections(updated)
                   }}
                 >
-                  {conn.connected ? 'Rozlacz' : 'Polacz'}
+                  {conn.connected ? 'Rozłącz' : 'Połącz'}
                 </Button>
               </div>
             ))}
@@ -280,21 +280,21 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Preferencje powiadomien</CardTitle>
+            <CardTitle className="text-lg">Preferencje powiadomień</CardTitle>
           </div>
-          <CardDescription>Wybierz jakie alerty chcesz otrzymywac</CardDescription>
+          <CardDescription>Wybierz jakie alerty chcesz otrzymywać</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {([
             {
               key: 'email_alerts' as const,
               label: 'Alerty email',
-              desc: 'Otrzymuj powiadomienia email o waznych zdarzeniach',
+              desc: 'Otrzymuj powiadomienia email o ważnych zdarzeniach',
             },
             {
               key: 'low_stock_alerts' as const,
               label: 'Alerty niskiego stanu',
-              desc: 'Powiadomienie gdy stan magazynowy spadnie ponizej minimum',
+              desc: 'Powiadomienie gdy stan magazynowy spadnie poniżej minimum',
             },
             {
               key: 'competitor_price_changes' as const,
@@ -303,8 +303,8 @@ export default function SettingsPage() {
             },
             {
               key: 'compliance_warnings' as const,
-              label: 'Ostrzezenia zgodnosci',
-              desc: 'Powiadomienia o problemach ze zgodnosciami listingow',
+              label: 'Ostrzeżenia zgodności',
+              desc: 'Powiadomienia o problemach ze zgodnościami listingów',
             },
           ]).map((item) => (
             <div
@@ -369,9 +369,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Czestotliwosc synchronizacji */}
+          {/* Częstotliwość synchronizacji */}
           <div>
-            <label className="mb-1 block text-sm text-gray-400">Czestotliwosc auto-synchronizacji</label>
+            <label className="mb-1 block text-sm text-gray-400">Częstotliwość auto-synchronizacji</label>
             <div className="flex gap-2">
               {SYNC_OPTIONS.map((opt) => (
                 <Button
@@ -407,7 +407,7 @@ export default function SettingsPage() {
       </Card>
 
       <FaqSection
-        title="Najczesciej zadawane pytania"
+        title="Najczęściej zadawane pytania"
         subtitle="Konfiguracja i ustawienia"
         items={SETTINGS_FAQ}
       />

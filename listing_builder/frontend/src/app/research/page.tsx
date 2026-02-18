@@ -24,25 +24,25 @@ const SKILLS = [
   {
     category: 'Badanie rynku',
     items: [
-      { id: 'deep-customer-research', label: 'Badanie klienta', icon: Users, desc: 'Symuluje 12 pytan badawczych jako grupa docelowa — pain points, motywacje, jezyk kupujacych' },
+      { id: 'deep-customer-research', label: 'Badanie klienta', icon: Users, desc: 'Symuluje 12 pytań badawczych jako grupa docelowa — pain points, motywacje, język kupujących' },
       { id: 'icp-discovery', label: 'Odkrywanie ICP', icon: Target, desc: 'Testuje produkt na 6 segmentach — scoring, ranking, najlepsza grupa docelowa' },
-      { id: 'idea-validation', label: 'Walidacja pomyslu', icon: Rocket, desc: 'Brutalna ocena pomyslu — Go/Pivot/Kill z matryca dowodow' },
+      { id: 'idea-validation', label: 'Walidacja pomysłu', icon: Rocket, desc: 'Brutalna ocena pomysłu — Go/Pivot/Kill z matrycą dowodów' },
     ],
   },
   {
     category: 'Kreacja',
     items: [
       { id: 'creative-brief', label: 'Brief kreatywny', icon: Lightbulb, desc: 'Brief strategiczny z insightem, single-minded message i tone guidance' },
-      { id: 'creative-testing', label: 'Test kreacji', icon: Search, desc: 'Symuluje reakcje grupy docelowej na koncepty PRZED wydaniem budzetu' },
+      { id: 'creative-testing', label: 'Test kreacji', icon: Search, desc: 'Symuluje reakcje grupy docelowej na koncepty PRZED wydaniem budżetu' },
     ],
   },
   {
     category: 'Reklamy',
     items: [
-      { id: 'facebook-ad-copy', label: 'Facebook/Instagram', icon: Megaphone, desc: '14 wariantow reklam: pain point, benefit, social proof, story, urgency' },
-      { id: 'google-ad-copy', label: 'Google Ads RSA', icon: PenTool, desc: '15 naglowkow + 4 opisy z limitem znakow i Quality Score checklistą' },
+      { id: 'facebook-ad-copy', label: 'Facebook/Instagram', icon: Megaphone, desc: '14 wariantów reklam: pain point, benefit, social proof, story, urgency' },
+      { id: 'google-ad-copy', label: 'Google Ads RSA', icon: PenTool, desc: '15 nagłówków + 4 opisy z limitem znaków i Quality Score checklistą' },
       { id: 'video-script', label: 'Skrypt wideo', icon: Video, desc: 'Skrypt z timingiem, 3 hooki, pacing guide — TikTok/YouTube/UGC' },
-      { id: 'email-campaign', label: 'Email kampania', icon: Mail, desc: '15 subject lines + 5 wariantow maila z A/B planem' },
+      { id: 'email-campaign', label: 'Email kampania', icon: Mail, desc: '15 subject lines + 5 wariantów maila z A/B planem' },
     ],
   },
 ]
@@ -57,7 +57,7 @@ const EXTRA_FIELDS: Record<string, { key: string; label: string; placeholder: st
     { key: 'objective', label: 'Cel', placeholder: 'np. conversions, leads, traffic' },
     { key: 'offer', label: 'Oferta', placeholder: 'np. -20% z kodem LAUNCH, darmowa dostawa' },
   ],
-  'google-ad-copy': [{ key: 'keywords', label: 'Slowa kluczowe', placeholder: 'np. organic dog treats, healthy snacks for dogs' }],
+  'google-ad-copy': [{ key: 'keywords', label: 'Słowa kluczowe', placeholder: 'np. organic dog treats, healthy snacks for dogs' }],
   'email-campaign': [{ key: 'offer', label: 'Oferta', placeholder: 'np. darmowy trial, -30% na start' }],
 }
 
@@ -98,12 +98,12 @@ export default function ResearchPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Blad ${res.status}`)
+        throw new Error(data.detail || `Błąd ${res.status}`)
       }
 
       setResult(await res.json())
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Nieznany blad')
+      setError(e instanceof Error ? e.message : 'Nieznany błąd')
     } finally {
       setIsLoading(false)
     }
@@ -168,12 +168,12 @@ export default function ResearchPage() {
         )}
 
         <div>
-          <label className="mb-1 block text-xs text-gray-400">Produkt / usluga *</label>
+          <label className="mb-1 block text-xs text-gray-400">Produkt / usługa *</label>
           <input
             type="text"
             value={product}
             onChange={e => setProduct(e.target.value)}
-            placeholder="np. organiczne przysmaki dla psow, kurs e-commerce, aplikacja do budzetowania"
+            placeholder="np. organiczne przysmaki dla psów, kurs e-commerce, aplikacja do budżetowania"
             className="w-full rounded-lg border border-gray-800 bg-[#1A1A1A] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-800"
           />
         </div>
@@ -184,7 +184,7 @@ export default function ResearchPage() {
             type="text"
             value={audience}
             onChange={e => setAudience(e.target.value)}
-            placeholder="np. wlasciciele psow 30-50 lat, sprzedawcy Amazon, freelancerzy"
+            placeholder="np. właściciele psów 30-50 lat, sprzedawcy Amazon, freelancerzy"
             className="w-full rounded-lg border border-gray-800 bg-[#1A1A1A] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-800"
           />
         </div>
@@ -239,7 +239,7 @@ export default function ResearchPage() {
             </div>
             <div className="flex gap-2 text-[10px] text-gray-500">
               <span>{result.model}</span>
-              <span>{result.tokens_used} tokenow</span>
+              <span>{result.tokens_used} tokenów</span>
               <span>{result.cost}</span>
             </div>
           </div>

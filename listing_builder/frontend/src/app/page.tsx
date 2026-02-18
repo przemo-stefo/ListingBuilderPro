@@ -46,7 +46,7 @@ async function redirectToCheckout() {
   })
 
   if (!res.ok) {
-    alert('Blad tworzenia sesji platnosci. Sprobuj ponownie.')
+    alert('Błąd tworzenia sesji płatności. Spróbuj ponownie.')
     return
   }
 
@@ -96,7 +96,7 @@ export default function LandingPage() {
               FREE
             </span>
             <h2 className="text-2xl font-bold text-gray-300 mt-3">Zacznij za darmo</h2>
-            <p className="text-sm text-gray-500 mt-1">Sprawdz mozliwosci platformy</p>
+            <p className="text-sm text-gray-500 mt-1">Sprawdź możliwości platformy</p>
           </div>
 
           <ul className="space-y-3 flex-1">
@@ -133,7 +133,7 @@ export default function LandingPage() {
               <Crown className="h-3 w-3" />
               PREMIUM
             </span>
-            <h2 className="text-3xl font-bold text-white mt-3">Pelna moc AI</h2>
+            <h2 className="text-3xl font-bold text-white mt-3">Pełna moc AI</h2>
             <p className="text-sm text-gray-400 mt-1">Wszystko czego potrzebujesz do dominacji rynku</p>
           </div>
 
@@ -153,11 +153,11 @@ export default function LandingPage() {
               className="w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />
-              {loading ? 'Ladowanie...' : '49 PLN / miesiac'}
+              {loading ? 'Ładowanie...' : '49 PLN / miesiąc'}
               <Zap className="h-4 w-4" />
             </button>
             <p className="text-center text-xs text-gray-600">
-              Anuluj kiedy chcesz. Bez zobowiazan.
+              Anuluj kiedy chcesz. Bez zobowiązań.
             </p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function LandingPage() {
       {/* Feature comparison table */}
       <div className="rounded-xl border border-gray-800 bg-[#121212] overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-800">
-          <h3 className="text-lg font-semibold text-white">Porownanie funkcji</h3>
+          <h3 className="text-lg font-semibold text-white">Porównanie funkcji</h3>
         </div>
         <table className="w-full text-sm">
           <thead>
@@ -178,7 +178,7 @@ export default function LandingPage() {
           </thead>
           <tbody>
             {[
-              { feature: 'Optymalizacje / dzien', free: '3', premium: 'Bez limitu' },
+              { feature: 'Optymalizacje / dzień', free: '3', premium: 'Bez limitu' },
               { feature: 'RAG Knowledge Base', free: false, premium: true },
               { feature: 'Keyword Intelligence', free: false, premium: true },
               { feature: 'Monitoring & Alerty', free: false, premium: true },
@@ -227,33 +227,33 @@ export default function LandingPage() {
             </div>
             <div>
               <h3 className="text-2xl font-bold text-white">Ekspert AI</h3>
-              <p className="text-sm text-green-400">Twoj osobisty doradca e-commerce</p>
+              <p className="text-sm text-green-400">Twój osobisty doradca e-commerce</p>
             </div>
           </div>
           <p className="text-gray-300 max-w-2xl">
-            Zadaj pytanie — dostaniesz ekspercka odpowiedz oparta na ponad 10 000 fragmentow wiedzy
-            od najlepszych praktyków Amazon, PPC i e-commerce. Baza wiedzy budowana latami, dostepna w sekundy.
+            Zadaj pytanie — dostaniesz ekspercką odpowiedź opartą na ponad 10 000 fragmentów wiedzy
+            od najlepszych praktyków Amazon, PPC i e-commerce. Baza wiedzy budowana latami, dostępna w sekundy.
           </p>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="flex items-start gap-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
               <MessageSquare className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-white">Natychmiastowe odpowiedzi</p>
-                <p className="text-xs text-gray-500">Pytaj o PPC, listingi, algorytm A9, COSMO i wiecej</p>
+                <p className="text-xs text-gray-500">Pytaj o PPC, listingi, algorytm A9, COSMO i więcej</p>
               </div>
             </div>
             <div className="flex items-start gap-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
               <BookOpen className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-white">10 266 fragmentow wiedzy</p>
-                <p className="text-xs text-gray-500">Inner Circle, Ecom Creative i materialy eksperckie</p>
+                <p className="text-sm font-medium text-white">10 266 fragmentów wiedzy</p>
+                <p className="text-xs text-gray-500">Inner Circle, Ecom Creative i materiały eksperckie</p>
               </div>
             </div>
             <div className="flex items-start gap-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
               <Shield className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-white">Zrodla i cytaty</p>
-                <p className="text-xs text-gray-500">Kazda odpowiedz z linkiem do zrodla wiedzy</p>
+                <p className="text-sm font-medium text-white">Źródła i cytaty</p>
+                <p className="text-xs text-gray-500">Każda odpowiedź z linkiem do źródła wiedzy</p>
               </div>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function LandingPage() {
             className="rounded-lg bg-green-900/40 border border-green-800/50 px-6 py-2.5 text-sm font-medium text-green-400 hover:bg-green-900/60 transition-colors flex items-center gap-2"
           >
             <Brain className="h-4 w-4" />
-            Wyprobuj Eksperta AI
+            Wypróbuj Eksperta AI
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -274,7 +274,7 @@ export default function LandingPage() {
           onClick={() => router.push('/payment/recover')}
           className="text-gray-500 text-xs hover:text-gray-400 transition-colors"
         >
-          Masz juz klucz? Odzyskaj go tutaj
+          Masz już klucz? Odzyskaj go tutaj
         </button>
       </div>
 
@@ -284,7 +284,7 @@ export default function LandingPage() {
             onClick={() => router.push('/dashboard')}
             className="text-amber-400 text-sm hover:underline flex items-center gap-1 mx-auto"
           >
-            Jestes Premium — przejdz do Dashboard
+            Jesteś Premium — przejdź do Dashboard
             <ArrowRight className="h-3 w-3" />
           </button>
         </div>
