@@ -80,7 +80,11 @@ const complianceSubItems = [
   { key: 'epr', label: 'Raporty EPR', icon: FileBarChart, desc: 'Raporty EPR wymagane przez regulacje UE' },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { tier, isLoading } = useTier()
@@ -90,8 +94,11 @@ export function Sidebar() {
   const [complianceOpen, setComplianceOpen] = useState(isOnCompliance)
   const activeComplianceTab = searchParams.get('tab') || 'dashboard'
 
+  // WHY: Close sidebar on mobile after navigating
+  const handleNav = () => onClose?.()
+
   return (
-    <div className="w-64 border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
+    <div className="w-64 h-full border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">
           OctoHelper
@@ -115,6 +122,7 @@ export function Sidebar() {
                   <div key={item.href} className="group/nav relative">
                     <Link
                       href={item.href}
+                      onClick={handleNav}
                       className={cn(
                         'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
                         isActive
@@ -184,6 +192,7 @@ export function Sidebar() {
                   <div key={key} className="group/sub relative">
                     <Link
                       href={`/compliance?tab=${key}`}
+                      onClick={handleNav}
                       className={cn(
                         'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
                         isSubActive
@@ -210,6 +219,7 @@ export function Sidebar() {
           <div className="group/nav relative mt-0.5">
             <Link
               href="/news"
+              onClick={handleNav}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
                 pathname === '/news'
@@ -227,6 +237,7 @@ export function Sidebar() {
         <div className="pt-2 border-t border-gray-800/50 space-y-0.5">
           <Link
             href="/account"
+            onClick={handleNav}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
               pathname === '/account'
@@ -239,6 +250,7 @@ export function Sidebar() {
           </Link>
           <Link
             href="/settings"
+            onClick={handleNav}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
               pathname === '/settings'
