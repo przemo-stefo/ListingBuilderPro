@@ -43,20 +43,20 @@ def _call_gemini(
 ) -> Tuple[str, Optional[dict]]:
     """Call Google Gemini API. Returns (text, usage_dict).
 
-    WHY: Uses per-request client instead of global genai.configure() —
-    genai.configure() sets module-level state, so concurrent requests with
-    different API keys would race. Client-based approach is thread-safe.
+    WHY: Uses per-request configure() call — google-generativeai doesn't
+    have a Client-based API, so we reconfigure before each call. This is
+    safe because Gemini calls are dispatched through this single function.
     """
-    from google import genai as genai_client
+    import google.generativeai as genai
 
-    client = genai_client.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config={
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
-        },
+    genai.configure(api_key=api_key)
+    gen_model = genai.GenerativeModel(model)
+    response = gen_model.generate_content(
+        prompt,
+        generation_config=genai.types.GenerationConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        ),
     )
 
     text = response.text.strip()
