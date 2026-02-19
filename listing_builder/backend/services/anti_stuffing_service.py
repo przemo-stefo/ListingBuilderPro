@@ -6,14 +6,18 @@ from __future__ import annotations
 
 import re
 from typing import List, Dict, Any
+import structlog
+
+logger = structlog.get_logger()
 
 
 # WHY: Amazon's A10 algorithm penalizes keyword density >3% per word
 MAX_DENSITY_PCT = 3.0
 # WHY: Repeating a word more than 2x in title looks spammy and triggers suppression
 TITLE_MAX_REPEATS = 2
-# WHY: Across the full listing, 3x is the safe ceiling per DataDive analysis
-LISTING_MAX_REPEATS = 3
+# WHY: Across the full listing, 5x is the safe ceiling — 3x was too aggressive
+# and flagged legitimate product terms (e.g. "stainless" in kitchenware listings)
+LISTING_MAX_REPEATS = 5
 # WHY: Skip common function words — they inflate density but aren't keyword stuffing.
 # Covers EN/DE/PL/FR/IT/ES since listings are generated in marketplace language.
 STOP_WORDS = {
@@ -64,6 +68,10 @@ def validate_keyword_density(text: str) -> List[str]:
         return warnings
 
     for word, count in counts.items():
+        # WHY: A word appearing only once is never "stuffing" — skip to avoid
+        # false positives on short texts where 1/9 = 11% density
+        if count < 2:
+            continue
         density = (count / total) * 100
         if density > MAX_DENSITY_PCT:
             warnings.append(
@@ -103,4 +111,6 @@ def run_anti_stuffing_check(
     full_text = title + " " + " ".join(bullets) + " " + description
     warnings = validate_keyword_density(full_text)
     warnings.extend(validate_word_repetition(title, bullets))
+    if warnings:
+        logger.info("anti_stuffing_warnings", count=len(warnings), first=warnings[0])
     return warnings

@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 from typing import List, Dict, Any, Tuple
+import structlog
+
+logger = structlog.get_logger()
 
 # WHY: DataDive's placement strategy assigns keywords by Ranking Juice (search_volume as proxy)
 # Title gets the highest-RJ keywords, bullets get mid-range, backend gets long-tail
@@ -66,7 +69,32 @@ def prepare_keywords_by_rj(
     backend_kw = sorted_kw[ranges["backend"][0]:ranges["backend"][1]]
     description_kw = sorted_kw[ranges["description"][0]:ranges["description"][1]]
 
+    logger.debug(
+        "keywords_placed_by_rj",
+        account_type=account_type, total=len(sorted_kw),
+        title=len(title_kw), bullets=len(bullets_kw),
+        backend=len(backend_kw), description=len(description_kw),
+    )
+
     return sorted_kw, title_kw, bullets_kw, backend_kw, description_kw
+
+
+def extract_root_words(keywords: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Extract unique root words (2+ chars) with aggregate search volume.
+
+    WHY: Root words show which individual terms carry the most search demand.
+    Used by optimizer to populate keyword_intel in the response.
+    """
+    roots: Dict[str, int] = {}
+    for kw in keywords:
+        words = kw["phrase"].lower().split()
+        vol = kw.get("search_volume", 0)
+        for w in words:
+            w = w.strip(".,;:-()[]")
+            if len(w) >= 2:
+                roots[w] = roots.get(w, 0) + vol
+    sorted_roots = sorted(roots.items(), key=lambda x: x[1], reverse=True)[:20]
+    return [{"word": w, "total_volume": v} for w, v in sorted_roots]
 
 
 def prepare_keywords_with_fallback(

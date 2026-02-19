@@ -32,7 +32,16 @@ import { FeedbackWidget } from './FeedbackWidget'
 import { KeywordIntelCard } from './KeywordIntelCard'
 import AudienceResearchCard from './AudienceResearchCard'
 import { PPCRecommendationsCard } from './PPCRecommendationsCard'
-import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword } from '@/lib/types'
+import { useSettings } from '@/lib/hooks/useSettings'
+import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider } from '@/lib/types'
+
+// WHY: Same provider list as settings — keeps UI consistent
+const LLM_PROVIDERS: { id: LLMProvider; label: string; hint: string }[] = [
+  { id: 'groq', label: 'Groq (w cenie)', hint: 'Llama 3.3 70B — darmowy' },
+  { id: 'gemini_flash', label: 'Gemini Flash', hint: 'Szybki i tani' },
+  { id: 'gemini_pro', label: 'Gemini Pro', hint: 'Najlepsza jakosc' },
+  { id: 'openai', label: 'OpenAI', hint: 'GPT-4o Mini' },
+]
 
 // WHY: Marketplace options match what the n8n workflow supports
 const MARKETPLACES = [
@@ -58,6 +67,14 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
   const [marketplace, setMarketplace] = useState('amazon_de')
   const [mode, setMode] = useState<'aggressive' | 'standard'>('aggressive')
   const [accountType, setAccountType] = useState<'seller' | 'vendor'>('seller')
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>('groq')
+  const [inlineLlmKey, setInlineLlmKey] = useState('')
+
+  // WHY: Read saved LLM settings — masked keys mean user saved a key in Settings
+  const { data: settingsData } = useSettings()
+  const savedLlmKey = settingsData?.llm?.providers?.[llmProvider]?.api_key || ''
+  // WHY: Masked key (****) means backend HAS a saved key — backend will read it directly
+  const hasSavedKey = savedLlmKey.length > 0 && savedLlmKey !== '****'
 
   // Results — use loaded result from history if provided
   const [results, setResults] = useState<OptimizerResponse | null>(null)
@@ -131,6 +148,11 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
       category: category || undefined,
       audience_context: audienceContext || undefined,
       account_type: accountType,
+      // WHY: Only send provider info when not default Groq
+      ...(llmProvider !== 'groq' && {
+        llm_provider: llmProvider,
+        llm_api_key: inlineLlmKey || undefined,
+      }),
     }
 
     generateMutation.mutate(payload, {
@@ -237,6 +259,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
             <Target className="h-5 w-5 text-gray-400" />
             <CardTitle className="text-lg">Cel i tryb</CardTitle>
           </div>
+          <CardDescription>Wybierz marketplace, tryb optymalizacji, typ konta i model AI</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -332,6 +355,45 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
               </button>
             </div>
           </div>
+
+          {/* WHY: LLM provider picker — lets user choose Gemini/OpenAI per optimization */}
+          <div>
+            <label className="mb-1 block text-sm text-gray-400">Model AI</label>
+            <p className="mb-2 text-[10px] text-gray-500">Silnik AI generujacy listing. Groq jest darmowy. Inne wymagaja klucza API (zapisz go w Ustawieniach).</p>
+            <div className="flex flex-wrap gap-2">
+              {LLM_PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => { setLlmProvider(p.id); setInlineLlmKey('') }}
+                  title={p.hint}
+                  className={cn(
+                    'rounded-lg border px-3 py-1.5 text-sm transition-colors',
+                    llmProvider === p.id
+                      ? 'border-white bg-white/5 text-white'
+                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
+                  )}
+                >
+                  {p.label}
+                  <span className="ml-1 text-[9px] text-gray-600">{p.hint}</span>
+                </button>
+              ))}
+            </div>
+            {/* WHY: Show inline key input when no saved key for this provider */}
+            {llmProvider !== 'groq' && !hasSavedKey && (
+              <div className="mt-2">
+                <Input
+                  type="password"
+                  value={inlineLlmKey}
+                  onChange={(e) => setInlineLlmKey(e.target.value)}
+                  placeholder="Wklej klucz API (lub zapisz w Ustawieniach)"
+                  className="text-sm"
+                />
+              </div>
+            )}
+            {llmProvider !== 'groq' && hasSavedKey && (
+              <p className="mt-1 text-[10px] text-gray-500">Uzyje klucza zapisanego w Ustawieniach</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -407,7 +469,7 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
               optimizationSource={displayResults.optimization_source}
             />
           )}
-          <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} coverageBreakdown={displayResults.coverage_breakdown} />
+          <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} coverageBreakdown={displayResults.coverage_breakdown} llmProvider={displayResults.llm_provider} />
           <ListingCard
             listing={displayResults.listing}
             compliance={displayResults.compliance}

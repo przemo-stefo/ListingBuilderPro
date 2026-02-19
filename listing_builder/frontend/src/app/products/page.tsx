@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatRelativeTime, getStatusColor, truncate, cn } from '@/lib/utils'
-import { Search, Trash2, ExternalLink, Filter } from 'lucide-react'
+import { Search, Trash2, ExternalLink, Sparkles } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const PRODUCTS_FAQ = [
@@ -170,9 +170,15 @@ export default function ProductsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {/* WHY: Quick action to send product to optimizer with prefill */}
+                    <Link href={`/optimize?prefill=${encodeURIComponent(JSON.stringify({ title: product.title, description: product.description || '', asin: product.asin || '' }))}`}>
+                      <Button variant="ghost" size="icon" title="Optymalizuj">
+                        <Sparkles className="h-4 w-4 text-blue-400" />
+                      </Button>
+                    </Link>
                     <Link href={`/products/${product.id}`}>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" title="Szczegóły">
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     </Link>
@@ -181,6 +187,7 @@ export default function ProductsPage() {
                       size="icon"
                       onClick={() => handleDelete(product.id)}
                       disabled={deleteProduct.isPending}
+                      title="Usuń"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>

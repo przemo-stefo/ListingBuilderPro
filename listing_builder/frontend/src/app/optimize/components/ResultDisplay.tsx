@@ -9,7 +9,15 @@ import { Copy, Check } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { OptimizerResponse } from '@/lib/types'
+import type { OptimizerResponse, LLMProvider } from '@/lib/types'
+
+// WHY: Human-readable labels for provider badges in results
+const PROVIDER_LABELS: Record<string, string> = {
+  groq: 'Groq',
+  gemini_flash: 'Gemini Flash',
+  gemini_pro: 'Gemini Pro',
+  openai: 'OpenAI',
+}
 
 // WHY: Map marketplace to eBay SiteID — each eBay market has a different numeric ID
 function getEbaySiteId(marketplace: string): number {
@@ -76,10 +84,12 @@ export function ScoresCard({
   scores,
   intel,
   coverageBreakdown,
+  llmProvider,
 }: {
   scores: OptimizerResponse['scores']
   intel: OptimizerResponse['keyword_intel']
   coverageBreakdown?: OptimizerResponse['coverage_breakdown']
+  llmProvider?: LLMProvider
 }) {
   const coverageColor =
     scores.coverage_pct >= 96
@@ -98,7 +108,15 @@ export function ScoresCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Wyniki optymalizacji</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-lg">Wyniki optymalizacji</CardTitle>
+          {/* WHY: Show which AI model generated this listing when not default Groq */}
+          {llmProvider && llmProvider !== 'groq' && (
+            <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 text-[10px]" title="Listing wygenerowany tym modelem AI zamiast domyslnego Groq">
+              {PROVIDER_LABELS[llmProvider] || llmProvider}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

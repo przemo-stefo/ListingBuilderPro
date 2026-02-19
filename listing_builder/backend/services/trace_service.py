@@ -6,8 +6,7 @@ import time
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-# WHY: Groq llama-3.3-70b pricing per 1M tokens (as of 2026-02)
-COST_PER_1M = {"prompt": 0.59, "completion": 0.79}
+from services.llm_providers import get_cost_per_1m
 
 
 def new_trace(name: str) -> dict:
@@ -74,10 +73,16 @@ def finalize_trace(trace: dict) -> dict:
 
     total_tokens = prompt_tokens + completion_tokens
 
-    # WHY: Cost estimate helps track spend without external billing dashboards
+    # WHY: Cost estimate per model — each provider has different pricing
+    model_name = "unknown"
+    for s in trace["spans"]:
+        if "model" in s:
+            model_name = s["model"]
+            break
+    cost = get_cost_per_1m(model_name)
     est_cost = (
-        (prompt_tokens / 1_000_000) * COST_PER_1M["prompt"]
-        + (completion_tokens / 1_000_000) * COST_PER_1M["completion"]
+        (prompt_tokens / 1_000_000) * cost["prompt"]
+        + (completion_tokens / 1_000_000) * cost["completion"]
     )
 
     return {

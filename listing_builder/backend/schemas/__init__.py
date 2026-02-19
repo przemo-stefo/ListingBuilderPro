@@ -59,6 +59,8 @@ from .mock_data import (
     MarketplaceConnection,
     NotificationSettings,
     DataExportSettings,
+    LLMProviderConfig,
+    LLMSettings,
     SettingsResponse,
     DashboardStatsResponse,
 )
@@ -92,6 +94,8 @@ __all__ = [
     "MarketplaceConnection",
     "NotificationSettings",
     "DataExportSettings",
+    "LLMProviderConfig",
+    "LLMSettings",
     "SettingsResponse",
     "DashboardStatsResponse",
     "ComplianceIssue",

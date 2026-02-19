@@ -22,7 +22,7 @@ export default function ImportPage() {
   const [activeTab, setActiveTab] = useState<'single' | 'batch'>('batch')
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <button

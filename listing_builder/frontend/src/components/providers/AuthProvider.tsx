@@ -78,8 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = useCallback(async (email: string) => {
     const supabase = createClient()
+    // WHY: redirectTo → /auth/callback exchanges PKCE code, then redirects to /login?mode=reset
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login`,
+      redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/login?mode=reset')}`,
     })
     if (error) return { error: error.message }
     return {}

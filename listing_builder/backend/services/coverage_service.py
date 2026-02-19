@@ -14,7 +14,7 @@ logger = structlog.get_logger()
 COVERAGE_TARGET = 95.0
 
 
-def _extract_words(text: str) -> Set[str]:
+def extract_words(text: str) -> Set[str]:
     """Extract unique words from text using word boundaries.
 
     WHY: Simple `w in text` is substring matching — "cap" matches "capsule".
@@ -24,7 +24,7 @@ def _extract_words(text: str) -> Set[str]:
     return set(re.findall(r"[a-zA-Z0-9äöüßÄÖÜąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+", text.lower()))
 
 
-def _keyword_covered(phrase: str, word_set: Set[str]) -> bool:
+def keyword_covered(phrase: str, word_set: Set[str]) -> bool:
     """Check if >= 70% of a keyword's words appear in the word set."""
     words = phrase.lower().split()
     if not words:
@@ -43,17 +43,17 @@ def _coverage_for_word_set(
     """
     if not keywords:
         return 0.0, 0, 0
-    covered = sum(1 for kw in keywords if _keyword_covered(kw["phrase"], word_set))
+    covered = sum(1 for kw in keywords if keyword_covered(kw["phrase"], word_set))
     total = len(keywords)
     pct = round((covered / total) * 100, 1) if total > 0 else 0.0
     return pct, covered, total
 
 
-def _coverage_for_text(
+def coverage_for_text(
     keywords: List[Dict[str, Any]], text: str,
 ) -> Tuple[float, int, int]:
     """Convenience wrapper — extracts words then delegates to _coverage_for_word_set."""
-    return _coverage_for_word_set(keywords, _extract_words(text))
+    return _coverage_for_word_set(keywords, extract_words(text))
 
 
 def count_exact_matches(keywords: List[Dict[str, Any]], text: str) -> int:
@@ -61,12 +61,16 @@ def count_exact_matches(keywords: List[Dict[str, Any]], text: str) -> int:
 
     WHY: Exact phrase matches are stronger ranking signals than partial word matches.
     Used by optimizer_service for the 'exact_matches_in_title' score.
+    Word-boundary regex prevents "cap" falsely matching inside "capsule".
     """
     text_lower = text.lower()
-    return sum(1 for kw in keywords if kw["phrase"].lower() in text_lower)
+    return sum(
+        1 for kw in keywords
+        if re.search(rf"\b{re.escape(kw['phrase'].lower())}\b", text_lower)
+    )
 
 
-def _grade(pct: float) -> str:
+def grade(pct: float) -> str:
     """Coverage grade label."""
     if pct >= 95:
         return "EXCELLENT"
@@ -93,11 +97,11 @@ def calculate_multi_tier_coverage(
     full_text = f"{title} {bullets_text} {description} {backend}"
 
     # WHY: Precompute all word sets once — avoids 5x redundant regex extraction
-    full_ws = _extract_words(full_text)
-    title_ws = _extract_words(title)
-    bullets_ws = _extract_words(bullets_text)
-    backend_ws = _extract_words(backend)
-    desc_ws = _extract_words(description)
+    full_ws = extract_words(full_text)
+    title_ws = extract_words(title)
+    bullets_ws = extract_words(bullets_text)
+    backend_ws = extract_words(backend)
+    desc_ws = extract_words(description)
 
     overall_pct, overall_covered, overall_total = _coverage_for_word_set(keywords, full_ws)
     title_pct, _, _ = _coverage_for_word_set(keywords, title_ws)
@@ -108,7 +112,7 @@ def calculate_multi_tier_coverage(
     # WHY: Find keywords not covered anywhere — reuses precomputed full_ws
     missing = [
         kw["phrase"] for kw in keywords
-        if not _keyword_covered(kw["phrase"], full_ws)
+        if not keyword_covered(kw["phrase"], full_ws)
     ]
 
     logger.debug(
@@ -121,7 +125,7 @@ def calculate_multi_tier_coverage(
 
     return {
         "overall_pct": overall_pct,
-        "overall_grade": _grade(overall_pct),
+        "overall_grade": grade(overall_pct),
         "overall_covered": overall_covered,
         "overall_total": overall_total,
         "target_pct": COVERAGE_TARGET,

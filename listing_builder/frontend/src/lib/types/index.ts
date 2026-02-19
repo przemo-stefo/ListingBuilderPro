@@ -345,6 +345,7 @@ export interface SettingsResponse {
   marketplace_connections: MarketplaceConnection[]
   notifications: NotificationSettings
   data_export: DataExportSettings
+  llm?: LLMSettings
 }
 
 // WHY: Partial so each section can be saved independently
@@ -486,6 +487,18 @@ export interface ComplianceReportsListResponse {
   offset: number
 }
 
+// LLM Provider types
+export type LLMProvider = 'groq' | 'gemini_flash' | 'gemini_pro' | 'openai'
+
+export interface LLMProviderConfig {
+  api_key: string
+}
+
+export interface LLMSettings {
+  default_provider: LLMProvider
+  providers: Partial<Record<LLMProvider, LLMProviderConfig>>
+}
+
 // Listing Optimizer types (n8n workflow)
 export interface OptimizerKeyword {
   phrase: string
@@ -504,6 +517,9 @@ export interface OptimizerRequest {
   category?: string
   audience_context?: string
   account_type?: 'seller' | 'vendor'
+  // WHY: Multi-LLM — client picks provider and sends their API key
+  llm_provider?: LLMProvider
+  llm_api_key?: string
 }
 
 export interface OptimizerListing {
@@ -587,6 +603,7 @@ export interface OptimizerResponse {
   compliance: OptimizerCompliance
   keyword_intel: OptimizerKeywordIntel
   ranking_juice?: RankingJuice
+  llm_provider?: LLMProvider
   optimization_source?: 'n8n' | 'direct'
   listing_history_id?: string | null
   coverage_breakdown?: CoverageBreakdown

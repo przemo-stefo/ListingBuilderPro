@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     database_url: str
 
     # AI/LLM - Groq (PRIMARY, NOT OpenAI)
+    groq_model: str = "llama-3.3-70b-versatile"  # WHY: Configurable via env — test new models without code change
     groq_api_key: str
     groq_api_key_2: str = ""  # WHY: Backup keys for rotation on 429 rate limits
     groq_api_key_3: str = ""

@@ -1,15 +1,16 @@
 // frontend/src/app/dashboard/page.tsx
-// Purpose: Dashboard home page with stats, quick actions, and Expert AI widget
+// Purpose: Dashboard home page with stats, app tiles, and Expert AI widget
 // NOT for: Product management or detailed views
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { formatNumber } from '@/lib/utils'
-import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight, Link2 } from 'lucide-react'
+import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight, Link2, Upload, Database, ArrowRightLeft } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const DASHBOARD_FAQ = [
@@ -145,12 +146,12 @@ export default function DashboardPage() {
             </p>
             <p className="text-xs text-yellow-600 mt-0.5">Token wygasł. Połącz ponownie w Integracje.</p>
           </div>
-          <a
-            href="/compliance?tab=integrations"
+          <Link
+            href="/integrations"
             className="rounded-lg bg-yellow-900/40 px-3 py-1.5 text-xs font-medium text-yellow-400 hover:bg-yellow-900/60 transition-colors"
           >
             Połącz ponownie
-          </a>
+          </Link>
         </div>
       )}
 
@@ -178,38 +179,48 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Szybkie akcje</CardTitle>
-          <CardDescription>
-            Najczęściej używane funkcje
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <a
-            href="/products/import"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
-          >
-            <Package className="h-8 w-8 mb-2 text-white" />
-            <span className="text-sm font-medium text-white">Importuj produkty</span>
-          </a>
-          <a
-            href="/optimize"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
-          >
-            <Sparkles className="h-8 w-8 mb-2 text-blue-500" />
-            <span className="text-sm font-medium text-white">Optymalizuj listingi</span>
-          </a>
-          {/* WHY: Replaced "Publikuj na marketplace" with "Ekspert AI" — Publish hidden in MVP */}
-          <a
-            href="/expert-qa"
-            className="flex flex-col items-center justify-center p-6 rounded-lg border border-green-900/30 hover:bg-green-900/10 transition-colors"
-          >
-            <Brain className="h-8 w-8 mb-2 text-green-400" />
-            <span className="text-sm font-medium text-green-400">Ekspert AI</span>
-          </a>
-        </CardContent>
-      </Card>
+      {/* WHY: 4 app tiles — each links to a core workflow (Import, Products, Converter, Optimizer) */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Link
+          href="/products/import"
+          className="group rounded-xl border border-gray-800 bg-[#1A1A1A] p-6 hover:border-gray-600 transition-colors"
+        >
+          <Upload className="h-8 w-8 mb-3 text-gray-400 group-hover:text-white transition-colors" />
+          <h3 className="text-sm font-semibold text-white mb-1">Importer</h3>
+          <p className="text-xs text-gray-500">CSV, Allegro URL lub ręcznie</p>
+          {(stats?.recent_imports ?? 0) > 0 && (
+            <p className="text-xs text-gray-400 mt-2">{stats?.recent_imports} importów (24h)</p>
+          )}
+        </Link>
+        <Link
+          href="/products"
+          className="group rounded-xl border border-gray-800 bg-[#1A1A1A] p-6 hover:border-gray-600 transition-colors"
+        >
+          <Database className="h-8 w-8 mb-3 text-gray-400 group-hover:text-white transition-colors" />
+          <h3 className="text-sm font-semibold text-white mb-1">Baza Produktów</h3>
+          <p className="text-xs text-gray-500">Przeglądaj i zarządzaj produktami</p>
+          <p className="text-xs text-gray-400 mt-2">{formatNumber(stats?.total_products || 0)} produktów</p>
+        </Link>
+        <Link
+          href="/converter"
+          className="group rounded-xl border border-gray-800 bg-[#1A1A1A] p-6 hover:border-gray-600 transition-colors"
+        >
+          <ArrowRightLeft className="h-8 w-8 mb-3 text-gray-400 group-hover:text-white transition-colors" />
+          <h3 className="text-sm font-semibold text-white mb-1">Konwerter</h3>
+          <p className="text-xs text-gray-500">Allegro → Amazon/eBay/Kaufland</p>
+        </Link>
+        <Link
+          href="/optimize"
+          className="group rounded-xl border border-gray-800 bg-[#1A1A1A] p-6 hover:border-gray-600 transition-colors"
+        >
+          <Sparkles className="h-8 w-8 mb-3 text-blue-500 group-hover:text-blue-400 transition-colors" />
+          <h3 className="text-sm font-semibold text-white mb-1">Optymalizator</h3>
+          <p className="text-xs text-gray-500">AI generuje tytuł, bullety, opis</p>
+          {(stats?.average_optimization_score ?? 0) > 0 && (
+            <p className="text-xs text-green-500 mt-2">Średnia: {Math.round(stats?.average_optimization_score || 0)}%</p>
+          )}
+        </Link>
+      </div>
 
       {/* WHY: Expert AI widget on dashboard — makes the feature more discoverable */}
       <Card className="border-green-900/30">

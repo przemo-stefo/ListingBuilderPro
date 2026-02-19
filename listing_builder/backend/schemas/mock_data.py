@@ -210,11 +210,22 @@ class DataExportSettings(BaseModel):
     auto_sync_frequency: str
 
 
+# WHY: Per-provider API key storage — keys masked on GET, raw on PUT
+class LLMProviderConfig(BaseModel):
+    api_key: str = ""
+
+
+class LLMSettings(BaseModel):
+    default_provider: str = "groq"
+    providers: dict[str, LLMProviderConfig] = {}
+
+
 class SettingsResponse(BaseModel):
     general: GeneralSettings
     marketplace_connections: list[MarketplaceConnection]
     notifications: NotificationSettings
     data_export: DataExportSettings
+    llm: Optional[LLMSettings] = None
 
 
 # --- Dashboard Stats ---

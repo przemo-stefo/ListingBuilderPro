@@ -5,6 +5,10 @@
 from __future__ import annotations
 
 from typing import List, Dict, Any
+from services.coverage_service import extract_words, keyword_covered
+import structlog
+
+logger = structlog.get_logger()
 
 
 def generate_ppc_recommendations(
@@ -17,7 +21,8 @@ def generate_ppc_recommendations(
     mid-range get phrase match, long-tail get broad match.
     Zero LLM cost — pure post-processing of existing keyword data.
     """
-    listing_lower = listing_text.lower()
+    # WHY: Word-set matching — "cap" won't falsely match "capsule"
+    listing_words = extract_words(listing_text)
     exact_match: List[Dict[str, Any]] = []
     phrase_match: List[Dict[str, Any]] = []
     broad_match: List[Dict[str, Any]] = []
@@ -28,8 +33,8 @@ def generate_ppc_recommendations(
         volume = kw.get("search_volume", 0)
         entry = {"phrase": phrase, "search_volume": volume}
 
-        # WHY: Check if keyword is actually in the listing (indexed = better relevance score)
-        is_indexed = phrase.lower() in listing_lower
+        # WHY: Word-boundary check — reuses coverage_service logic for consistency
+        is_indexed = keyword_covered(phrase, listing_words)
 
         if i < 10 and volume >= 1000:
             # WHY: Top 10 high-volume = exact match for maximum conversion at lowest ACoS
@@ -52,16 +57,29 @@ def generate_ppc_recommendations(
     # This is a starting point — user should review and adjust
     negative = _detect_competitor_terms(keywords_sorted)
 
+    # WHY: Slice to max display counts, then use sliced lists for summary
+    # so counts match the number of items the client actually receives
+    exact_out = exact_match[:15]
+    phrase_out = phrase_match[:20]
+    broad_out = broad_match[:25]
+    negative_out = negative[:10]
+
+    logger.debug(
+        "ppc_recommendations_generated",
+        exact=len(exact_out), phrase=len(phrase_out),
+        broad=len(broad_out), negative=len(negative_out),
+    )
+
     return {
-        "exact_match": exact_match[:15],
-        "phrase_match": phrase_match[:20],
-        "broad_match": broad_match[:25],
-        "negative_suggestions": negative[:10],
+        "exact_match": exact_out,
+        "phrase_match": phrase_out,
+        "broad_match": broad_out,
+        "negative_suggestions": negative_out,
         "summary": {
-            "exact_count": len(exact_match),
-            "phrase_count": len(phrase_match),
-            "broad_count": len(broad_match),
-            "negative_count": len(negative),
+            "exact_count": len(exact_out),
+            "phrase_count": len(phrase_out),
+            "broad_count": len(broad_out),
+            "negative_count": len(negative_out),
             "estimated_daily_budget_usd": _estimate_budget(exact_match, phrase_match),
         },
     }
@@ -79,10 +97,20 @@ def _detect_competitor_terms(keywords: List[Dict[str, Any]]) -> List[str]:
     generic_words = {
         "set", "kit", "pack", "box", "case", "bag", "holder", "stand",
         "cover", "mat", "pad", "tool", "bottle", "cup", "glass", "plate",
+        # WHY: Extended list — reviewer flagged false positives on material/shape words
+        "ceramic", "bamboo", "silicone", "stainless", "steel", "plastic",
+        "wooden", "metal", "rubber", "cotton", "leather", "foam", "nylon",
+        "large", "small", "mini", "extra", "heavy", "light", "slim", "flat",
+        "round", "square", "long", "short", "wide", "narrow", "thick", "thin",
+        "black", "white", "blue", "green", "pink", "grey", "gray", "brown",
+        "premium", "professional", "portable", "reusable", "universal",
+        "waterproof", "outdoor", "indoor", "travel", "kitchen", "garden",
+        "bathroom", "bedroom", "office", "storage", "organizer", "cleaner",
     }
     for kw in keywords:
         words = kw["phrase"].lower().split()
-        # Single-word keywords that aren't generic product terms might be brands
+        # WHY: Single-word keywords that aren't generic product terms might be brands.
+        # This is a heuristic — users should always review suggestions before applying.
         if len(words) == 1 and words[0] not in generic_words and len(words[0]) >= 4:
             suspects.append(kw["phrase"])
     return suspects

@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 from typing import Dict, Any
+import structlog
+
+logger = structlog.get_logger()
 
 
 def score_grey_market(
@@ -35,11 +38,13 @@ def score_grey_market(
     suppressed_score = min(suppressed_asins * 10, 20)
     score += suppressed_score
 
-    # WHY: IP/hijack reports are the strongest signal
-    hijack_score = min(hijack_reports * 20, 10)
+    # WHY: IP/hijack reports are the strongest signal — each report worth 10 points
+    hijack_score = min(hijack_reports * 10, 20)
     score += hijack_score
 
     total = min(round(score), 100)
+
+    logger.info("grey_market_scored", score=total, sellers=unauthorized_sellers, buybox=buy_box_rate)
 
     if total >= 70:
         risk_level = "CRITICAL"

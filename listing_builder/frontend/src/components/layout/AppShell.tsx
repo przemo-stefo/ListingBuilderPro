@@ -5,11 +5,12 @@
 'use client'
 
 import { Suspense, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { TierProvider } from '@/components/providers/TierProvider'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Toaster } from '@/components/ui/toaster'
-import { Menu } from 'lucide-react'
+import { Menu, Bell, Settings, UserCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -43,15 +44,38 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* WHY: Mobile-only header bar with hamburger — desktop has sidebar always visible */}
-          <div className="flex items-center gap-3 border-b border-gray-800 px-4 py-3 md:hidden">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <span className="text-sm font-bold text-white">OctoHelper</span>
+          {/* WHY: Header bar — hamburger on mobile, profile/settings/alerts icons on all screens */}
+          <div className="flex items-center justify-between border-b border-gray-800 px-6 py-2.5">
+            <div className="flex items-center gap-3 md:hidden">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <span className="text-sm font-bold text-white">OctoHelper</span>
+            </div>
+            <div className="hidden md:block" />
+            <div className="flex items-center gap-1">
+              <Link
+                href="/compliance?tab=alerts"
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+              >
+                <Bell className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/settings"
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/account"
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+              >
+                <UserCircle className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-8">

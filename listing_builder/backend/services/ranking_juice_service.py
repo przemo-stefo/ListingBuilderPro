@@ -9,7 +9,10 @@ Five weighted components → single 0-100 score + letter grade.
 WHY in FastAPI: Runs on BOTH n8n and fallback paths, so it must live in Python.
 """
 
+import re
 from typing import List, Dict
+
+from services.coverage_service import extract_words
 
 
 def calculate_ranking_juice(
@@ -90,8 +93,9 @@ def _coverage_score(
     """Keyword coverage (0-100). 70%+ word overlap = covered. Scored against top 200."""
     if not keywords:
         return 0
-    all_text = (title + " " + " ".join(bullets) + " " + backend + " " + description).lower()
-    all_words = set(all_text.split())
+    all_text = title + " " + " ".join(bullets) + " " + backend + " " + description
+    # WHY: extract_words uses word-boundary regex — "cap" won't match "capsule"
+    all_words = extract_words(all_text)
     top = keywords[:200]
     covered = 0
     for kw in top:
@@ -119,9 +123,11 @@ def _exact_match_score(keywords: List[Dict], title: str, bullets: List[str] = No
     score = 0
     for kw in top:
         phrase = kw["phrase"].lower()
-        if phrase in title_lower:
+        # WHY: Word-boundary regex prevents "cap" matching inside "capsule"
+        pattern = rf"\b{re.escape(phrase)}\b"
+        if re.search(pattern, title_lower):
             score += 1.5
-        elif phrase in bullets_text:
+        elif re.search(pattern, bullets_text):
             score += 1.0
     target = max(3, min(8, len(top) * 0.5))
     return min(100, (score / target) * 100)
@@ -138,18 +144,21 @@ def _search_volume_score(
     if total_vol == 0:
         return 50  # WHY: Default when no search volume data available
 
+    # WHY: Word-boundary matching prevents "cap" matching "capsule"
+    title_words = extract_words(title_lower)
     captured = 0
     for kw in top50:
         vol = kw.get("search_volume", 0)
         phrase = kw["phrase"].lower()
-        if phrase in title_lower:
+        pattern = rf"\b{re.escape(phrase)}\b"
+        if re.search(pattern, title_lower):
             captured += vol * 1.5
-        elif phrase in bullets_text:
+        elif re.search(pattern, bullets_text):
             captured += vol * 1.0
         else:
             # WHY: Partial overlap still counts (individual words present)
             phrase_words = set(phrase.split())
-            if phrase_words & set(title_lower.split()):
+            if phrase_words & title_words:
                 captured += vol * 0.3
 
     max_possible = total_vol * 1.5

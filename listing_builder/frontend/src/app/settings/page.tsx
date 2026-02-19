@@ -1,18 +1,23 @@
 // frontend/src/app/settings/page.tsx
-// Purpose: Settings page with 4 sections — General, Marketplaces, Notifications, Data & Export
+// Purpose: Settings page — General config, Notifications, Data & Export (Marketplace connections → /integrations)
 // NOT for: API logic or data fetching (handled by hooks/useSettings.ts)
 
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Settings as SettingsIcon, Link, Bell, Download, Save } from 'lucide-react'
+import Link from 'next/link'
+import { Settings as SettingsIcon, Link as LinkIcon, Bell, Download, Save, Cpu } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const SETTINGS_FAQ = [
   { question: 'Jak zmienić domyślny marketplace?', answer: 'W sekcji "Ustawienia ogólne" wybierz nowy marketplace z listy i kliknij "Zapisz". Wszystkie nowe optymalizacje będą domyślnie tworzone dla wybranego rynku.' },
-  { question: 'Jak połączyć klucz API marketplace?', answer: 'W sekcji "Połączenia z marketplace" wpisz klucz API w pole obok nazwy marketplace i kliknij "Połącz". Status zmieni się na "Połączony" po weryfikacji klucza.' },
+  { question: 'Jak połączyć marketplace?', answer: 'Przejdź do strony Integracje w menu głównym. Tam możesz połączyć konto przez OAuth (Amazon, Allegro, eBay) i zarządzać wszystkimi połączeniami w jednym miejscu.' },
   { question: 'Jakie powiadomienia są dostępne?', answer: 'Możesz włączyć alerty email, powiadomienia o niskim stanie magazynowym, zmianach cen konkurencji i ostrzeżeniach o zgodności (compliance). Każdy typ można włączać/wyłączać niezależnie.' },
   { question: 'Jak zmienić format eksportu?', answer: 'W sekcji "Dane i eksport" wybierz preferowany format (CSV, JSON, Excel). Wszystkie pobrania z systemu będą używały wybranego formatu.' },
+  { question: 'Co to jest "Model AI" i po co mi to?', answer: 'Model AI to silnik sztucznej inteligencji generujacy listingi. Domyslnie uzywa Groq (Llama 3.3 70B) — jest darmowy i wystarczajacy w wiekszosci przypadkow. Jesli chcesz wyzsza jakosc (np. Gemini Pro), mozesz podac swoj klucz API.' },
+  { question: 'Skad wziac klucz API Gemini lub OpenAI?', answer: 'Gemini: wejdz na aistudio.google.com → kliknij "Get API key" → skopiuj klucz. OpenAI: wejdz na platform.openai.com → API keys → "Create new secret key". Klucze sa platne wg zuzycia — sprawdz cennik danego providera.' },
+  { question: 'Czy Groq jest naprawde darmowy?', answer: 'Tak! Groq jest wliczony w cene i nie wymaga klucza API. Uzywa modelu Llama 3.3 70B Versatile — wystarczajaco dobrego do wiekszosci listingow. Platne providery (Gemini Pro, OpenAI) moga dawac lepsza jakosc tekstu.' },
+  { question: 'Co sie stanie jesli moj klucz API jest nieprawidlowy?', answer: 'System automatycznie przelacza na Groq (darmowy) jesli Twoj klucz API nie zadziala. Zobaczysz wynik wygenerowany przez Groq zamiast wybranego providera. Sprawdz klucz w Ustawieniach i sprobuj ponownie.' },
 ]
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,11 +25,19 @@ import { Input } from '@/components/ui/input'
 import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
 import type {
   MarketplaceId,
-  MarketplaceConnection,
   NotificationSettings,
   ExportFormat,
   SyncFrequency,
+  LLMProvider,
 } from '@/lib/types'
+
+// WHY: Provider options for the AI Model card — Groq is free (included), others need user's key
+const LLM_PROVIDERS: { id: LLMProvider; label: string; desc: string }[] = [
+  { id: 'groq', label: 'Groq', desc: 'Llama 3.3 70B (w cenie)' },
+  { id: 'gemini_flash', label: 'Gemini Flash', desc: 'Szybki, tani (Twoj klucz)' },
+  { id: 'gemini_pro', label: 'Gemini Pro', desc: 'Najlepsza jakosc (Twoj klucz)' },
+  { id: 'openai', label: 'OpenAI', desc: 'GPT-4o Mini (Twoj klucz)' },
+]
 
 const MARKETPLACE_OPTIONS: { id: MarketplaceId; label: string }[] = [
   { id: 'amazon', label: 'Amazon' },
@@ -78,7 +91,6 @@ export default function SettingsPage() {
   const [storeName, setStoreName] = useState('')
   const [defaultMarketplace, setDefaultMarketplace] = useState<MarketplaceId>('amazon')
   const [timezone, setTimezone] = useState('America/New_York')
-  const [connections, setConnections] = useState<MarketplaceConnection[]>([])
   const [notifications, setNotifications] = useState<NotificationSettings>({
     email_alerts: true,
     low_stock_alerts: true,
@@ -87,6 +99,9 @@ export default function SettingsPage() {
   })
   const [exportFormat, setExportFormat] = useState<ExportFormat>('csv')
   const [syncFrequency, setSyncFrequency] = useState<SyncFrequency>('6h')
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>('groq')
+  // WHY: Store per-provider API keys locally. Groq doesn't need one (our key).
+  const [llmKeys, setLlmKeys] = useState<Record<string, string>>({})
 
   // WHY: Populate local state when server data arrives or changes
   useEffect(() => {
@@ -94,10 +109,17 @@ export default function SettingsPage() {
     setStoreName(data.general.store_name)
     setDefaultMarketplace(data.general.default_marketplace)
     setTimezone(data.general.timezone)
-    setConnections(data.marketplace_connections)
     setNotifications(data.notifications)
     setExportFormat(data.data_export.default_export_format)
     setSyncFrequency(data.data_export.auto_sync_frequency)
+    if (data.llm) {
+      setLlmProvider(data.llm.default_provider)
+      const keys: Record<string, string> = {}
+      for (const [pname, pconf] of Object.entries(data.llm.providers || {})) {
+        keys[pname] = pconf?.api_key || ''
+      }
+      setLlmKeys(keys)
+    }
   }, [data])
 
   if (isLoading) return <LoadingSkeleton />
@@ -198,80 +220,92 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Card 2 — Polaczenia z marketplace'ami */}
+      {/* Card — Model AI */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Link className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Połączenia z marketplace&apos;ami</CardTitle>
+            <Cpu className="h-5 w-5 text-gray-400" />
+            <CardTitle className="text-lg">Model AI</CardTitle>
           </div>
-          <CardDescription>Zarządzaj połączeniami API do marketplace&apos;ów</CardDescription>
+          <CardDescription>Wybierz silnik AI do generowania listingow. Groq (Llama 3.3) jest darmowy i wliczony w cene. Gemini i OpenAI wymagaja Twojego klucza API.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            {connections.map((conn, idx) => (
-              <div
-                key={conn.id}
-                className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-4 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-white">{conn.name}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      conn.connected
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-gray-700 text-gray-400'
-                    }`}
-                  >
-                    {conn.connected ? 'Połączony' : 'Rozłączony'}
-                  </span>
-                </div>
-
-                <Input
-                  type="password"
-                  value={conn.api_key}
-                  onChange={(e) => {
-                    const updated = [...connections]
-                    updated[idx] = { ...updated[idx], api_key: e.target.value }
-                    setConnections(updated)
-                  }}
-                  placeholder="Wprowadź klucz API"
-                />
-
-                <Button
-                  size="sm"
-                  variant={conn.connected ? 'destructive' : 'default'}
-                  className="w-full"
-                  onClick={() => {
-                    const updated = [...connections]
-                    updated[idx] = {
-                      ...updated[idx],
-                      connected: !updated[idx].connected,
-                      // WHY: Set last_synced when connecting
-                      last_synced: !updated[idx].connected
-                        ? new Date().toISOString()
-                        : updated[idx].last_synced,
-                    }
-                    setConnections(updated)
-                  }}
+          <div>
+            <label className="mb-2 block text-sm text-gray-400">Domyslny provider</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {LLM_PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setLlmProvider(p.id)}
+                  className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                    llmProvider === p.id
+                      ? 'border-white bg-white/5 text-white'
+                      : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
+                  }`}
                 >
-                  {conn.connected ? 'Rozłącz' : 'Połącz'}
-                </Button>
-              </div>
-            ))}
+                  <span className="font-medium">{p.label}</span>
+                  <span className="block text-[10px] text-gray-500">{p.desc}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* WHY: Show API key input only for non-Groq providers */}
+          {llmProvider !== 'groq' && (
+            <div>
+              <label className="mb-1 block text-sm text-gray-400">
+                Klucz API ({LLM_PROVIDERS.find((p) => p.id === llmProvider)?.label})
+              </label>
+              <Input
+                type="password"
+                value={llmKeys[llmProvider] || ''}
+                onChange={(e) =>
+                  setLlmKeys((prev) => ({ ...prev, [llmProvider]: e.target.value }))
+                }
+                placeholder="Wklej swoj klucz API"
+              />
+              <p className="mt-1 text-[10px] text-gray-500">
+                Klucz jest szyfrowany i nigdy nie wyswietlany w pelni.
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end">
             <Button
-              onClick={() =>
-                updateSettings.mutate({ marketplace_connections: connections })
-              }
+              onClick={() => {
+                const providers: Record<string, { api_key: string }> = {}
+                for (const [pname, key] of Object.entries(llmKeys)) {
+                  if (key) providers[pname] = { api_key: key }
+                }
+                updateSettings.mutate({
+                  llm: { default_provider: llmProvider, providers },
+                })
+              }}
               disabled={updateSettings.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
               Zapisz
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* WHY: Marketplace connections moved to /integrations — link only */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <LinkIcon className="h-5 w-5 text-gray-400" />
+            <CardTitle className="text-lg">Połączenia z marketplace&apos;ami</CardTitle>
+          </div>
+          <CardDescription>Zarządzaj OAuth i API marketplace&apos;ów w jednym miejscu</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/integrations"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-white/5 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+          >
+            Zarządzaj w Integracje →
+          </Link>
         </CardContent>
       </Card>
 

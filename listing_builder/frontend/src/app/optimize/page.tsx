@@ -113,6 +113,8 @@ function OptimizeContent() {
           { question: 'Jaka jest różnica między trybem agresywnym a standardowym?', answer: 'Tryb standardowy generuje naturalne, czytelne listingi. Tryb agresywny maksymalizuje nasycenie słów kluczowych — tytuł i bullety są bardziej "keyword-stuffed". Użyj agresywnego dla produktów w konkurencyjnych kategoriach.' },
           { question: 'Ile kosztuje jedna optymalizacja?', answer: 'Plan darmowy: 3 optymalizacje dziennie (tylko Amazon). Plan Premium (49 PLN/mieś): nieograniczone optymalizacje na wszystkich marketplace (Amazon, eBay, Kaufland, Allegro).' },
           { question: 'Jak pobrać wynik jako CSV?', answer: 'Po optymalizacji kliknij przycisk "Eksportuj CSV" nad wynikiem. Plik zawiera tytuł, bullety, opis i backend keywords — gotowy do uploadu na marketplace lub do flat file.' },
+          { question: 'Co to jest "Model AI" w sekcji Cel i tryb?', answer: 'To silnik sztucznej inteligencji generujacy listing. Domyslnie uzywamy Groq (Llama 3.3 70B) — jest darmowy i wliczony w cene. Jesli chcesz lepszej jakosci, mozesz wybrac Gemini Pro lub OpenAI (wymagaja Twojego klucza API). Klucz zapisujesz w Ustawienia → Model AI.' },
+          { question: 'Jaka jest roznica miedzy Groq, Gemini i OpenAI?', answer: 'Groq (Llama 3.3): darmowy, dobra jakosc, najszybszy. Gemini Flash: tani, szybki, nieco lepsza jakosc. Gemini Pro: najlepsza jakosc tekstu, wolniejszy, drozszy. OpenAI (GPT-4o Mini): dobra jakosc, srednia cena. Jesli nie wiesz co wybrac — zostaw Groq, jest wystarczajaco dobry.' },
         ]}
       />
     </div>

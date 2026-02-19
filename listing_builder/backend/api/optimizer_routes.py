@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 import structlog
 
 from services.optimizer_service import optimize_listing
+from services.llm_providers import PROVIDERS
 from services.stripe_service import validate_license
 from database import get_db
 from models.optimization import OptimizationRun
@@ -78,6 +79,9 @@ class OptimizerRequest(BaseModel):
     category: Optional[str] = Field(default="", max_length=200)
     audience_context: Optional[str] = Field(default="", max_length=5000)
     account_type: str = Field(default="seller", pattern="^(seller|vendor)$")
+    # WHY: Multi-LLM support — client picks provider, sends their own API key
+    llm_provider: Optional[str] = Field(default=None, max_length=20)
+    llm_api_key: Optional[str] = Field(default=None, max_length=200)
 
 
 class OptimizerScores(BaseModel):
@@ -140,6 +144,7 @@ class OptimizerResponse(BaseModel):
     compliance: OptimizerCompliance = OptimizerCompliance()
     keyword_intel: OptimizerKeywordIntel = OptimizerKeywordIntel()
     ranking_juice: Optional[RankingJuiceResponse] = None
+    llm_provider: str = "groq"  # WHY: Shows which LLM generated the listing
     optimization_source: str = "direct"
     listing_history_id: Optional[str] = None  # WHY: Used by frontend feedback widget
     trace: Optional[Dict[str, Any]] = None  # WHY: Observability — tokens, latency, cost per run
@@ -170,6 +175,31 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
         keyword_count=len(body.keywords),
     )
 
+    # WHY: Build provider_config if client requested non-Groq provider
+    provider_config = None
+    if body.llm_provider and body.llm_provider != "groq":
+        if body.llm_provider not in PROVIDERS:
+            raise HTTPException(status_code=400, detail=f"Nieznany provider: {body.llm_provider}")
+
+        api_key = body.llm_api_key
+        # WHY: If frontend didn't send a key, try to read the saved key from user settings
+        if not api_key:
+            from api.settings_routes import _load_settings
+            from api.dependencies import get_user_id
+            user_id = get_user_id(request)
+            settings_data = _load_settings(db, user_id)
+            saved_providers = settings_data.get("llm", {}).get("providers", {})
+            saved_conf = saved_providers.get(body.llm_provider, {})
+            api_key = saved_conf.get("api_key", "") if isinstance(saved_conf, dict) else ""
+
+        if not api_key:
+            raise HTTPException(status_code=400, detail="Klucz API wymagany dla tego providera. Zapisz go w Ustawieniach lub wklej w formularzu.")
+
+        provider_config = {
+            "provider": body.llm_provider,
+            "api_key": api_key,
+        }
+
     try:
         result = await optimize_listing(
             product_title=body.product_title,
@@ -186,6 +216,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
             audience_context=body.audience_context or "",
             account_type=body.account_type,
             category=body.category or "",
+            provider_config=provider_config,
         )
 
         logger.info(
@@ -203,7 +234,8 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
                 mode=body.mode,
                 coverage_pct=result.get("scores", {}).get("coverage_pct", 0),
                 compliance_status=result.get("compliance", {}).get("status", "UNKNOWN"),
-                request_data=body.model_dump(),
+                # SECURITY: Strip API key before persisting — never store user keys in history
+                request_data={k: v for k, v in body.model_dump().items() if k != "llm_api_key"},
                 response_data=result,
                 trace_data=result.get("trace"),
                 client_ip=get_remote_address(request),
@@ -265,6 +297,15 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
 
     for i, product in enumerate(body.products):
         try:
+            # WHY: Build provider_config per product — each could have different provider
+            batch_provider_config = None
+            if product.llm_provider and product.llm_provider != "groq":
+                if product.llm_provider in PROVIDERS and product.llm_api_key:
+                    batch_provider_config = {
+                        "provider": product.llm_provider,
+                        "api_key": product.llm_api_key,
+                    }
+
             data = await optimize_listing(
                 product_title=product.product_title,
                 brand=product.brand,
@@ -279,6 +320,7 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
                 db=db,
                 account_type=product.account_type,
                 category=product.category or "",
+                provider_config=batch_provider_config,
             )
 
             results.append(BatchOptimizerResult(

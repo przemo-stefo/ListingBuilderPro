@@ -1,5 +1,5 @@
 // frontend/src/components/layout/Sidebar.tsx
-// Purpose: Main navigation sidebar — OctoHelper MVP (8 items + Compliance + Settings)
+// Purpose: Main navigation sidebar — workflow items + Compliance (Settings/Account in header bar)
 // NOT for: Page content or complex routing logic
 
 'use client'
@@ -27,9 +27,8 @@ import {
   Link2,
   FileBarChart,
   FileDown,
-  Settings,
   Info,
-  UserCircle,
+  Database,
 } from 'lucide-react'
 
 interface NavItem {
@@ -47,14 +46,15 @@ interface NavSection {
   items: NavItem[]
 }
 
-// WHY: MVP sidebar order per Mateusz: Pulpit→Import→Konwerter→Optymalizator→Publikuj (do pliku)→Ekspert AI
-// Hidden pages (products, inventory, allegro-manager, keywords, etc.) still accessible via URL
+// WHY: Sidebar order: Pulpit→Import→Baza Produktów→Integracje→Konwerter | Optymalizator→Eksport→Ekspert AI→Badanie rynku
 const navSections: NavSection[] = [
   {
     label: 'Główne',
     items: [
       { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przegląd statystyk i szybkie akcje' },
       { title: 'Import', href: '/products/import', icon: Upload, desc: 'Importuj produkty z CSV lub Allegro' },
+      { title: 'Baza Produktów', href: '/products', icon: Database, desc: 'Przeglądaj, filtruj i zarządzaj zaimportowanymi produktami' },
+      { title: 'Integracje', href: '/integrations', icon: Link2, desc: 'Połączenia OAuth z marketplace (Amazon, Allegro, eBay...)' },
       { title: 'Konwerter', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty Allegro na Amazon/eBay/Kaufland' },
     ],
   },
@@ -233,35 +233,6 @@ export function Sidebar({ onClose }: SidebarProps) {
           </div>
         </div>
 
-        {/* WHY: Settings + Account separated — not part of seller workflow, utility */}
-        <div className="pt-2 border-t border-gray-800/50 space-y-0.5">
-          <Link
-            href="/account"
-            onClick={handleNav}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
-              pathname === '/account'
-                ? 'bg-white text-black'
-                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-            )}
-          >
-            <UserCircle className="h-4 w-4" />
-            Konto
-          </Link>
-          <Link
-            href="/settings"
-            onClick={handleNav}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
-              pathname === '/settings'
-                ? 'bg-white text-black'
-                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-            )}
-          >
-            <Settings className="h-4 w-4" />
-            Ustawienia
-          </Link>
-        </div>
       </nav>
 
       {/* Footer — tier badge + legal links */}

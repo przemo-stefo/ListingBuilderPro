@@ -18,7 +18,10 @@ from schemas import (
     MarketplaceConnection,
     NotificationSettings,
     DataExportSettings,
+    LLMSettings,
+    LLMProviderConfig,
 )
+from services.llm_providers import mask_api_key
 import structlog
 
 logger = structlog.get_logger()
@@ -36,6 +39,7 @@ class SettingsUpdateRequest(BaseModel):
     marketplace_connections: Optional[List[MarketplaceConnection]] = None
     notifications: Optional[NotificationSettings] = None
     data_export: Optional[DataExportSettings] = None
+    llm: Optional[LLMSettings] = None
 
 
 limiter = Limiter(key_func=get_remote_address)
@@ -63,6 +67,10 @@ _DEFAULT_SETTINGS = {
     "data_export": {
         "default_export_format": "csv",
         "auto_sync_frequency": "24h",
+    },
+    "llm": {
+        "default_provider": "groq",
+        "providers": {},
     },
 }
 
@@ -92,7 +100,14 @@ def _save_settings(db: Session, data: dict, user_id: str) -> None:
 
 
 def _build_response(data: dict) -> SettingsResponse:
-    """Build a typed response from settings dict."""
+    """Build a typed response from settings dict. Masks LLM API keys for safety."""
+    llm_data = data.get("llm", _DEFAULT_SETTINGS["llm"])
+    # WHY: Never return raw API keys in GET — mask them
+    masked_providers = {}
+    for pname, pconf in llm_data.get("providers", {}).items():
+        raw_key = pconf.get("api_key", "") if isinstance(pconf, dict) else ""
+        masked_providers[pname] = LLMProviderConfig(api_key=mask_api_key(raw_key))
+
     return SettingsResponse(
         general=GeneralSettings(**data["general"]),
         marketplace_connections=[
@@ -100,6 +115,10 @@ def _build_response(data: dict) -> SettingsResponse:
         ],
         notifications=NotificationSettings(**data["notifications"]),
         data_export=DataExportSettings(**data["data_export"]),
+        llm=LLMSettings(
+            default_provider=llm_data.get("default_provider", "groq"),
+            providers=masked_providers,
+        ),
     )
 
 
@@ -137,6 +156,22 @@ async def update_settings(
 
     if payload.data_export is not None:
         data["data_export"].update(payload.data_export.model_dump(exclude_unset=True))
+
+    if payload.llm is not None:
+        if "llm" not in data:
+            data["llm"] = dict(_DEFAULT_SETTINGS["llm"])
+        llm_update = payload.llm.model_dump(exclude_unset=True)
+        if "default_provider" in llm_update:
+            data["llm"]["default_provider"] = llm_update["default_provider"]
+        # WHY: Merge per-provider keys — don't wipe unrelated providers
+        if "providers" in llm_update:
+            if "providers" not in data["llm"]:
+                data["llm"]["providers"] = {}
+            for pname, pconf in llm_update["providers"].items():
+                key_val = pconf.get("api_key", "") if isinstance(pconf, dict) else ""
+                # WHY: Skip masked keys (****) — means client didn't change the key
+                if key_val and "****" not in key_val:
+                    data["llm"]["providers"][pname] = {"api_key": key_val}
 
     _save_settings(db, data, user_id)
     logger.info("settings_saved", user_id=user_id)

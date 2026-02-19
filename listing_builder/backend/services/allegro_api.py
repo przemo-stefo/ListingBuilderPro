@@ -22,6 +22,92 @@ ALLEGRO_TOKEN_URL = "https://allegro.pl/auth/oauth/token"
 _client_token_cache: Dict = {"token": None, "expires_at": None}
 
 
+def _parse_images(data: Dict) -> List[str]:
+    """Extract image URLs from offer data — handles both str and dict formats."""
+    images = []
+    for img in data.get("images", []):
+        if isinstance(img, str):
+            if img:
+                images.append(img)
+        elif isinstance(img, dict):
+            url = img.get("url", "")
+            if url:
+                images.append(url)
+    return images
+
+
+def _parse_parameters(param_list: list) -> Dict[str, str]:
+    """Parse Allegro parameter list into {name: value} dict."""
+    parameters = {}
+    for param in param_list:
+        name = param.get("name", "")
+        values = param.get("values", [])
+        if name and values:
+            if isinstance(values[0], dict):
+                val = ", ".join(v.get("value", "") for v in values if v.get("value"))
+            else:
+                val = ", ".join(str(v) for v in values if v)
+            if val:
+                parameters[name] = val
+    return parameters
+
+
+def _parse_description(data: Dict) -> str:
+    """Extract text content from Allegro description sections."""
+    desc_section = data.get("description", {})
+    if not desc_section or not desc_section.get("sections"):
+        return ""
+    parts = []
+    for section in desc_section["sections"]:
+        for item in section.get("items", []):
+            if item.get("type") == "TEXT":
+                parts.append(item.get("content", ""))
+    return "\n".join(parts)
+
+
+def _extract_ean(parameters: Dict[str, str], data: Dict = None) -> str:
+    """Extract EAN from parameters, with optional fallback to external.id."""
+    for key in ("EAN", "EAN (GTIN)", "GTIN"):
+        if key in parameters:
+            return parameters[key]
+    # WHY: /sale/product-offers sometimes has EAN in external.id instead of parameters
+    if data:
+        external = data.get("external", {})
+        if external.get("id"):
+            return external["id"]
+    return ""
+
+
+def _build_offer_result(offer_id: str, data: Dict, parameters: Dict[str, str],
+                        ean: str, images: List[str], description: str) -> Dict:
+    """Build standardized offer result dict compatible with converter pipeline."""
+    title = data.get("name", "")
+    price = ""
+    currency = "PLN"
+    selling_mode = data.get("sellingMode", {})
+    if selling_mode.get("price"):
+        price = str(selling_mode["price"].get("amount", ""))
+        currency = selling_mode["price"].get("currency", "PLN")
+
+    return {
+        "source_url": f"https://allegro.pl/oferta/{offer_id}",
+        "source_id": offer_id,
+        "title": title,
+        "description": description,
+        "price": price,
+        "currency": currency,
+        "ean": ean,
+        "images": images,
+        "category": data.get("category", {}).get("id", ""),
+        "quantity": str(data.get("stock", {}).get("available", "1")),
+        "condition": data.get("condition", ""),
+        "parameters": parameters,
+        "brand": parameters.get("Marka", ""),
+        "manufacturer": parameters.get("Producent", ""),
+        "error": None,
+    }
+
+
 async def get_client_credentials_token() -> Optional[str]:
     """Get app-level Allegro token via Client Credentials grant.
 
@@ -94,84 +180,15 @@ async def fetch_public_offer_details(offer_id: str) -> Dict:
                 return {"error": f"Allegro API {resp.status_code}"}
 
             data = resp.json()
-
-            # WHY same structure as fetch_offer_details: converter pipeline
-            # expects AllegroProduct-compatible dict regardless of data source
-            title = data.get("name", "")
-
-            price = ""
-            currency = "PLN"
-            selling_mode = data.get("sellingMode", {})
-            if selling_mode.get("price"):
-                price = str(selling_mode["price"].get("amount", ""))
-                currency = selling_mode["price"].get("currency", "PLN")
-
-            images = []
-            for img in data.get("images", []):
-                if isinstance(img, str):
-                    if img:
-                        images.append(img)
-                elif isinstance(img, dict):
-                    url = img.get("url", "")
-                    if url:
-                        images.append(url)
-
-            parameters = {}
-            for param in data.get("parameters", []):
-                name = param.get("name", "")
-                values = param.get("values", [])
-                if name and values:
-                    if isinstance(values[0], dict):
-                        val = ", ".join(v.get("value", "") for v in values if v.get("value"))
-                    else:
-                        val = ", ".join(str(v) for v in values if v)
-                    if val:
-                        parameters[name] = val
-
-            ean = ""
-            for key in ("EAN", "EAN (GTIN)", "GTIN"):
-                if key in parameters:
-                    ean = parameters[key]
-                    break
-
-            brand = parameters.get("Marka", "")
-            manufacturer = parameters.get("Producent", "")
-
-            description = ""
-            desc_section = data.get("description", {})
-            if desc_section and desc_section.get("sections"):
-                parts = []
-                for section in desc_section["sections"]:
-                    for item in section.get("items", []):
-                        if item.get("type") == "TEXT":
-                            parts.append(item.get("content", ""))
-                description = "\n".join(parts)
-
-            category_id = data.get("category", {}).get("id", "")
-            condition = data.get("condition", "")
-            stock = data.get("stock", {})
-            quantity = str(stock.get("available", "1"))
-
-            result = {
-                "source_url": f"https://allegro.pl/oferta/{offer_id}",
-                "source_id": offer_id,
-                "title": title,
-                "description": description,
-                "price": price,
-                "currency": currency,
-                "ean": ean,
-                "images": images,
-                "category": category_id,
-                "quantity": quantity,
-                "condition": condition,
-                "parameters": parameters,
-                "brand": brand,
-                "manufacturer": manufacturer,
-                "error": None,
-            }
+            images = _parse_images(data)
+            parameters = _parse_parameters(data.get("parameters", []))
+            ean = _extract_ean(parameters)
+            description = _parse_description(data)
+            result = _build_offer_result(offer_id, data, parameters, ean, images, description)
 
             logger.info("allegro_public_offer_fetched", offer_id=offer_id,
-                        title=title[:60], price=price, params=len(parameters))
+                        title=result["title"][:60], price=result["price"],
+                        params=len(parameters))
             return result
 
     except httpx.TimeoutException:
@@ -358,10 +375,7 @@ async def fetch_offer_details(
     """Fetch full product details from Allegro REST API.
 
     WHY API not scraping: Structured JSON, no DataDome blocks, no Scrape.do costs.
-    Returns dict compatible with AllegroProduct fields for converter pipeline.
-
-    Uses GET /sale/product-offers/{offerId} for seller's own offers — returns
-    title, description, images, parameters, price, EAN, category.
+    Uses GET /sale/product-offers/{offerId} for seller's own offers.
     """
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -370,8 +384,7 @@ async def fetch_offer_details(
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            # WHY /sale/product-offers: new endpoint (replaces deprecated /sale/offers/{id}).
-            # Returns full product data: name, productSet (params, images), price, stock.
+            # WHY /sale/product-offers: new endpoint (replaces deprecated /sale/offers/{id})
             resp = await client.get(
                 f"{ALLEGRO_API_BASE}/sale/product-offers/{offer_id}",
                 headers=headers,
@@ -383,115 +396,28 @@ async def fetch_offer_details(
                 return {"error": f"Allegro API {resp.status_code}"}
 
             data = resp.json()
+            images = _parse_images(data)
 
-            # Extract fields into AllegroProduct-compatible dict
-            title = data.get("name", "")
-
-            # Price from sellingMode (in /sale/offers list format)
-            price = ""
-            currency = "PLN"
-            selling_mode = data.get("sellingMode", {})
-            if selling_mode.get("price"):
-                price = str(selling_mode["price"].get("amount", ""))
-                currency = selling_mode["price"].get("currency", "PLN")
-
-            # Images — API may return strings or objects with "url" key
-            images = []
-            for img in data.get("images", []):
-                if isinstance(img, str):
-                    if img:
-                        images.append(img)
-                elif isinstance(img, dict):
-                    url = img.get("url", "")
-                    if url:
-                        images.append(url)
-
-            # Parameters — from productSet[0].product.parameters
             # WHY productSet: /sale/product-offers nests params under productSet
             parameters = {}
             product_set = data.get("productSet", [])
             if product_set:
-                for param in product_set[0].get("product", {}).get("parameters", []):
-                    name = param.get("name", "")
-                    values = param.get("values", [])
-                    if name and values:
-                        # WHY: values is a flat list of strings here (not objects)
-                        if isinstance(values[0], dict):
-                            val = ", ".join(v.get("value", "") for v in values if v.get("value"))
-                        else:
-                            val = ", ".join(str(v) for v in values if v)
-                        if val:
-                            parameters[name] = val
-
+                parameters = _parse_parameters(
+                    product_set[0].get("product", {}).get("parameters", [])
+                )
             # Also check top-level parameters (some offers have both)
-            for param in data.get("parameters", []):
-                name = param.get("name", "")
-                values = param.get("values", [])
-                if name and values and name not in parameters:
-                    if isinstance(values[0], dict):
-                        val = ", ".join(v.get("value", "") for v in values if v.get("value"))
-                    else:
-                        val = ", ".join(str(v) for v in values if v)
-                    if val:
-                        parameters[name] = val
+            top_params = _parse_parameters(data.get("parameters", []))
+            for name, val in top_params.items():
+                if name not in parameters:
+                    parameters[name] = val
 
-            # EAN from parameters or external
-            ean = ""
-            for key in ("EAN", "EAN (GTIN)", "GTIN"):
-                if key in parameters:
-                    ean = parameters[key]
-                    break
-            if not ean:
-                external = data.get("external", {})
-                if external.get("id"):
-                    ean = external["id"]
-
-            # Brand / Manufacturer
-            brand = parameters.get("Marka", "")
-            manufacturer = parameters.get("Producent", "")
-
-            # Description — sections with items
-            description = ""
-            desc_section = data.get("description", {})
-            if desc_section and desc_section.get("sections"):
-                parts = []
-                for section in desc_section["sections"]:
-                    for item in section.get("items", []):
-                        if item.get("type") == "TEXT":
-                            parts.append(item.get("content", ""))
-                description = "\n".join(parts)
-
-            # Category
-            category_id = data.get("category", {}).get("id", "")
-
-            # Condition
-            condition = data.get("condition", "")
-
-            # Quantity
-            stock = data.get("stock", {})
-            quantity = str(stock.get("available", "1"))
-
-            result = {
-                "source_url": f"https://allegro.pl/oferta/{offer_id}",
-                "source_id": offer_id,
-                "title": title,
-                "description": description,
-                "price": price,
-                "currency": currency,
-                "ean": ean,
-                "images": images,
-                "category": category_id,
-                "quantity": quantity,
-                "condition": condition,
-                "parameters": parameters,
-                "brand": brand,
-                "manufacturer": manufacturer,
-                "error": None,
-            }
+            ean = _extract_ean(parameters, data)
+            description = _parse_description(data)
+            result = _build_offer_result(offer_id, data, parameters, ean, images, description)
 
             logger.info("allegro_offer_fetched", offer_id=offer_id,
-                        title=title[:60], price=price, params=len(parameters),
-                        images=len(images), has_ean=bool(ean))
+                        title=result["title"][:60], price=result["price"],
+                        params=len(parameters), images=len(images), has_ean=bool(ean))
             return result
 
     except httpx.TimeoutException:
