@@ -255,6 +255,103 @@ async def handle_allegro_callback(
     return {"status": "connected", "marketplace": "allegro"}
 
 
+# ── eBay OAuth ──────────────────────────────────────────────────────────────
+
+EBAY_AUTH_URL = "https://auth.ebay.com/oauth2/authorize"
+EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
+
+# WHY: These scopes cover listing management + basic account info
+EBAY_SCOPES = " ".join([
+    "https://api.ebay.com/oauth/api_scope",
+    "https://api.ebay.com/oauth/api_scope/sell.inventory",
+    "https://api.ebay.com/oauth/api_scope/sell.account",
+])
+
+
+def get_ebay_authorize_url(user_id: str = "default") -> Dict:
+    """Generate eBay OAuth URL with CSRF state."""
+    if not settings.ebay_app_id:
+        return {"error": "eBay app_id not configured"}
+
+    state = _sign_state("ebay", user_id)
+    redirect_uri = f"{_backend_url()}/api/oauth/ebay/callback"
+
+    # WHY: eBay requires RuName as redirect_uri param name
+    ru_name = settings.ebay_ru_name or redirect_uri
+
+    params = {
+        "client_id": settings.ebay_app_id,
+        "response_type": "code",
+        "redirect_uri": ru_name,
+        "scope": EBAY_SCOPES,
+        "state": state,
+    }
+
+    url = f"{EBAY_AUTH_URL}?{urlencode(params)}"
+    return {"authorize_url": url, "state": state}
+
+
+async def handle_ebay_callback(
+    code: str,
+    state: str,
+    db: Session,
+) -> Dict:
+    """Exchange eBay authorization code for tokens."""
+    payload = _verify_state(state)
+    if not payload or payload.get("m") != "ebay":
+        return {"error": "Invalid or expired state parameter"}
+
+    user_id = payload.get("u", "default")
+
+    if not settings.ebay_app_id or not settings.ebay_cert_id:
+        return {"error": "eBay credentials not configured"}
+
+    redirect_uri = f"{_backend_url()}/api/oauth/ebay/callback"
+    ru_name = settings.ebay_ru_name or redirect_uri
+
+    # WHY: eBay uses HTTP Basic auth (app_id:cert_id) for token exchange
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            EBAY_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": ru_name,
+            },
+            auth=(settings.ebay_app_id, settings.ebay_cert_id),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+
+    if resp.status_code != 200:
+        logger.error("ebay_oauth_token_failed", status=resp.status_code, body=resp.text[:200])
+        return {"error": f"Token exchange failed: {resp.status_code}"}
+
+    data = resp.json()
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 7200))
+
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
+        OAuthConnection.marketplace == "ebay",
+    ).first()
+
+    if not conn:
+        conn = OAuthConnection(user_id=user_id, marketplace="ebay")
+        db.add(conn)
+
+    conn.status = "active"
+    conn.access_token = data.get("access_token")
+    conn.refresh_token = data.get("refresh_token")
+    conn.token_expires_at = expires_at
+    conn.scopes = EBAY_SCOPES
+    conn.raw_data = {"token_type": data.get("token_type")}
+    conn.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    logger.info("ebay_oauth_connected")
+
+    return {"status": "connected", "marketplace": "ebay"}
+
+
 # ── Connection status ────────────────────────────────────────────────────────
 
 def get_connections(db: Session, user_id: str = "default") -> list:

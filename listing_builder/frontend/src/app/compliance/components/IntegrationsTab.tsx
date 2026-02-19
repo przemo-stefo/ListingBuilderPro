@@ -19,8 +19,8 @@ import { useTrackedProducts } from '@/lib/hooks/useMonitoring'
 import { useOAuthConnections, useOAuthAuthorize, useOAuthDisconnect } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
 
-// WHY: Only amazon & allegro have OAuth flow ready — others are static cards
-const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro'])
+// WHY: Marketplaces with OAuth flow ready — others show "Wkrótce"
+const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro', 'ebay'])
 
 const MARKETPLACES = [
   { id: 'amazon', name: 'Amazon Seller Central', desc: 'Europejskie rynki Amazon (DE, FR, IT, ES, PL)', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-orange-500/20' },

@@ -17,6 +17,8 @@ from services.oauth_service import (
     handle_amazon_callback,
     get_allegro_authorize_url,
     handle_allegro_callback,
+    get_ebay_authorize_url,
+    handle_ebay_callback,
     get_connections,
     disconnect,
 )
@@ -116,6 +118,39 @@ async def allegro_callback(
 
     frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/converter?allegro=connected")
+
+
+# ── eBay OAuth ────────────────────────────────────────────────────────────────
+
+@router.get("/ebay/authorize")
+@limiter.limit("10/minute")
+async def ebay_authorize(request: Request, user_id: str = Depends(get_user_id)):
+    """Generate eBay OAuth URL."""
+    result = get_ebay_authorize_url(user_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.get("/ebay/callback")
+async def ebay_callback(
+    code: str = "",
+    state: str = "",
+    db: Session = Depends(get_db),
+):
+    """eBay OAuth callback — exchanges authorization code for tokens."""
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing code or state")
+
+    result = await handle_ebay_callback(code, state, db)
+
+    if "error" in result:
+        logger.error("ebay_oauth_callback_error", error=result["error"])
+        frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
+        return RedirectResponse(f"{frontend}/integrations?oauth=error&msg={result['error']}")
+
+    frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
+    return RedirectResponse(f"{frontend}/integrations?oauth=success&marketplace=ebay")
 
 
 # ── Connection status (all marketplaces) ──────────────────────────────────

@@ -44,10 +44,10 @@ class Settings(BaseSettings):
     amazon_client_secret: str = ""
     amazon_region: str = "eu-west-1"
 
-    ebay_app_id: str = ""
+    ebay_app_id: str = ""  # WHY: eBay OAuth app credentials (from Mateusz)
     ebay_cert_id: str = ""
     ebay_dev_id: str = ""
-    ebay_user_token: str = ""
+    ebay_ru_name: str = ""  # WHY: eBay Redirect URL Name — generated in eBay Developer portal
 
     allegro_client_id: str = ""  # WHY: Allegro OAuth app credentials (from Mateusz)
     allegro_client_secret: str = ""
