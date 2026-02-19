@@ -29,6 +29,7 @@ import {
   FileDown,
   Info,
   Database,
+  DollarSign,
 } from 'lucide-react'
 
 interface NavItem {
@@ -65,6 +66,12 @@ const navSections: NavSection[] = [
       { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace' },
       { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedaży na marketplace', highlight: true },
       { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo' },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { title: 'Koszty API', href: '/admin', icon: DollarSign, desc: 'Zużycie tokenów, koszty per provider, trend dzienny' },
     ],
   },
 ]

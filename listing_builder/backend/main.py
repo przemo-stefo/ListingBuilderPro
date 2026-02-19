@@ -37,6 +37,7 @@ from api import allegro_routes
 from api import allegro_offers_routes
 from api import research_routes
 from api import auth_routes
+from api import admin_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -162,6 +163,7 @@ app.include_router(allegro_routes.router)
 app.include_router(allegro_offers_routes.router)
 app.include_router(research_routes.router)
 app.include_router(auth_routes.router)
+app.include_router(admin_routes.router)
 
 
 @app.get("/")

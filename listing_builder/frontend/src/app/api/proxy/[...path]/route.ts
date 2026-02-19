@@ -38,6 +38,7 @@ const ALLOWED_PATH_PREFIXES = [
   'allegro',
   'research',
   'auth',
+  'admin',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
