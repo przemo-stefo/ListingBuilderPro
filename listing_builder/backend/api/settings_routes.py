@@ -20,6 +20,7 @@ from schemas import (
     DataExportSettings,
     LLMSettings,
     LLMProviderConfig,
+    GPSRSettings,
 )
 from services.llm_providers import mask_api_key
 import structlog
@@ -40,6 +41,7 @@ class SettingsUpdateRequest(BaseModel):
     notifications: Optional[NotificationSettings] = None
     data_export: Optional[DataExportSettings] = None
     llm: Optional[LLMSettings] = None
+    gpsr: Optional[GPSRSettings] = None
 
 
 limiter = Limiter(key_func=get_remote_address)
@@ -71,6 +73,22 @@ _DEFAULT_SETTINGS = {
     "llm": {
         "default_provider": "groq",
         "providers": {},
+    },
+    "gpsr": {
+        "manufacturer_contact": "",
+        "manufacturer_address": "",
+        "manufacturer_city": "",
+        "manufacturer_country": "",
+        "country_of_origin": "",
+        "safety_attestation": "",
+        "responsible_person_type": "",
+        "responsible_person_name": "",
+        "responsible_person_address": "",
+        "responsible_person_country": "",
+        "amazon_browse_node": "",
+        "amazon_product_type": "",
+        "ebay_category_id": "",
+        "kaufland_category": "",
     },
 }
 
@@ -119,6 +137,7 @@ def _build_response(data: dict) -> SettingsResponse:
             default_provider=llm_data.get("default_provider", "groq"),
             providers=masked_providers,
         ),
+        gpsr=GPSRSettings(**data.get("gpsr", _DEFAULT_SETTINGS["gpsr"])),
     )
 
 
@@ -172,6 +191,11 @@ async def update_settings(
                 # WHY: Skip masked keys (****) — means client didn't change the key
                 if key_val and "****" not in key_val:
                     data["llm"]["providers"][pname] = {"api_key": key_val}
+
+    if payload.gpsr is not None:
+        if "gpsr" not in data:
+            data["gpsr"] = dict(_DEFAULT_SETTINGS["gpsr"])
+        data["gpsr"].update(payload.gpsr.model_dump(exclude_unset=True))
 
     _save_settings(db, data, user_id)
     logger.info("settings_saved", user_id=user_id)

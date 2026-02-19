@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Save,
   Search,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -25,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useMarketplaces, useConvertProducts, useDownloadTemplate } from '@/lib/hooks/useConverter'
+import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
 import {
   getStoreUrls,
   startStoreConvert,
@@ -96,6 +98,11 @@ export default function ConverterPage() {
   const { data: marketplaces, isLoading: loadingMarketplaces } = useMarketplaces()
   const convertMutation = useConvertProducts()
   const downloadMutation = useDownloadTemplate()
+  const { data: settings } = useSettings()
+  const updateSettingsMutation = useUpdateSettings()
+
+  // WHY: Auto-fill GPSR from saved settings on mount
+  const [gpsrLoaded, setGpsrLoaded] = useState(false)
 
   // Parse URLs from textarea
   const parseUrls = (): string[] =>
@@ -124,6 +131,20 @@ export default function ConverterPage() {
       })
       .catch(() => {})
   }, [])
+
+  // WHY: Auto-fill GPSR from user settings — only once after settings load
+  useEffect(() => {
+    if (!settings?.gpsr || gpsrLoaded) return
+    const saved = settings.gpsr
+    const hasData = Object.values(saved).some((v) => v !== '')
+    if (hasData) {
+      setGpsr(saved)
+    } else {
+      // WHY: Open GPSR section when empty so user sees they need to fill it
+      setShowGpsr(true)
+    }
+    setGpsrLoaded(true)
+  }, [settings, gpsrLoaded])
 
   // WHY: After OAuth callback redirects to /converter?allegro=connected
   // Also reads ?urls= param for pre-fill from products page
@@ -483,20 +504,42 @@ export default function ConverterPage() {
 
       {/* Section 4: GPSR Data (collapsible) */}
       <Card>
-        <button
-          onClick={() => setShowGpsr(!showGpsr)}
-          className="flex w-full items-center justify-between p-6"
-        >
-          <div>
-            <h3 className="text-lg font-semibold text-white">Dane producenta (opcjonalne)</h3>
-            <p className="text-sm text-gray-400">GPSR, osoba odpowiedzialna w UE i kategorie — wypełnij raz dla wszystkich produktów</p>
-          </div>
-          {showGpsr ? (
-            <ChevronDown className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronRight className="h-5 w-5 text-gray-400" />
+        <div className="flex items-center justify-between p-6">
+          <button
+            onClick={() => setShowGpsr(!showGpsr)}
+            className="flex flex-1 items-center justify-between"
+          >
+            <div>
+              <h3 className="text-lg font-semibold text-white">Dane producenta (opcjonalne)</h3>
+              <p className="text-sm text-gray-400">GPSR, osoba odpowiedzialna w UE i kategorie — wypełnij raz dla wszystkich produktów</p>
+            </div>
+            {showGpsr ? (
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-gray-400" />
+            )}
+          </button>
+          {/* WHY: Save GPSR to settings so it auto-fills next time */}
+          {showGpsr && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-3 shrink-0"
+              disabled={updateSettingsMutation.isPending}
+              onClick={(e) => {
+                e.stopPropagation()
+                updateSettingsMutation.mutate({ gpsr: gpsr as GPSRData })
+              }}
+            >
+              {updateSettingsMutation.isPending ? (
+                <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+              ) : (
+                <Save className="mr-1.5 h-3 w-3" />
+              )}
+              Zapisz domyślne
+            </Button>
           )}
-        </button>
+        </div>
         {showGpsr && (
           <CardContent className="space-y-6">
             {/* Manufacturer */}

@@ -346,6 +346,7 @@ export interface SettingsResponse {
   notifications: NotificationSettings
   data_export: DataExportSettings
   llm?: LLMSettings
+  gpsr?: GPSRData
 }
 
 // WHY: Partial so each section can be saved independently

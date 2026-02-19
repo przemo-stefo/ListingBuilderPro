@@ -220,12 +220,31 @@ class LLMSettings(BaseModel):
     providers: dict[str, LLMProviderConfig] = {}
 
 
+# WHY: Persisted GPSR defaults so converter auto-fills them on load
+class GPSRSettings(BaseModel):
+    manufacturer_contact: str = ""
+    manufacturer_address: str = ""
+    manufacturer_city: str = ""
+    manufacturer_country: str = ""
+    country_of_origin: str = ""
+    safety_attestation: str = ""
+    responsible_person_type: str = ""
+    responsible_person_name: str = ""
+    responsible_person_address: str = ""
+    responsible_person_country: str = ""
+    amazon_browse_node: str = ""
+    amazon_product_type: str = ""
+    ebay_category_id: str = ""
+    kaufland_category: str = ""
+
+
 class SettingsResponse(BaseModel):
     general: GeneralSettings
     marketplace_connections: list[MarketplaceConnection]
     notifications: NotificationSettings
     data_export: DataExportSettings
     llm: Optional[LLMSettings] = None
+    gpsr: Optional[GPSRSettings] = None
 
 
 # --- Dashboard Stats ---

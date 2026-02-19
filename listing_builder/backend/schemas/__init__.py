@@ -61,6 +61,7 @@ from .mock_data import (
     DataExportSettings,
     LLMProviderConfig,
     LLMSettings,
+    GPSRSettings,
     SettingsResponse,
     DashboardStatsResponse,
 )
@@ -96,6 +97,7 @@ __all__ = [
     "DataExportSettings",
     "LLMProviderConfig",
     "LLMSettings",
+    "GPSRSettings",
     "SettingsResponse",
     "DashboardStatsResponse",
     "ComplianceIssue",
