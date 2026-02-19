@@ -142,3 +142,6 @@ frontend.html
 
 # Test data (generate fresh)
 test_data/
+
+# Internal docs / notes (not code)
+docs/
