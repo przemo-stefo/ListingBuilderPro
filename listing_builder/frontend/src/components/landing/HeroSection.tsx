@@ -29,7 +29,7 @@ export function HeroSection() {
           </h1>
 
           <p className="mt-6 text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
-            System AI do optymalizacji listingów na Amazon, Allegro, eBay i Kaufland.
+            System AI do optymalizacji listingów na Amazon, Allegro, eBay, Kaufland, Temu i AliExpress.
             Lepsze tytuły, opisy i słowa kluczowe — zanim konkurencja Cię wyprzedzi.
           </p>
         </motion.div>

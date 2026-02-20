@@ -6,6 +6,7 @@
 
 import { motion } from 'framer-motion'
 import { Upload, Sparkles, RefreshCw, Rocket } from 'lucide-react'
+import { MarketplaceLogos } from './MarketplaceLogos'
 
 const STEPS = [
   {
@@ -67,6 +68,8 @@ export function HowItWorksSection() {
             </motion.div>
           ))}
         </div>
+
+        <MarketplaceLogos label="Obsługiwane platformy" className="mt-14" />
       </div>
     </section>
   )

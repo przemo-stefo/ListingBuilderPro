@@ -6,6 +6,7 @@
 
 import { motion } from 'framer-motion'
 import { EyeOff, TrendingDown, Clock, DollarSign } from 'lucide-react'
+import { MarketplaceLogos } from './MarketplaceLogos'
 
 const PROBLEMS = [
   { icon: EyeOff, title: 'Słaba widoczność', desc: 'Niezoptymalizowane tytuły i opisy obniżają pozycję w wynikach wyszukiwania.' },
@@ -52,6 +53,8 @@ export function ProblemSection() {
         <p className="text-center mt-10 text-sm text-gray-500">
           Dzisiejsza optymalizacja jest <span className="font-semibold text-white">reaktywna</span>. Dowiadujesz się, gdy jest za późno.
         </p>
+
+        <MarketplaceLogos label="Dotyczy platform" className="mt-12" />
       </div>
     </section>
   )

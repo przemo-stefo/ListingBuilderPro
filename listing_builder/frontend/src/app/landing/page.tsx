@@ -7,6 +7,7 @@ import { LandingNav } from '@/components/landing/LandingNav'
 import { HeroSection } from '@/components/landing/HeroSection'
 import { ProblemSection } from '@/components/landing/ProblemSection'
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
+import { ShowcaseSection } from '@/components/landing/ShowcaseSection'
 import { FeaturesSection } from '@/components/landing/FeaturesSection'
 import { ComparisonSection } from '@/components/landing/ComparisonSection'
 import { PricingSection } from '@/components/landing/PricingSection'
@@ -34,6 +35,7 @@ export default function LandingPage() {
         <HeroSection />
         <ProblemSection />
         <HowItWorksSection />
+        <ShowcaseSection />
         <FeaturesSection />
         <ComparisonSection />
         <PricingSection />
