@@ -19,6 +19,7 @@ def get_user_id_from_jwt(request: Request) -> Optional[str]:
     FastAPI dependency (dependencies.py) to avoid duplication.
 
     Returns user_id (sub claim) or None if no valid JWT.
+    Also sets request.state.user_email for admin checks.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -37,6 +38,8 @@ def get_user_id_from_jwt(request: Request) -> Optional[str]:
         )
         user_id = payload.get("sub")
         if user_id:
+            # WHY: Store email on request state so require_admin() can check it
+            request.state.user_email = payload.get("email", "")
             logger.debug("jwt_verified", user_id=user_id[:8])
         return user_id
     except jwt.ExpiredSignatureError:

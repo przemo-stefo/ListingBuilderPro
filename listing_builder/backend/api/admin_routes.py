@@ -2,18 +2,33 @@
 # Purpose: Admin-only endpoints — cost dashboard, usage stats for Mateusz
 # NOT for: User-facing features or settings (those are in settings_routes.py)
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db
+from api.dependencies import require_admin
+from config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+
+@router.get("/me")
+async def get_admin_status(request: Request):
+    """Check if current user is an admin.
+
+    WHY: Frontend calls this to show/hide admin UI sections.
+    No auth guard — returns is_admin: false for non-admins instead of 403.
+    """
+    email = getattr(request.state, "user_email", "")
+    is_admin = bool(email and email.lower() in settings.admin_emails_list)
+    return {"is_admin": is_admin, "email": email}
 
 
 @router.get("/costs")
 async def get_cost_dashboard(
     days: int = 30,
     db: Session = Depends(get_db),
+    _admin: str = Depends(require_admin),  # WHY: Only admins can see cost data
 ):
     """Cost dashboard — total spend, per-provider breakdown, daily trend.
 

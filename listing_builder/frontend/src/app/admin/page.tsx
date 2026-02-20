@@ -9,12 +9,14 @@ import { useQuery } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { apiRequest } from '@/lib/api/client'
+import { useAdmin } from '@/lib/hooks/useAdmin'
 import {
   DollarSign,
   Zap,
   TrendingUp,
   BarChart3,
   Cpu,
+  ShieldX,
 } from 'lucide-react'
 
 interface CostTotals {
@@ -82,6 +84,7 @@ function formatTokens(n: number): string {
 }
 
 export default function AdminPage() {
+  const { isAdmin, isLoading: adminLoading } = useAdmin()
   const [days, setDays] = useState(30)
 
   const { data, isLoading } = useQuery<CostDashboard>({
@@ -99,6 +102,20 @@ export default function AdminPage() {
     { label: '90 dni', value: 90 },
     { label: 'Rok', value: 365 },
   ]
+
+  // WHY: Block non-admins from seeing the page even if they navigate directly
+  if (adminLoading) {
+    return <div className="flex items-center justify-center py-12 text-gray-500">Sprawdzanie uprawnień...</div>
+  }
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-gray-500">
+        <ShieldX className="h-12 w-12 mb-4 text-gray-600" />
+        <p className="text-lg font-medium text-white">Brak dostępu</p>
+        <p className="text-sm">Ta sekcja jest dostępna tylko dla administratorów.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

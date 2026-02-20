@@ -4,8 +4,9 @@
 
 'use client'
 
-import { Suspense, useState, type ReactNode } from 'react'
+import { Suspense, useState, useEffect, type ReactNode } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { TierProvider } from '@/components/providers/TierProvider'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -16,6 +17,12 @@ import { cn } from '@/lib/utils'
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pathname = usePathname()
+
+  // WHY: Auto-close mobile sidebar on route change (fixes "menu nie chowa się")
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [pathname])
 
   // WHY: Login/register/landing pages get clean layout without sidebar
   if (loading || !user) {
@@ -33,17 +40,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
         )}
 
-        {/* Sidebar — always visible on md+, slide-in overlay on mobile */}
+        {/* WHY: w-64 shrink-0 on container guarantees stable width — prevents layout jump on desktop */}
         <div className={cn(
-          'fixed inset-y-0 left-0 z-50 md:static md:block',
+          'fixed inset-y-0 left-0 z-50 w-64 md:static md:block md:shrink-0',
           sidebarOpen ? 'block' : 'hidden md:block'
         )}>
-          <Suspense>
+          <Suspense fallback={<div className="w-64 h-full bg-[#121212]" />}>
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </Suspense>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* WHY: Header bar — hamburger on mobile, profile/settings/alerts icons on all screens */}
           <div className="flex items-center justify-between border-b border-gray-800 px-6 py-2.5">
             <div className="flex items-center gap-3 md:hidden">
@@ -78,7 +85,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          {/* WHY: overflow-y-scroll (not auto) prevents scrollbar appearing/disappearing = no layout jump */}
+          <main className="flex-1 overflow-y-scroll p-4 md:p-8">
             {children}
           </main>
         </div>

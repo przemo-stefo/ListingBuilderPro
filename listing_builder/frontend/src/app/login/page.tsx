@@ -1,5 +1,5 @@
 // frontend/src/app/login/page.tsx
-// Purpose: Login / registration / password reset page with Supabase Auth
+// Purpose: Login / registration / password reset — split layout with marketing copy
 // NOT for: Dashboard or protected content
 
 'use client'
@@ -8,6 +8,7 @@ import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { createClient } from '@/lib/supabase'
+import { Mail, Lock, ArrowRight, ShieldCheck, Sparkles, BarChart3, Zap } from 'lucide-react'
 
 type Tab = 'login' | 'register'
 
@@ -15,7 +16,7 @@ type Tab = 'login' | 'register'
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A]">
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-600 border-t-white" />
       </div>
     }>
@@ -24,9 +25,36 @@ export default function LoginPage() {
   )
 }
 
+// WHY: Rotating marketing slides — shows different value props
+const slides = [
+  {
+    icon: Sparkles,
+    headline: 'Zoptymalizuj swoje oferty',
+    accent: 'z pomocą AI',
+    desc: 'Tytuły, opisy, słowa kluczowe — wszystko generowane przez AI, dostosowane do algorytmów marketplace.',
+  },
+  {
+    icon: BarChart3,
+    headline: 'Analizuj konkurencję',
+    accent: 'i bądź o krok przed nią',
+    desc: 'Badanie rynku, ICP, brief reklamowy — 10 skilli AI do budowania przewagi konkurencyjnej.',
+  },
+  {
+    icon: ShieldCheck,
+    headline: 'Sprzedawaj na wielu',
+    accent: 'marketplace jednocześnie',
+    desc: 'Amazon, Allegro, eBay, Kaufland — konwertuj oferty między platformami jednym kliknięciem.',
+  },
+  {
+    icon: Zap,
+    headline: 'Ekspert AI odpowiada',
+    accent: 'na Twoje pytania 24/7',
+    desc: 'Baza wiedzy od top sprzedawców. Zadaj pytanie i otrzymaj konkretną odpowiedź opartą na danych.',
+  },
+]
+
 function LoginContent() {
   const searchParams = useSearchParams()
-  // WHY: ?mode=reset comes from /auth/callback after password recovery link click
   const isResetMode = searchParams.get('mode') === 'reset'
 
   const [tab, setTab] = useState<Tab>('login')
@@ -36,13 +64,21 @@ function LoginContent() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [activeSlide, setActiveSlide] = useState(0)
   const { user, loading, signIn, signUp, resetPassword } = useAuth()
   const router = useRouter()
 
-  // WHY: Logged-in user visiting /login (NOT in reset mode) should go to dashboard
   useEffect(() => {
     if (!loading && user && !isResetMode) router.replace('/dashboard')
   }, [user, loading, router, isResetMode])
+
+  // WHY: Auto-rotate slides every 5s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide(prev => (prev + 1) % slides.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,7 +121,6 @@ function LoginContent() {
     }
   }
 
-  // WHY: After clicking reset link in email, user lands here with session + ?mode=reset
   const handleSetNewPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -110,139 +145,227 @@ function LoginContent() {
     }
   }
 
+  const slide = slides[activeSlide]
+  const SlideIcon = slide.icon
+
+  // WHY: Shared left panel — marketing copy with rotating slides
+  const leftPanel = (
+    <div className="relative hidden lg:flex lg:w-1/2 flex-col justify-between p-12 overflow-hidden">
+      {/* WHY: Subtle green radial glow — matches the screenshot aesthetic */}
+      <div className="absolute inset-0 bg-[#0A0A0A]" />
+      <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-emerald-500/8 blur-3xl" />
+      <div className="absolute -top-32 -right-32 h-64 w-64 rounded-full bg-emerald-500/5 blur-3xl" />
+
+      <div className="relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+            <Sparkles className="h-5 w-5 text-emerald-400" />
+          </div>
+          <span className="text-lg font-semibold text-white">OctoHelper</span>
+        </div>
+      </div>
+
+      <div className="relative z-10 space-y-6">
+        <div className="flex items-center gap-3 mb-8">
+          <SlideIcon className="h-8 w-8 text-emerald-400" />
+        </div>
+        <h2 className="text-4xl font-bold leading-tight text-white">
+          {slide.headline}{' '}
+          <span className="text-emerald-400">{slide.accent}</span>
+        </h2>
+        <p className="text-lg text-gray-400 max-w-md leading-relaxed">
+          {slide.desc}
+        </p>
+      </div>
+
+      <div className="relative z-10 flex items-center gap-3">
+        <div className="flex gap-1.5">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveSlide(i)}
+              className={`h-2.5 w-2.5 rounded-full transition-all ${
+                i === activeSlide
+                  ? 'bg-emerald-400 w-6'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            />
+          ))}
+        </div>
+        <span className="ml-4 text-sm text-gray-500">
+          <span className="font-semibold text-white">500+</span> sprzedawców już korzysta
+        </span>
+      </div>
+    </div>
+  )
+
   // WHY: Reset mode — user clicked email link, session active, show new password form
   if (isResetMode) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A]">
-        <div className="w-full max-w-sm space-y-6">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">OctoHelper</h1>
-            <p className="mt-1 text-sm text-gray-400">Ustaw nowe hasło</p>
-          </div>
-
-          <form onSubmit={handleSetNewPassword} className="space-y-4">
+      <div className="flex min-h-screen bg-[#0A0A0A]">
+        {leftPanel}
+        <div className="flex w-full lg:w-1/2 items-center justify-center p-8">
+          <div className="w-full max-w-md space-y-8">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Nowe hasło</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                className="w-full rounded-lg border border-gray-800 bg-[#121212] px-4 py-2.5 text-sm text-white outline-none focus:border-gray-600"
-                placeholder="Min. 6 znaków"
-                autoFocus
-              />
+              <h1 className="text-2xl font-bold text-white">Ustaw nowe hasło</h1>
+              <p className="mt-2 text-sm text-gray-400">Wpisz nowe hasło dla swojego konta</p>
             </div>
 
-            {error && (
-              <p className="rounded-lg border border-red-800 bg-red-900/20 px-3 py-2 text-sm text-red-400">
-                {error}
-              </p>
-            )}
+            <form onSubmit={handleSetNewPassword} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Nowe hasło</label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    className="w-full rounded-xl border border-gray-800 bg-[#121212] pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 transition-colors"
+                    placeholder="Min. 6 znaków"
+                    autoFocus
+                  />
+                </div>
+              </div>
 
-            {message && (
-              <p className="rounded-lg border border-green-800 bg-green-900/20 px-3 py-2 text-sm text-green-400">
-                {message}
-              </p>
-            )}
+              {error && <ErrorMsg text={error} />}
+              {message && <SuccessMsg text={message} />}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {submitting ? 'Zapisuję...' : 'Zmień hasło'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white hover:bg-emerald-400 transition-colors disabled:opacity-50"
+              >
+                {submitting ? 'Zapisuję...' : 'Zmień hasło'}
+                {!submitting && <ArrowRight className="h-4 w-4" />}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A]">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-white">OctoHelper</h1>
-          <p className="mt-1 text-sm text-gray-400">Asystent sprzedawcy marketplace</p>
-        </div>
+    <div className="flex min-h-screen bg-[#0A0A0A]">
+      {leftPanel}
 
-        {/* WHY: Tabs — login/register share the same form, just different action */}
-        <div className="flex rounded-lg border border-gray-800 bg-[#121212] p-1">
-          <button
-            onClick={() => { setTab('login'); setError(''); setMessage('') }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
-              tab === 'login' ? 'bg-white text-black' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Zaloguj się
-          </button>
-          <button
-            onClick={() => { setTab('register'); setError(''); setMessage('') }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
-              tab === 'register' ? 'bg-white text-black' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Zarejestruj się
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-800 bg-[#121212] px-4 py-2.5 text-sm text-white outline-none focus:border-gray-600"
-              placeholder="twoj@email.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Hasło</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-800 bg-[#121212] px-4 py-2.5 text-sm text-white outline-none focus:border-gray-600"
-              placeholder="Min. 6 znaków"
-            />
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-8">
+          {/* WHY: Mobile-only logo — desktop shows it in left panel */}
+          <div className="lg:hidden flex items-center gap-3 mb-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <Sparkles className="h-4 w-4 text-emerald-400" />
+            </div>
+            <span className="text-lg font-semibold text-white">OctoHelper</span>
           </div>
 
-          {error && (
-            <p className="rounded-lg border border-red-800 bg-red-900/20 px-3 py-2 text-sm text-red-400">
-              {error}
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              {tab === 'login' ? 'Zaloguj się' : 'Zarejestruj się'}
+            </h1>
+            <p className="mt-2 text-sm text-gray-400">
+              {tab === 'login'
+                ? 'Wpisz swoje dane, aby uzyskać dostęp do panelu'
+                : 'Utwórz konto, aby zacząć optymalizować oferty'}
             </p>
-          )}
+          </div>
 
-          {message && (
-            <p className="rounded-lg border border-green-800 bg-green-900/20 px-3 py-2 text-sm text-green-400">
-              {message}
-            </p>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Adres email</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full rounded-xl border border-gray-800 bg-[#121212] pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 transition-colors"
+                  placeholder="jan@firma.pl"
+                />
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            {submitting ? 'Ładowanie...' : tab === 'login' ? 'Zaloguj się' : 'Zarejestruj się'}
-          </button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Hasło</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-gray-800 bg-[#121212] pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 transition-colors"
+                  placeholder="Min. 6 znaków"
+                />
+              </div>
+            </div>
 
-        {tab === 'login' && (
-          <button
-            onClick={handleReset}
-            className="block w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            Zapomniałeś hasła?
-          </button>
-        )}
+            {error && <ErrorMsg text={error} />}
+            {message && <SuccessMsg text={message} />}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-white hover:bg-emerald-400 transition-colors disabled:opacity-50"
+            >
+              {submitting ? 'Ładowanie...' : tab === 'login' ? 'Zaloguj się' : 'Zarejestruj się'}
+              {!submitting && <ArrowRight className="h-4 w-4" />}
+            </button>
+          </form>
+
+          <div className="text-center text-sm text-gray-500">
+            {tab === 'login' ? (
+              <div className="space-y-3">
+                <button
+                  onClick={handleReset}
+                  className="block w-full text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  Zapomniałeś hasła?
+                </button>
+                <p>
+                  Nie masz konta?{' '}
+                  <button
+                    onClick={() => { setTab('register'); setError(''); setMessage('') }}
+                    className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    Zarejestruj się
+                  </button>
+                </p>
+              </div>
+            ) : (
+              <p>
+                Masz już konto?{' '}
+                <button
+                  onClick={() => { setTab('login'); setError(''); setMessage('') }}
+                  className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  Zaloguj się
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+function ErrorMsg({ text }: { text: string }) {
+  return (
+    <p className="rounded-xl border border-red-800 bg-red-900/20 px-4 py-2.5 text-sm text-red-400">
+      {text}
+    </p>
+  )
+}
+
+function SuccessMsg({ text }: { text: string }) {
+  return (
+    <p className="rounded-xl border border-emerald-800 bg-emerald-900/20 px-4 py-2.5 text-sm text-emerald-400">
+      {text}
+    </p>
   )
 }

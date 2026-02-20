@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
+import { useAdmin } from '@/lib/hooks/useAdmin'
 import { TierBadge } from '@/components/tier/TierBadge'
 import {
   LayoutDashboard,
@@ -95,6 +96,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { tier, isLoading } = useTier()
+  const { isAdmin } = useAdmin()
 
   // WHY: Auto-expand when user is on /compliance, collapse otherwise
   const isOnCompliance = pathname === '/compliance'
@@ -114,7 +116,8 @@ export function Sidebar({ onClose }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-4">
-        {navSections.map((section) => (
+        {/* WHY: Filter out Admin section for non-admin users */}
+        {navSections.filter(s => s.label !== 'Admin' || isAdmin).map((section) => (
           <div key={section.label}>
             <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
               {section.label}

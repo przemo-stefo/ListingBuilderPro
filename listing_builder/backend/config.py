@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     # Supabase Auth (JWT verification)
     supabase_jwt_secret: str = ""  # WHY: Empty = JWT auth disabled (backward compat)
 
+    # Admin access control
+    admin_emails: str = ""  # WHY: Comma-separated admin emails — checked by require_admin()
+
     # Webhook Security
     webhook_secret: str  # REQUIRED - no default value
 
@@ -121,6 +124,13 @@ class Settings(BaseSettings):
         if v not in allowed:
             raise ValueError(f"app_env must be one of: {allowed}")
         return v
+
+    @property
+    def admin_emails_list(self) -> List[str]:
+        """Parse admin emails from comma-separated env var, lowercased."""
+        if not self.admin_emails:
+            return []
+        return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
 
     @property
     def groq_api_keys(self) -> List[str]:
