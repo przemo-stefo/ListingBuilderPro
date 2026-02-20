@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -11,13 +12,59 @@ from sqlalchemy import text
 VECTOR_WEIGHT = 0.6
 KEYWORD_WEIGHT = 0.4
 
+# WHY: Stop words removed before lexical search — plainto_tsquery fails with full sentences
+# because PostgreSQL's English parser doesn't match well on wordy natural language queries.
+# Extracting meaningful keywords dramatically improves tsvector recall.
+STOP_WORDS = frozenset(
+    "a an the is are was were be been being have has had do does did will would "
+    "shall should may might can could must need to of in on at by for with from "
+    "and or but not no nor so yet if then else when while as than that this these "
+    "those it its my your his her our their what which who whom how where why "
+    "about into through during before after above below between under over again "
+    "further once here there all each every both few more most other some such "
+    "only own same too very just because also still already even much many any "
+    "up out off down away back well now new get got go going like make made using "
+    "write writing create creating develop developing approach use build".split()
+)
+
+
+def _extract_keywords(query: str, min_len: int = 3) -> str:
+    """Extract meaningful keywords from natural language query for tsvector matching.
+
+    WHY: plainto_tsquery('english', 'How to write a unique mechanism') returns few matches
+    because tsquery includes stop words that dilute the search. Stripping them and keeping
+    only content words gives much better recall.
+    """
+    words = re.findall(r'[a-zA-Z]+', query.lower())
+    keywords = [w for w in words if w not in STOP_WORDS and len(w) >= min_len]
+    return " ".join(keywords) if keywords else query
+
 
 def lexical_search(
     db: Session, query: str, categories: list[str] | None, limit: int
 ) -> list[tuple]:
-    """Keyword search using tsvector. Returns (id, content, filename, category, score)."""
+    """Keyword search using tsvector. Returns (id, content, filename, category, score).
+
+    WHY: First tries the raw query, then falls back to extracted keywords if no results.
+    This handles both keyword-style and natural-language queries.
+    """
+    rows = _lexical_query(db, query, categories, limit)
+
+    # WHY: If raw query fails (common with full sentences), retry with extracted keywords
+    if not rows:
+        keywords = _extract_keywords(query)
+        if keywords != query:
+            rows = _lexical_query(db, keywords, categories, limit)
+
+    return rows
+
+
+def _lexical_query(
+    db: Session, query: str, categories: list[str] | None, limit: int
+) -> list[tuple]:
+    """Execute tsvector search query."""
     if categories:
-        rows = db.execute(
+        return db.execute(
             text("""
                 SELECT id, content, filename, category,
                        ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
@@ -29,19 +76,17 @@ def lexical_search(
             """),
             {"query": query, "categories": categories, "limit": limit},
         ).fetchall()
-    else:
-        rows = db.execute(
-            text("""
-                SELECT id, content, filename, category,
-                       ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
-                FROM knowledge_chunks
-                WHERE search_vector @@ plainto_tsquery('english', :query)
-                ORDER BY rank DESC
-                LIMIT :limit
-            """),
-            {"query": query, "limit": limit},
-        ).fetchall()
-    return rows
+    return db.execute(
+        text("""
+            SELECT id, content, filename, category,
+                   ts_rank(search_vector, plainto_tsquery('english', :query)) as rank
+            FROM knowledge_chunks
+            WHERE search_vector @@ plainto_tsquery('english', :query)
+            ORDER BY rank DESC
+            LIMIT :limit
+        """),
+        {"query": query, "limit": limit},
+    ).fetchall()
 
 
 def vector_search(
