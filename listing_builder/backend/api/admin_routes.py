@@ -2,7 +2,7 @@
 # Purpose: Admin-only endpoints — cost dashboard, usage stats for Mateusz
 # NOT for: User-facing features or settings (those are in settings_routes.py)
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db
@@ -26,7 +26,7 @@ async def get_admin_status(request: Request):
 
 @router.get("/costs")
 async def get_cost_dashboard(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),  # WHY: Validate range server-side
     db: Session = Depends(get_db),
     _admin: str = Depends(require_admin),  # WHY: Only admins can see cost data
 ):
@@ -35,8 +35,6 @@ async def get_cost_dashboard(
     WHY: Mateusz needs to see how much API usage costs so he can control expenses.
     Data comes from optimization_runs.trace_data (already tracked per run).
     """
-    # WHY: Cap at 365 days max to prevent huge queries
-    days = min(days, 365)
 
     # --- Totals ---
     totals = db.execute(text("""

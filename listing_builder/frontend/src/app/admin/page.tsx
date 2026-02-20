@@ -8,45 +8,23 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { StatCard } from '@/components/ui/StatCard'
 import { apiRequest } from '@/lib/api/client'
 import { useAdmin } from '@/lib/hooks/useAdmin'
-import {
-  DollarSign,
-  Zap,
-  TrendingUp,
-  BarChart3,
-  Cpu,
-  ShieldX,
-} from 'lucide-react'
-
-interface CostTotals {
-  runs: number
-  total_tokens: number
-  prompt_tokens: number
-  completion_tokens: number
-  total_cost_usd: number
-  avg_cost_per_run_usd: number
-}
-
-interface ProviderRow {
-  model: string
-  runs: number
-  tokens: number
-  cost_usd: number
-}
-
-interface DailyRow {
-  date: string
-  runs: number
-  tokens: number
-  cost_usd: number
-}
+import { DollarSign, Zap, TrendingUp, BarChart3, Cpu, ShieldX } from 'lucide-react'
 
 interface CostDashboard {
   period_days: number
-  totals: CostTotals
-  by_provider: ProviderRow[]
-  daily: DailyRow[]
+  totals: {
+    runs: number
+    total_tokens: number
+    prompt_tokens: number
+    completion_tokens: number
+    total_cost_usd: number
+    avg_cost_per_run_usd: number
+  }
+  by_provider: { model: string; runs: number; tokens: number; cost_usd: number }[]
+  daily: { date: string; runs: number; tokens: number; cost_usd: number }[]
 }
 
 // WHY: Model name → friendly label mapping
@@ -94,6 +72,8 @@ export default function AdminPage() {
       if (res.error) throw new Error(res.error)
       return res.data!
     },
+    // WHY: Don't fire query until admin status confirmed — avoids 403 for non-admins
+    enabled: isAdmin,
   })
 
   const periods = [
@@ -130,9 +110,7 @@ export default function AdminPage() {
               key={p.value}
               onClick={() => setDays(p.value)}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                days === p.value
-                  ? 'bg-white text-black'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                days === p.value ? 'bg-white text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
               {p.label}
@@ -142,40 +120,16 @@ export default function AdminPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-gray-500">
-          Ładowanie danych...
-        </div>
+        <div className="flex items-center justify-center py-12 text-gray-500">Ładowanie danych...</div>
       ) : data ? (
         <>
-          {/* Summary cards */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard
-              icon={DollarSign}
-              label="Koszt całkowity"
-              value={formatCost(data.totals.total_cost_usd)}
-              sub={`${days} dni`}
-            />
-            <StatCard
-              icon={Zap}
-              label="Optymalizacje"
-              value={data.totals.runs.toString()}
-              sub={`avg ${formatCost(data.totals.avg_cost_per_run_usd)}/szt`}
-            />
-            <StatCard
-              icon={Cpu}
-              label="Tokeny"
-              value={formatTokens(data.totals.total_tokens)}
-              sub={`${formatTokens(data.totals.prompt_tokens)} in / ${formatTokens(data.totals.completion_tokens)} out`}
-            />
-            <StatCard
-              icon={TrendingUp}
-              label="Avg/dzień"
-              value={formatCost(data.totals.total_cost_usd / Math.max(days, 1))}
-              sub={`${Math.round(data.totals.runs / Math.max(days, 1))} runs/dzień`}
-            />
+            <StatCard icon={DollarSign} label="Koszt całkowity" value={formatCost(data.totals.total_cost_usd)} sub={`${days} dni`} />
+            <StatCard icon={Zap} label="Optymalizacje" value={data.totals.runs.toString()} sub={`avg ${formatCost(data.totals.avg_cost_per_run_usd)}/szt`} />
+            <StatCard icon={Cpu} label="Tokeny" value={formatTokens(data.totals.total_tokens)} sub={`${formatTokens(data.totals.prompt_tokens)} in / ${formatTokens(data.totals.completion_tokens)} out`} />
+            <StatCard icon={TrendingUp} label="Avg/dzień" value={formatCost(data.totals.total_cost_usd / Math.max(days, 1))} sub={`${Math.round(data.totals.runs / Math.max(days, 1))} runs/dzień`} />
           </div>
 
-          {/* Per-provider breakdown */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Koszty wg providera</CardTitle>
@@ -192,22 +146,13 @@ export default function AdminPage() {
                       <div key={row.model} className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge className={`text-xs ${modelColor(row.model)}`}>
-                              {modelLabel(row.model)}
-                            </Badge>
-                            <span className="text-xs text-gray-500">
-                              {row.runs} runs · {formatTokens(row.tokens)} tokenów
-                            </span>
+                            <Badge className={`text-xs ${modelColor(row.model)}`}>{modelLabel(row.model)}</Badge>
+                            <span className="text-xs text-gray-500">{row.runs} runs · {formatTokens(row.tokens)} tokenów</span>
                           </div>
-                          <span className="text-sm font-medium text-white">
-                            {formatCost(row.cost_usd)}
-                          </span>
+                          <span className="text-sm font-medium text-white">{formatCost(row.cost_usd)}</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-gray-800">
-                          <div
-                            className="h-2 rounded-full bg-white/20 transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
+                          <div className="h-2 rounded-full bg-white/20 transition-all" style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     )
@@ -217,7 +162,6 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
-          {/* Daily trend table */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -258,35 +202,5 @@ export default function AdminPage() {
         </>
       ) : null}
     </div>
-  )
-}
-
-// WHY: Reusable stat card — keeps the grid DRY
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string
-  sub: string
-}) {
-  return (
-    <Card>
-      <CardContent className="py-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-white/5 p-2">
-            <Icon className="h-5 w-5 text-gray-400" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">{label}</p>
-            <p className="text-xl font-bold text-white">{value}</p>
-            <p className="text-[11px] text-gray-500">{sub}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
