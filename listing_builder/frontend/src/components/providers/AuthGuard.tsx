@@ -9,7 +9,7 @@ import { useEffect, type ReactNode } from 'react'
 import { useAuth } from './AuthProvider'
 
 // WHY: These pages don't require login
-const PUBLIC_PATHS = ['/login', '/', '/privacy', '/terms']
+const PUBLIC_PATHS = ['/login', '/', '/landing', '/privacy', '/terms']
 const PUBLIC_PREFIXES = ['/payment/', '/auth/']
 
 function isPublicPath(pathname: string): boolean {

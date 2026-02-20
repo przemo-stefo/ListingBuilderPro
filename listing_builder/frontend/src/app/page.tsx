@@ -1,6 +1,6 @@
 // frontend/src/app/page.tsx
-// Purpose: Root redirect — unauthenticated → /login, authenticated → /dashboard
-// NOT for: Landing page content (that's /pricing if needed)
+// Purpose: Root redirect — unauthenticated → /landing, authenticated → /dashboard
+// NOT for: Landing page content (that's /landing)
 
 'use client'
 
@@ -18,7 +18,7 @@ export default function RootRedirect() {
     if (user) {
       router.replace('/dashboard')
     } else {
-      router.replace('/login')
+      router.replace('/landing')
     }
   }, [user, loading, router])
 
