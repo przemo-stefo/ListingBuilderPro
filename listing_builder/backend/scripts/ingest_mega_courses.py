@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+# backend/scripts/ingest_mega_courses.py
+# Purpose: Ingest 5 MEGA course transcripts into knowledge_chunks for RAG expansion
+# NOT for: Runtime — run once from dev machine
+
+"""
+Usage:
+    cd listing_builder/backend
+    python scripts/ingest_mega_courses.py           # ingest + embed
+    python scripts/ingest_mega_courses.py --dry-run  # preview only
+    python scripts/ingest_mega_courses.py --no-embed  # ingest without embeddings
+
+Courses (539 files):
+  - Stefan Georgi RMBC II (124) — copywriting, VSL, unique mechanisms
+  - Ecom Talent Creative Systems (71) — ad creative, $100K/day systems
+  - Barry Hott Building Ads (56) — ad hooks, testing, creative
+  - Daniel Throssell Market Detective (80) — market research, angles
+  - Russel Brunson Conversation Domination (208) — funnels, traffic, offers
+"""
+
+import os
+import re
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from config import settings
+
+CHUNK_SIZE = 1500
+CHUNK_OVERLAP = 200
+EMBED_BATCH = 5
+SOURCE_TAG = "mega_course"
+MEGA_BASE = os.path.expanduser("~/Documents/MegaTranscripts")
+
+# WHY: 5 courses selected for maximum relevance to listing optimization / e-commerce
+COURSES = [
+    {
+        "dir": "Stefan Georgi - RMBC II",
+        "source_type": "georgi_rmbc",
+        "prefix": "Georgi RMBC",
+        "default_category": "copywriting",
+    },
+    {
+        "dir": "BASHERSFORLIFE - Ecom Talent - The Creative Systems That Print 100K per Day in E",
+        "source_type": "ecom_talent",
+        "prefix": "Ecom Talent",
+        "default_category": "creative_strategy",
+    },
+    {
+        "dir": "Barry Hott Building Ads 20",
+        "source_type": "barry_hott_ads",
+        "prefix": "Barry Hott",
+        "default_category": "ad_creative",
+    },
+    {
+        "dir": "Daniel Throssell - Market Detective",
+        "source_type": "throssell_market",
+        "prefix": "Throssell",
+        "default_category": "market_research",
+    },
+    {
+        "dir": "Russel Brunson conversation domination",
+        "source_type": "brunson_funnels",
+        "prefix": "Brunson",
+        "default_category": "funnels",
+    },
+]
+
+# WHY: Map filename keywords to categories for better RAG filtering
+CATEGORY_RULES = [
+    # Copywriting & listing
+    (r"headline|hook|subject.?line|curiosity|fascination", "copywriting"),
+    (r"bullet|feature|benefit|fab\b", "listing_optimization"),
+    (r"title|h1|headline", "listing_optimization"),
+    (r"description|copy|write|script", "copywriting"),
+    (r"vsl|video.?sales|sales.?letter", "copywriting"),
+    (r"rmbc|run.?move|block.?close|mechanism", "copywriting"),
+    # Ads & creative
+    (r"ad\b|ads\b|creative|ugc|visual|image|video.?ad", "ad_creative"),
+    (r"hook|angle|pattern.?interrupt", "ad_creative"),
+    (r"testing|split|ab.?test|variant", "ad_creative"),
+    (r"facebook|meta|instagram|tiktok|social", "ad_creative"),
+    (r"sponsored|ppc|campaign|bid|acos", "ppc"),
+    # Conversion & psychology
+    (r"conversion|convert|checkout|cart|buy", "conversion_optimization"),
+    (r"objection|faq|overcome|handle", "conversion_optimization"),
+    (r"urgency|scarcity|deadline|fomo", "conversion_optimization"),
+    (r"psycholog|persuasi|influence|trigger", "marketing_psychology"),
+    (r"story|narrative|origin|founder", "marketing_psychology"),
+    # Market research
+    (r"research|market|audience|persona|avatar", "market_research"),
+    (r"competitor|spy|reverse.?engineer|swipe", "market_research"),
+    (r"review|testimonial|voice.?of.?customer|voc", "market_research"),
+    (r"niche|segment|target|ideal.?customer", "market_research"),
+    # Keywords & ranking
+    (r"keyword|seo|rank|search|index", "keyword_research"),
+    (r"algorithm|a9|cosmo|ranking", "ranking"),
+    # Funnels & traffic
+    (r"funnel|landing|opt.?in|squeeze|lead", "funnels"),
+    (r"traffic|visitor|click|impression", "traffic"),
+    (r"email|sequence|autoresponder|newsletter", "email_marketing"),
+    (r"launch|pre.?launch|product.?launch", "product_launch"),
+    # Offers & pricing
+    (r"offer|price|discount|bundle|upsell|downsell", "offers"),
+    (r"value.?stack|bonus|guarantee|risk.?reversal", "offers"),
+]
+
+
+def detect_category(filename: str, folder_path: str, default: str) -> str:
+    """Map filename + folder to category. Falls back to course default."""
+    combined = f"{folder_path}/{filename}".lower()
+    for pattern, category in CATEGORY_RULES:
+        if re.search(pattern, combined):
+            return category
+    return default
+
+
+def chunk_text(content: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """Split text into overlapping chunks at sentence boundaries."""
+    if len(content) <= chunk_size:
+        return [content.strip()] if content.strip() else []
+
+    chunks = []
+    start = 0
+    while start < len(content):
+        end = start + chunk_size
+        if end >= len(content):
+            chunk = content[start:].strip()
+            if chunk:
+                chunks.append(chunk)
+            break
+
+        # WHY: Break at sentence boundary to preserve meaning
+        boundary = end
+        for i in range(end, max(start + chunk_size // 2, start), -1):
+            if content[i] in ".!?\n" and i + 1 < len(content):
+                boundary = i + 1
+                break
+
+        chunk = content[start:boundary].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = boundary - overlap if boundary - overlap > start else boundary
+
+    return chunks
+
+
+def sanitize_filename(name: str, max_len: int = 80) -> str:
+    """Create a safe filename for DB unique constraint."""
+    return re.sub(r'[^a-zA-Z0-9_-]', '', name.replace(' ', '_'))[:max_len]
+
+
+def find_transcripts(course_dir: str) -> list[tuple[str, str]]:
+    """Find all .txt files in course dir. Returns (full_path, relative_path)."""
+    results = []
+    for root, _, files in os.walk(course_dir):
+        for f in sorted(files):
+            if f.endswith('.txt'):
+                full = os.path.join(root, f)
+                rel = os.path.relpath(full, course_dir)
+                results.append((full, rel))
+    return results
+
+
+def main():
+    dry_run = "--dry-run" in sys.argv
+    no_embed = "--no-embed" in sys.argv
+
+    engine = create_engine(settings.database_url, pool_pre_ping=True)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+
+    # WHY: Check current state before inserting
+    existing = db.execute(text(
+        "SELECT COUNT(*) FROM knowledge_chunks WHERE source = :src"
+    ), {"src": SOURCE_TAG}).scalar()
+    print(f"Existing '{SOURCE_TAG}' chunks: {existing}")
+
+    total_files = 0
+    total_chunks = 0
+    inserted = 0
+    skipped_small = 0
+    stats_by_course = {}
+    stats_by_category = {}
+
+    for course in COURSES:
+        course_dir = os.path.join(MEGA_BASE, course["dir"])
+        if not os.path.isdir(course_dir):
+            print(f"WARNING: Not found: {course_dir}")
+            continue
+
+        transcripts = find_transcripts(course_dir)
+        print(f"\n{'='*60}")
+        print(f"{course['prefix']}: {len(transcripts)} files in {course['dir']}")
+        print(f"{'='*60}")
+
+        course_chunks = 0
+
+        for file_idx, (full_path, rel_path) in enumerate(transcripts):
+            basename = os.path.splitext(os.path.basename(rel_path))[0]
+
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read().strip()
+
+            # WHY: Skip tiny/empty transcripts (likely failed transcriptions)
+            if len(content) < 100:
+                skipped_small += 1
+                continue
+
+            category = detect_category(basename, rel_path, course["default_category"])
+            chunks = chunk_text(content)
+
+            # WHY: filename = course prefix + sanitized basename for uniqueness
+            db_filename = f"{sanitize_filename(course['prefix'])}_{sanitize_filename(basename)}"
+
+            for chunk_idx, chunk in enumerate(chunks):
+                # WHY: Prepend course + lesson context for better RAG retrieval
+                chunk_with_context = f"[{course['prefix']} - {basename}]\n{chunk}"
+
+                if not dry_run:
+                    try:
+                        db.execute(
+                            text("""
+                                INSERT INTO knowledge_chunks
+                                (content, filename, category, source_type, chunk_index, source)
+                                VALUES (:content, :filename, :category, :source_type, :chunk_index, :source)
+                                ON CONFLICT (filename, chunk_index) DO NOTHING
+                            """),
+                            {
+                                "content": chunk_with_context,
+                                "filename": db_filename,
+                                "category": category,
+                                "source_type": course["source_type"],
+                                "chunk_index": chunk_idx,
+                                "source": SOURCE_TAG,
+                            },
+                        )
+                        inserted += 1
+                    except Exception as e:
+                        print(f"  ERROR {db_filename}[{chunk_idx}]: {e}")
+
+                total_chunks += 1
+                course_chunks += 1
+
+                # Track category stats
+                stats_by_category[category] = stats_by_category.get(category, 0) + 1
+
+            total_files += 1
+
+            if (file_idx + 1) % 50 == 0:
+                if not dry_run:
+                    db.commit()
+                print(f"  Progress: {file_idx + 1}/{len(transcripts)} files, {course_chunks} chunks")
+
+        if not dry_run:
+            db.commit()
+
+        stats_by_course[course["prefix"]] = {
+            "files": len(transcripts),
+            "chunks": course_chunks,
+        }
+
+    # Summary
+    print(f"\n{'='*60}")
+    print(f"SUMMARY {'(DRY RUN)' if dry_run else ''}")
+    print(f"{'='*60}")
+    print(f"Files processed: {total_files}")
+    print(f"Files skipped (too small): {skipped_small}")
+    print(f"Total chunks: {total_chunks}")
+    if not dry_run:
+        print(f"Inserted to DB: {inserted}")
+
+    print(f"\nBy course:")
+    for name, s in stats_by_course.items():
+        print(f"  {name}: {s['files']} files → {s['chunks']} chunks")
+
+    print(f"\nBy category:")
+    for cat, count in sorted(stats_by_category.items(), key=lambda x: -x[1]):
+        print(f"  {cat}: {count}")
+
+    if dry_run or no_embed:
+        if dry_run:
+            print("\nDry run — nothing inserted. Remove --dry-run to execute.")
+        if no_embed:
+            print("\nSkipping embeddings. Run embed_chunks.py separately.")
+        db.close()
+        return
+
+    # Phase 2: Embed new chunks
+    print(f"\n--- Embedding phase ---")
+    try:
+        from services.embedding_service import get_embeddings_batch_sync, EMBEDDING_DIM
+    except ImportError:
+        print("WARNING: embedding_service not available. Run embed_chunks.py separately.")
+        db.close()
+        return
+
+    to_embed = db.execute(text(
+        "SELECT COUNT(*) FROM knowledge_chunks WHERE source = :src AND embedding IS NULL"
+    ), {"src": SOURCE_TAG}).scalar()
+    print(f"Chunks to embed: {to_embed} (dim={EMBEDDING_DIM})")
+
+    if to_embed == 0:
+        print("All chunks already embedded.")
+        db.close()
+        return
+
+    done = 0
+    while True:
+        rows = db.execute(text(
+            "SELECT id, content FROM knowledge_chunks "
+            "WHERE source = :src AND embedding IS NULL ORDER BY id LIMIT :batch"
+        ), {"src": SOURCE_TAG, "batch": EMBED_BATCH}).fetchall()
+
+        if not rows:
+            break
+
+        ids = [r[0] for r in rows]
+        texts = [r[1][:2000] for r in rows]
+
+        try:
+            embeddings = get_embeddings_batch_sync(texts)
+        except Exception as e:
+            err = str(e)
+            print(f"  Embed error at id={ids[0]}: {err[:100]}")
+            if any(code in err for code in ["500", "502", "408", "503"]):
+                time.sleep(15)
+                continue
+            if "429" in err or "rate" in err.lower():
+                time.sleep(60)
+                continue
+            raise
+
+        for chunk_id, emb in zip(ids, embeddings):
+            emb_str = "[" + ",".join(str(x) for x in emb) + "]"
+            db.execute(
+                text("UPDATE knowledge_chunks SET embedding = CAST(:emb AS vector) WHERE id = :id"),
+                {"emb": emb_str, "id": chunk_id},
+            )
+
+        db.commit()
+        done += len(rows)
+        if done % 50 == 0 or done == to_embed:
+            print(f"  Embedded {done}/{to_embed}")
+        # WHY: CF Workers AI free tier — ~10 req/min, 5 texts/req
+        time.sleep(6.0)
+
+    db.close()
+    print(f"\nAll done! {done} chunks embedded.")
+
+
+if __name__ == "__main__":
+    main()
