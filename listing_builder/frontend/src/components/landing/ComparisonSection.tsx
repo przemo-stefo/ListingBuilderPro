@@ -35,9 +35,10 @@ export function ComparisonSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="rounded-xl border border-gray-800 bg-[#0F1419]/60 overflow-hidden"
+          className="rounded-xl border border-gray-800 bg-[#0F1419]/60 overflow-x-auto"
         >
-          <table className="w-full text-sm">
+          {/* WHY: min-w prevents column collapse on mobile, overflow-x-auto on parent scrolls */}
+          <table className="w-full text-sm min-w-[540px]">
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left px-6 py-4 text-gray-500 font-medium">Aspekt</th>

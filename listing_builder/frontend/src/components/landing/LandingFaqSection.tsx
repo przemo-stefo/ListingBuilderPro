@@ -2,8 +2,7 @@
 // Purpose: FAQ accordion for landing page with section label
 // NOT for: In-app FAQ (that's ui/FaqSection.tsx)
 
-'use client'
-
+// WHY: No 'use client' needed — FaqItem is already a client component, this parent stays server-side
 import { FaqItem } from '@/components/ui/FaqSection'
 
 const FAQ_ITEMS = [
