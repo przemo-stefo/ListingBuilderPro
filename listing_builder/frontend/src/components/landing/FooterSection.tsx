@@ -61,7 +61,7 @@ export function FooterSection() {
 
       <div className="mx-auto max-w-5xl mt-12 pt-8 border-t border-gray-800/50 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-xs text-gray-600">
-          &copy; {new Date().getFullYear()} PYROX AI, LLC. Wszelkie prawa zastrzeżone.
+          &copy; {new Date().getFullYear()} VIAREGIA.ONLINE Sp. z o.o. Wszelkie prawa zastrzeżone.
         </p>
         <p className="text-xs text-gray-600">
           Stworzone dla sprzedawców marketplace

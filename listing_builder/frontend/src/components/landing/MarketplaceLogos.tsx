@@ -11,6 +11,7 @@ const LOGOS = [
   { src: '/logos/kaufland.svg', alt: 'Kaufland', width: 110 },
   { src: '/logos/temu.svg', alt: 'Temu', width: 75 },
   { src: '/logos/aliexpress.svg', alt: 'AliExpress', width: 120 },
+  { src: '/logos/bol.svg', alt: 'Bol.com', width: 70 },
 ]
 
 interface Props {

@@ -12,7 +12,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Jakie marketplace są obsługiwane?',
-    answer: 'Amazon, Allegro, eBay i Kaufland. Konwerter ofert pozwala przenosić listingi między tymi platformami jednym kliknięciem.',
+    answer: 'Amazon, Allegro, eBay, Kaufland, Temu, AliExpress i Bol.com. Konwerter ofert pozwala przenosić listingi między tymi platformami jednym kliknięciem.',
   },
   {
     question: 'Jak działa optymalizacja AI?',

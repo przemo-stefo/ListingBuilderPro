@@ -11,6 +11,7 @@ import { ShowcaseSection } from '@/components/landing/ShowcaseSection'
 import { FeaturesSection } from '@/components/landing/FeaturesSection'
 import { ComparisonSection } from '@/components/landing/ComparisonSection'
 import { PricingSection } from '@/components/landing/PricingSection'
+import { ExpertsSection } from '@/components/landing/ExpertsSection'
 import { LandingFaqSection } from '@/components/landing/LandingFaqSection'
 import { CtaBanner } from '@/components/landing/CtaBanner'
 import { FooterSection } from '@/components/landing/FooterSection'
@@ -18,7 +19,7 @@ import { FooterSection } from '@/components/landing/FooterSection'
 // WHY: SEO metadata — critical for a marketing landing page
 export const metadata: Metadata = {
   title: 'OctoHelper — AI Marketplace Assistant | Optymalizuj oferty z AI',
-  description: 'Optymalizuj oferty na Amazon, Allegro, eBay i Kaufland z pomocą AI. Generuj tytuły, opisy, słowa kluczowe. Konwertuj między platformami jednym kliknięciem.',
+  description: 'Optymalizuj oferty na Amazon, Allegro, eBay, Kaufland, Temu, AliExpress i Bol.com z pomocą AI. Generuj tytuły, opisy, słowa kluczowe. Konwertuj między platformami jednym kliknięciem.',
   openGraph: {
     title: 'OctoHelper — AI Marketplace Assistant',
     description: 'Optymalizuj oferty marketplace z pomocą AI. Amazon, Allegro, eBay, Kaufland.',
@@ -39,6 +40,7 @@ export default function LandingPage() {
         <FeaturesSection />
         <ComparisonSection />
         <PricingSection />
+        <ExpertsSection />
         <LandingFaqSection />
         <CtaBanner />
       </main>
