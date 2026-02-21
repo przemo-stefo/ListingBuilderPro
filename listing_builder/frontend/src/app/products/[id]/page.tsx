@@ -4,7 +4,6 @@
 
 'use client'
 
-import { use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProduct } from '@/lib/hooks/useProducts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,10 +12,10 @@ import { Badge } from '@/components/ui/badge'
 import { formatDate, getStatusColor, cn, getScoreColor } from '@/lib/utils'
 import { ArrowLeft, Sparkles, Send } from 'lucide-react'
 
-export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
+// WHY: Next.js 14 passes params as plain object, not Promise (that's Next.js 15+)
+export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const { data: product, isLoading, error } = useProduct(resolvedParams.id)
+  const { data: product, isLoading, error } = useProduct(params.id)
 
   // WHY: Navigate to optimizer with product title pre-filled instead of
   // calling a broken /ai/optimize endpoint that doesn't exist on backend.
