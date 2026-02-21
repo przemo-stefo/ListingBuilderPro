@@ -5,7 +5,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BarChart3, Package, Bell, AlertTriangle, TrendingUp } from 'lucide-react'
+import { BarChart3, Package, Bell, AlertTriangle, TrendingUp, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/ui/FaqSection'
 
@@ -21,8 +21,9 @@ import TrackedProductsTab from './components/TrackedProductsTab'
 import AlertRulesTab from './components/AlertRulesTab'
 import AlertHistoryTab from './components/AlertHistoryTab'
 import SnapshotsTab from './components/SnapshotsTab'
+import AlertSettingsTab from './components/AlertSettingsTab'
 
-type Tab = 'dashboard' | 'products' | 'rules' | 'alerts' | 'snapshots'
+type Tab = 'dashboard' | 'products' | 'rules' | 'alerts' | 'snapshots' | 'alert-settings'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -30,6 +31,7 @@ const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'rules', label: 'Alert Rules', icon: Bell },
   { key: 'alerts', label: 'Alerts', icon: AlertTriangle },
   { key: 'snapshots', label: 'Snapshots', icon: TrendingUp },
+  { key: 'alert-settings', label: 'Alert Settings', icon: Settings },
 ]
 
 export default function MonitoringPage() {
@@ -70,6 +72,7 @@ export default function MonitoringPage() {
         {activeTab === 'rules' && <AlertRulesTab />}
         {activeTab === 'alerts' && <AlertHistoryTab />}
         {activeTab === 'snapshots' && <SnapshotsTab />}
+        {activeTab === 'alert-settings' && <AlertSettingsTab />}
 
         <FaqSection
           title="Najczesciej zadawane pytania"

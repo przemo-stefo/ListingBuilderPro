@@ -105,3 +105,25 @@ class Alert(Base):
     acknowledged_at = Column(DateTime(timezone=True))
 
     config = relationship("AlertConfig", back_populates="alerts")
+
+
+class AlertTypeSetting(Base):
+    """User preference for a Sellerboard-style alert type (global, not per-product)."""
+    __tablename__ = "alert_type_settings"
+
+    id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(Text, nullable=False, index=True)
+    alert_type = Column(String(80), nullable=False)
+    category = Column(String(40), nullable=False)
+    priority = Column(String(10), nullable=False, default="minor")
+    notify_in_app = Column(Boolean, nullable=False, default=True)
+    notify_email = Column(Boolean, nullable=False, default=False)
+    # WHY ARRAY: User may want alerts sent to multiple team members
+    email_recipients = Column(JSON, default=list)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "alert_type", name="uq_user_alert_type"),
+    )

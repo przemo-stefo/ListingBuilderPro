@@ -39,6 +39,7 @@ const ALLOWED_PATH_PREFIXES = [
   'research',
   'auth',
   'admin',
+  'alert-settings',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
