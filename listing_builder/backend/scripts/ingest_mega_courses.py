@@ -10,12 +10,7 @@ Usage:
     python scripts/ingest_mega_courses.py --dry-run  # preview only
     python scripts/ingest_mega_courses.py --no-embed  # ingest without embeddings
 
-Courses (539 files):
-  - Stefan Georgi RMBC II (124) — copywriting, VSL, unique mechanisms
-  - Ecom Talent Creative Systems (71) — ad creative, $100K/day systems
-  - Barry Hott Building Ads (56) — ad hooks, testing, creative
-  - Daniel Throssell Market Detective (80) — market research, angles
-  - Russel Brunson Conversation Domination (208) — funnels, traffic, offers
+All 52 MEGA courses (~3,067 transcripts). ON CONFLICT DO NOTHING = safe to re-run.
 """
 
 import os
@@ -38,38 +33,66 @@ EMBED_BATCH = 5
 SOURCE_TAG = "mega_course"
 MEGA_BASE = os.path.expanduser("~/Documents/MegaTranscripts")
 
-# WHY: 5 courses selected for maximum relevance to listing optimization / e-commerce
+# WHY: All 52 courses from MEGA transcripts. ON CONFLICT DO NOTHING = idempotent.
+# Already ingested courses will be skipped automatically.
 COURSES = [
-    {
-        "dir": "Stefan Georgi - RMBC II",
-        "source_type": "georgi_rmbc",
-        "prefix": "Georgi RMBC",
-        "default_category": "copywriting",
-    },
-    {
-        "dir": "BASHERSFORLIFE - Ecom Talent - The Creative Systems That Print 100K per Day in E",
-        "source_type": "ecom_talent",
-        "prefix": "Ecom Talent",
-        "default_category": "creative_strategy",
-    },
-    {
-        "dir": "Barry Hott Building Ads 20",
-        "source_type": "barry_hott_ads",
-        "prefix": "Barry Hott",
-        "default_category": "ad_creative",
-    },
-    {
-        "dir": "Daniel Throssell - Market Detective",
-        "source_type": "throssell_market",
-        "prefix": "Throssell",
-        "default_category": "market_research",
-    },
-    {
-        "dir": "Russel Brunson conversation domination",
-        "source_type": "brunson_funnels",
-        "prefix": "Brunson",
-        "default_category": "funnels",
-    },
+    # === BATCH 1 (already ingested — will be skipped) ===
+    {"dir": "Stefan Georgi - RMBC II", "source_type": "georgi_rmbc", "prefix": "Georgi RMBC", "default_category": "copywriting"},
+    {"dir": "BASHERSFORLIFE - Ecom Talent - The Creative Systems That Print 100K per Day in E", "source_type": "ecom_talent", "prefix": "Ecom Talent", "default_category": "creative_strategy"},
+    {"dir": "Barry Hott Building Ads 20", "source_type": "barry_hott_ads", "prefix": "Barry Hott", "default_category": "ad_creative"},
+    {"dir": "Daniel Throssell - Market Detective", "source_type": "throssell_market", "prefix": "Throssell", "default_category": "market_research"},
+    {"dir": "Russel Brunson conversation domination", "source_type": "brunson_funnels", "prefix": "Brunson", "default_category": "funnels"},
+    # === COPYWRITING & SALES ===
+    {"dir": "Premium Ghostwriting Academy by Dickie Bush and Nicholas Cole Full Stack Writer ", "source_type": "ghostwriting_academy", "prefix": "Ghostwriting", "default_category": "copywriting"},
+    {"dir": "Chris Orzechowski - One Person Agency", "source_type": "orzechowski", "prefix": "Orzechowski", "default_category": "copywriting"},
+    {"dir": "Ben Settle - Client-less Copywriter", "source_type": "ben_settle", "prefix": "Settle", "default_category": "copywriting"},
+    {"dir": "Kim Krause Schwalm - Supplement Copy Boot Camp", "source_type": "schwalm_supplement", "prefix": "Schwalm", "default_category": "copywriting"},
+    {"dir": "Jon Benson ChatVSL Create and even sell high-converting VSLs using only ChatGPT", "source_type": "benson_chatvsl", "prefix": "Benson VSL", "default_category": "copywriting"},
+    {"dir": "Frank Kern - Five Courses Bundle", "source_type": "frank_kern", "prefix": "Kern", "default_category": "funnels"},
+    # === ADS & CREATIVE ===
+    {"dir": "Creative Vibe Marketing with AI AI UGC for Pros Course", "source_type": "creative_vibe_ugc", "prefix": "Creative Vibe", "default_category": "ad_creative"},
+    {"dir": "TMS Media - Engaging Ads Academy", "source_type": "tms_engaging_ads", "prefix": "TMS Ads", "default_category": "ad_creative"},
+    {"dir": "The Ad Creative course by Fraser Cottrell", "source_type": "cottrell_ad_creative", "prefix": "Cottrell", "default_category": "ad_creative"},
+    {"dir": "BASHERSFORLIFE BFL- Sam O Halloran - Scale With Paid Ads In 2025 Info Product Ad", "source_type": "ohalloran_paid_ads", "prefix": "OHalloran", "default_category": "ppc"},
+    {"dir": "Philipp Humm - Power of StorySelling", "source_type": "humm_storyselling", "prefix": "Humm", "default_category": "marketing_psychology"},
+    # === CONTENT & YOUTUBE ===
+    {"dir": "Bryan Ng - YouTube Script Academy BFL", "source_type": "bryan_ng_youtube", "prefix": "Bryan Ng", "default_category": "content_creation"},
+    {"dir": "The Client Magnets BASHERS FOR LIFE1", "source_type": "client_magnets_1", "prefix": "Client Magnets", "default_category": "content_creation"},
+    {"dir": "The Client Magnets BASHERS FOR LIFE", "source_type": "client_magnets_2", "prefix": "Client Magnets 2", "default_category": "content_creation"},
+    {"dir": "Sean Cannell - Video Success Secrets Bonus", "source_type": "cannell_video_1", "prefix": "Cannell", "default_category": "content_creation"},
+    {"dir": "Sean Cannell - Video Success Secrets Vol II", "source_type": "cannell_video_2", "prefix": "Cannell V2", "default_category": "content_creation"},
+    {"dir": "Ross Harkness - MasteryOS", "source_type": "harkness_mastery", "prefix": "Harkness", "default_category": "content_creation"},
+    {"dir": "Zita Viral Content Creator AI Automation 2024 19700 moneyvipprogramcom", "source_type": "zita_viral", "prefix": "Zita", "default_category": "content_creation"},
+    # === MARKETING & BUSINESS ===
+    {"dir": "Augment - The Augment MBA", "source_type": "augment_mba", "prefix": "Augment MBA", "default_category": "business"},
+    {"dir": "Smart Marketer - Smart Business Exit", "source_type": "smart_marketer", "prefix": "Smart Marketer", "default_category": "business"},
+    {"dir": "Eddie Cumberbatch - Creator Accelerator", "source_type": "cumberbatch_creator", "prefix": "Cumberbatch", "default_category": "content_creation"},
+    {"dir": "Nero Knowledge - The Awakened Entrepreneurs Blueprint v20", "source_type": "nero_knowledge", "prefix": "Nero", "default_category": "business"},
+    {"dir": "BASHERSFORLIFE - Alex Hormozi 18k Upsell - ACQ Scale Advisory", "source_type": "hormozi_acq", "prefix": "Hormozi ACQ", "default_category": "business"},
+    # === AI & AUTOMATION ===
+    {"dir": "Stephen G Pope - NO CODES ARCHITECT 2025 VERSION UPDATED - AI AGENTS AUTOMATION", "source_type": "pope_nocode", "prefix": "Pope NoCode", "default_category": "ai_tools"},
+    {"dir": "Corbin ai - Start a Successful AI Automation Agency", "source_type": "corbin_ai", "prefix": "Corbin AI", "default_category": "ai_tools"},
+    {"dir": "Niko x Studios - The AI Atelier", "source_type": "niko_ai_atelier", "prefix": "Niko AI", "default_category": "ai_tools"},
+    {"dir": "Automation Tribe", "source_type": "automation_tribe", "prefix": "AutoTribe", "default_category": "ai_tools"},
+    # === AGENCY & OUTREACH ===
+    {"dir": "BASHERSFORLIFE - WisdomElites-Agency Flywheel Accelerator - Faris Bio", "source_type": "agency_flywheel", "prefix": "Flywheel", "default_category": "agency"},
+    {"dir": "BASHERS FOR LIFE - Ty Frankel - Sign 2-5 high-ticket clients a month on LinkedIn", "source_type": "frankel_linkedin", "prefix": "Frankel", "default_category": "outreach"},
+    {"dir": "Yassin Baum - AI Cold Email Academy", "source_type": "baum_cold_email", "prefix": "Baum", "default_category": "outreach"},
+    {"dir": "James Lawrence - Finding A Offers High Ticket Sales", "source_type": "lawrence_sales", "prefix": "Lawrence", "default_category": "sales"},
+    {"dir": "Adil Maf - Payment Processing Secrets", "source_type": "maf_payments", "prefix": "Maf", "default_category": "business"},
+    {"dir": "Beyond_TheHorizon Sean Ferres - CMB 20 10 Week Fire Your Boss Challenge", "source_type": "beyond_horizon", "prefix": "Beyond", "default_category": "business"},
+    {"dir": "Carl Allen - Dealmaker CEO 2021", "source_type": "carl_allen", "prefix": "Allen", "default_category": "business"},
+    # === TRADING & FINANCE ===
+    {"dir": "The Wall Street Quants BootCamp", "source_type": "quants_bootcamp", "prefix": "Quants", "default_category": "trading"},
+    {"dir": "OrderFlows - Crypto Order Flow Trading Course - Mike Valtos", "source_type": "orderflows_crypto", "prefix": "OrderFlows", "default_category": "trading"},
+    {"dir": "ALGOHUB 2023 Full Completed", "source_type": "algohub", "prefix": "AlgoHub", "default_category": "trading"},
+    {"dir": "WD Gann Secrets Revealed", "source_type": "gann_secrets", "prefix": "Gann", "default_category": "trading"},
+    {"dir": "QuantProgram - Prometheus", "source_type": "quantprogram", "prefix": "QuantProg", "default_category": "trading"},
+    {"dir": "Trading Busters - London Strategy", "source_type": "trading_busters", "prefix": "TradBust", "default_category": "trading"},
+    {"dir": "AlgoTrading101", "source_type": "algotrading101", "prefix": "AlgoTrad", "default_category": "trading"},
+    # === OTHER ===
+    {"dir": "GSFU", "source_type": "gsfu", "prefix": "GSFU", "default_category": "general"},
+    {"dir": "1stman - Outlier Male Body Language", "source_type": "body_language", "prefix": "1stMan", "default_category": "general"},
 ]
 
 # WHY: Map filename keywords to categories for better RAG filtering
@@ -109,6 +132,23 @@ CATEGORY_RULES = [
     # Offers & pricing
     (r"offer|price|discount|bundle|upsell|downsell", "offers"),
     (r"value.?stack|bonus|guarantee|risk.?reversal", "offers"),
+    # Content & YouTube
+    (r"youtube|video|thumbnail|subscribe|channel", "content_creation"),
+    (r"content|blog|post|article|thread|newsletter", "content_creation"),
+    (r"ghostwrit|ghost.?writ|writing.?system|writing.?habit", "copywriting"),
+    # AI & automation
+    (r"ai\b|artificial|gpt|chatgpt|llm|prompt|automat", "ai_tools"),
+    (r"agent|workflow|n8n|zapier|make\.com|no.?code", "ai_tools"),
+    # Agency & outreach
+    (r"agency|client.?acqui|retainer|freelanc", "agency"),
+    (r"outreach|cold.?email|linkedin|inmail|prospect", "outreach"),
+    (r"high.?ticket|close|sales.?call|appointment", "sales"),
+    # Trading & finance
+    (r"trade|trading|stock|crypto|forex|order.?flow", "trading"),
+    (r"algo|quant|backtest|strategy|indicator", "trading"),
+    # Business
+    (r"business|entrepreneur|startup|scale|exit|acquisition", "business"),
+    (r"mindset|productivity|habit|morning|routine", "business"),
 ]
 
 
