@@ -12,6 +12,7 @@ import structlog
 from config import settings
 from database import get_db
 from api.dependencies import get_user_id
+from pydantic import BaseModel
 from services.oauth_service import (
     get_amazon_authorize_url,
     handle_amazon_callback,
@@ -19,6 +20,7 @@ from services.oauth_service import (
     handle_allegro_callback,
     get_ebay_authorize_url,
     handle_ebay_callback,
+    connect_bol,
     get_connections,
     disconnect,
 )
@@ -151,6 +153,33 @@ async def ebay_callback(
 
     frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/integrations?oauth=success&marketplace=ebay")
+
+
+# ── BOL.com (Client Credentials — no browser redirect) ───────────────────
+
+class BolConnectRequest(BaseModel):
+    """WHY POST body: BOL uses Client Credentials, user provides keys in UI form."""
+    client_id: str
+    client_secret: str
+
+
+@router.post("/bol/connect")
+@limiter.limit("10/minute")
+async def bol_connect(
+    request: Request,
+    body: BolConnectRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+):
+    """Validate BOL.com credentials and save connection.
+
+    WHY POST not GET/authorize: BOL Client Credentials doesn't require
+    browser redirect. User enters client_id/secret in form, we test and save.
+    """
+    result = await connect_bol(body.client_id, body.client_secret, db, user_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # ── Connection status (all marketplaces) ──────────────────────────────────

@@ -18,9 +18,11 @@ import { cn } from '@/lib/utils'
 import { useTrackedProducts } from '@/lib/hooks/useMonitoring'
 import { useOAuthConnections, useOAuthAuthorize, useOAuthDisconnect } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
+import { connectBol } from '@/lib/api/oauth'
 
 // WHY: Marketplaces with OAuth flow ready — others show "Wkrótce"
-const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro', 'ebay'])
+// WHY bol: Uses Client Credentials (form-based), not browser redirect
+const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro', 'ebay', 'bol'])
 
 const MARKETPLACES = [
   { id: 'amazon', name: 'Amazon Seller Central', desc: 'Europejskie rynki Amazon (DE, FR, IT, ES, PL)', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-orange-500/20' },
@@ -41,6 +43,8 @@ export default function IntegrationsTab() {
   const authorizeMutation = useOAuthAuthorize()
   const disconnectMutation = useOAuthDisconnect()
   const [scanning, setScanning] = useState(false)
+  // WHY: BOL uses Client Credentials — user enters keys in a form, not browser redirect
+  const [bolForm, setBolForm] = useState({ open: false, clientId: '', clientSecret: '', loading: false })
 
   const tracked = trackedQuery.data?.items ?? []
   const oauthConns = oauthQuery.data?.connections ?? []
@@ -88,6 +92,23 @@ export default function IntegrationsTab() {
       })
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function handleBolConnect() {
+    if (!bolForm.clientId.trim() || !bolForm.clientSecret.trim()) {
+      toast({ title: 'Uzupełnij dane', description: 'Podaj Client ID i Client Secret', variant: 'destructive' })
+      return
+    }
+    setBolForm(f => ({ ...f, loading: true }))
+    try {
+      await connectBol(bolForm.clientId.trim(), bolForm.clientSecret.trim())
+      toast({ title: 'Połączono!', description: 'BOL.com podłączony pomyślnie' })
+      setBolForm({ open: false, clientId: '', clientSecret: '', loading: false })
+      oauthQuery.refetch()
+    } catch (err: any) {
+      toast({ title: 'Błąd BOL.com', description: err.message || 'Nieprawidłowe dane', variant: 'destructive' })
+      setBolForm(f => ({ ...f, loading: false }))
     }
   }
 
@@ -177,7 +198,15 @@ export default function IntegrationsTab() {
                     </button>
                   )}
                   <button
-                    onClick={() => hasOAuth && !isOAuthActive ? authorizeMutation.mutate(mp.id) : undefined}
+                    onClick={() => {
+                      if (!hasOAuth || isOAuthActive) return
+                      // WHY: BOL uses form-based connect, others use browser redirect
+                      if (mp.id === 'bol') {
+                        setBolForm(f => ({ ...f, open: true }))
+                      } else {
+                        authorizeMutation.mutate(mp.id)
+                      }
+                    }}
                     disabled={!hasOAuth || isOAuthActive || authorizeMutation.isPending}
                     className={cn(
                       'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
@@ -202,6 +231,50 @@ export default function IntegrationsTab() {
           )
         })}
       </div>
+
+      {/* WHY inline form: BOL Client Credentials don't need browser redirect — simple form */}
+      {bolForm.open && (
+        <div className="rounded-xl border border-blue-500/30 bg-[#121212] p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-white">Połącz BOL.com</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              Wpisz Client ID i Client Secret z BOL Partner Platform
+            </p>
+          </div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              placeholder="Client ID"
+              value={bolForm.clientId}
+              onChange={e => setBolForm(f => ({ ...f, clientId: e.target.value }))}
+              className="w-full rounded-lg border border-gray-700 bg-[#1A1A1A] px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            />
+            <input
+              type="password"
+              placeholder="Client Secret"
+              value={bolForm.clientSecret}
+              onChange={e => setBolForm(f => ({ ...f, clientSecret: e.target.value }))}
+              className="w-full rounded-lg border border-gray-700 bg-[#1A1A1A] px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleBolConnect}
+              disabled={bolForm.loading}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+            >
+              {bolForm.loading && <Loader2 className="h-3 w-3 animate-spin" />}
+              {bolForm.loading ? 'Łączenie...' : 'Połącz'}
+            </button>
+            <button
+              onClick={() => setBolForm({ open: false, clientId: '', clientSecret: '', loading: false })}
+              className="rounded-lg px-4 py-2 text-xs text-gray-400 hover:text-white transition-colors"
+            >
+              Anuluj
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

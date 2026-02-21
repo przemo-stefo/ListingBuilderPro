@@ -23,6 +23,7 @@ from services.allegro_api import (
     fetch_seller_offers, fetch_offer_details,
     get_access_token,
 )
+from services.bol_api import fetch_bol_offers
 
 limiter = Limiter(key_func=get_remote_address)
 from services.scraper.allegro_scraper import (
@@ -537,6 +538,22 @@ async def get_allegro_offers(
     the same response format for frontend compatibility.
     """
     result = await fetch_seller_offers(db, user_id)
+    return StoreUrlsResponse(**result)
+
+
+@router.get("/bol-offers", response_model=StoreUrlsResponse)
+@limiter.limit("5/minute")
+async def get_bol_offers(
+    request: Request,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+):
+    """Fetch seller's offers via BOL.com Retailer API (requires connection).
+
+    WHY same response format: StoreUrlsResponse is used by converter frontend
+    for all marketplaces — keeps the UI code unified.
+    """
+    result = await fetch_bol_offers(db, user_id)
     return StoreUrlsResponse(**result)
 
 

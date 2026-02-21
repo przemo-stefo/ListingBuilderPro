@@ -352,6 +352,42 @@ async def handle_ebay_callback(
     return {"status": "connected", "marketplace": "ebay"}
 
 
+# ── BOL.com (Client Credentials — no browser redirect) ────────────────────
+
+async def connect_bol(client_id: str, client_secret: str, db: Session, user_id: str = "default") -> Dict:
+    """Validate BOL.com credentials and save connection.
+
+    WHY no redirect: BOL.com uses Client Credentials (server-to-server).
+    User provides client_id/secret in UI, we test them, save if valid.
+    """
+    from services.bol_api import validate_bol_credentials
+
+    result = await validate_bol_credentials(client_id, client_secret)
+    if not result["valid"]:
+        return {"error": result["error"]}
+
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
+        OAuthConnection.marketplace == "bol",
+    ).first()
+
+    if not conn:
+        conn = OAuthConnection(user_id=user_id, marketplace="bol")
+        db.add(conn)
+
+    conn.status = "active"
+    conn.access_token = result["token"]
+    conn.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=result["expires_in"])
+    # WHY raw_data: Store client_id/secret for token refresh (BOL tokens last ~5 min)
+    conn.raw_data = {"client_id": client_id, "client_secret": client_secret}
+    conn.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    logger.info("bol_connected", user_id=user_id)
+
+    return {"status": "connected", "marketplace": "bol"}
+
+
 # ── Connection status ────────────────────────────────────────────────────────
 
 def get_connections(db: Session, user_id: str = "default") -> list:

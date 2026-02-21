@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     allegro_client_id: str = ""  # WHY: Allegro OAuth app credentials (from Mateusz)
     allegro_client_secret: str = ""
 
+    bol_client_id: str = ""  # WHY: BOL.com Retailer API credentials (Client Credentials grant)
+    bol_client_secret: str = ""
+
     kaufland_client_key: str = ""
     kaufland_secret_key: str = ""
 

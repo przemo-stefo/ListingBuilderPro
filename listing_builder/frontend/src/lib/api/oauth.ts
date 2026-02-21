@@ -17,6 +17,15 @@ export async function getAuthorizeUrl(marketplace: string): Promise<OAuthAuthori
   return response.data!
 }
 
+export async function connectBol(clientId: string, clientSecret: string): Promise<{ status: string; marketplace: string }> {
+  const response = await apiRequest<{ status: string; marketplace: string }>('post', '/oauth/bol/connect', {
+    client_id: clientId,
+    client_secret: clientSecret,
+  })
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
 export async function disconnectMarketplace(marketplace: string): Promise<void> {
   const response = await apiRequest<void>('delete', `/oauth/${marketplace}`)
   if (response.error) throw new Error(response.error)
