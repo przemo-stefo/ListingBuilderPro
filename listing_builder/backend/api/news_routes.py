@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import time
+import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Query
@@ -37,57 +38,94 @@ RSS_FEEDS = [
     {"url": "https://sellerengine.com/feed/", "source": "SellerEngine", "category": "ecommerce"},
     {"url": "https://news.google.com/rss/search?q=Temu+marketplace+sellers+ecommerce&hl=en&gl=US&ceid=US:en", "source": "Temu News", "category": "temu"},
     {"url": "https://channelx.world/category/temu/feed/", "source": "ChannelX Temu", "category": "temu"},
+    {"url": "https://news.google.com/rss/search?q=bol.com+marketplace+sellers+ecommerce&hl=nl&gl=NL&ceid=NL:nl", "source": "BOL.com News", "category": "bol"},
+    {"url": "https://news.google.com/rss/search?q=bol.com+verkoper+marktplaats&hl=nl&gl=NL&ceid=NL:nl", "source": "BOL.com Verkoper", "category": "bol"},
     {"url": "https://news.google.com/rss/search?q=EU+GPSR+EPR+product+safety+ecommerce+compliance&hl=en&gl=DE&ceid=DE:en", "source": "EU Compliance", "category": "compliance"},
     {"url": "https://news.google.com/rss/search?q=Amazon+eBay+marketplace+compliance+regulation&hl=en&gl=US&ceid=US:en", "source": "Marketplace Compliance", "category": "compliance"},
 ]
 
-RSS_API = "https://api.rss2json.com/v1/api.json?rss_url="
 TRANSLATE_BATCH_SIZE = 10  # WHY: Smaller batches = faster Groq response + less data lost on failure
+
+# WHY: Atom uses namespaces — need prefix for findall
+_ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
+
+
+def _parse_rss_xml(xml_text: str, feed: dict) -> List[dict]:
+    """Parse RSS/Atom XML directly — no rss2json dependency."""
+    root = ET.fromstring(xml_text)
+
+    # RSS 2.0: <channel><item>
+    raw_items = root.findall(".//item")
+    # Atom fallback: <entry>
+    if not raw_items:
+        raw_items = root.findall(".//atom:entry", _ATOM_NS)
+
+    items = []
+    for item in raw_items[:6]:
+        # RSS uses <title>, Atom uses <atom:title>
+        title = (item.findtext("title") or item.findtext("atom:title", namespaces=_ATOM_NS) or "").strip()
+        link_el = item.find("link")
+        link = ""
+        if link_el is not None:
+            link = link_el.text or link_el.get("href", "")
+        # Atom: <link href="..."/>
+        if not link:
+            atom_link = item.find("atom:link", _ATOM_NS)
+            if atom_link is not None:
+                link = atom_link.get("href", "")
+
+        pub_date = (item.findtext("pubDate") or item.findtext("atom:updated", namespaces=_ATOM_NS) or "").strip()
+        desc_raw = item.findtext("description") or item.findtext("atom:summary", namespaces=_ATOM_NS) or ""
+
+        # Extract thumbnail from <img> in description or <media:thumbnail>
+        img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', desc_raw)
+        media_thumb = item.find(".//{http://search.yahoo.com/mrss/}thumbnail")
+        enclosure = item.find("enclosure")
+        thumb = (
+            (img_match.group(1) if img_match else "")
+            or (media_thumb.get("url", "") if media_thumb is not None else "")
+            or (enclosure.get("url", "") if enclosure is not None else "")
+        )
+
+        items.append({
+            "title": title,
+            "link": link.strip(),
+            "source": feed["source"],
+            "pubDate": pub_date,
+            "description": re.sub(r"<[^>]*>", "", desc_raw)[:200].strip(),
+            "category": feed["category"],
+            "thumbnail": thumb,
+        })
+    return items
 
 
 async def _fetch_feed(client: httpx.AsyncClient, feed: dict) -> List[dict]:
-    """Fetch single RSS feed via rss2json.com API."""
+    """Fetch and parse RSS/Atom feed directly (no rss2json)."""
     try:
-        resp = await client.get(f"{RSS_API}{feed['url']}", timeout=15)
+        resp = await client.get(
+            feed["url"],
+            timeout=15,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; LBPNewsBot/1.0)"},
+            follow_redirects=True,
+        )
         if resp.status_code != 200:
             return []
-        data = resp.json()
-        if data.get("status") != "ok":
-            return []
-
-        items = []
-        for item in data.get("items", [])[:6]:
-            desc = item.get("description", "")
-            img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', desc)
-            thumb = (
-                item.get("thumbnail")
-                or (item.get("enclosure") or {}).get("link")
-                or (img_match.group(1) if img_match else "")
-            )
-            items.append({
-                "title": item.get("title", ""),
-                "link": item.get("link", ""),
-                "source": feed["source"],
-                "pubDate": item.get("pubDate", ""),
-                "description": re.sub(r"<[^>]*>", "", desc)[:200],
-                "category": feed["category"],
-                "thumbnail": thumb,
-            })
-        return items
+        return _parse_rss_xml(resp.text, feed)
     except Exception:
         return []
 
 
 async def _fetch_all_feeds() -> List[dict]:
-    """Fetch all RSS feeds in parallel batches (3 at a time)."""
+    """Fetch all RSS feeds in parallel batches (5 at a time)."""
     articles: List[dict] = []
+    # WHY: Direct fetch = no rss2json rate limit, can do 5 parallel safely
     async with httpx.AsyncClient() as client:
-        for i in range(0, len(RSS_FEEDS), 3):
-            batch = RSS_FEEDS[i : i + 3]
+        for i in range(0, len(RSS_FEEDS), 5):
+            batch = RSS_FEEDS[i : i + 5]
             results = await asyncio.gather(*[_fetch_feed(client, f) for f in batch])
             for r in results:
                 articles.extend(r)
-            if i + 3 < len(RSS_FEEDS):
+            if i + 5 < len(RSS_FEEDS):
                 await asyncio.sleep(0.3)
 
     articles.sort(key=lambda a: a.get("pubDate", ""), reverse=True)
@@ -150,7 +188,7 @@ async def _translate_batch(articles: List[dict], keys: List[str], batch_idx: int
 
     prompt = (
         "Przetłumacz tytuły (T) i opisy (D) artykułów e-commerce na język polski.\n"
-        "Zachowaj nazwy własne (Amazon, Allegro, eBay, Kaufland, Temu, GPSR, EPR) bez zmian.\n"
+        "Zachowaj nazwy własne (Amazon, Allegro, eBay, Kaufland, Temu, BOL.com, GPSR, EPR) bez zmian.\n"
         "Jeśli tekst jest już po polsku, zostaw go bez zmian.\n"
         "WAŻNE: Przetłumacz KAŻDY artykuł — nie pomijaj żadnego.\n"
         'Odpowiedz TYLKO jako JSON: {"items": [{"t": "tytuł PL", "d": "opis PL"}, ...]}\n\n'

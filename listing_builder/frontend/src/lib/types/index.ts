@@ -314,7 +314,7 @@ export interface GetAnalyticsParams {
 }
 
 // Settings types
-export type MarketplaceId = 'amazon' | 'ebay' | 'walmart' | 'shopify' | 'allegro'
+export type MarketplaceId = 'amazon' | 'ebay' | 'walmart' | 'shopify' | 'allegro' | 'bol'
 
 export interface MarketplaceConnection {
   id: MarketplaceId

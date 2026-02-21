@@ -25,7 +25,7 @@ interface NewsItem {
   thumbnail: string
 }
 
-type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'temu' | 'ecommerce' | 'compliance'
+type NewsCategory = 'all' | 'amazon' | 'allegro' | 'ebay' | 'kaufland' | 'temu' | 'bol' | 'ecommerce' | 'compliance'
 
 const CATEGORIES: { key: NewsCategory; label: string; icon: string; color: string }[] = [
   { key: 'all', label: 'Wszystkie', icon: '🌐', color: 'bg-white/10 text-white' },
@@ -34,6 +34,7 @@ const CATEGORIES: { key: NewsCategory; label: string; icon: string; color: strin
   { key: 'ebay', label: 'eBay', icon: '🏷️', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   { key: 'kaufland', label: 'Kaufland', icon: '🇩🇪', color: 'bg-red-500/10 text-red-300 border-red-500/20' },
   { key: 'temu', label: 'Temu', icon: '🟠', color: 'bg-orange-500/10 text-orange-300 border-orange-500/20' },
+  { key: 'bol', label: 'BOL.com', icon: '🇳🇱', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   { key: 'ecommerce', label: 'E-commerce', icon: '🛒', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
   { key: 'compliance', label: 'Compliance', icon: '📋', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
 ]
@@ -44,6 +45,7 @@ const SECTION_COLORS: Record<string, string> = {
   ebay: 'text-blue-400',
   kaufland: 'text-red-300',
   temu: 'text-orange-300',
+  bol: 'text-blue-400',
   ecommerce: 'text-green-400',
   compliance: 'text-red-400',
 }
@@ -111,6 +113,7 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
             item.category === 'compliance' ? 'bg-gradient-to-br from-red-950 to-[#1A1A1A]' :
             item.category === 'ebay' ? 'bg-gradient-to-br from-blue-950 to-[#1A1A1A]' :
             item.category === 'temu' ? 'bg-gradient-to-br from-orange-950 to-[#1A1A1A]' :
+            item.category === 'bol' ? 'bg-gradient-to-br from-blue-950 to-[#1A1A1A]' :
             'bg-gradient-to-br from-gray-800 to-[#1A1A1A]'
           )}>
             <span className="text-3xl opacity-40">
@@ -209,7 +212,7 @@ export default function NewsTab() {
   const filteredNews = category === 'all' ? news : news.filter((n) => n.category === category)
 
   // WHY: Group by marketplace for "all" view — each section shows its own grid
-  const groupedByMarketplace = ['amazon', 'allegro', 'ebay', 'kaufland', 'temu', 'ecommerce', 'compliance']
+  const groupedByMarketplace = ['amazon', 'allegro', 'ebay', 'kaufland', 'temu', 'bol', 'ecommerce', 'compliance']
     .map((cat) => ({ category: cat, items: news.filter((n) => n.category === cat) }))
     .filter((g) => g.items.length > 0)
 

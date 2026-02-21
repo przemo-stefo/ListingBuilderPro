@@ -17,6 +17,7 @@ MARKETPLACE_LIMITS = {
     "ebay_de":    {"title": 80,  "bullet": 300, "backend": 0,   "lang": "de"},
     "kaufland":   {"title": 150, "bullet": 400, "backend": 0,   "lang": "de"},
     "allegro":    {"title": 75,  "bullet": 500, "backend": 0,   "lang": "pl"},
+    "bol":        {"title": 150, "bullet": 500, "backend": 0,   "lang": "nl"},
 }
 
 

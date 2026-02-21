@@ -108,7 +108,7 @@ class ConvertRequest(BaseModel):
     @field_validator("marketplace")
     @classmethod
     def validate_marketplace(cls, v):
-        allowed = ["amazon", "ebay", "kaufland"]
+        allowed = ["amazon", "ebay", "kaufland", "bol"]
         if v not in allowed:
             raise ValueError(f"marketplace must be one of: {allowed}")
         return v
@@ -164,7 +164,7 @@ class StoreConvertRequest(BaseModel):
     @field_validator("marketplace")
     @classmethod
     def validate_marketplace(cls, v):
-        allowed = ["amazon", "ebay", "kaufland"]
+        allowed = ["amazon", "ebay", "kaufland", "bol"]
         if v not in allowed:
             raise ValueError(f"marketplace must be one of: {allowed}")
         return v
@@ -413,6 +413,14 @@ async def list_marketplaces():
                 "format": "CSV (Semicolon-separated, UTF-8-BOM)",
                 "extension": ".csv",
                 "description": "Kaufland Seller Portal product data template",
+            },
+            {
+                "id": "bol",
+                "name": "BOL.com (NL/BE)",
+                "format": "CSV",
+                "region": "Holandia / Belgia",
+                "fields": "EAN, tytuł, opis, cena, zdjęcia, atrybuty",
+                "requires_gpsr": False,
             },
         ]
     }
