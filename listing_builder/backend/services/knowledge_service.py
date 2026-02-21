@@ -14,11 +14,12 @@ from services.search_strategies import lexical_search, vector_search, hybrid_mer
 
 logger = structlog.get_logger()
 
-# WHY: Map prompt types to relevant transcript categories
+# WHY: Map prompt types to relevant transcript categories.
+# Expanded to include copywriting + marketing_psychology — 49K chunks from 21 courses.
 CATEGORY_MAP = {
-    "title": ["listing_optimization", "keyword_research", "ranking"],
-    "bullets": ["listing_optimization", "conversion_optimization", "keyword_research"],
-    "description": ["listing_optimization", "conversion_optimization", "general"],
+    "title": ["listing_optimization", "keyword_research", "ranking", "copywriting"],
+    "bullets": ["listing_optimization", "conversion_optimization", "keyword_research", "copywriting", "marketing_psychology"],
+    "description": ["listing_optimization", "conversion_optimization", "copywriting", "marketing_psychology", "market_research"],
 }
 
 MAX_CONTEXT_CHARS = 3000

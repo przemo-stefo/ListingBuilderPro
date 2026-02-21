@@ -40,6 +40,8 @@ const ALLOWED_PATH_PREFIXES = [
   'auth',
   'admin',
   'alert-settings',
+  'ads',
+  'score',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
