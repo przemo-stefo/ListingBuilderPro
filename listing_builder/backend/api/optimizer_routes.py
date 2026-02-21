@@ -145,6 +145,7 @@ class OptimizerResponse(BaseModel):
     keyword_intel: OptimizerKeywordIntel = OptimizerKeywordIntel()
     ranking_juice: Optional[RankingJuiceResponse] = None
     llm_provider: str = "groq"  # WHY: Shows which LLM generated the listing
+    llm_fallback_from: Optional[str] = None  # WHY: Set when provider failed and fell back to Groq
     optimization_source: str = "direct"
     listing_history_id: Optional[str] = None  # WHY: Used by frontend feedback widget
     trace: Optional[Dict[str, Any]] = None  # WHY: Observability — tokens, latency, cost per run

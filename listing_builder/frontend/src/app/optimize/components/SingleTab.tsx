@@ -159,6 +159,15 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
       onSuccess: (data) => {
         setResults(data)
         incrementUsage()
+        // WHY: Warn user when their chosen provider failed and Groq was used instead
+        if (data.llm_fallback_from) {
+          const providerLabel = LLM_PROVIDERS.find((p) => p.id === data.llm_fallback_from)?.label || data.llm_fallback_from
+          toast({
+            title: `${providerLabel} nie zadziałał`,
+            description: 'Klucz API jest nieprawidłowy lub wygasł. Użyto Groq jako fallback. Sprawdź klucz w Ustawieniach.',
+            variant: 'destructive',
+          })
+        }
       },
     })
   }

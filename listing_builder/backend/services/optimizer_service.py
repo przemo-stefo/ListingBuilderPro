@@ -122,6 +122,8 @@ async def optimize_listing(
     # 3. n8n-first, fallback to direct LLM
     optimization_source = "direct"
     used_provider = (provider_config or {}).get("provider", "groq")
+    # WHY: Track original provider when fallback happens — frontend shows warning to user
+    fallback_from = None
     backend_suggestions = ""
 
     if settings.n8n_webhook_url:
@@ -151,6 +153,7 @@ async def optimize_listing(
         except Exception as provider_err:
             if used_provider != "groq":
                 logger.warning("provider_fallback_to_groq", provider=used_provider, error=str(provider_err))
+                fallback_from = used_provider
                 title_text, bullet_lines, desc_text, backend_suggestions = await run_direct_groq(
                     trace, product_title, brand, product_line,
                     tier1_phrases, tier2_phrases, tier3_phrases, all_kw,
@@ -218,6 +221,7 @@ async def optimize_listing(
         },
         "ranking_juice": scores["rj"],
         "llm_provider": used_provider,
+        "llm_fallback_from": fallback_from,
         "optimization_source": optimization_source,
         "listing_history_id": listing_history_id,
         "trace": trace_data,
