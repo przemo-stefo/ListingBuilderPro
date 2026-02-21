@@ -25,7 +25,8 @@ const PUBLISH_FAQ = [
 export default function PublishPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // WHY: product.id is number from backend, but bulkPublish expects string[] — convert on publish
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('')
 
   // Fetch optimized products ready to publish
@@ -48,8 +49,9 @@ export default function PublishPage() {
   }, [marketplaces, selectedMarketplace])
 
   const publishMutation = useMutation({
+    // WHY: bulkPublish expects string[] but our IDs are numbers — convert here
     mutationFn: () =>
-      bulkPublish(selectedIds, selectedMarketplace, true),
+      bulkPublish(selectedIds.map(String), selectedMarketplace, true),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
@@ -75,7 +77,7 @@ export default function PublishPage() {
     },
   })
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: number) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
@@ -241,7 +243,7 @@ export default function PublishPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-lg font-semibold text-white">
-                          {truncate(product.title, 80)}
+                          {truncate(product.title_optimized || product.title_original, 80)}
                         </h3>
                         <Badge className={cn('text-xs', getStatusColor(product.status))}>
                           {product.status}
@@ -253,10 +255,10 @@ export default function PublishPage() {
                         )}
                       </div>
                       <p className="text-sm text-gray-400">
-                        {truncate(product.description || 'Brak opisu', 120)}
+                        {truncate(product.description_optimized || product.description_original || 'Brak opisu', 120)}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        {product.asin && <span>ASIN: {product.asin}</span>}
+                        {product.source_id && <span>ID: {product.source_id}</span>}
                         {product.brand && <span>Marka: {product.brand}</span>}
                         {product.category && <span>Kategoria: {product.category}</span>}
                       </div>

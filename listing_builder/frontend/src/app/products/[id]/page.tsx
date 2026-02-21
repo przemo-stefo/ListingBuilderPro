@@ -21,7 +21,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   // WHY: Navigate to optimizer with product title pre-filled instead of
   // calling a broken /ai/optimize endpoint that doesn't exist on backend.
   const handleOptimize = () => {
-    const title = product?.title || ''
+    const title = product?.title_optimized || product?.title_original || ''
     router.push(`/optimize?product=${encodeURIComponent(title)}`)
   }
 
@@ -85,12 +85,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <CardTitle className="text-2xl mb-2">{product.title}</CardTitle>
+              <CardTitle className="text-2xl mb-2">
+                {product.title_optimized || product.title_original}
+              </CardTitle>
               <div className="flex items-center gap-4 text-sm text-gray-400">
-                {product.asin && <span>ASIN: {product.asin}</span>}
+                {product.source_id && <span>ID: {product.source_id}</span>}
                 {product.brand && <span>Marka: {product.brand}</span>}
                 {product.category && <span>Kategoria: {product.category}</span>}
-                {product.marketplace && <span>Marketplace: {product.marketplace}</span>}
+                {product.source_platform && <span>Platforma: {product.source_platform}</span>}
               </div>
             </div>
             <Badge className={cn('text-sm', getStatusColor(product.status))}>
@@ -100,7 +102,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Optimization Score */}
-          {product.optimization_score !== undefined && (
+          {product.optimization_score != null && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-white">Wynik optymalizacji</span>
@@ -124,15 +126,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {/* Description */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Opis</h3>
-            <p className="text-gray-300 whitespace-pre-wrap">{product.description}</p>
+            <p className="text-gray-300 whitespace-pre-wrap">
+              {product.description_optimized || product.description_original || 'Brak opisu'}
+            </p>
           </div>
 
-          {/* Bullet Points */}
-          {product.bullet_points && product.bullet_points.length > 0 && (
+          {/* Bullet Points — stored in attributes if present */}
+          {Array.isArray(product.attributes?.bullet_points) && (product.attributes.bullet_points as string[]).length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-2">Kluczowe cechy</h3>
               <ul className="space-y-2">
-                {product.bullet_points.map((bullet, index) => (
+                {(product.attributes.bullet_points as string[]).map((bullet, index) => (
                   <li key={index} className="flex items-start gap-2 text-gray-300">
                     <span className="text-white mt-1">•</span>
                     <span>{bullet}</span>
@@ -142,12 +146,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
           )}
 
-          {/* SEO Keywords */}
-          {product.seo_keywords && product.seo_keywords.length > 0 && (
+          {/* SEO Keywords — stored in attributes if present */}
+          {Array.isArray(product.attributes?.seo_keywords) && (product.attributes.seo_keywords as string[]).length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-2">Słowa kluczowe SEO</h3>
               <div className="flex flex-wrap gap-2">
-                {product.seo_keywords.map((keyword, index) => (
+                {(product.attributes.seo_keywords as string[]).map((keyword, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {keyword}
                   </Badge>
@@ -175,7 +179,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="flex justify-between">
                 <span>Zaktualizowano:</span>
-                <span>{formatDate(product.updated_at)}</span>
+                <span>{product.updated_at ? formatDate(product.updated_at) : '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span>ID produktu:</span>

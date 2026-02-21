@@ -18,7 +18,7 @@ import { FaqSection } from '@/components/ui/FaqSection'
 
 const PRODUCTS_FAQ = [
   { question: 'Jak importowac produkty?', answer: 'Kliknij "Importuj produkty" w prawym gornym rogu. Mozesz wkleic URL z Allegro, przeslac plik CSV lub polaczyc sie z API Allegro. System automatycznie pobierze dane o produkcie.' },
-  { question: 'Co oznaczaja statusy produktow?', answer: 'Oczekujace = czekaja na optymalizacje AI. Zoptymalizowane = przetworzone przez AI z nowym tytulem i opisem. Opublikowane = wyeksportowane na marketplace. Bledy = problem podczas przetwarzania.' },
+  { question: 'Co oznaczaja statusy produktow?', answer: 'Imported = czekaja na optymalizacje AI. Optimized = przetworzone przez AI z nowym tytulem i opisem. Published = wyeksportowane na marketplace. Failed = problem podczas przetwarzania.' },
   { question: 'Czy moge usunac produkt?', answer: 'Tak, kliknij ikone kosza przy produkcie. Usuniecie jest trwale — produkt zostanie usuniety z systemu wraz z historia optymalizacji.' },
   { question: 'Jak filtrowac produkty?', answer: 'Uzyj paska wyszukiwania aby znalezc produkt po nazwie, ASIN lub marce. Przyciski statusu filtruja wedlug etapu przetwarzania.' },
 ]
@@ -35,13 +35,11 @@ export default function ProductsPage() {
   const { data, isLoading, error } = useProducts(filters)
   const deleteProduct = useDeleteProduct()
 
-  // Handle search with debounce
   const handleSearch = (query: string) => {
     setSearchQuery(query)
     setFilters((prev) => ({ ...prev, search: query, page: 1 }))
   }
 
-  // Handle status filter
   const handleStatusFilter = (status: string) => {
     setFilters((prev) => ({
       ...prev,
@@ -50,19 +48,18 @@ export default function ProductsPage() {
     }))
   }
 
-  // Handle delete
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Czy na pewno chcesz usunac ten produkt?')) {
-      await deleteProduct.mutateAsync(id)
+      await deleteProduct.mutateAsync(String(id))
     }
   }
 
   const statusFilters = [
     { label: 'Wszystkie', value: 'all' },
-    { label: 'Oczekujace', value: 'pending' },
-    { label: 'Zoptymalizowane', value: 'optimized' },
-    { label: 'Opublikowane', value: 'published' },
-    { label: 'Bledy', value: 'error' },
+    { label: 'Imported', value: 'imported' },
+    { label: 'Optimized', value: 'optimized' },
+    { label: 'Published', value: 'published' },
+    { label: 'Failed', value: 'failed' },
   ]
 
   return (
@@ -83,7 +80,6 @@ export default function ProductsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
@@ -93,8 +89,6 @@ export default function ProductsPage() {
                 className="pl-10"
               />
             </div>
-
-            {/* Status Filter */}
             <div className="flex gap-2 overflow-x-auto">
               {statusFilters.map((status) => (
                 <Button
@@ -130,75 +124,80 @@ export default function ProductsPage() {
         </Card>
       ) : data && data.items.length > 0 ? (
         <div className="space-y-4">
-          {data.items.map((product) => (
-            <Card key={product.id} className="hover:border-gray-600 transition-colors">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Link
-                        href={`/products/${product.id}`}
-                        className="text-lg font-semibold text-white hover:underline"
-                      >
-                        {truncate(product.title, 80)}
+          {data.items.map((product) => {
+            // WHY: Backend has title_original + title_optimized, show optimized if available
+            const title = product.title_optimized || product.title_original || 'Bez tytulu'
+            const description = product.description_optimized || product.description_original
+
+            return (
+              <Card key={product.id} className="hover:border-gray-600 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Link
+                          href={`/products/${product.id}`}
+                          className="text-lg font-semibold text-white hover:underline"
+                        >
+                          {truncate(title, 80)}
+                        </Link>
+                        <Badge className={cn('text-xs', getStatusColor(product.status))}>
+                          {product.status}
+                        </Badge>
+                      </div>
+
+                      <p className="text-sm text-gray-400 mb-3">
+                        {truncate(description || 'Brak opisu', 150)}
+                      </p>
+
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        {product.source_id && product.source_id !== 'manual' && (
+                          <span>ID: {product.source_id}</span>
+                        )}
+                        {product.brand && (
+                          <span>Marka: {product.brand}</span>
+                        )}
+                        {product.source_platform && (
+                          <span>Zrodlo: {product.source_platform}</span>
+                        )}
+                        {product.optimization_score && (
+                          <span className="text-green-500">
+                            Ocena: {Math.round(product.optimization_score)}%
+                          </span>
+                        )}
+                        <span>{formatRelativeTime(product.created_at)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Link href={`/optimize?prefill=${encodeURIComponent(JSON.stringify({ product_title: title, brand: product.brand || '', keywords: [] }))}`}>
+                        <Button variant="ghost" size="icon" title="Optymalizuj">
+                          <Sparkles className="h-4 w-4 text-blue-400" />
+                        </Button>
                       </Link>
-                      <Badge className={cn('text-xs', getStatusColor(product.status))}>
-                        {product.status}
-                      </Badge>
-                    </div>
-
-                    <p className="text-sm text-gray-400 mb-3">
-                      {truncate(product.description || 'Brak opisu', 150)}
-                    </p>
-
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      {product.asin && (
-                        <span>ASIN: {product.asin}</span>
-                      )}
-                      {product.brand && (
-                        <span>Marka: {product.brand}</span>
-                      )}
-                      {product.marketplace && (
-                        <span>Rynek: {product.marketplace}</span>
-                      )}
-                      {product.optimization_score && (
-                        <span className="text-green-500">
-                          Ocena: {Math.round(product.optimization_score)}%
-                        </span>
-                      )}
-                      <span>{formatRelativeTime(product.created_at)}</span>
+                      <Link href={`/products/${product.id}`}>
+                        <Button variant="ghost" size="icon" title="Szczegoly">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(product.id)}
+                        disabled={deleteProduct.isPending}
+                        title="Usun"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1">
-                    {/* WHY: Quick action to send product to optimizer with prefill */}
-                    <Link href={`/optimize?prefill=${encodeURIComponent(JSON.stringify({ title: product.title, description: product.description || '', asin: product.asin || '' }))}`}>
-                      <Button variant="ghost" size="icon" title="Optymalizuj">
-                        <Sparkles className="h-4 w-4 text-blue-400" />
-                      </Button>
-                    </Link>
-                    <Link href={`/products/${product.id}`}>
-                      <Button variant="ghost" size="icon" title="Szczegóły">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(product.id)}
-                      disabled={deleteProduct.isPending}
-                      title="Usuń"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
 
           {/* Pagination */}
-          {data.has_more && (
+          {data.total_pages > (filters.page || 1) && (
             <div className="flex justify-center">
               <Button
                 variant="outline"

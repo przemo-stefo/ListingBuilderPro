@@ -2,23 +2,27 @@
 // Purpose: TypeScript types and interfaces for the entire application
 // NOT for: Runtime validation or API implementation
 
-// Product types
+// WHY: Must match backend ProductResponse schema exactly (schemas/product.py)
 export interface Product {
-  id: string
-  asin?: string
-  title: string
-  description: string
-  bullet_points: string[]
-  price?: number
-  brand?: string
-  category?: string
-  image_urls?: string[]
-  status: 'pending' | 'optimized' | 'published' | 'error'
-  marketplace?: string
+  id: number
+  source_platform: string
+  source_id: string
+  source_url: string | null
+  title_original: string
+  title_optimized: string | null
+  description_original: string | null
+  description_optimized: string | null
+  category: string | null
+  brand: string | null
+  price: number | null
+  currency: string
+  images: string[]
+  attributes: Record<string, unknown>
+  status: 'imported' | 'optimizing' | 'optimized' | 'publishing' | 'published' | 'failed'
+  optimization_score: number | null
+  marketplace_data: Record<string, unknown>
   created_at: string
-  updated_at: string
-  optimization_score?: number
-  seo_keywords?: string[]
+  updated_at: string | null
 }
 
 export interface ProductListResponse {
@@ -26,7 +30,7 @@ export interface ProductListResponse {
   total: number
   page: number
   page_size: number
-  has_more: boolean
+  total_pages: number
 }
 
 // Import types

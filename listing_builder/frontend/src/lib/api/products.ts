@@ -41,8 +41,9 @@ export async function listProducts(
 }
 
 // Get single product by ID
+// WHY: Path must be /products/${id} not /api/products/${id} — proxy adds /api/ prefix
 export async function getProduct(id: string): Promise<Product> {
-  const response = await apiRequest<Product>('get', `/api/products/${id}`)
+  const response = await apiRequest<Product>('get', `/products/${id}`)
 
   if (response.error) {
     throw new Error(response.error)
@@ -53,7 +54,7 @@ export async function getProduct(id: string): Promise<Product> {
 
 // Delete product
 export async function deleteProduct(id: string): Promise<void> {
-  const response = await apiRequest('delete', `/api/products/${id}`)
+  const response = await apiRequest('delete', `/products/${id}`)
 
   if (response.error) {
     throw new Error(response.error)
