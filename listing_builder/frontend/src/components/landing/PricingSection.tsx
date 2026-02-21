@@ -17,7 +17,7 @@ const FREE_FEATURES = [
 
 const PREMIUM_FEATURES = [
   'Nieograniczone optymalizacje',
-  'Wszystkie marketplace (Amazon, Allegro, eBay, Kaufland)',
+  'Wszystkie marketplace (Amazon, Allegro, eBay, Kaufland, Temu, AliExpress)',
   'Pełny optymalizator AI (7 modułów)',
   'Konwerter ofert między platformami',
   'Ekspert AI z bazą wiedzy',

@@ -70,6 +70,21 @@ export function HeroSection() {
             </div>
           </div>
         </motion.div>
+
+        {/* Social proof stats */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.5 }}
+          className="mt-12 flex items-center justify-center gap-8 sm:gap-12 flex-wrap">
+          {[
+            { value: '1,200+', label: 'zoptymalizowanych ofert' },
+            { value: '6', label: 'marketplace' },
+            { value: '+34%', label: 'średni wzrost widoczności' },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center">
+              <p className="text-2xl font-bold text-white">{stat.value}</p>
+              <p className="text-xs text-gray-500 mt-1">{stat.label}</p>
+            </div>
+          ))}
+        </motion.div>
       </div>
     </section>
   )

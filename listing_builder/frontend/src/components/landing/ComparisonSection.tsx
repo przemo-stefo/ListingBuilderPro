@@ -10,9 +10,12 @@ import { Check, X } from 'lucide-react'
 const ROWS = [
   { aspect: 'Szybkość', manual: 'Godziny na jeden listing', ai: 'Sekundy na jeden listing' },
   { aspect: 'Jakość', manual: 'Zależna od doświadczenia', ai: 'Bazuje na danych top sprzedawców' },
-  { aspect: 'Marketplace', manual: 'Jeden marketplace na raz', ai: 'Wszystkie marketplace jednocześnie' },
-  { aspect: 'SEO Keywords', manual: 'Ręczny research', ai: 'Automatyczna analiza AI' },
+  { aspect: 'Marketplace', manual: 'Jeden marketplace na raz', ai: '6 platform jednocześnie' },
+  { aspect: 'SEO Keywords', manual: 'Ręczny research', ai: 'Automatyczna analiza i rozmieszczenie' },
+  { aspect: 'Konwersja', manual: 'Przepisywanie od zera', ai: 'Jednym kliknięciem między platformami' },
+  { aspect: 'Compliance', manual: 'Ręczne sprawdzanie regulaminów', ai: 'Automatyczny Compliance Guard' },
   { aspect: 'Skalowalność', manual: 'Nie skaluje się', ai: 'Nieograniczona liczba produktów' },
+  { aspect: 'Koszt', manual: 'Copywriter od 50 zł/listing', ai: 'Od 0 zł — free tier dostępny' },
 ]
 
 export function ComparisonSection() {

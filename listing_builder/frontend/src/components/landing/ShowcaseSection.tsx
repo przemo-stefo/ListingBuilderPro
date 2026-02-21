@@ -7,6 +7,10 @@
 import { motion } from 'framer-motion'
 import { CheckCircle2, XCircle, Sparkles, TrendingUp, ArrowRight } from 'lucide-react'
 
+// WHY: Extracted so mobile and desktop can reuse the same card data
+const BEFORE_TITLE = 'Butelka termiczna stal nierdzewna'
+const AFTER_TITLE = 'Butelka Termiczna 750ml Stal Nierdzewna | Termos Sport BPA-Free Izolacja 24h'
+
 export function ShowcaseSection() {
   return (
     <section className="py-24 px-6 overflow-hidden">
@@ -33,9 +37,52 @@ export function ShowcaseSection() {
               </div>
             ))}
           </div>
+
+          {/* WHY: Mobile-only stacked cards — desktop uses absolute-positioned floating layout */}
+          <div className="mt-10 flex flex-col gap-4 lg:hidden">
+            {/* Before/After title card */}
+            <div className="rounded-xl border border-gray-700 bg-[#141A21]/90 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">Optymalizacja tytułu</span>
+              </div>
+              <div className="space-y-2.5">
+                <div className="flex items-start gap-2 rounded-lg bg-red-500/5 border border-red-500/10 px-3 py-2">
+                  <XCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-400 line-through">{BEFORE_TITLE}</p>
+                </div>
+                <div className="flex items-start gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 px-3 py-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-300">{AFTER_TITLE}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl border border-gray-700 bg-[#141A21]/90 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-white">Pokrycie keywords</span>
+                  <span className="text-xs font-bold text-emerald-400">97%</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-800">
+                  <div className="h-2 rounded-full bg-emerald-500 w-[97%]" />
+                </div>
+              </div>
+              <div className="rounded-xl border border-gray-700 bg-[#141A21]/90 p-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/20 shrink-0">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">23</p>
+                  <p className="text-[10px] text-gray-500">zoptymalizowane</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Right: floating UI mockup */}
+        {/* Right: floating UI mockup (desktop only) */}
         <div className="relative h-[480px] hidden lg:block">
           {/* WHY: Glow behind cards — depth effect */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -74,11 +121,11 @@ export function ShowcaseSection() {
             <div className="space-y-2.5">
               <div className="flex items-start gap-2 rounded-lg bg-red-500/5 border border-red-500/10 px-3 py-2">
                 <XCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-gray-400 line-through">Butelka termiczna stal nierdzewna</p>
+                <p className="text-xs text-gray-400 line-through">{BEFORE_TITLE}</p>
               </div>
               <div className="flex items-start gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 px-3 py-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-gray-300">Butelka Termiczna 750ml Stal Nierdzewna | Termos Sport BPA-Free Izolacja 24h</p>
+                <p className="text-xs text-gray-300">{AFTER_TITLE}</p>
               </div>
             </div>
           </motion.div>
