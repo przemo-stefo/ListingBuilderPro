@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
   ArrowRightLeft,
@@ -16,15 +16,19 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   Save,
   Search,
+  Package,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useQuery } from '@tanstack/react-query'
+import { listProducts } from '@/lib/api/products'
 import { useMarketplaces, useConvertProducts, useDownloadTemplate } from '@/lib/hooks/useConverter'
 import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
 import {
@@ -82,6 +86,10 @@ export default function ConverterPage() {
   const [storeError, setStoreError] = useState('')
   const [storeCount, setStoreCount] = useState<number | null>(null)
 
+  // Imported products picker
+  const [showImported, setShowImported] = useState(false)
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
+
   // Allegro OAuth connection
   const [allegroConnected, setAllegroConnected] = useState(false)
   const [allegroLoading, setAllegroLoading] = useState(false)
@@ -100,6 +108,19 @@ export default function ConverterPage() {
   const downloadMutation = useDownloadTemplate()
   const { data: settings } = useSettings()
   const updateSettingsMutation = useUpdateSettings()
+
+  // WHY: Only fetch when section is expanded — enabled: showImported prevents wasted API calls
+  const { data: importedData, isLoading: importedLoading } = useQuery({
+    queryKey: ['products', { source: 'allegro', page_size: 100 }],
+    queryFn: () => listProducts({ source: 'allegro', page_size: 100 }),
+    enabled: showImported,
+    staleTime: 30000,
+  })
+  // WHY: Only products with source_url can be converted
+  const importedProducts = useMemo(
+    () => (importedData?.items || []).filter((p) => p.source_url),
+    [importedData]
+  )
 
   // WHY: Auto-fill GPSR from saved settings on mount
   const [gpsrLoaded, setGpsrLoaded] = useState(false)
@@ -389,6 +410,131 @@ export default function ConverterPage() {
             )}
             {storeError && (
               <p className="mt-1 text-xs text-yellow-400">{storeError}</p>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-800" />
+            <span className="text-xs text-gray-500">lub wybierz z zaimportowanych produktów</span>
+            <div className="h-px flex-1 bg-gray-800" />
+          </div>
+
+          {/* Imported products picker */}
+          <div>
+            <button
+              onClick={() => setShowImported(!showImported)}
+              className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
+            >
+              <Package className="h-4 w-4" />
+              <span>Wybierz z bazy{importedData ? ` (${importedProducts.length})` : ''}</span>
+              {showImported ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+
+            {showImported && (
+              <div className="mt-3 rounded-lg border border-gray-800 bg-[#121212] p-3 space-y-3">
+                {importedLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-400 py-4 justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Ładowanie produktów...
+                  </div>
+                ) : importedProducts.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-4 text-center">
+                    Brak zaimportowanych produktów z Allegro
+                  </p>
+                ) : (
+                  <>
+                    {/* Select all / deselect buttons */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7"
+                        onClick={() => setSelectedProductIds(importedProducts.map((p) => p.id))}
+                      >
+                        Zaznacz wszystkie
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7"
+                        onClick={() => setSelectedProductIds([])}
+                      >
+                        Odznacz
+                      </Button>
+                      <span className="text-xs text-gray-500 ml-auto">
+                        {selectedProductIds.length} z {importedProducts.length}
+                      </span>
+                    </div>
+
+                    {/* Product list */}
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {importedProducts.map((product) => {
+                        const isSelected = selectedProductIds.includes(product.id)
+                        const daysAgo = Math.floor(
+                          (Date.now() - new Date(product.created_at).getTime()) / 86400000
+                        )
+                        const timeLabel = daysAgo === 0 ? 'dziś' : daysAgo === 1 ? 'wczoraj' : `${daysAgo} dni`
+                        return (
+                          <button
+                            key={product.id}
+                            onClick={() =>
+                              setSelectedProductIds((prev) =>
+                                prev.includes(product.id)
+                                  ? prev.filter((id) => id !== product.id)
+                                  : [...prev, product.id]
+                              )
+                            }
+                            className={cn(
+                              'flex items-center gap-3 w-full rounded-md px-3 py-2 text-left transition-colors',
+                              isSelected ? 'bg-white/5' : 'hover:bg-white/5'
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                'w-4 h-4 rounded border flex items-center justify-center shrink-0',
+                                isSelected ? 'border-white bg-white' : 'border-gray-600'
+                              )}
+                            >
+                              {isSelected && <CheckCircle2 className="h-3 w-3 text-black" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white truncate">
+                                {product.title_original}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {product.source_url}
+                              </p>
+                            </div>
+                            <span className="text-xs text-gray-600 shrink-0">{timeLabel}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Load button */}
+                    <Button
+                      size="sm"
+                      disabled={selectedProductIds.length === 0}
+                      className="w-full"
+                      onClick={() => {
+                        const urls = importedProducts
+                          .filter((p) => selectedProductIds.includes(p.id))
+                          .map((p) => p.source_url!)
+                        setUrlsText(urls.join('\n'))
+                        setSelectedProductIds([])
+                        setShowImported(false)
+                      }}
+                    >
+                      Wczytaj {selectedProductIds.length > 0 ? `${selectedProductIds.length} produktów` : ''}
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
           </div>
 

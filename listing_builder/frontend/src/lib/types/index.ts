@@ -141,6 +141,7 @@ export interface DashboardStats {
 export interface ProductFilters {
   status?: Product['status']
   marketplace?: string
+  source?: string
   search?: string
   min_score?: number
   max_score?: number
@@ -609,6 +610,7 @@ export interface OptimizerResponse {
   keyword_intel: OptimizerKeywordIntel
   ranking_juice?: RankingJuice
   llm_provider?: LLMProvider
+  llm_fallback_from?: string | null
   optimization_source?: 'n8n' | 'direct'
   listing_history_id?: string | null
   coverage_breakdown?: CoverageBreakdown

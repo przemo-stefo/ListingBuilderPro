@@ -17,6 +17,7 @@ export async function listProducts(
   const params = {
     status: filters?.status,
     marketplace: filters?.marketplace,
+    source: filters?.source,
     search: filters?.search,
     min_score: filters?.min_score,
     max_score: filters?.max_score,
