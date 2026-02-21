@@ -234,48 +234,27 @@ async def _translate_all(articles: List[dict]) -> List[dict]:
     return translated
 
 
-# WHY: Flag prevents duplicate background translations from concurrent requests
-_translating = False
-
-
-async def _bg_translate_and_cache(articles: List[dict]) -> None:
-    """Background task: translate articles and update cache when done."""
-    global _translating
-    if _translating:
-        return
-    _translating = True
-    try:
-        translated = await _translate_all(articles)
-        _cache["articles"] = translated
-        _cache["timestamp"] = time.time()
-        logger.info("news_bg_translation_done", total=len(translated))
-    except Exception as e:
-        logger.error("news_bg_translation_failed", error=str(e))
-    finally:
-        _translating = False
-
-
 @router.get("/feed")
 async def get_news_feed(force: bool = Query(False)):
     """Aggregated marketplace news feed — translated to Polish, cached 2h.
 
-    WHY two-phase: Fetch feeds (~10s) → return immediately → translate in
-    background. Next request gets translated version. Prevents Render 60s timeout.
+    WHY synchronous: 6 Groq keys in parallel ≈ 5-10s translate + 10-15s fetch = ~25s total.
+    Well under Render 60s timeout. User always gets Polish content.
     """
     now = time.time()
     if not force and _cache["articles"] and (now - _cache["timestamp"]) < CACHE_TTL:
         return {"articles": _cache["articles"], "cached": True}
 
-    # Phase 1: Fetch feeds (fast: ~10-15s)
+    # Phase 1: Fetch feeds (~10-15s)
     articles = await _fetch_all_feeds()
     await _resolve_thumbnails(articles)
 
-    # Cache untranslated immediately — fast response
+    # Phase 2: Translate to Polish synchronously (~5-10s with parallel Groq keys)
+    articles = await _translate_all(articles)
+
+    # Cache translated articles
     _cache["articles"] = articles
     _cache["timestamp"] = now
 
-    # Phase 2: Translate in background — next request gets Polish version
-    asyncio.create_task(_bg_translate_and_cache(articles))
-
-    logger.info("news_feed_refreshed", total=len(articles), translating=True)
-    return {"articles": articles, "cached": False, "translating": True}
+    logger.info("news_feed_refreshed", total=len(articles), translated=True)
+    return {"articles": articles, "cached": False}
