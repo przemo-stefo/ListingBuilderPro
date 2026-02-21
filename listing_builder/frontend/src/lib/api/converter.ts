@@ -149,3 +149,12 @@ export async function getAllegroOffers(): Promise<StoreUrlsResponse> {
   if (response.error) throw new Error(response.error)
   return response.data!
 }
+
+export async function getBolOffers(): Promise<StoreUrlsResponse> {
+  const response = await apiRequest<StoreUrlsResponse>(
+    'get',
+    '/converter/bol-offers'
+  )
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}

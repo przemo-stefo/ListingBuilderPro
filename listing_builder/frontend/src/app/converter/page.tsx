@@ -38,6 +38,7 @@ import {
   downloadStoreJob,
   getOAuthConnections,
   getAllegroOffers,
+  getBolOffers,
 } from '@/lib/api/converter'
 import type {
   ConvertRequest,
@@ -94,6 +95,10 @@ export default function ConverterPage() {
   const [allegroConnected, setAllegroConnected] = useState(false)
   const [allegroLoading, setAllegroLoading] = useState(false)
 
+  // BOL.com connection
+  const [bolConnected, setBolConnected] = useState(false)
+  const [bolLoading, setBolLoading] = useState(false)
+
   // Async job (for >20 products)
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobStatus, setJobStatus] = useState<StoreJobStatus | null>(null)
@@ -143,12 +148,14 @@ export default function ConverterPage() {
     delay,
   })
 
-  // ── Check Allegro OAuth on mount ──
+  // ── Check marketplace connections on mount ──
   useEffect(() => {
     getOAuthConnections()
       .then((conns) => {
         const allegro = conns.find((c) => c.marketplace === 'allegro')
         setAllegroConnected(allegro?.status === 'active')
+        const bol = conns.find((c) => c.marketplace === 'bol')
+        setBolConnected(bol?.status === 'active')
       })
       .catch(() => {})
   }, [])
@@ -179,6 +186,27 @@ export default function ConverterPage() {
     if (urlsParam) {
       setUrlsText(decodeURIComponent(urlsParam))
       window.history.replaceState({}, '', '/converter')
+    }
+  }, [])
+
+  const handleFetchBolOffers = useCallback(async () => {
+    setBolLoading(true)
+    setStoreError('')
+    setStoreCount(null)
+    try {
+      const result = await getBolOffers()
+      if (result.error) {
+        setStoreError(result.error)
+      } else if (result.total === 0) {
+        setStoreError('Nie znaleziono ofert na Twoim koncie BOL.com')
+      } else {
+        setUrlsText(result.urls.join('\n'))
+        setStoreCount(result.total)
+      }
+    } catch (err) {
+      setStoreError(err instanceof Error ? err.message : 'Błąd pobierania ofert BOL')
+    } finally {
+      setBolLoading(false)
     }
   }, [])
 
@@ -365,6 +393,42 @@ export default function ConverterPage() {
                 className="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-transparent px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800 transition-colors"
               >
                 {allegroConnected ? 'Zarządzaj' : 'Połącz w Integracje'}
+              </Link>
+            </div>
+          </div>
+
+          {/* WHY: BOL.com uses Client Credentials — connected via Integrations page */}
+          <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#121212] p-3">
+            <div className="flex items-center gap-2">
+              {bolConnected ? (
+                <CheckCircle className="h-4 w-4 text-green-400" />
+              ) : (
+                <XCircle className="h-4 w-4 text-gray-500" />
+              )}
+              <span className="text-sm text-gray-300">
+                {bolConnected ? 'Konto BOL.com połączone' : 'Konto BOL.com niepołączone'}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {bolConnected && (
+                <Button
+                  onClick={handleFetchBolOffers}
+                  disabled={bolLoading}
+                  size="sm"
+                >
+                  {bolLoading ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-3 w-3" />
+                  )}
+                  Pobierz oferty BOL
+                </Button>
+              )}
+              <Link
+                href="/integrations"
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-transparent px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800 transition-colors"
+              >
+                {bolConnected ? 'Zarządzaj' : 'Połącz w Integracje'}
               </Link>
             </div>
           </div>
