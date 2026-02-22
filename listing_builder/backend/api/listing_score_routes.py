@@ -11,8 +11,9 @@ import structlog
 
 from database import get_db
 from services.listing_score_service import score_listing
-from services.scraper.amazon_scraper import parse_input
+from services.scraper.amazon_scraper import parse_input, fetch_listing
 from services.sp_api_catalog import fetch_catalog_item
+from services.sp_api_auth import credentials_configured, has_refresh_token
 
 logger = structlog.get_logger()
 
@@ -64,26 +65,39 @@ async def fetch_listing_endpoint(request: Request, body: FetchRequest):
     if parsed.error and not parsed.asin:
         return FetchResponse(error=parsed.error)
 
-    # WHY: Use SP-API Catalog Items (official API) instead of HTML scraping
-    # — reliable, structured data, no anti-bot issues
     marketplace = parsed.marketplace or "DE"
-    if parsed.asin:
+    url = parsed.url or (f"https://www.amazon.{parsed.domain or 'de'}/dp/{parsed.asin}" if parsed.asin else "")
+
+    if not parsed.asin:
+        return FetchResponse(asin="", marketplace=marketplace, url=url)
+
+    # WHY: Try SP-API first (official, reliable), fall back to HTML scraping
+    if credentials_configured() and has_refresh_token():
         catalog = await fetch_catalog_item(parsed.asin, marketplace)
-        if catalog.get("error"):
+        if not catalog.get("error"):
             return FetchResponse(
                 asin=parsed.asin, marketplace=marketplace,
-                url=parsed.url, error=catalog["error"],
+                title=catalog.get("title", ""),
+                bullets=catalog.get("bullets", []),
+                description=catalog.get("description", ""),
+                url=url,
             )
-        return FetchResponse(
-            asin=parsed.asin,
-            marketplace=marketplace,
-            title=catalog.get("title", ""),
-            bullets=catalog.get("bullets", []),
-            description=catalog.get("description", ""),
-            url=parsed.url or f"https://www.amazon.{parsed.domain or 'de'}/dp/{parsed.asin}",
-        )
+        logger.warning("sp_api_fallback_to_scraper", error=catalog.get("error", ""))
 
-    return FetchResponse(asin=parsed.asin, marketplace=marketplace, url=parsed.url)
+    # WHY: Fallback — direct HTML fetch (works for some marketplaces)
+    if parsed.domain:
+        parsed = await fetch_listing(parsed)
+        if parsed.title:
+            return FetchResponse(
+                asin=parsed.asin, marketplace=marketplace,
+                title=parsed.title, bullets=parsed.bullets,
+                description=parsed.description, url=url,
+            )
+
+    return FetchResponse(
+        asin=parsed.asin, marketplace=marketplace, url=url,
+        error="Rozpoznano ASIN i marketplace. Wklej dane ręcznie lub autoryzuj Amazon SP-API w Integracje.",
+    )
 
 
 @router.post("/listing", response_model=ScoreResponse)
