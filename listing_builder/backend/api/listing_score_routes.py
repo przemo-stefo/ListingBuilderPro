@@ -11,7 +11,8 @@ import structlog
 
 from database import get_db
 from services.listing_score_service import score_listing
-from services.scraper.amazon_scraper import parse_input, fetch_listing
+from services.scraper.amazon_scraper import parse_input
+from services.sp_api_catalog import fetch_catalog_item
 
 logger = structlog.get_logger()
 
@@ -57,25 +58,32 @@ class FetchResponse(BaseModel):
 @router.post("/fetch", response_model=FetchResponse)
 @limiter.limit("10/minute")
 async def fetch_listing_endpoint(request: Request, body: FetchRequest):
-    """Parse Amazon URL/ASIN, detect marketplace, fetch listing data."""
+    """Parse Amazon URL/ASIN, detect marketplace, fetch listing data via SP-API."""
     parsed = parse_input(body.input)
 
     if parsed.error and not parsed.asin:
         return FetchResponse(error=parsed.error)
 
-    # WHY: Only fetch if we have ASIN + domain (skip for bare ASIN without marketplace)
-    if parsed.asin and parsed.domain:
-        parsed = await fetch_listing(parsed)
+    # WHY: Use SP-API Catalog Items (official API) instead of HTML scraping
+    # — reliable, structured data, no anti-bot issues
+    marketplace = parsed.marketplace or "DE"
+    if parsed.asin:
+        catalog = await fetch_catalog_item(parsed.asin, marketplace)
+        if catalog.get("error"):
+            return FetchResponse(
+                asin=parsed.asin, marketplace=marketplace,
+                url=parsed.url, error=catalog["error"],
+            )
+        return FetchResponse(
+            asin=parsed.asin,
+            marketplace=marketplace,
+            title=catalog.get("title", ""),
+            bullets=catalog.get("bullets", []),
+            description=catalog.get("description", ""),
+            url=parsed.url or f"https://www.amazon.{parsed.domain or 'de'}/dp/{parsed.asin}",
+        )
 
-    return FetchResponse(
-        asin=parsed.asin,
-        marketplace=parsed.marketplace,
-        title=parsed.title,
-        bullets=parsed.bullets,
-        description=parsed.description,
-        url=parsed.url,
-        error=parsed.error or "",
-    )
+    return FetchResponse(asin=parsed.asin, marketplace=marketplace, url=parsed.url)
 
 
 @router.post("/listing", response_model=ScoreResponse)
