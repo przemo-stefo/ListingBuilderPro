@@ -9,8 +9,9 @@ from typing import List, Dict
 from config import settings
 from services.scraper.allegro_scraper import scrape_allegro_product, AllegroProduct
 from services.compliance.allegro_rules import validate_allegro_parameters
-from services.scraper.amazon_scraper import parse_input as parse_amazon_input
+from services.scraper.amazon_scraper import parse_input as parse_amazon_input, fetch_listing as fetch_amazon_listing
 from services.sp_api_catalog import fetch_catalog_item
+from services.sp_api_auth import credentials_configured as sp_api_configured, has_refresh_token
 from services.ebay_service import fetch_ebay_product
 
 logger = structlog.get_logger()
@@ -349,21 +350,36 @@ async def _audit_allegro(url: str, marketplace: str) -> Dict:
 
 
 async def _audit_amazon(url: str, marketplace: str) -> Dict:
-    """Amazon audit: parse ASIN/URL → SP-API Catalog Items → base rules → AI suggestions.
+    """Amazon audit: parse ASIN/URL → SP-API (preferred) or HTML scraping (fallback).
 
-    WHY SP-API over scraping: Reliable structured data, no anti-bot issues,
-    returns title, bullets, description, images, brand from Amazon's own API.
+    WHY fallback: SP-API needs refresh_token from Mateusz. Until he authorizes,
+    we scrape Amazon HTML to still provide audit functionality.
     """
     listing = parse_amazon_input(url)
     if listing.error:
         return _error_response(url, marketplace, listing.error)
 
-    # WHY: SP-API needs marketplace code (DE, US, etc.) — parse_input extracts it from URL
     mp_code = listing.marketplace or "DE"
-    data = await fetch_catalog_item(listing.asin, mp_code)
+    data = None
 
-    if data.get("error"):
-        return _error_response(url, marketplace, data["error"])
+    # WHY: Try SP-API first (structured data, reliable), fall back to scraping
+    if sp_api_configured() and has_refresh_token():
+        sp_data = await fetch_catalog_item(listing.asin, mp_code)
+        if not sp_data.get("error"):
+            data = sp_data
+        else:
+            logger.warning("sp_api_fallback_to_scrape", error=sp_data["error"], asin=listing.asin)
+
+    # Fallback: HTML scraping via Scrape.do or direct fetch
+    if not data:
+        listing = await fetch_amazon_listing(listing)
+        if listing.error:
+            return _error_response(url, marketplace, listing.error)
+        data = {
+            "title": listing.title, "bullets": listing.bullets,
+            "description": listing.description, "brand": "", "manufacturer": "",
+            "images": [],
+        }
 
     fields = {
         "title": data.get("title", ""),
