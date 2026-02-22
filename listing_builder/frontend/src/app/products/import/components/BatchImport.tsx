@@ -58,13 +58,36 @@ export default function BatchImport() {
       })
     }
 
-    setProducts(mapped)
+    // WHY: Deduplicate by source_id — prevents crash when CSV has duplicate rows
+    const seen = new Set<string>()
+    const deduped = mapped.filter(p => {
+      if (seen.has(p.source_id)) return false
+      seen.add(p.source_id)
+      return true
+    })
+    const dupeCount = mapped.length - deduped.length
+
+    // WHY: If >50% of products got fallback "import-N" IDs, column mapping likely failed
+    const unmappedCount = deduped.filter(p => p.source_id.startsWith('import-')).length
+    const unmappedPct = deduped.length > 0 ? unmappedCount / deduped.length : 0
+
+    setProducts(deduped)
     const total = parsed.data.length
-    if (mapped.length === 0) {
+    if (deduped.length === 0) {
       toast({ title: 'Brak danych', description: 'Nie znaleziono produktów. Sprawdź format CSV.', variant: 'destructive' })
     } else {
+      if (dupeCount > 0) {
+        toast({ title: `Usunięto ${dupeCount} duplikatów`, description: `Pozostało ${deduped.length} unikalnych produktów` })
+      }
+      if (unmappedPct > 0.5) {
+        toast({
+          title: 'Brak kolumny ID',
+          description: 'Większość produktów nie ma rozpoznanego ID. Sprawdź nagłówki CSV (np. "numer oferty", "asin", "item number").',
+          variant: 'destructive',
+        })
+      }
       const extra = total > MAX_BATCH_SIZE ? ` (limit ${MAX_BATCH_SIZE}, pominięto ${total - MAX_BATCH_SIZE})` : ''
-      toast({ title: `Znaleziono ${mapped.length} produktów${extra}`, description: 'Sprawdź podgląd i kliknij Importuj' })
+      toast({ title: `Znaleziono ${deduped.length} produktów${extra}`, description: 'Sprawdź podgląd i kliknij Importuj' })
     }
   }, [toast])
 

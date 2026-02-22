@@ -2,7 +2,7 @@
 # Purpose: Product database model (core entity)
 # NOT for: Business logic or validation schemas
 
-from sqlalchemy import Column, Integer, String, Float, JSON, DateTime, Text, Enum
+from sqlalchemy import Column, Integer, String, Float, JSON, DateTime, Text, Enum, UniqueConstraint
 from sqlalchemy.sql import func
 from database import Base
 import enum
@@ -24,13 +24,17 @@ class Product(Base):
     Stores scraped product data + optimized listings + marketplace info.
     """
     __tablename__ = "products"
+    # WHY: Same source_id can exist on different platforms (e.g. "B08XXX" on Amazon + eBay)
+    __table_args__ = (
+        UniqueConstraint('source_platform', 'source_id', name='uq_platform_source'),
+    )
 
     # Primary Key
     id = Column(Integer, primary_key=True, index=True)
 
     # Source Data (from Allegro scraper)
     source_platform = Column(String(50), default="allegro")
-    source_id = Column(String(255), unique=True, index=True)  # Original listing ID
+    source_id = Column(String(255), index=True)  # Original listing ID
     source_url = Column(Text)
 
     # Product Details

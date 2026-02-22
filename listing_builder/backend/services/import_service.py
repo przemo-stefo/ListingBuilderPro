@@ -119,8 +119,13 @@ class ImportService:
                 logger.error("product_import_failed", error=str(e), source_id=product_data.source_id)
                 self.db.commit()
 
-        # Complete job
-        job.status = JobStatus.COMPLETED if failed_count == 0 else JobStatus.FAILED
+        # WHY: Partial success (some OK, some failed) should not mark entire job as FAILED
+        if failed_count == 0:
+            job.status = JobStatus.COMPLETED
+        elif success_count == 0:
+            job.status = JobStatus.FAILED
+        else:
+            job.status = JobStatus.COMPLETED  # partial success, errors logged in error_log
         job.completed_at = datetime.now(timezone.utc)
         job.error_log = errors
         self.db.commit()

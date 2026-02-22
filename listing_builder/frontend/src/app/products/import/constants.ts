@@ -15,6 +15,7 @@ export const COLUMN_MAP: Record<string, string> = {
   'cena': 'price', 'price': 'price', 'cena brutto': 'price',
   'numer oferty': 'source_id', 'id oferty': 'source_id', 'offer_id': 'source_id',
   'id': 'source_id', 'asin': 'source_id', 'source_id': 'source_id', 'sku': 'source_id',
+  'item number': 'source_id', 'item id': 'source_id', 'item_id': 'source_id',
   'kategoria': 'category', 'category': 'category',
   'marka': 'brand', 'brand': 'brand', 'producent': 'brand',
   'opis': 'description', 'description': 'description',

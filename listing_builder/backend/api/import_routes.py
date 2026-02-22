@@ -4,6 +4,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel, ValidationError
 from database import get_db
 from api.dependencies import get_user_id
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
@@ -12,7 +14,6 @@ from config import settings
 from typing import List, Literal, Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from pydantic import BaseModel
 import hmac
 import structlog
 
@@ -83,9 +84,22 @@ async def receive_webhook(
             **result
         }
 
+    except IntegrityError as e:
+        logger.error("webhook_integrity_error", error=str(e))
+        raise HTTPException(status_code=409, detail="Produkt o tym ID już istnieje na tej platformie")
+    except ValidationError as e:
+        logger.error("webhook_validation_error", error=str(e))
+        first_err = e.errors()[0] if e.errors() else {}
+        field = first_err.get("loc", ["?"])[-1]
+        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
+    except HTTPException:
+        raise
+    except TimeoutError:
+        logger.error("webhook_timeout")
+        raise HTTPException(status_code=504, detail="Timeout — spróbuj ponownie")
     except Exception as e:
         logger.error("webhook_processing_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Import failed")
+        raise HTTPException(status_code=500, detail=f"Nieoczekiwany błąd: {type(e).__name__}")
 
 
 VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "manual"}
@@ -192,9 +206,19 @@ async def import_single_product(
         service = ImportService(db)
         result = service.import_product(product)
         return {"status": "success", "product_id": result.id}
+    except IntegrityError as e:
+        logger.error("product_import_integrity", error=str(e))
+        raise HTTPException(status_code=409, detail="Produkt o tym ID już istnieje na tej platformie")
+    except ValidationError as e:
+        logger.error("product_import_validation", error=str(e))
+        first_err = e.errors()[0] if e.errors() else {}
+        field = first_err.get("loc", ["?"])[-1]
+        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("product_import_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Product import failed")
+        raise HTTPException(status_code=500, detail=f"Nieoczekiwany błąd: {type(e).__name__}")
 
 
 @router.post("/batch")
@@ -221,9 +245,19 @@ async def import_batch(
         service = ImportService(db)
         result = service.import_batch(products, source)
         return {"status": "success", **result}
+    except IntegrityError as e:
+        logger.error("batch_import_integrity", error=str(e))
+        raise HTTPException(status_code=409, detail="Duplikat produktu — jeden z produktów już istnieje")
+    except ValidationError as e:
+        logger.error("batch_import_validation", error=str(e))
+        first_err = e.errors()[0] if e.errors() else {}
+        field = first_err.get("loc", ["?"])[-1]
+        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("batch_import_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Batch import failed")
+        raise HTTPException(status_code=500, detail=f"Nieoczekiwany błąd: {type(e).__name__}")
 
 
 @router.get("/job/{job_id}", response_model=ImportJobResponse)

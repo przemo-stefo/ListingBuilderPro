@@ -39,6 +39,20 @@ function detectMarketplace(url: string): string | null {
 // WHY: Only Allegro scraping is implemented — others need different scrapers
 const SCRAPEABLE = new Set(['allegro'])
 
+// WHY: Extract readable title from URL slug instead of showing raw URL as product title
+function titleFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname
+    // Allegro: /oferta/kolumna-1000w-glosnik-bezprzewodowy → "kolumna 1000w glosnik bezprzewodowy"
+    const slug = path.split('/').filter(Boolean).pop() || ''
+    // Remove numeric ID suffix (Allegro appends offer ID at end)
+    const clean = slug.replace(/-\d{8,}$/, '').replace(/-/g, ' ').trim()
+    return clean || 'Produkt bez nazwy'
+  } catch {
+    return 'Produkt bez nazwy'
+  }
+}
+
 export default function SingleImport() {
   const router = useRouter()
   const { toast } = useToast()
@@ -91,7 +105,7 @@ export default function SingleImport() {
         source_platform: marketplace,
         source_id: asin || 'manual',
         source_url: productUrl || undefined,
-        title: title || asin || productUrl || 'Produkt bez nazwy',
+        title: title || asin || (productUrl ? titleFromUrl(productUrl) : 'Produkt bez nazwy'),
         asin: asin || undefined,
         brand: brand || undefined,
         price: price ? parseFloat(price) : undefined,
@@ -109,6 +123,11 @@ export default function SingleImport() {
       toast({ title: 'Błąd importu', description: error.message, variant: 'destructive' })
     },
   })
+
+  // WHY: ASIN format check — warning only, not blocking (user may enter custom IDs)
+  const ASIN_PATTERN = /^[B0-9][A-Z0-9]{9}$/i
+  const asinWarning = asin.trim() && !ASIN_PATTERN.test(asin.trim())
+    ? 'ASIN powinien mieć 10 znaków (np. B0XXXXXXXX)' : ''
 
   const canSubmit = asin.trim() || productUrl.trim() || title.trim()
   const canScrape = productUrl.trim() && SCRAPEABLE.has(marketplace) && !scrapeMutation.isPending
@@ -186,7 +205,16 @@ export default function SingleImport() {
           </label>
           <input type="text" value={asin} onChange={(e) => setAsin(e.target.value)}
             placeholder="np. B0XXXXXXX" className={cn(inputCls, 'mt-2 px-4 py-3')} />
+          {asinWarning && (
+            <p className="text-xs text-amber-400 mt-1">{asinWarning}</p>
+          )}
         </div>
+        {/* WHY: User needs to know why scrape button is missing for non-Allegro */}
+        {productUrl.trim() && !SCRAPEABLE.has(marketplace) && (
+          <p className="text-xs text-gray-500">
+            Automatyczne pobieranie dostępne tylko dla Allegro. Dla {MARKETPLACES.find(m => m.value === marketplace)?.label || marketplace} — wpisz dane ręcznie.
+          </p>
+        )}
         <p className="text-xs text-gray-600">Podaj link, ASIN lub oba.</p>
       </div>
 
