@@ -226,9 +226,14 @@ async def fetch_listing(listing: AmazonListing) -> AmazonListing:
     scrape_do_token = os.environ.get("SCRAPE_DO_TOKEN", "")
 
     try:
+        html = ""
+        # WHY: Try scrape.do first (handles anti-bot), fall back to direct on failure
         if scrape_do_token:
-            html = await _fetch_via_scrape_do(url, scrape_do_token)
-        else:
+            try:
+                html = await _fetch_via_scrape_do(url, scrape_do_token)
+            except Exception as e:
+                logger.warning("scrape_do_failed_fallback_direct", error=str(e)[:80])
+        if not html:
             html = await _fetch_direct(url)
 
         if not html:
