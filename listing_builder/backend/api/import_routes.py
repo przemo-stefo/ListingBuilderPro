@@ -27,6 +27,25 @@ MAX_BATCH_SIZE = 500
 router = APIRouter(prefix="/api/import", tags=["Import"])
 
 
+def _handle_import_error(e: Exception, context: str):
+    """WHY: DRY — same error handling pattern used by webhook, single, and batch endpoints."""
+    if isinstance(e, IntegrityError):
+        logger.error(f"{context}_integrity", error=str(e))
+        raise HTTPException(status_code=409, detail="Produkt o tym ID już istnieje na tej platformie")
+    if isinstance(e, ValidationError):
+        logger.error(f"{context}_validation", error=str(e))
+        first_err = e.errors()[0] if e.errors() else {}
+        field = first_err.get("loc", ["?"])[-1]
+        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
+    if isinstance(e, HTTPException):
+        raise
+    if isinstance(e, TimeoutError):
+        logger.error(f"{context}_timeout")
+        raise HTTPException(status_code=504, detail="Timeout — spróbuj ponownie")
+    logger.error(f"{context}_failed", error=str(e))
+    raise HTTPException(status_code=500, detail="Nieoczekiwany błąd importu")
+
+
 def verify_webhook_secret(x_webhook_secret: Optional[str] = Header(None)):
     """
     Verify webhook secret from n8n.
@@ -84,22 +103,8 @@ async def receive_webhook(
             **result
         }
 
-    except IntegrityError as e:
-        logger.error("webhook_integrity_error", error=str(e))
-        raise HTTPException(status_code=409, detail="Produkt o tym ID już istnieje na tej platformie")
-    except ValidationError as e:
-        logger.error("webhook_validation_error", error=str(e))
-        first_err = e.errors()[0] if e.errors() else {}
-        field = first_err.get("loc", ["?"])[-1]
-        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
-    except HTTPException:
-        raise
-    except TimeoutError:
-        logger.error("webhook_timeout")
-        raise HTTPException(status_code=504, detail="Timeout — spróbuj ponownie")
     except Exception as e:
-        logger.error("webhook_processing_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Nieoczekiwany błąd: {type(e).__name__}")
+        _handle_import_error(e, "webhook")
 
 
 VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "manual"}
@@ -206,19 +211,8 @@ async def import_single_product(
         service = ImportService(db)
         result = service.import_product(product)
         return {"status": "success", "product_id": result.id}
-    except IntegrityError as e:
-        logger.error("product_import_integrity", error=str(e))
-        raise HTTPException(status_code=409, detail="Produkt o tym ID już istnieje na tej platformie")
-    except ValidationError as e:
-        logger.error("product_import_validation", error=str(e))
-        first_err = e.errors()[0] if e.errors() else {}
-        field = first_err.get("loc", ["?"])[-1]
-        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error("product_import_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Nieoczekiwany błąd: {type(e).__name__}")
+        _handle_import_error(e, "product_import")
 
 
 @router.post("/batch")
@@ -245,19 +239,8 @@ async def import_batch(
         service = ImportService(db)
         result = service.import_batch(products, source)
         return {"status": "success", **result}
-    except IntegrityError as e:
-        logger.error("batch_import_integrity", error=str(e))
-        raise HTTPException(status_code=409, detail="Duplikat produktu — jeden z produktów już istnieje")
-    except ValidationError as e:
-        logger.error("batch_import_validation", error=str(e))
-        first_err = e.errors()[0] if e.errors() else {}
-        field = first_err.get("loc", ["?"])[-1]
-        raise HTTPException(status_code=400, detail=f"Niepoprawne dane: {field}")
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error("batch_import_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Nieoczekiwany błąd: {type(e).__name__}")
+        _handle_import_error(e, "batch_import")
 
 
 @router.get("/job/{job_id}", response_model=ImportJobResponse)

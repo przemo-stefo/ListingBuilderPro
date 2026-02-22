@@ -39,6 +39,9 @@ function detectMarketplace(url: string): string | null {
 // WHY: Only Allegro scraping is implemented — others need different scrapers
 const SCRAPEABLE = new Set(['allegro'])
 
+// WHY: ASIN format = 10 chars starting with B0 or digit. Outside component to avoid re-creation.
+const ASIN_PATTERN = /^[B0-9][A-Z0-9]{9}$/i
+
 // WHY: Extract readable title from URL slug instead of showing raw URL as product title
 function titleFromUrl(url: string): string {
   try {
@@ -125,7 +128,6 @@ export default function SingleImport() {
   })
 
   // WHY: ASIN format check — warning only, not blocking (user may enter custom IDs)
-  const ASIN_PATTERN = /^[B0-9][A-Z0-9]{9}$/i
   const asinWarning = asin.trim() && !ASIN_PATTERN.test(asin.trim())
     ? 'ASIN powinien mieć 10 znaków (np. B0XXXXXXXX)' : ''
 

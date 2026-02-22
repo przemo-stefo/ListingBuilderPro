@@ -112,6 +112,8 @@ class ImportService:
                 job.processed_products = success_count
                 self.db.commit()
             except Exception as e:
+                # WHY: rollback dirty session before updating job counters
+                self.db.rollback()
                 failed_count += 1
                 job.failed_products = failed_count
                 error_msg = f"Failed to import {product_data.source_id}: {str(e)}"
