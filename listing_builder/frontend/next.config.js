@@ -16,6 +16,12 @@ const nextConfig = {
   },
   // Enable standalone output for production
   output: 'standalone',
+  // Rewrite /health → /api/health so monitoring bots can hit the root path
+  async rewrites() {
+    return [
+      { source: '/health', destination: '/api/health' },
+    ];
+  },
 }
 
 module.exports = nextConfig

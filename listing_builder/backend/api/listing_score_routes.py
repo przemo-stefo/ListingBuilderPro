@@ -11,6 +11,7 @@ import structlog
 
 from database import get_db
 from services.listing_score_service import score_listing
+from services.scraper.amazon_scraper import parse_input, fetch_listing
 
 logger = structlog.get_logger()
 
@@ -37,6 +38,44 @@ class ScoreResponse(BaseModel):
     overall_score: float
     dimensions: list[DimensionScore]
     sources_used: int
+
+
+class FetchRequest(BaseModel):
+    input: str = Field(..., min_length=2, max_length=500, description="Amazon URL or ASIN")
+
+
+class FetchResponse(BaseModel):
+    asin: str = ""
+    marketplace: str = ""
+    title: str = ""
+    bullets: list[str] = []
+    description: str = ""
+    url: str = ""
+    error: str = ""
+
+
+@router.post("/fetch", response_model=FetchResponse)
+@limiter.limit("10/minute")
+async def fetch_listing_endpoint(request: Request, body: FetchRequest):
+    """Parse Amazon URL/ASIN, detect marketplace, fetch listing data."""
+    parsed = parse_input(body.input)
+
+    if parsed.error and not parsed.asin:
+        return FetchResponse(error=parsed.error)
+
+    # WHY: Only fetch if we have ASIN + domain (skip for bare ASIN without marketplace)
+    if parsed.asin and parsed.domain:
+        parsed = await fetch_listing(parsed)
+
+    return FetchResponse(
+        asin=parsed.asin,
+        marketplace=parsed.marketplace,
+        title=parsed.title,
+        bullets=parsed.bullets,
+        description=parsed.description,
+        url=parsed.url,
+        error=parsed.error or "",
+    )
 
 
 @router.post("/listing", response_model=ScoreResponse)

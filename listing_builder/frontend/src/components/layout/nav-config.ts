@@ -18,6 +18,7 @@ import {
   FileDown,
   Database,
   DollarSign,
+  Megaphone,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -53,6 +54,8 @@ export const navSections: NavSection[] = [
       { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytuł, bullety, opis i słowa kluczowe backend' },
       { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace' },
       { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedaży na marketplace', highlight: true },
+      { title: 'Reklamy AI', href: '/ad-copy', icon: Megaphone, desc: '3 warianty reklam (hook, story, benefit) z wiedzy ekspertów' },
+      { title: 'Listing Score', href: '/listing-score', icon: BarChart3, desc: 'Oceń listing 1-10 w 5 wymiarach copywriterskich' },
       { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo' },
     ],
   },
