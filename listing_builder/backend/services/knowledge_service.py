@@ -152,6 +152,14 @@ async def search_knowledge(
         rows = await _get_search_rows(db, search_query, categories, max_chunks, query_embedding)
         if not rows:
             rows = await _get_search_rows(db, search_query, None, max_chunks, query_embedding)
+
+        # WHY: Expanded query can be too verbose for plainto_tsquery (requires ALL terms).
+        # Fallback to original user query — same pattern as search_all_categories().
+        if not rows and search_query != query:
+            logger.info("search_fallback_to_original", expanded=search_query[:60])
+            query_embedding = await _get_embedding_if_needed(query)
+            rows = await _get_search_rows(db, query, None, max_chunks, query_embedding)
+
         if not rows:
             return ""
 
