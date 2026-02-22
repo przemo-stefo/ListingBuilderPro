@@ -2,12 +2,15 @@
 # Purpose: Product card audit — scrape → run checks → generate AI fix suggestions
 # NOT for: Template file validation (that's compliance/service.py)
 
+import re
 import structlog
 from typing import List, Dict
 
 from config import settings
 from services.scraper.allegro_scraper import scrape_allegro_product, AllegroProduct
 from services.compliance.allegro_rules import validate_allegro_parameters
+from services.scraper.amazon_scraper import parse_input as parse_amazon_input, fetch_listing as fetch_amazon_listing
+from services.ebay_service import fetch_ebay_product
 
 logger = structlog.get_logger()
 
@@ -41,6 +44,36 @@ ALLEGRO_BASE_RULES = [
      "message": "Mniej niż 3 parametry wypełnione — uzupełnij dla lepszej widoczności"},
     {"field": "condition", "check": "not_empty", "severity": "warning",
      "message": "Brak informacji o stanie produktu (Nowy/Używany)"},
+]
+
+
+# WHY: Amazon scraper returns title, bullets, description — no images/EAN/price from HTML
+AMAZON_BASE_RULES = [
+    {"field": "title", "check": "not_empty", "severity": "error",
+     "message": "Brak tytułu produktu"},
+    {"field": "title", "check": "max_length", "max": 200, "severity": "warning",
+     "message": "Tytuł dłuższy niż 200 znaków — Amazon może obciąć"},
+    {"field": "bullets", "check": "min_count", "min": 1, "severity": "error",
+     "message": "Brak bullet pointów — Amazon wymaga minimum jednego"},
+    {"field": "bullets", "check": "min_count", "min": 5, "severity": "warning",
+     "message": "Mniej niż 5 bullet pointów — Amazon rekomenduje 5 dla lepszej konwersji"},
+    {"field": "description", "check": "not_empty", "severity": "warning",
+     "message": "Brak opisu produktu — wpływa na konwersję i A9 SEO"},
+]
+
+
+# WHY: eBay scraper returns title, price, condition, listing_active — no bullets/images
+EBAY_BASE_RULES = [
+    {"field": "title", "check": "not_empty", "severity": "error",
+     "message": "Brak tytułu produktu"},
+    {"field": "title", "check": "max_length", "max": 80, "severity": "warning",
+     "message": "Tytuł dłuższy niż 80 znaków — limit eBay"},
+    {"field": "price", "check": "not_empty", "severity": "error",
+     "message": "Brak ceny produktu"},
+    {"field": "listing_active", "check": "is_true", "severity": "error",
+     "message": "Aukcja zakończona — oferta nie jest aktywna"},
+    {"field": "condition", "check": "not_empty", "severity": "warning",
+     "message": "Brak informacji o stanie produktu"},
 ]
 
 
@@ -83,6 +116,9 @@ def _run_base_rules(fields: Dict, rules: list) -> List[Dict]:
         elif check == "min_count":
             if isinstance(value, (list, dict)):
                 violated = len(value) < rule["min"]
+        elif check == "is_true":
+            # WHY: eBay listing_active — False means listing ended
+            violated = not value
 
         if violated:
             issues.append({
@@ -219,63 +255,34 @@ async def audit_product(url: str, marketplace: str) -> Dict:
     """
     Full audit pipeline: scrape → base rules → parameter rules → AI suggestions.
     """
-    # Step 1: Scrape
+    # Step 1: Scrape based on marketplace
     if marketplace == "allegro":
-        product = await scrape_allegro_product(url)
+        return await _audit_allegro(url, marketplace)
+    elif marketplace == "amazon":
+        return await _audit_amazon(url, marketplace)
+    elif marketplace == "ebay":
+        return await _audit_ebay(url, marketplace)
     else:
-        return {
-            "source_url": url, "source_id": "", "marketplace": marketplace,
-            "product_title": "", "overall_status": "error", "score": 0,
-            "issues": [{"field": "scraper", "severity": "error",
-                        "message": f"Scraping dla {marketplace} jeszcze nie dostępny — użyj Allegro URL",
-                        "fix_suggestion": None}],
-            "product_data": {},
-        }
+        return _error_response(url, marketplace, f"Marketplace '{marketplace}' nie jest obsługiwany")
 
-    if product.error:
-        return {
-            "source_url": url, "source_id": product.source_id,
-            "marketplace": marketplace, "product_title": "", "overall_status": "error",
-            "score": 0,
-            "issues": [{"field": "scraper", "severity": "error",
-                        "message": f"Błąd scrapowania: {product.error}",
-                        "fix_suggestion": None}],
-            "product_data": {},
-        }
 
-    # Step 2: Base audit rules (title, images, description, etc.)
-    fields = _extract_audit_fields(product)
-    issues = _run_base_rules(fields, ALLEGRO_BASE_RULES)
+def _error_response(url: str, marketplace: str, message: str) -> Dict:
+    """Standard error response for audit failures."""
+    return {
+        "source_url": url, "source_id": "", "marketplace": marketplace,
+        "product_title": "", "overall_status": "error", "score": 0,
+        "issues": [{"field": "scraper", "severity": "error",
+                    "message": message, "fix_suggestion": None}],
+        "product_data": {},
+    }
 
-    # Step 3: Deep Allegro parameter validation (batteries, CE, GPSR, weight, etc.)
-    param_issues = validate_allegro_parameters(
-        raw_params=product.parameters or {},
-        title=product.title or "",
-        category=product.category or "",
-    )
 
-    # WHY: Deduplicate — base rules already check manufacturer/ean at top level,
-    # param rules check them in parameters. Keep the more specific param rule.
-    base_fields = {i["field"] for i in issues}
-    for pi in param_issues:
-        if pi["field"] not in base_fields:
-            issues.append(pi)
-        elif pi["severity"] == "error" and any(
-            i["field"] == pi["field"] and i["severity"] != "error" for i in issues
-        ):
-            # WHY: Upgrade warning → error if param rule is stricter
-            issues = [i for i in issues if i["field"] != pi["field"]]
-            issues.append(pi)
-
-    # Step 4: AI fix suggestions
-    issues = await _generate_fix_suggestions(issues, product.title)
-
-    # Step 5: Calculate score
+def _score_response(url: str, source_id: str, marketplace: str, title: str,
+                    issues: List[Dict], product_data: Dict, total_checks: int) -> Dict:
+    """Build audit response with score calculation — shared by all marketplaces."""
     error_count = sum(1 for i in issues if i["severity"] == "error")
     warning_count = sum(1 for i in issues if i["severity"] == "warning")
 
-    # WHY: Total possible checks = base rules + estimated param rules
-    total_checks = len(ALLEGRO_BASE_RULES) + 8  # 8 key parameter checks
     penalty = (error_count * 2 + warning_count) / max(total_checks, 1) * 100
     score = max(0, round(100 - penalty, 1))
 
@@ -286,38 +293,121 @@ async def audit_product(url: str, marketplace: str) -> Dict:
     else:
         overall_status = "compliant"
 
+    logger.info("audit_completed", url=url, marketplace=marketplace,
+                score=score, errors=error_count, warnings=warning_count)
+
+    return {
+        "source_url": url, "source_id": source_id, "marketplace": marketplace,
+        "product_title": title, "overall_status": overall_status,
+        "score": score, "issues": issues, "product_data": product_data,
+    }
+
+
+async def _audit_allegro(url: str, marketplace: str) -> Dict:
+    """Allegro audit: scrape → base rules → parameter rules → AI suggestions."""
+    product = await scrape_allegro_product(url)
+    if product.error:
+        return _error_response(url, marketplace, f"Błąd scrapowania: {product.error}")
+
+    fields = _extract_audit_fields(product)
+    issues = _run_base_rules(fields, ALLEGRO_BASE_RULES)
+
+    # WHY: Deep Allegro parameter validation (batteries, CE, GPSR, weight, etc.)
+    param_issues = validate_allegro_parameters(
+        raw_params=product.parameters or {},
+        title=product.title or "",
+        category=product.category or "",
+    )
+
+    # WHY: Deduplicate — keep more specific param rule over base rule
+    base_fields = {i["field"] for i in issues}
+    for pi in param_issues:
+        if pi["field"] not in base_fields:
+            issues.append(pi)
+        elif pi["severity"] == "error" and any(
+            i["field"] == pi["field"] and i["severity"] != "error" for i in issues
+        ):
+            issues = [i for i in issues if i["field"] != pi["field"]]
+            issues.append(pi)
+
+    issues = await _generate_fix_suggestions(issues, product.title)
+
     product_data = {
-        "title": product.title,
-        "price": product.price,
-        "currency": product.currency,
-        "ean": product.ean,
-        "brand": product.brand,
-        "manufacturer": product.manufacturer,
-        "condition": product.condition,
-        "category": product.category,
-        "images": product.images[:5],
-        "parameters_count": len(product.parameters),
+        "title": product.title, "price": product.price, "currency": product.currency,
+        "ean": product.ean, "brand": product.brand, "manufacturer": product.manufacturer,
+        "condition": product.condition, "category": product.category,
+        "images": product.images[:5], "parameters_count": len(product.parameters),
         "description_length": len(product.description),
-        # WHY: Include raw parameters for frontend detail view
         "parameters": dict(list((product.parameters or {}).items())[:20]),
     }
 
-    logger.info(
-        "audit_completed",
-        url=url,
-        score=score,
-        errors=error_count,
-        warnings=warning_count,
-        param_issues=len(param_issues),
+    return _score_response(
+        url, product.source_id, marketplace, product.title, issues,
+        product_data, total_checks=len(ALLEGRO_BASE_RULES) + 8,
     )
 
-    return {
-        "source_url": url,
-        "source_id": product.source_id,
-        "marketplace": marketplace,
-        "product_title": product.title,
-        "overall_status": overall_status,
-        "score": score,
-        "issues": issues,
-        "product_data": product_data,
+
+async def _audit_amazon(url: str, marketplace: str) -> Dict:
+    """Amazon audit: parse ASIN/URL → scrape → base rules → AI suggestions."""
+    listing = parse_amazon_input(url)
+    if listing.error:
+        return _error_response(url, marketplace, listing.error)
+
+    listing = await fetch_amazon_listing(listing)
+    if listing.error:
+        return _error_response(url, marketplace, f"Błąd scrapowania: {listing.error}")
+
+    fields = {
+        "title": listing.title or "",
+        "bullets": listing.bullets or [],
+        "description": listing.description or "",
     }
+    issues = _run_base_rules(fields, AMAZON_BASE_RULES)
+    issues = await _generate_fix_suggestions(issues, listing.title)
+
+    product_data = {
+        "title": listing.title, "asin": listing.asin,
+        "marketplace_code": listing.marketplace, "domain": listing.domain,
+        "bullets_count": len(listing.bullets), "bullets": listing.bullets[:7],
+        "description_length": len(listing.description),
+    }
+
+    return _score_response(
+        listing.url or url, listing.asin, marketplace, listing.title,
+        issues, product_data, total_checks=len(AMAZON_BASE_RULES),
+    )
+
+
+async def _audit_ebay(url: str, marketplace: str) -> Dict:
+    """eBay audit: extract item_id → scrape → base rules → AI suggestions."""
+    m = re.search(r'/itm/(\d+)', url)
+    if not m:
+        return _error_response(url, marketplace,
+                               "Nie znaleziono ID oferty — wklej link eBay np. ebay.com/itm/123456789")
+
+    item_id = m.group(1)
+    data = await fetch_ebay_product(item_id)
+
+    if not data or data.get("error"):
+        return _error_response(url, marketplace, data.get("error", "Błąd pobierania danych z eBay"))
+
+    fields = {
+        "title": data.get("title") or "",
+        "price": str(data.get("price") or ""),
+        "listing_active": data.get("listing_active", True),
+        "condition": data.get("condition") or "",
+    }
+    issues = _run_base_rules(fields, EBAY_BASE_RULES)
+    issues = await _generate_fix_suggestions(issues, data.get("title", ""))
+
+    product_data = {
+        "title": data.get("title"), "price": data.get("price"),
+        "currency": data.get("currency"), "condition": data.get("condition"),
+        "seller": data.get("seller"), "listing_active": data.get("listing_active"),
+        "stock": data.get("stock"),
+    }
+
+    return _score_response(
+        url, item_id, marketplace, data.get("title", ""),
+        issues, product_data, total_checks=len(EBAY_BASE_RULES),
+    )

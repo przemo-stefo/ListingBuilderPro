@@ -22,10 +22,10 @@ import { cn } from '@/lib/utils'
 import { useAuditProduct } from '@/lib/hooks/useCompliance'
 import type { AuditResult, AuditIssue } from '@/lib/api/compliance'
 
-const MARKETPLACE_OPTIONS: { id: string; label: string; disabled?: boolean }[] = [
-  { id: 'allegro', label: 'Allegro' },
-  { id: 'amazon', label: 'Amazon (wkrótce)', disabled: true },
-  { id: 'ebay', label: 'eBay (wkrótce)', disabled: true },
+const MARKETPLACE_OPTIONS: { id: string; label: string; placeholder: string }[] = [
+  { id: 'allegro', label: 'Allegro', placeholder: 'https://allegro.pl/oferta/...' },
+  { id: 'amazon', label: 'Amazon', placeholder: 'https://www.amazon.de/dp/B0XXXXXX lub sam ASIN' },
+  { id: 'ebay', label: 'eBay', placeholder: 'https://www.ebay.com/itm/...' },
 ]
 
 export default function AuditTab() {
@@ -78,15 +78,12 @@ export default function AuditTab() {
             {MARKETPLACE_OPTIONS.map((mp) => (
               <button
                 key={mp.id}
-                onClick={() => !mp.disabled && setMarketplace(mp.id)}
-                disabled={mp.disabled}
+                onClick={() => setMarketplace(mp.id)}
                 className={cn(
                   'rounded-lg border px-4 py-2 text-sm transition-colors',
-                  mp.disabled
-                    ? 'border-gray-800 text-gray-600 cursor-not-allowed'
-                    : marketplace === mp.id
-                      ? 'border-white bg-white/5 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
+                  marketplace === mp.id
+                    ? 'border-white bg-white/5 text-white'
+                    : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
                 )}
               >
                 {mp.label}
@@ -100,7 +97,7 @@ export default function AuditTab() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAudit()}
-              placeholder="https://allegro.pl/oferta/..."
+              placeholder={MARKETPLACE_OPTIONS.find(mp => mp.id === marketplace)?.placeholder || 'URL produktu...'}
               className="flex-1 rounded-lg border border-gray-800 bg-[#121212] px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-green-500 focus:outline-none"
             />
             <Button
