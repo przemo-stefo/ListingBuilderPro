@@ -20,6 +20,11 @@ class AuditRequest(BaseModel):
     # which may not be parsed yet when url field_validator runs (declaration order)
     @model_validator(mode="after")
     def validate_url_domain(self):
+        # WHY: User can paste bare ASIN (e.g. "B0DK9QXQJR") in URL field for Amazon.
+        # Detect ASIN pattern and move to asin field before URL validation runs.
+        if self.url and self.marketplace.lower() == "amazon" and ASIN_PATTERN.match(self.url.strip().upper()):
+            self.asin = self.url.strip().upper()
+            self.url = None
         if self.url:
             from utils.url_validator import validate_marketplace_url
             self.url = validate_marketplace_url(self.url, self.marketplace.lower())
