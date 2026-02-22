@@ -2,7 +2,6 @@
 # Purpose: BOL.com Retailer API v10 client — fetch offers via Client Credentials
 # NOT for: OAuth browser redirect flow (BOL uses server-to-server only)
 
-import asyncio
 import httpx
 import structlog
 from datetime import datetime, timezone, timedelta
@@ -16,37 +15,6 @@ logger = structlog.get_logger()
 BOL_TOKEN_URL = "https://login.bol.com/token"
 BOL_API_BASE = "https://api.bol.com/retailer"
 BOL_ACCEPT = "application/vnd.retailer.v10+json"
-
-RETRYABLE_STATUSES = {429, 500, 502, 503}
-MAX_RETRIES = 3
-BACKOFF_BASE = 1  # seconds: 1, 3, 9
-
-
-async def get_bol_token(client_id: str, client_secret: str) -> Optional[str]:
-    """Get BOL.com token via Client Credentials grant (HTTP Basic auth).
-
-    WHY no module-level cache: BOL credentials are per-user (stored in OAuthConnection),
-    not app-level like Allegro. Each seller has their own client_id/secret.
-    Token lifetime is ~5 min so we rely on OAuthConnection.token_expires_at.
-    """
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                BOL_TOKEN_URL,
-                data={"grant_type": "client_credentials"},
-                auth=(client_id, client_secret),
-            )
-
-        if resp.status_code != 200:
-            logger.error("bol_token_failed", status=resp.status_code)
-            return None
-
-        data = resp.json()
-        return data.get("access_token")
-
-    except Exception as e:
-        logger.error("bol_token_error", error=str(e))
-        return None
 
 
 async def validate_bol_credentials(client_id: str, client_secret: str) -> Dict:
@@ -117,28 +85,6 @@ async def _get_fresh_token(conn: OAuthConnection, db: Session) -> Optional[str]:
     return conn.access_token
 
 
-def _build_bol_offer_result(offer: Dict) -> Dict:
-    """Normalize BOL offer data to converter-compatible format."""
-    offer_id = offer.get("offerId", "")
-    return {
-        "source_url": f"https://www.bol.com/nl/nl/p/-/{offer_id}/",
-        "source_id": offer_id,
-        "title": offer.get("store", {}).get("productTitle", ""),
-        "description": "",
-        "price": str(offer.get("pricing", {}).get("bundlePrices", [{}])[0].get("unitPrice", "")),
-        "currency": "EUR",
-        "ean": offer.get("ean", ""),
-        "images": [],
-        "category": "",
-        "quantity": str(offer.get("stock", {}).get("amount", "0")),
-        "condition": offer.get("condition", {}).get("name", ""),
-        "parameters": {},
-        "brand": "",
-        "manufacturer": "",
-        "error": None,
-    }
-
-
 async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
     """Fetch all offers from connected BOL.com seller account.
 
@@ -191,7 +137,6 @@ async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
                 offers = data.get("offers", [])
 
                 for offer in offers:
-                    ean = offer.get("ean", "")
                     offer_id = offer.get("offerId", "")
                     if offer_id:
                         all_urls.append(f"https://www.bol.com/nl/nl/p/-/{offer_id}/")

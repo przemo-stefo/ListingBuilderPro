@@ -12,7 +12,7 @@ import structlog
 from config import settings
 from database import get_db
 from api.dependencies import get_user_id
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from services.oauth_service import (
     get_amazon_authorize_url,
     handle_amazon_callback,
@@ -161,6 +161,13 @@ class BolConnectRequest(BaseModel):
     """WHY POST body: BOL uses Client Credentials, user provides keys in UI form."""
     client_id: str
     client_secret: str
+
+    @field_validator("client_id", "client_secret")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Pole nie może być puste")
+        return v.strip()
 
 
 @router.post("/bol/connect")
