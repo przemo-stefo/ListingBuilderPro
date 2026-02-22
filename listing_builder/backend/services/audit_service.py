@@ -9,7 +9,8 @@ from typing import List, Dict
 from config import settings
 from services.scraper.allegro_scraper import scrape_allegro_product, AllegroProduct
 from services.compliance.allegro_rules import validate_allegro_parameters
-from services.scraper.amazon_scraper import parse_input as parse_amazon_input, fetch_listing as fetch_amazon_listing
+from services.scraper.amazon_scraper import parse_input as parse_amazon_input
+from services.sp_api_catalog import fetch_catalog_item
 from services.ebay_service import fetch_ebay_product
 
 logger = structlog.get_logger()
@@ -348,32 +349,42 @@ async def _audit_allegro(url: str, marketplace: str) -> Dict:
 
 
 async def _audit_amazon(url: str, marketplace: str) -> Dict:
-    """Amazon audit: parse ASIN/URL → scrape → base rules → AI suggestions."""
+    """Amazon audit: parse ASIN/URL → SP-API Catalog Items → base rules → AI suggestions.
+
+    WHY SP-API over scraping: Reliable structured data, no anti-bot issues,
+    returns title, bullets, description, images, brand from Amazon's own API.
+    """
     listing = parse_amazon_input(url)
     if listing.error:
         return _error_response(url, marketplace, listing.error)
 
-    listing = await fetch_amazon_listing(listing)
-    if listing.error:
-        return _error_response(url, marketplace, f"Błąd scrapowania: {listing.error}")
+    # WHY: SP-API needs marketplace code (DE, US, etc.) — parse_input extracts it from URL
+    mp_code = listing.marketplace or "DE"
+    data = await fetch_catalog_item(listing.asin, mp_code)
+
+    if data.get("error"):
+        return _error_response(url, marketplace, data["error"])
 
     fields = {
-        "title": listing.title or "",
-        "bullets": listing.bullets or [],
-        "description": listing.description or "",
+        "title": data.get("title", ""),
+        "bullets": data.get("bullets", []),
+        "description": data.get("description", ""),
     }
     issues = _run_base_rules(fields, AMAZON_BASE_RULES)
-    issues = await _generate_fix_suggestions(issues, listing.title)
+    issues = await _generate_fix_suggestions(issues, data.get("title", ""))
 
     product_data = {
-        "title": listing.title, "asin": listing.asin,
-        "marketplace_code": listing.marketplace, "domain": listing.domain,
-        "bullets_count": len(listing.bullets), "bullets": listing.bullets[:7],
-        "description_length": len(listing.description),
+        "title": data.get("title"), "asin": listing.asin,
+        "marketplace_code": mp_code, "brand": data.get("brand"),
+        "manufacturer": data.get("manufacturer"),
+        "bullets_count": len(data.get("bullets", [])),
+        "bullets": data.get("bullets", [])[:7],
+        "images": data.get("images", [])[:5],
+        "description_length": len(data.get("description", "")),
     }
 
     return _score_response(
-        listing.url or url, listing.asin, marketplace, listing.title,
+        listing.url or url, listing.asin, marketplace, data.get("title", ""),
         issues, product_data, total_checks=len(AMAZON_BASE_RULES),
     )
 

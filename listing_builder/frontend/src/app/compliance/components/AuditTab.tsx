@@ -70,7 +70,11 @@ export default function AuditTab() {
         <CardHeader>
           <CardTitle className="text-lg">Audyt karty produktu</CardTitle>
           <CardDescription>
-            Wklej URL produktu — sprawdzimy zgodność i podpowiemy co poprawić
+            {marketplace === 'amazon'
+              ? 'Wklej link Amazon lub sam ASIN (np. B0DXXXXXX) — sprawdzimy przez SP-API'
+              : marketplace === 'ebay'
+                ? 'Wklej link eBay (np. ebay.com/itm/...) — sprawdzimy kartę produktu'
+                : 'Wklej URL produktu — sprawdzimy zgodność i podpowiemy co poprawić'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -116,7 +120,7 @@ export default function AuditTab() {
 
           {auditMutation.isPending && (
             <p className="text-sm text-gray-400 animate-pulse">
-              Scrapuję i analizuję kartę produktu...
+              {marketplace === 'amazon' ? 'Pobieram dane z Amazon SP-API...' : 'Scrapuję i analizuję kartę produktu...'}
             </p>
           )}
         </CardContent>
