@@ -2,14 +2,17 @@
 # Purpose: API routes for publishing to marketplaces
 # NOT for: Import or AI optimization
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from database import get_db
 from schemas import BulkJobCreate, BulkJobResponse
 from services.export_service import ExportService
 import structlog
 
 logger = structlog.get_logger()
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/export", tags=["Export"])
 
 
@@ -17,10 +20,12 @@ ALLOWED_MARKETPLACES = {"amazon", "ebay", "kaufland"}
 
 
 @router.post("/publish/{product_id}")
+@limiter.limit("5/minute")
 async def publish_product(
+    request: Request,
     product_id: int,
     marketplace: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Publish a single product to marketplace.
@@ -57,9 +62,11 @@ async def publish_product(
 
 
 @router.post("/bulk-publish", response_model=BulkJobResponse)
+@limiter.limit("2/minute")
 async def bulk_publish(
+    request: Request,
     job_data: BulkJobCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Publish multiple products to marketplace.

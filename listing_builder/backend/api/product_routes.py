@@ -2,8 +2,10 @@
 # Purpose: CRUD API routes for products
 # NOT for: Import, AI, or export logic
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from database import get_db
 from models import Product, ProductStatus
 from schemas import ProductResponse, ProductList, DashboardStatsResponse, ProductUpdate
@@ -11,16 +13,19 @@ from typing import Optional
 import structlog
 
 logger = structlog.get_logger()
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/products", tags=["Products"])
 
 
 @router.get("", response_model=ProductList)
+@limiter.limit("30/minute")
 async def list_products(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
     source: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List products with pagination and filters.
@@ -99,7 +104,9 @@ async def get_product(product_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
+@limiter.limit("10/minute")
 async def update_product(
+    request: Request,
     product_id: int,
     payload: ProductUpdate,
     db: Session = Depends(get_db),
@@ -120,7 +127,8 @@ async def update_product(
 
 
 @router.delete("/{product_id}")
-async def delete_product(product_id: int, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def delete_product(request: Request, product_id: int, db: Session = Depends(get_db)):
     """
     Delete a product by ID.
     """

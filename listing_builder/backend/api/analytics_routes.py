@@ -2,9 +2,11 @@
 # Purpose: Analytics endpoint — DB-backed revenue, orders, conversion, top products
 # NOT for: Real-time metrics or order processing (separate services)
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from database import get_db
 from schemas import (
     AnalyticsResponse,
@@ -14,11 +16,14 @@ from schemas import (
 )
 from typing import Optional
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 
 @router.get("", response_model=AnalyticsResponse)
+@limiter.limit("10/minute")
 async def get_analytics(
+    request: Request,
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     period: Optional[str] = Query(None, description="Time period: 7d, 30d, 90d, 12m"),
     db: Session = Depends(get_db),

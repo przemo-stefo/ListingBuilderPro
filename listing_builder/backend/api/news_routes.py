@@ -10,13 +10,16 @@ import time
 from defusedxml import ElementTree as ET
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import httpx
 import structlog
 
 from config import settings
 
 logger = structlog.get_logger()
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/news", tags=["news"])
 
@@ -274,7 +277,8 @@ async def _translate_all(articles: List[dict]) -> List[dict]:
 
 
 @router.get("/feed")
-async def get_news_feed(force: bool = Query(False)):
+@limiter.limit("5/minute")
+async def get_news_feed(request: Request, force: bool = Query(False)):
     """Aggregated marketplace news feed — translated to Polish, cached 2h.
 
     WHY synchronous: 6 Groq keys in parallel ≈ 5-10s translate + 10-15s fetch = ~25s total.

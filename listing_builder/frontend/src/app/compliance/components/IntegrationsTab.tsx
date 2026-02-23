@@ -106,8 +106,9 @@ export default function IntegrationsTab() {
       toast({ title: 'Połączono!', description: 'BOL.com podłączony pomyślnie' })
       setBolForm({ open: false, clientId: '', clientSecret: '', loading: false })
       oauthQuery.refetch()
-    } catch (err: any) {
-      toast({ title: 'Błąd BOL.com', description: err.message || 'Nieprawidłowe dane', variant: 'destructive' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Nieprawidłowe dane'
+      toast({ title: 'Błąd BOL.com', description: msg, variant: 'destructive' })
       setBolForm(f => ({ ...f, loading: false }))
     }
   }
