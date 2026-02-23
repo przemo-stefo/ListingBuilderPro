@@ -2,7 +2,7 @@
 // Purpose: API client — all calls go through Vercel proxy (API key injected server-side)
 // NOT for: Direct backend calls
 
-const BASE_URL = "https://listing.feedmasters.org/api/proxy";
+const BASE_URL = "https://panel.octohelper.com/api/proxy";
 
 async function request<T>(
   path: string,

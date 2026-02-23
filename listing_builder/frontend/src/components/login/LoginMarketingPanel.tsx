@@ -1,61 +1,46 @@
 // frontend/src/components/login/LoginMarketingPanel.tsx
-// Purpose: Left marketing panel for login page — rotating slides with value props
+// Purpose: Left marketing panel for login page — explains what OctoHelper does
 // NOT for: Form logic or authentication (that's login/page.tsx)
 
-'use client'
+import { Sparkles, PenTool, Globe, Upload, Brain, Search, Check } from 'lucide-react'
 
-import { useState, useEffect } from 'react'
-import { Sparkles, BarChart3, ShieldCheck, Zap } from 'lucide-react'
-
-// WHY: Rotating marketing slides — shows different value props
-const slides = [
+// WHY: Static feature list — clear "what does this tool do" before login
+const features = [
   {
-    icon: Sparkles,
-    headline: 'Zoptymalizuj swoje oferty',
-    accent: 'z pomocą AI',
-    desc: 'Tytuły, opisy, słowa kluczowe — wszystko generowane przez AI, dostosowane do algorytmów marketplace.',
+    icon: PenTool,
+    title: 'Optymalizacja listingów AI',
+    desc: 'Tytuły, bullet points, opisy i backend keywords — generowane przez AI pod algorytmy marketplace.',
   },
   {
-    icon: BarChart3,
-    headline: 'Analizuj konkurencję',
-    accent: 'i bądź o krok przed nią',
-    desc: 'Badanie rynku, ICP, brief reklamowy — 10 skilli AI do budowania przewagi konkurencyjnej.',
+    icon: Globe,
+    title: '5 marketplace w jednym panelu',
+    desc: 'Amazon, Allegro, eBay, Kaufland, BOL.com — twórz i konwertuj oferty między platformami.',
   },
   {
-    icon: ShieldCheck,
-    headline: 'Sprzedawaj na wielu',
-    accent: 'marketplace jednocześnie',
-    desc: 'Amazon, Allegro, eBay, Kaufland — konwertuj oferty między platformami jednym kliknięciem.',
+    icon: Upload,
+    title: 'Szybki import produktów',
+    desc: 'Wrzuć CSV, wklej URL oferty lub zaimportuj prosto z konta Allegro.',
   },
   {
-    icon: Zap,
-    headline: 'Ekspert AI odpowiada',
-    accent: 'na Twoje pytania 24/7',
-    desc: 'Baza wiedzy od top sprzedawców. Zadaj pytanie i otrzymaj konkretną odpowiedź opartą na danych.',
+    icon: Brain,
+    title: 'Ekspert AI — chatbot e-commerce',
+    desc: 'Zadaj pytanie o słowa kluczowe, PPC, ranking — AI odpowie na bazie 10 000+ fragmentów wiedzy.',
+  },
+  {
+    icon: Search,
+    title: 'Badanie rynku i konkurencji',
+    desc: 'Analiza grupy docelowej, persony kupujących, brief reklamowy — 10 narzędzi badawczych.',
   },
 ]
 
 export function LoginMarketingPanel() {
-  const [activeSlide, setActiveSlide] = useState(0)
-
-  // WHY: Auto-rotate slides every 5s
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSlide(prev => (prev + 1) % slides.length)
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const slide = slides[activeSlide]
-  const SlideIcon = slide.icon
-
   return (
     <div className="relative hidden lg:flex lg:w-1/2 flex-col justify-between p-12 overflow-hidden">
-      {/* WHY: Subtle green radial glow — matches the screenshot aesthetic */}
       <div className="absolute inset-0 bg-[#0A0A0A]" />
       <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-emerald-500/8 blur-3xl" />
       <div className="absolute -top-32 -right-32 h-64 w-64 rounded-full bg-emerald-500/5 blur-3xl" />
 
+      {/* Logo */}
       <div className="relative z-10">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
@@ -65,36 +50,40 @@ export function LoginMarketingPanel() {
         </div>
       </div>
 
-      <div className="relative z-10 space-y-6">
-        <div className="flex items-center gap-3 mb-8">
-          <SlideIcon className="h-8 w-8 text-emerald-400" />
+      {/* WHY: Static feature list — user sees exactly what the tool does before signing up */}
+      <div className="relative z-10 space-y-5">
+        <div>
+          <h2 className="text-3xl font-bold leading-tight text-white">
+            Twoje oferty,{' '}
+            <span className="text-emerald-400">zoptymalizowane AI</span>
+          </h2>
+          <p className="mt-2 text-gray-400 max-w-sm">
+            Panel do tworzenia i optymalizacji listingów na największych marketplace w Europie.
+          </p>
         </div>
-        <h2 className="text-4xl font-bold leading-tight text-white">
-          {slide.headline}{' '}
-          <span className="text-emerald-400">{slide.accent}</span>
-        </h2>
-        <p className="text-lg text-gray-400 max-w-md leading-relaxed">
-          {slide.desc}
-        </p>
+
+        <div className="space-y-3">
+          {features.map((f) => {
+            const Icon = f.icon
+            return (
+              <div key={f.title} className="flex gap-3 rounded-xl border border-gray-800/60 bg-gray-900/30 p-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <Icon className="h-4 w-4 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white">{f.title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed">{f.desc}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="relative z-10 flex items-center gap-3">
-        <div className="flex gap-1.5">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveSlide(i)}
-              className={`h-2.5 w-2.5 rounded-full transition-all ${
-                i === activeSlide
-                  ? 'bg-emerald-400 w-6'
-                  : 'bg-gray-700 hover:bg-gray-600'
-              }`}
-            />
-          ))}
-        </div>
-        <span className="ml-4 text-sm text-gray-500">
-          <span className="font-semibold text-white">500+</span> sprzedawców już korzysta
-        </span>
+      {/* WHY: Free tier highlight — lowers signup friction */}
+      <div className="relative z-10 flex items-center gap-2 text-sm text-gray-500">
+        <Check className="h-4 w-4 text-emerald-500" />
+        <span>3 darmowe optymalizacje dziennie — bez karty kredytowej</span>
       </div>
     </div>
   )

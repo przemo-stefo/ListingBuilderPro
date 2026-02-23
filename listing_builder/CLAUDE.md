@@ -14,7 +14,7 @@
 
 | What | URL |
 |------|-----|
-| Frontend (prod) | https://listing.feedmasters.org |
+| Frontend (prod) | https://panel.octohelper.com |
 | Backend (prod) | https://api-listing.feedmasters.org |
 | Frontend (alt) | https://listing-builder-pro.vercel.app |
 | Backend (alt) | https://listingbuilderpro.onrender.com |

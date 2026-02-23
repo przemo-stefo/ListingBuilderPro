@@ -1,5 +1,5 @@
 # backend/services/knowledge_service.py
-# Purpose: Search Inner Circle transcript chunks for expert context injection
+# Purpose: Search knowledge chunks for expert context injection
 # NOT for: Ingestion, chunk management, or low-level search (see search_strategies.py)
 
 from __future__ import annotations

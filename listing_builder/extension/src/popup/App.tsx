@@ -45,7 +45,7 @@ export default function App() {
       {/* Footer */}
       <div className="px-4 py-2 border-t border-dark-border text-center">
         <a
-          href="https://listing.feedmasters.org"
+          href="https://panel.octohelper.com"
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-emerald-500 hover:text-emerald-400"

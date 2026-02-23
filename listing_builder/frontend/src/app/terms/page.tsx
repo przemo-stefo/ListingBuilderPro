@@ -12,8 +12,8 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">1. Service Description</h2>
           <p>
-            PYROX AI, LLC (&quot;we&quot;, &quot;us&quot;) provides the Compliance Guard
-            platform — a marketplace monitoring and compliance tool for e-commerce
+            VIAREGIA.ONLINE Sp. z o.o. (&quot;we&quot;, &quot;us&quot;) provides the OctoHelper
+            platform — a marketplace listing optimization and monitoring tool for e-commerce
             sellers. Our services include:
           </p>
           <ul className="list-disc list-inside mt-2 space-y-1">
@@ -86,8 +86,8 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">7. Intellectual Property</h2>
           <p>
-            All content, software, and technology comprising the Compliance Guard
-            platform is owned by PYROX AI, LLC. You retain ownership of your
+            All content, software, and technology comprising the OctoHelper
+            platform is owned by VIAREGIA.ONLINE Sp. z o.o. You retain ownership of your
             marketplace data. By using our services, you grant us a limited license
             to process your data solely for providing the services described herein.
           </p>
@@ -96,7 +96,7 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">8. Limitation of Liability</h2>
           <p>
-            To the maximum extent permitted by law, PYROX AI, LLC shall not be
+            To the maximum extent permitted by law, VIAREGIA.ONLINE Sp. z o.o. shall not be
             liable for any indirect, incidental, special, consequential, or punitive
             damages, including loss of profits, data, or business opportunities,
             arising from your use of our services. Our total liability shall not
@@ -126,9 +126,9 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">11. Governing Law</h2>
           <p>
-            These terms are governed by the laws of the State of Illinois, United
-            States. Any disputes shall be resolved in the courts of Cook County,
-            Illinois.
+            These terms are governed by the laws of the Republic of Poland.
+            Any disputes shall be resolved by the competent courts in Warsaw,
+            Poland.
           </p>
         </section>
 
@@ -136,9 +136,8 @@ export default function TermsOfServicePage() {
           <h2 className="text-xl font-semibold text-white mb-3">12. Contact</h2>
           <p>
             For questions about these terms:<br />
-            PYROX AI, LLC<br />
-            1060 Everett Lane, Des Plaines, IL 60018<br />
-            shawnstefaniak@pyroxai.com
+            VIAREGIA.ONLINE Sp. z o.o.<br />
+            kontakt@octohelper.com
           </p>
         </section>
       </div>

@@ -17,7 +17,7 @@ logger = structlog.get_logger()
 
 MODEL = "llama-3.3-70b-versatile"
 
-# WHY: These categories contain copywriting frameworks from Inner Circle + Ecom Creative courses
+# WHY: These categories contain copywriting frameworks from expert e-commerce courses
 SCORE_CATEGORIES = [
     "copywriting", "listing_optimization",
     "conversion_optimization", "marketing_psychology",

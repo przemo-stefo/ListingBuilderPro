@@ -12,13 +12,12 @@ export default function PrivacyPolicyPage() {
         <section>
           <h2 className="text-xl font-semibold text-white mb-3">1. Who We Are</h2>
           <p>
-            PYROX AI, LLC (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the Compliance Guard
-            platform at compliance.feedmasters.org and listing.feedmasters.org. We are
-            registered in Illinois, United States.
+            VIAREGIA.ONLINE Sp. z o.o. (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the
+            OctoHelper platform at panel.octohelper.com. We are
+            a company registered in Poland (NIP: 5252944772).
           </p>
           <p className="mt-2">
-            Contact: shawnstefaniak@pyroxai.com<br />
-            Address: 1060 Everett Lane, Des Plaines, IL 60018, United States
+            Contact: kontakt@octohelper.com
           </p>
         </section>
 
@@ -96,7 +95,7 @@ export default function PrivacyPolicyPage() {
             <li>Withdraw consent at any time</li>
           </ul>
           <p className="mt-2">
-            To exercise these rights, contact us at shawnstefaniak@pyroxai.com.
+            To exercise these rights, contact us at kontakt@octohelper.com.
             We will respond within 30 days.
           </p>
         </section>
@@ -133,9 +132,8 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-xl font-semibold text-white mb-3">11. Contact</h2>
           <p>
             For privacy-related questions or requests:<br />
-            PYROX AI, LLC<br />
-            1060 Everett Lane, Des Plaines, IL 60018<br />
-            shawnstefaniak@pyroxai.com
+            VIAREGIA.ONLINE Sp. z o.o.<br />
+            kontakt@octohelper.com
           </p>
         </section>
       </div>

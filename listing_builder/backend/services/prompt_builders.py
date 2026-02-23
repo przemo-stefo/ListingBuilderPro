@@ -13,7 +13,7 @@ def build_title_prompt(
     expert_context: str = "",
 ) -> str:
     kw_list = ", ".join(tier1_phrases[:10])
-    # WHY: Expert context from Inner Circle transcripts teaches proven title strategies
+    # WHY: Expert context from knowledge base teaches proven title strategies
     context_block = ""
     if expert_context:
         context_block = f"""

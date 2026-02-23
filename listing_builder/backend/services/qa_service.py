@@ -64,11 +64,11 @@ Question: {question}"""
     context_block = ""
     if context:
         context_block = f"""
-EXPERT KNOWLEDGE FROM TRAINING TRANSCRIPTS (Inner Circle + Ecom Creative Expert):
+EXPERT KNOWLEDGE BASE:
 {context}
 
 """
-    return f"""You are an expert Amazon and e-commerce marketplace consultant with deep knowledge from training transcripts covering: Amazon keywords, listings, PPC, ranking strategies, as well as video ads, creative strategies, AI tools, and marketing psychology. Answer the user's question using the expert knowledge provided below.
+    return f"""You are an expert Amazon and e-commerce marketplace consultant with deep knowledge covering: Amazon keywords, listings, PPC, ranking strategies, as well as video ads, creative strategies, AI tools, and marketing psychology. Answer the user's question using the expert knowledge provided below.
 
 {context_block}Rules:
 {rules}

@@ -130,11 +130,11 @@ function ExpertQAContent() {
           </div>
           <div className="flex items-center gap-1.5 rounded-md bg-gray-800/50 border border-gray-700/50 px-2.5 py-1">
             <BookOpen className="h-3 w-3 text-gray-400" />
-            <span className="text-[11px] text-gray-400">Inner Circle + Ecom Creative</span>
+            <span className="text-[11px] text-gray-400">Baza wiedzy e-commerce</span>
           </div>
           <div className="flex items-center gap-1.5 rounded-md bg-gray-800/50 border border-gray-700/50 px-2.5 py-1">
             <Zap className="h-3 w-3 text-gray-400" />
-            <span className="text-[11px] text-gray-400">Groq AI — odpowiedź w sekundy</span>
+            <span className="text-[11px] text-gray-400">AI — odpowiedź w sekundy</span>
           </div>
         </div>
 
