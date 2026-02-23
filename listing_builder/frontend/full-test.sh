@@ -3,7 +3,7 @@
 # Purpose: Full functional test of OctoHelper as user Mateusz — real API calls
 # NOT for: Unit tests or UI-only testing
 
-API="https://api-listing.feedmasters.org/api"
+API="https://api-lbp.feedmasters.org/api"
 KEY="bmUS9B8-vpxg8PBemSQEV74Ny5N4EzzWs8y8UK5gdGo"
 
 PASS=0; FAIL=0; WARN=0; FAILURES=""

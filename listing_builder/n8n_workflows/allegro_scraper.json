@@ -123,7 +123,7 @@
       "onError": "continueRegularOutput",
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.LBP_WEBHOOK_URL || 'https://api-listing.feedmasters.org/api/import/webhook' }}",
+        "url": "={{ $env.LBP_WEBHOOK_URL || 'https://api-lbp.feedmasters.org/api/import/webhook' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
