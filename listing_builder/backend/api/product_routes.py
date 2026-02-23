@@ -3,6 +3,7 @@
 # NOT for: Import, AI, or export logic
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -66,17 +67,23 @@ async def list_products(
 # IMPORTANT: /stats/summary MUST be above /{product_id} — otherwise FastAPI
 # matches "stats" as a product_id and returns 422
 @router.get("/stats/summary", response_model=DashboardStatsResponse)
-async def get_stats(db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def get_stats(request: Request, db: Session = Depends(get_db)):
     """
     Dashboard stats — 8 cards on the main dashboard page.
     Returns counts by status + aggregate metrics the frontend expects.
     """
-    total = db.query(Product).count()
+    # WHY: Single GROUP BY instead of N+1 (was 7 queries, now 2)
+    status_rows = db.query(
+        Product.status, func.count(Product.id)
+    ).group_by(Product.status).all()
+    counts = {str(s.value) if hasattr(s, 'value') else str(s): c for s, c in status_rows}
+    total = sum(counts.values())
 
-    # Count per status
-    counts: dict[str, int] = {}
-    for s in ProductStatus:
-        counts[s.value] = db.query(Product).filter(Product.status == s).count()
+    # WHY: Real avg from DB instead of hardcoded 78.5
+    avg_score = db.query(func.avg(Product.optimization_score)).filter(
+        Product.optimization_score.isnot(None)
+    ).scalar()
 
     return DashboardStatsResponse(
         total_products=total,
@@ -84,14 +91,15 @@ async def get_stats(db: Session = Depends(get_db)):
         optimized_products=counts.get("optimized", 0),
         published_products=counts.get("published", 0),
         failed_products=counts.get("failed", 0),
-        average_optimization_score=78.5,
+        average_optimization_score=round(float(avg_score), 1) if avg_score else 0.0,
         recent_imports=counts.get("imported", 0),
         recent_publishes=counts.get("published", 0),
     )
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: int, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def get_product(request: Request, product_id: int, db: Session = Depends(get_db)):
     """
     Get a single product by ID.
     """

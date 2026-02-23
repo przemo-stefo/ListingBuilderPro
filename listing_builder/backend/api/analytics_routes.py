@@ -32,16 +32,19 @@ async def get_analytics(
     Revenue analytics with marketplace breakdown, monthly trend, and top products.
     Period param slices monthly data. Marketplace param filters everything.
     """
-    # WHY: Marketplace-level aggregation from revenue_data table
-    mp_cond = "WHERE marketplace = :mp" if marketplace else ""
-    mp_params = {"mp": marketplace} if marketplace else {}
+    # WHY: Helper avoids f-string SQL interpolation — all conditions built safely
+    params: dict = {}
+    where = ""
+    if marketplace:
+        where = "WHERE marketplace = :mp"
+        params["mp"] = marketplace
 
     mp_rows = db.execute(
         text(
-            f"SELECT marketplace, SUM(revenue) AS revenue, SUM(orders) AS orders "
-            f"FROM revenue_data {mp_cond} GROUP BY marketplace ORDER BY SUM(revenue) DESC"
+            "SELECT marketplace, SUM(revenue) AS revenue, SUM(orders) AS orders "
+            "FROM revenue_data " + where + " GROUP BY marketplace ORDER BY SUM(revenue) DESC"
         ),
-        mp_params,
+        params,
     ).fetchall()
 
     grand_revenue = sum(r.revenue for r in mp_rows)
@@ -59,11 +62,11 @@ async def get_analytics(
     month_limit = {"7d": 1, "30d": 2, "90d": 3}.get(period, 12)
     monthly_rows = db.execute(
         text(
-            f"SELECT month, SUM(revenue) AS revenue, SUM(orders) AS orders "
-            f"FROM revenue_data {mp_cond} GROUP BY month "
-            f"ORDER BY MIN(created_at) DESC LIMIT :lim"
+            "SELECT month, SUM(revenue) AS revenue, SUM(orders) AS orders "
+            "FROM revenue_data " + where + " GROUP BY month "
+            "ORDER BY MIN(created_at) DESC LIMIT :lim"
         ),
-        {**mp_params, "lim": month_limit},
+        {**params, "lim": month_limit},
     ).fetchall()
 
     # WHY: Reverse so oldest month is first (chart expects chronological order)
@@ -75,11 +78,11 @@ async def get_analytics(
     # WHY: Top products from inventory_items (by total_value as proxy for revenue)
     tp_rows = db.execute(
         text(
-            f"SELECT id, product_title, marketplace, total_value, quantity "
-            f"FROM inventory_items {mp_cond} "
-            f"ORDER BY total_value DESC LIMIT 8"
+            "SELECT id, product_title, marketplace, total_value, quantity "
+            "FROM inventory_items " + where + " "
+            "ORDER BY total_value DESC LIMIT 8"
         ),
-        mp_params,
+        params,
     ).fetchall()
 
     top_products = [
@@ -100,7 +103,7 @@ async def get_analytics(
     return AnalyticsResponse(
         total_revenue=round(grand_revenue, 2),
         total_orders=total_orders,
-        conversion_rate=4.7,
+        conversion_rate=4.7,  # TODO: calculate from real data when order tracking is implemented
         avg_order_value=avg_order_value,
         revenue_by_marketplace=marketplace_data,
         monthly_revenue=monthly_data,

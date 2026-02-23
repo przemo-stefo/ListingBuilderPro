@@ -93,7 +93,8 @@ async def bulk_publish(
 
 
 @router.get("/marketplaces")
-async def list_marketplaces():
+@limiter.limit("30/minute")
+async def list_marketplaces(request: Request):
     """
     List available marketplaces.
     """
