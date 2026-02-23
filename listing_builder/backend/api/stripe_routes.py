@@ -2,6 +2,8 @@
 # Purpose: REST endpoints for Stripe license-key payment flow
 # NOT for: Stripe API logic (see services/stripe_service.py)
 
+from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Request, Depends
 from sqlalchemy.orm import Session
 from slowapi import Limiter

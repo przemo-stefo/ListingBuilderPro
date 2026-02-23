@@ -78,7 +78,7 @@ async def receive_webhook(
             }
         }
     """
-    logger.info("webhook_received", source=payload.source, event=payload.event_type)
+    logger.info("webhook_received", source=payload.source, event_type=payload.event_type)
 
     try:
         service = ImportService(db)

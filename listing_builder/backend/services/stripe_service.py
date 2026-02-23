@@ -2,6 +2,8 @@
 # Purpose: Stripe Checkout + license key generation/validation
 # NOT for: Route definitions (see api/stripe_routes.py)
 
+from __future__ import annotations
+
 import secrets
 import stripe
 import structlog
