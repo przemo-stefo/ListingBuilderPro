@@ -13,6 +13,7 @@ import structlog
 
 from database import get_db
 from models.monitoring import TrackedProduct, MonitoringSnapshot, AlertConfig, Alert
+from utils.validators import validate_uuid
 from schemas.monitoring import (
     TrackProductRequest,
     TrackedProductResponse,
@@ -93,6 +94,7 @@ async def list_tracked_products(
 @router.delete("/track/{product_id}")
 async def untrack_product(product_id: str, db: Session = Depends(get_db)):
     """Stop tracking a product. Deletes snapshots via CASCADE."""
+    validate_uuid(product_id, "product_id")
     product = (
         db.query(TrackedProduct)
         .filter(TrackedProduct.id == product_id, TrackedProduct.user_id == DEFAULT_USER_ID)
@@ -109,6 +111,7 @@ async def untrack_product(product_id: str, db: Session = Depends(get_db)):
 @router.patch("/track/{product_id}/toggle")
 async def toggle_tracking(product_id: str, db: Session = Depends(get_db)):
     """Enable/disable polling for a tracked product."""
+    validate_uuid(product_id, "product_id")
     product = (
         db.query(TrackedProduct)
         .filter(TrackedProduct.id == product_id, TrackedProduct.user_id == DEFAULT_USER_ID)
@@ -132,6 +135,7 @@ async def get_snapshots(
     db: Session = Depends(get_db),
 ):
     """Get price/stock history for a tracked product."""
+    validate_uuid(tracked_id, "tracked_id")
     query = (
         db.query(MonitoringSnapshot)
         .filter(MonitoringSnapshot.tracked_product_id == tracked_id)
@@ -186,6 +190,7 @@ async def list_alert_configs(
 @router.delete("/alerts/config/{config_id}")
 async def delete_alert_config(config_id: str, db: Session = Depends(get_db)):
     """Delete an alert config and its alert history."""
+    validate_uuid(config_id, "config_id")
     config = (
         db.query(AlertConfig)
         .filter(AlertConfig.id == config_id, AlertConfig.user_id == DEFAULT_USER_ID)
@@ -202,6 +207,7 @@ async def delete_alert_config(config_id: str, db: Session = Depends(get_db)):
 @router.patch("/alerts/config/{config_id}/toggle")
 async def toggle_alert_config(config_id: str, db: Session = Depends(get_db)):
     """Enable/disable an alert config."""
+    validate_uuid(config_id, "config_id")
     config = (
         db.query(AlertConfig)
         .filter(AlertConfig.id == config_id, AlertConfig.user_id == DEFAULT_USER_ID)
@@ -234,6 +240,7 @@ async def list_alerts(
 @router.patch("/alerts/{alert_id}/ack")
 async def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
     """Acknowledge an alert."""
+    validate_uuid(alert_id, "alert_id")
     from services.alert_service import get_alert_service
     svc = get_alert_service()
     alert = svc.acknowledge_alert(db, alert_id)

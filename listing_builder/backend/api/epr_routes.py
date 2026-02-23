@@ -21,6 +21,7 @@ from schemas.epr import (
 )
 from services.sp_api_auth import credentials_configured, has_refresh_token
 from services.epr_service import fetch_epr_report_pipeline
+from utils.validators import validate_uuid
 
 logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
@@ -95,6 +96,7 @@ async def list_epr_reports(db: Session = Depends(get_db)):
 @router.get("/reports/{report_id}", response_model=EprReportResponse)
 async def get_epr_report(report_id: str, db: Session = Depends(get_db)):
     """Get a single EPR report with all rows."""
+    validate_uuid(report_id, "report_id")
     report = db.query(EprReport).filter(EprReport.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -110,6 +112,7 @@ async def get_epr_report(report_id: str, db: Session = Depends(get_db)):
 @router.delete("/reports/{report_id}", status_code=204)
 async def delete_epr_report(report_id: str, db: Session = Depends(get_db)):
     """Delete an EPR report and its rows (CASCADE)."""
+    validate_uuid(report_id, "report_id")
     report = db.query(EprReport).filter(EprReport.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")

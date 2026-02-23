@@ -12,6 +12,7 @@ from typing import Optional
 from database import get_db
 from models.listing import TrackedKeyword
 from schemas import KeywordCreate, KeywordItem, KeywordsResponse
+from utils.validators import validate_uuid
 
 router = APIRouter(prefix="/api/keywords", tags=["Keywords"])
 limiter = Limiter(key_func=get_remote_address)
@@ -118,6 +119,7 @@ async def create_keyword(
 @router.delete("/{keyword_id}")
 async def delete_keyword(keyword_id: str, db: Session = Depends(get_db)):
     """Stop tracking a keyword."""
+    validate_uuid(keyword_id, "keyword_id")
     kw = db.query(TrackedKeyword).filter(TrackedKeyword.id == keyword_id).first()
     if not kw:
         raise HTTPException(status_code=404, detail="Keyword not found")

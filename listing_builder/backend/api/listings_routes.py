@@ -12,6 +12,7 @@ from typing import Optional
 from database import get_db
 from models.listing import Listing
 from schemas import ListingCreate, ListingItem, ListingsResponse
+from utils.validators import validate_uuid
 
 router = APIRouter(prefix="/api/listings", tags=["Listings"])
 limiter = Limiter(key_func=get_remote_address)
@@ -105,6 +106,7 @@ async def create_listing(
 @router.delete("/{listing_id}")
 async def delete_listing(listing_id: str, db: Session = Depends(get_db)):
     """Remove a listing by ID."""
+    validate_uuid(listing_id, "listing_id")
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
