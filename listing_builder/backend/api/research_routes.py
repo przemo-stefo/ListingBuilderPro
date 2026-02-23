@@ -150,7 +150,8 @@ async def research_audience(
         result = _call_groq_research(prompts["system"], prompts["user"])
     except Exception as e:
         logger.error("research_audience_error", error=str(e), error_type=type(e).__name__)
-        raise HTTPException(status_code=502, detail=f"Research error: {str(e)[:200]}")
+        # WHY generic: internal errors (Groq API keys, network) must not leak to client
+        raise HTTPException(status_code=502, detail="Research failed — spróbuj ponownie za chwilę")
 
     logger.info("research_audience_done", product=body.product[:50], result_len=len(result["text"]))
 

@@ -125,6 +125,10 @@ app.add_middleware(SecurityHeadersMiddleware)
 # 3. API key authentication
 app.add_middleware(APIKeyMiddleware)
 
+# WHY: One-time startup check — CORS misconfiguration is hard to debug
+if settings.is_production and any("localhost" in o for o in settings.cors_origins_list):
+    logger.warning("cors_localhost_in_production", origins=settings.cors_origins_list)
+
 # 4. CORS middleware (more restrictive in production)
 app.add_middleware(
     CORSMiddleware,

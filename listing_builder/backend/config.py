@@ -149,16 +149,8 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        """Parse CORS origins from comma-separated string.
-
-        WHY warning: If production still has localhost defaults, CORS will reject
-        real frontend requests — loud warning helps catch misconfiguration.
-        """
-        origins = [origin.strip() for origin in self.cors_origins.split(",")]
-        if self.app_env == "production" and any("localhost" in o for o in origins):
-            import structlog
-            structlog.get_logger().warning("cors_localhost_in_production", origins=origins)
-        return origins
+        """Parse CORS origins from comma-separated string."""
+        return [origin.strip() for origin in self.cors_origins.split(",")]
 
     @property
     def is_production(self) -> bool:

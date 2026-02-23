@@ -25,18 +25,12 @@ from services.oauth_service import (
     connect_bol,
     get_connections,
     disconnect,
+    _frontend_url,
 )
 
 logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/oauth", tags=["OAuth"])
-
-
-def _frontend_url() -> str:
-    """WHY helper: avoids repeating production URL check in every callback."""
-    if settings.app_env == "production":
-        return "https://panel.octohelper.com"
-    return "http://localhost:3000"
 
 
 # ── Connection status ─────────────────────────────────────────────────────────
