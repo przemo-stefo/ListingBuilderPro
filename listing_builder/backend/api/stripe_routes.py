@@ -27,38 +27,30 @@ from services.stripe_service import (
     create_portal_session,
     get_subscription_status,
 )
-from middleware.supabase_auth import get_user_id_from_jwt
+from typing import Optional
 
 logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/stripe", tags=["Stripe"])
 
 
-def _get_email_from_jwt(request: Request) -> str | None:
+def _get_email_from_jwt(request: Request) -> Optional[str]:
     """Extract email from Supabase JWT. Shared by subscription + portal endpoints.
 
-    WHY not use get_user_id_from_jwt: We need email (not user_id) to look up
-    Stripe subscriptions — PremiumLicense stores email from Stripe checkout.
+    WHY reuse middleware: get_user_id_from_jwt handles ES256 (JWKS) + HS256 fallback.
+    We call it to verify the token, then read email from request.state.
     """
-    import jwt as pyjwt
-    from config import settings as cfg
+    from middleware.supabase_auth import get_user_id_from_jwt
 
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    user_id = get_user_id_from_jwt(request)
+    if not user_id:
         return None
-    try:
-        payload = pyjwt.decode(
-            auth_header[7:], cfg.supabase_jwt_secret,
-            algorithms=["HS256"], audience="authenticated",
-        )
-        return payload.get("email")
-    except Exception:
-        return None
+    return getattr(request.state, "user_email", None)
 
 
 @router.post("/create-checkout", response_model=CheckoutResponse)
 @limiter.limit("10/minute")
-async def checkout(request: Request, body: CheckoutRequest, db: Session = Depends(get_db)):
+async def checkout(request: Request, body: CheckoutRequest):
     """Create Stripe Checkout session for monthly plan."""
     try:
         url = create_checkout_session(body.plan_type, body.email)

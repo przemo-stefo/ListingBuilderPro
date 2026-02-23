@@ -1,11 +1,10 @@
 # backend/services/oauth_service.py
-# Purpose: OAuth2 authorize URL generation + callback token exchange for Amazon & Allegro
+# Purpose: OAuth2 authorize URL generation + callback token exchange (Amazon, Allegro, eBay, BOL)
 # NOT for: Token refresh caching (that's sp_api_auth.py) or UI logic
 
 import hashlib
 import hmac
 import json
-import secrets
 import time
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 
@@ -24,7 +23,7 @@ logger = structlog.get_logger()
 STATE_TTL = 600  # 10 minutes
 
 
-# ── Stateless CSRF state (survives Render free tier restarts) ────────────────
+# ── Stateless CSRF state (survives container restarts) ───────────────────────
 
 def _sign_state(marketplace: str, user_id: str = "default") -> str:
     """Generate signed OAuth state token.
@@ -41,7 +40,7 @@ def _sign_state(marketplace: str, user_id: str = "default") -> str:
     encoded = urlsafe_b64encode(payload.encode()).decode().rstrip("=")
     sig = hmac.new(
         settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
-    ).hexdigest()[:24]
+    ).hexdigest()[:32]
     return f"{encoded}.{sig}"
 
 
@@ -54,7 +53,7 @@ def _verify_state(state: str) -> Optional[Dict]:
     encoded, sig = parts
     expected = hmac.new(
         settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
-    ).hexdigest()[:24]
+    ).hexdigest()[:32]
 
     if not hmac.compare_digest(sig, expected):
         return None
@@ -87,6 +86,49 @@ def _backend_url() -> str:
     if settings.app_env == "production":
         return "https://api-lbp.feedmasters.org"
     return "http://localhost:8000"
+
+
+# ── Shared connection persistence ────────────────────────────────────────────
+
+def _save_connection(
+    db: Session,
+    user_id: str,
+    marketplace: str,
+    *,
+    access_token: str,
+    refresh_token: Optional[str] = None,
+    expires_at: datetime,
+    seller_id: Optional[str] = None,
+    scopes: Optional[str] = None,
+    raw_data: Optional[Dict] = None,
+) -> OAuthConnection:
+    """Get-or-create OAuthConnection, update tokens, commit.
+
+    WHY extracted: Amazon, Allegro, eBay, BOL all repeat the same 15-line
+    get-or-create + field-set + commit pattern. One place to maintain.
+    """
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
+        OAuthConnection.marketplace == marketplace,
+    ).first()
+
+    if not conn:
+        conn = OAuthConnection(user_id=user_id, marketplace=marketplace)
+        db.add(conn)
+
+    conn.status = "active"
+    conn.access_token = access_token
+    conn.refresh_token = refresh_token
+    conn.token_expires_at = expires_at
+    if seller_id is not None:
+        conn.seller_id = seller_id
+    if scopes is not None:
+        conn.scopes = scopes
+    conn.raw_data = raw_data or {}
+    conn.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    return conn
 
 
 # ── Amazon SP-API OAuth ──────────────────────────────────────────────────────
@@ -147,24 +189,14 @@ async def handle_amazon_callback(
     data = resp.json()
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
 
-    conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == user_id,
-        OAuthConnection.marketplace == "amazon",
-    ).first()
-
-    if not conn:
-        conn = OAuthConnection(user_id=user_id, marketplace="amazon")
-        db.add(conn)
-
-    conn.status = "active"
-    conn.access_token = data.get("access_token")
-    conn.refresh_token = data.get("refresh_token")
-    conn.token_expires_at = expires_at
-    conn.seller_id = selling_partner_id
-    conn.raw_data = {"token_type": data.get("token_type"), "scope": data.get("scope")}
-    conn.updated_at = datetime.now(timezone.utc)
-
-    db.commit()
+    _save_connection(
+        db, user_id, "amazon",
+        access_token=data.get("access_token"),
+        refresh_token=data.get("refresh_token"),
+        expires_at=expires_at,
+        seller_id=selling_partner_id,
+        raw_data={"token_type": data.get("token_type"), "scope": data.get("scope")},
+    )
     logger.info("amazon_oauth_connected", seller_id=selling_partner_id)
 
     return {"status": "connected", "marketplace": "amazon", "seller_id": selling_partner_id}
@@ -232,24 +264,14 @@ async def handle_allegro_callback(
     data = resp.json()
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 43200))
 
-    conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == user_id,
-        OAuthConnection.marketplace == "allegro",
-    ).first()
-
-    if not conn:
-        conn = OAuthConnection(user_id=user_id, marketplace="allegro")
-        db.add(conn)
-
-    conn.status = "active"
-    conn.access_token = data.get("access_token")
-    conn.refresh_token = data.get("refresh_token")
-    conn.token_expires_at = expires_at
-    conn.scopes = data.get("scope")
-    conn.raw_data = {"token_type": data.get("token_type"), "allegro_api": data.get("allegro_api")}
-    conn.updated_at = datetime.now(timezone.utc)
-
-    db.commit()
+    _save_connection(
+        db, user_id, "allegro",
+        access_token=data.get("access_token"),
+        refresh_token=data.get("refresh_token"),
+        expires_at=expires_at,
+        scopes=data.get("scope"),
+        raw_data={"token_type": data.get("token_type"), "allegro_api": data.get("allegro_api")},
+    )
     logger.info("allegro_oauth_connected")
 
     return {"status": "connected", "marketplace": "allegro"}
@@ -329,24 +351,14 @@ async def handle_ebay_callback(
     data = resp.json()
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 7200))
 
-    conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == user_id,
-        OAuthConnection.marketplace == "ebay",
-    ).first()
-
-    if not conn:
-        conn = OAuthConnection(user_id=user_id, marketplace="ebay")
-        db.add(conn)
-
-    conn.status = "active"
-    conn.access_token = data.get("access_token")
-    conn.refresh_token = data.get("refresh_token")
-    conn.token_expires_at = expires_at
-    conn.scopes = EBAY_SCOPES
-    conn.raw_data = {"token_type": data.get("token_type")}
-    conn.updated_at = datetime.now(timezone.utc)
-
-    db.commit()
+    _save_connection(
+        db, user_id, "ebay",
+        access_token=data.get("access_token"),
+        refresh_token=data.get("refresh_token"),
+        expires_at=expires_at,
+        scopes=EBAY_SCOPES,
+        raw_data={"token_type": data.get("token_type")},
+    )
     logger.info("ebay_oauth_connected")
 
     return {"status": "connected", "marketplace": "ebay"}
@@ -366,23 +378,13 @@ async def connect_bol(client_id: str, client_secret: str, db: Session, user_id: 
     if not result["valid"]:
         return {"error": result["error"]}
 
-    conn = db.query(OAuthConnection).filter(
-        OAuthConnection.user_id == user_id,
-        OAuthConnection.marketplace == "bol",
-    ).first()
-
-    if not conn:
-        conn = OAuthConnection(user_id=user_id, marketplace="bol")
-        db.add(conn)
-
-    conn.status = "active"
-    conn.access_token = result["token"]
-    conn.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=result["expires_in"])
     # WHY raw_data: Store client_id/secret for token refresh (BOL tokens last ~5 min)
-    conn.raw_data = {"client_id": client_id, "client_secret": client_secret}
-    conn.updated_at = datetime.now(timezone.utc)
-
-    db.commit()
+    _save_connection(
+        db, user_id, "bol",
+        access_token=result["token"],
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=result["expires_in"]),
+        raw_data={"client_id": client_id, "client_secret": client_secret},
+    )
     logger.info("bol_connected", user_id=user_id)
 
     return {"status": "connected", "marketplace": "bol"}
