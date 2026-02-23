@@ -212,10 +212,17 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </div>
           ) : (
             <>
-              {/* Description (read mode) */}
+              {/* Description (read mode) — WHY: Optimizer returns HTML (<p>, <b>, <ul>), so render it */}
               <div>
                 <h3 className="text-lg font-semibold text-white mb-2">Opis</h3>
-                <p className="text-gray-300 whitespace-pre-wrap">{product.description_optimized || product.description_original || 'Brak opisu'}</p>
+                {(product.description_optimized || product.description_original || '').includes('<') ? (
+                  <div
+                    className="text-gray-300 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_li]:mb-1 [&_b]:font-semibold [&_b]:text-white"
+                    dangerouslySetInnerHTML={{ __html: product.description_optimized || product.description_original || '' }}
+                  />
+                ) : (
+                  <p className="text-gray-300 whitespace-pre-wrap">{product.description_optimized || product.description_original || 'Brak opisu'}</p>
+                )}
               </div>
               {/* Bullet Points */}
               {Array.isArray(product.attributes?.bullet_points) && (product.attributes.bullet_points as string[]).length > 0 && (
