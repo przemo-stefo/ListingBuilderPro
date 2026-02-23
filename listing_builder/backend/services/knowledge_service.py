@@ -14,16 +14,27 @@ from services.search_strategies import lexical_search, vector_search, hybrid_mer
 
 logger = structlog.get_logger()
 
-# WHY: Map prompt types to relevant transcript categories.
-# Expanded to include copywriting + marketing_psychology — 49K chunks from 21 courses.
+# WHY: Primary categories = high-signal marketplace knowledge (listing, keyword, ranking, ppc).
+# Copywriting (25K chunks) excluded from primary — too generic, drowns real marketplace advice.
+# Secondary categories used only as fallback when primary returns < 2 results.
 CATEGORY_MAP = {
-    "title": ["listing_optimization", "keyword_research", "ranking", "copywriting"],
-    "bullets": ["listing_optimization", "conversion_optimization", "keyword_research", "copywriting", "marketing_psychology"],
-    "description": ["listing_optimization", "conversion_optimization", "copywriting", "marketing_psychology", "market_research"],
+    "title": {
+        "primary": ["listing_optimization", "keyword_research", "ranking"],
+        "fallback": ["copywriting", "ppc"],
+    },
+    "bullets": {
+        "primary": ["listing_optimization", "conversion_optimization", "keyword_research"],
+        "fallback": ["copywriting", "marketing_psychology"],
+    },
+    "description": {
+        "primary": ["listing_optimization", "conversion_optimization", "market_research"],
+        "fallback": ["copywriting", "marketing_psychology"],
+    },
 }
 
 MAX_CONTEXT_CHARS = 3000
-ALL_CATEGORIES = list({c for cats in CATEGORY_MAP.values() for c in cats})
+# WHY: Only primary categories for the batch search — keeps results focused
+ALL_PRIMARY = list({c for cats in CATEGORY_MAP.values() for c in cats["primary"]})
 
 
 async def _get_search_rows(
@@ -106,29 +117,40 @@ def _format_chunks_with_sources(
 async def search_knowledge_batch(
     db: Session, query: str, max_chunks_per_type: int = 5,
 ) -> dict[str, str]:
-    """Fetch expert context for all prompt types in a single search pass.
+    """Fetch expert context per prompt type with primary/fallback category strategy.
 
-    Returns {"title": "...", "bullets": "...", "description": "..."}.
+    WHY: Searching per prompt_type separately prevents copywriting (25K chunks)
+    from drowning out high-signal marketplace categories (listing_optimization, ranking).
+    Fallback to copywriting only when primary categories return < 2 results.
     """
     try:
         search_query = await _expand_query(query)
         query_embedding = await _get_embedding_if_needed(search_query)
-        limit = max_chunks_per_type * 3
-
-        rows = await _get_search_rows(db, search_query, ALL_CATEGORIES, limit, query_embedding)
-        if not rows:
-            rows = await _get_search_rows(db, search_query, None, limit, query_embedding)
+        min_primary_results = 2
 
         result = {}
-        for prompt_type, categories in CATEGORY_MAP.items():
-            cat_set = set(categories)
-            matched = [r for r in rows if r[3] in cat_set] or list(rows)
-            result[prompt_type] = _format_chunks(matched[:max_chunks_per_type])
+        total_fetched = 0
+        for prompt_type, cat_config in CATEGORY_MAP.items():
+            rows = await _get_search_rows(
+                db, search_query, cat_config["primary"],
+                max_chunks_per_type, query_embedding,
+            )
+
+            # WHY: If primary categories return too few results, add fallback (copywriting etc.)
+            if len(rows) < min_primary_results and cat_config["fallback"]:
+                fallback_rows = await _get_search_rows(
+                    db, search_query, cat_config["fallback"],
+                    max_chunks_per_type - len(rows), query_embedding,
+                )
+                rows = rows + fallback_rows
+
+            total_fetched += len(rows)
+            result[prompt_type] = _format_chunks(rows[:max_chunks_per_type])
 
         hit_count = sum(1 for v in result.values() if v)
         if hit_count:
             logger.info("knowledge_batch_hit", mode=settings.rag_mode,
-                        chunks_fetched=len(rows), types_with_context=hit_count,
+                        chunks_fetched=total_fetched, types_with_context=hit_count,
                         query_preview=query[:60])
 
         return result
@@ -140,25 +162,32 @@ async def search_knowledge_batch(
 async def search_knowledge(
     db: Session, query: str, prompt_type: str, max_chunks: int = 5,
 ) -> str:
-    """Search knowledge chunks with hybrid/lexical/semantic based on rag_mode.
+    """Search knowledge chunks with primary/fallback category strategy.
 
     WHY: This must never crash the optimizer — expert context is a bonus, not required.
     """
     try:
-        categories = CATEGORY_MAP.get(prompt_type, ["general"])
+        cat_config = CATEGORY_MAP.get(prompt_type)
+        primary = cat_config["primary"] if cat_config else ["listing_optimization"]
+        fallback = cat_config["fallback"] if cat_config else ["copywriting"]
+
         search_query = await _expand_query(query)
         query_embedding = await _get_embedding_if_needed(search_query)
 
-        rows = await _get_search_rows(db, search_query, categories, max_chunks, query_embedding)
-        if not rows:
-            rows = await _get_search_rows(db, search_query, None, max_chunks, query_embedding)
+        rows = await _get_search_rows(db, search_query, primary, max_chunks, query_embedding)
+
+        # WHY: If primary categories return too few, add fallback (copywriting etc.)
+        if len(rows) < 2 and fallback:
+            fallback_rows = await _get_search_rows(
+                db, search_query, fallback, max_chunks - len(rows), query_embedding,
+            )
+            rows = rows + fallback_rows
 
         # WHY: Expanded query can be too verbose for plainto_tsquery (requires ALL terms).
-        # Fallback to original user query — same pattern as search_all_categories().
         if not rows and search_query != query:
             logger.info("search_fallback_to_original", expanded=search_query[:60])
             query_embedding = await _get_embedding_if_needed(query)
-            rows = await _get_search_rows(db, query, None, max_chunks, query_embedding)
+            rows = await _get_search_rows(db, query, primary, max_chunks, query_embedding)
 
         if not rows:
             return ""
