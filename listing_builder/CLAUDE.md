@@ -7,7 +7,7 @@
 - **Frontend:** Next.js 14 + TypeScript + Tailwind (Vercel)
 - **Backend:** FastAPI + Groq LLM + Supabase PostgreSQL (grzegorz152 Docker, Cloudflare Tunnel)
 - **Proxy:** Frontend `/api/proxy/[...path]` → injects `X-API-Key` server-side → backend
-- **Auth:** `APIKeyMiddleware` in `middleware/auth.py` — checks ALL requests except PUBLIC_PATHS
+- **Auth:** JWT (Supabase ES256 JWKS + HS256 fallback) → `middleware/supabase_auth.py`, API key fallback → `middleware/auth.py`
 - **LLM:** Groq `llama-3.3-70b-versatile` (default), 6 API keys for rotation on 429
 
 ## URLs
@@ -17,7 +17,7 @@
 | Frontend (prod) | https://panel.octohelper.com |
 | Backend (prod) | https://api-lbp.feedmasters.org |
 | Frontend (alt) | https://listing-builder-pro.vercel.app |
-| Backend (legacy) | https://listingbuilderpro.onrender.com (Render, may be decommissioned) |
+| Backend (Render) | SUSPENDED + auto-deploy OFF — nie używać |
 | Health check | `GET /health` |
 
 ## Deploy
@@ -29,8 +29,8 @@ cd listing_builder/frontend && npx vercel --prod
 # Backend (grzegorz152) — Docker + Cloudflare Tunnel
 cd listing_builder/deploy/grzegorz152 && bash deploy.sh
 
-# Backend (Render) — LEGACY, do not use for new deploys
-# Render auto-deploy still active on push to main — disable when ready
+# Render — SUSPENDED + auto-deploy OFF (2026-02-23)
+# To resume: Render Dashboard → Resume Service → Enable auto-deploy
 ```
 
 ## Key Patterns
@@ -51,9 +51,9 @@ NEVER use `:param::jsonb` — SQLAlchemy misparses it. Use `CAST(:param AS jsonb
 ### Models
 All UUID columns: `PG_UUID(as_uuid=False)` — NOT `String(36)`.
 
-### Render Env Vars
-ALWAYS use `PUT /v1/services/{id}/env-vars` (replaces entire set), NOT `POST` (adds one).
-Dashboard edits can wipe API-set vars. Full list: 19 vars (see MEMORY.md).
+### Render (SUSPENDED)
+Service `srv-d644kr0gjchc739fjdq0` — suspended + auto-deploy OFF since 2026-02-23.
+If resuming: `PUT /v1/services/{id}/env-vars` replaces ALL vars (never POST). Verify count after PUT.
 
 ### Supabase Migrations
 Use Management API: `POST https://api.supabase.com/v1/projects/{ref}/database/query`
