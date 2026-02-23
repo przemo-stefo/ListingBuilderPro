@@ -3,8 +3,8 @@
 // NOT for: Direct API calls (those are in lib/api/products.ts)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listProducts, getProduct, deleteProduct, getDashboardStats } from '../api/products'
-import type { ProductFilters } from '../types'
+import { listProducts, getProduct, deleteProduct, updateProduct, getDashboardStats } from '../api/products'
+import type { Product, ProductFilters } from '../types'
 import { useToast } from './useToast'
 
 // Hook to list products with filters
@@ -49,6 +49,24 @@ export function useDeleteProduct() {
         description: error.message,
         variant: 'destructive',
       })
+    },
+  })
+}
+
+// WHY: Hook for editing product from detail page — invalidates both list and single product
+export function useUpdateProduct() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Product> }) => updateProduct(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['product', id] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast({ title: 'Zapisano', description: 'Produkt zostal zaktualizowany.' })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Blad zapisu', description: error.message, variant: 'destructive' })
     },
   })
 }

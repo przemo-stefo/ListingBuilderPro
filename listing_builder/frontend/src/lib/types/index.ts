@@ -944,6 +944,20 @@ export interface AudienceResearchResponse {
   cost: string
 }
 
+// Listing Score types (used by /listing-score page and auto-score in optimizer)
+export interface DimensionScore {
+  name: string
+  score: number
+  explanation: string
+  tip: string
+}
+
+export interface ScoreResult {
+  overall_score: number
+  dimensions: DimensionScore[]
+  sources_used: number
+}
+
 // Error types
 export interface ApiError {
   message: string

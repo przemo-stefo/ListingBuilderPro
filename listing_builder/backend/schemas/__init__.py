@@ -8,6 +8,7 @@ from .product import (
     ProductResponse,
     ProductList,
     ProductStatusEnum,
+    ProductUpdate,
 )
 from .jobs import (
     ImportJobResponse,
@@ -72,6 +73,7 @@ __all__ = [
     "ProductResponse",
     "ProductList",
     "ProductStatusEnum",
+    "ProductUpdate",
     "ImportJobResponse",
     "BulkJobCreate",
     "BulkJobResponse",

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Product, ProductStatus
-from schemas import ProductResponse, ProductList, DashboardStatsResponse
+from schemas import ProductResponse, ProductList, DashboardStatsResponse, ProductUpdate
 from typing import Optional
 import structlog
 
@@ -95,6 +95,27 @@ async def get_product(product_id: int, db: Session = Depends(get_db)):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    return product
+
+
+@router.put("/{product_id}", response_model=ProductResponse)
+async def update_product(
+    product_id: int,
+    payload: ProductUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update product fields — only provided (non-null) fields are changed."""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # WHY: exclude_unset so only explicitly provided fields are updated
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(product, field, value)
+
+    db.commit()
+    db.refresh(product)
+    logger.info("product_updated", product_id=product_id)
     return product
 
 

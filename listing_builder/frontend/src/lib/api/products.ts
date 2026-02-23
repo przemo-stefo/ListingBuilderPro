@@ -62,6 +62,13 @@ export async function deleteProduct(id: string): Promise<void> {
   }
 }
 
+// Update product fields
+export async function updateProduct(id: string, data: Partial<Product>): Promise<Product> {
+  const response = await apiRequest<Product>('put', `/products/${id}`, data)
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
 // Get dashboard stats
 export async function getDashboardStats(): Promise<DashboardStats> {
   const response = await apiRequest<DashboardStats>(

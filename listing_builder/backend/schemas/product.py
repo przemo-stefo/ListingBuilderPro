@@ -80,6 +80,19 @@ class ProductResponse(BaseModel):
         from_attributes = True  # Enable ORM mode
 
 
+class ProductUpdate(BaseModel):
+    """Schema for updating product fields — only provided fields are changed"""
+    title_original: Optional[str] = None
+    title_optimized: Optional[str] = None
+    description_original: Optional[str] = None
+    description_optimized: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    price: Optional[float] = None
+    attributes: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+
+
 class ProductList(BaseModel):
     """Paginated list of products"""
     items: List[ProductResponse]

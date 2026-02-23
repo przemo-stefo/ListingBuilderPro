@@ -23,6 +23,8 @@ function OptimizeContent() {
   const searchParams = useSearchParams()
   // WHY: Allegro Manager "Optymalizuj z AI" passes ?prefill=title
   const prefillTitle = searchParams.get('prefill') ?? undefined
+  // WHY: When coming from product detail page, we pass product_id so optimizer can save back
+  const productId = searchParams.get('product_id') ?? undefined
   const [activeTab, setActiveTab] = useState<Tab>('single')
   // WHY: When user clicks "Load" in History, we switch to Single and pass the result
   const [loadedResult, setLoadedResult] = useState<OptimizerResponse | null>(null)
@@ -100,7 +102,7 @@ function OptimizeContent() {
       </div>
 
       {/* Active tab content */}
-      {activeTab === 'single' && <SingleTab loadedResult={loadedResult} initialTitle={prefillTitle} />}
+      {activeTab === 'single' && <SingleTab loadedResult={loadedResult} initialTitle={prefillTitle} productId={productId} />}
       {activeTab === 'batch' && <BatchTab />}
       {activeTab === 'history' && isPremium && <HistoryTab onLoadResult={handleLoadFromHistory} />}
 

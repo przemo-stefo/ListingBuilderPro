@@ -15,6 +15,7 @@ import {
   Hash,
   Zap,
   Target,
+  Database,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,7 +34,9 @@ import { KeywordIntelCard } from './KeywordIntelCard'
 import AudienceResearchCard from './AudienceResearchCard'
 import { PPCRecommendationsCard } from './PPCRecommendationsCard'
 import { useSettings } from '@/lib/hooks/useSettings'
-import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider } from '@/lib/types'
+import { useUpdateProduct } from '@/lib/hooks/useProducts'
+import { ListingScoreCard } from './ListingScoreCard'
+import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider, ScoreResult } from '@/lib/types'
 
 // WHY: Same provider list as settings — keeps UI consistent
 const LLM_PROVIDERS: { id: LLMProvider; label: string; hint: string }[] = [
@@ -56,9 +59,11 @@ interface SingleTabProps {
   loadedResult?: OptimizerResponse | null
   // WHY: Allegro Manager passes ?prefill=title to pre-populate the form
   initialTitle?: string
+  // WHY: When coming from product detail page, we can save optimized listing back to the product
+  productId?: string
 }
 
-export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps) {
+export default function SingleTab({ loadedResult, initialTitle, productId }: SingleTabProps) {
   // Form state — WHY initialTitle: prefill from Allegro Manager's "Optymalizuj z AI" button
   const [productTitle, setProductTitle] = useState(initialTitle ?? '')
   const [brand, setBrand] = useState('')
@@ -81,6 +86,10 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
   const displayResults = loadedResult ?? results
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
+  // WHY: Auto-score state — fires after optimization completes
+  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null)
+  const [scoreLoading, setScoreLoading] = useState(false)
+
   // WHY: Audience research result feeds into optimizer as LLM context
   const [audienceContext, setAudienceContext] = useState('')
 
@@ -99,8 +108,76 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
   ) ?? false
   const { toast } = useToast()
 
-  // Hook
+  // Hooks
   const generateMutation = useGenerateListing()
+  const saveToProductMutation = useUpdateProduct()
+  const [savedToProduct, setSavedToProduct] = useState(false)
+
+  // WHY: Score API expects plain text, but optimizer returns HTML description
+  const stripHtml = (html: string): string =>
+    html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+
+  // WHY: Auto-trigger listing score after optimization to close the feedback loop
+  const triggerScore = async (listing: OptimizerResponse['listing']) => {
+    setScoreLoading(true)
+    setScoreResult(null)
+    try {
+      const res = await fetch('/api/proxy/score/listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: listing.title,
+          bullets: listing.bullet_points,
+          description: stripHtml(listing.description),
+        }),
+      })
+      if (res.ok) {
+        const data: ScoreResult = await res.json()
+        setScoreResult(data)
+      }
+    } catch {
+      // WHY: Score is non-critical — don't break the flow if it fails
+    } finally {
+      setScoreLoading(false)
+    }
+  }
+
+  // WHY: "Popraw" button — re-generates with improvement hints from low-scoring dimensions
+  const handleImprove = () => {
+    if (!scoreResult) return
+    const tips = scoreResult.dimensions
+      .filter((d) => d.score < 7)
+      .map((d) => `${d.name}: ${d.tip}`)
+      .join('\n')
+    // WHY: Inject tips into audience_context so LLM uses them as improvement guidance
+    setAudienceContext((prev) => {
+      const prefix = prev ? prev + '\n\n' : ''
+      return prefix + '--- IMPROVEMENT HINTS ---\n' + tips
+    })
+    // WHY: Small delay to ensure state updates before re-trigger
+    setTimeout(() => handleGenerate(), 50)
+  }
+
+  // WHY: Bridge between Optimizer and Product Database — saves optimized listing back to the product
+  const handleSaveToProduct = () => {
+    if (!productId || !displayResults?.listing) return
+    const { title, bullet_points, description, backend_keywords } = displayResults.listing
+    saveToProductMutation.mutate(
+      {
+        id: productId,
+        data: {
+          title_optimized: title,
+          description_optimized: description,
+          attributes: {
+            bullet_points,
+            seo_keywords: backend_keywords ? backend_keywords.split(',').map((k: string) => k.trim()) : [],
+          },
+          status: 'optimized' as const,
+        },
+      },
+      { onSuccess: () => setSavedToProduct(true) },
+    )
+  }
 
   // WHY: Parse keywords from textarea — supports CSV (phrase,volume) and plain text (one per line)
   const parseKeywords = (): OptimizerKeyword[] => {
@@ -159,6 +236,9 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
       onSuccess: (data) => {
         setResults(data)
         incrementUsage()
+        setSavedToProduct(false)
+        // WHY: Auto-score the generated listing to show quality feedback
+        if (data.listing) triggerScore(data.listing)
         // WHY: Warn user when their chosen provider failed and Groq was used instead
         if (data.llm_fallback_from) {
           const providerLabel = LLM_PROVIDERS.find((p) => p.id === data.llm_fallback_from)?.label || data.llm_fallback_from
@@ -478,6 +558,18 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
               optimizationSource={displayResults.optimization_source}
             />
           )}
+          {/* WHY: Auto-score card — shows listing quality right after optimization */}
+          {scoreLoading && (
+            <Card>
+              <CardContent className="flex items-center gap-3 p-6">
+                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                <span className="text-sm text-gray-400">Oceniamy Twoj listing...</span>
+              </CardContent>
+            </Card>
+          )}
+          {scoreResult && (
+            <ListingScoreCard scoreResult={scoreResult} onImprove={handleImprove} />
+          )}
           <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} coverageBreakdown={displayResults.coverage_breakdown} llmProvider={displayResults.llm_provider} />
           <ListingCard
             listing={displayResults.listing}
@@ -492,6 +584,38 @@ export default function SingleTab({ loadedResult, initialTitle }: SingleTabProps
             <PPCRecommendationsCard ppc={displayResults.ppc_recommendations} />
           )}
           <FeedbackWidget listingHistoryId={displayResults.listing_history_id} />
+          {/* WHY: Bridge — saves optimized listing back to the product in DB */}
+          {productId && (
+            <Card>
+              <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-2">
+                  <Database className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-300">
+                    {savedToProduct
+                      ? 'Listing zapisany do produktu'
+                      : 'Zapisz zoptymalizowany listing do Bazy Produktow'}
+                  </span>
+                </div>
+                <Button
+                  onClick={handleSaveToProduct}
+                  disabled={savedToProduct || saveToProductMutation.isPending}
+                  variant={savedToProduct ? 'ghost' : 'outline'}
+                  size="sm"
+                >
+                  {saveToProductMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  ) : savedToProduct ? (
+                    '✓ Zapisano'
+                  ) : (
+                    <>
+                      <Database className="h-3.5 w-3.5 mr-1.5" />
+                      Zapisz do produktu
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
