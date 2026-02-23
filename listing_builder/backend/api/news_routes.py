@@ -6,7 +6,8 @@ import asyncio
 import json
 import re
 import time
-import xml.etree.ElementTree as ET
+# WHY: defusedxml prevents XXE attacks — malicious RSS feed could read local files via entity expansion
+from defusedxml import ElementTree as ET
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Query

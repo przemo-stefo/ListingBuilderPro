@@ -53,6 +53,9 @@ apscheduler==3.10.4
 # Payments
 stripe==8.0.0
 
+# Security
+defusedxml>=0.7.1  # WHY: Prevents XXE attacks in RSS/Atom XML parsing
+
 # Logging
 structlog==24.1.0
 PyJWT[crypto]==2.8.0  # WHY: [crypto] needed for ES256 (Supabase JWKS verification)

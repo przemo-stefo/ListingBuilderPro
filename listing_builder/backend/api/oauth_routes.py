@@ -67,7 +67,9 @@ async def amazon_authorize(request: Request, user_id: str = Depends(get_user_id)
 
 
 @router.get("/amazon/callback")
+@limiter.limit("5/minute")
 async def amazon_callback(
+    request: Request,
     spapi_oauth_code: str = "",
     state: str = "",
     selling_partner_id: str = "",
@@ -104,7 +106,9 @@ async def allegro_authorize(request: Request, user_id: str = Depends(get_user_id
 
 
 @router.get("/allegro/callback")
+@limiter.limit("5/minute")
 async def allegro_callback(
+    request: Request,
     code: str = "",
     state: str = "",
     db: Session = Depends(get_db),
@@ -136,7 +140,9 @@ async def ebay_authorize(request: Request, user_id: str = Depends(get_user_id)):
 
 
 @router.get("/ebay/callback")
+@limiter.limit("5/minute")
 async def ebay_callback(
+    request: Request,
     code: str = "",
     state: str = "",
     db: Session = Depends(get_db),
