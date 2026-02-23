@@ -5,7 +5,7 @@
 ## Architecture
 
 - **Frontend:** Next.js 14 + TypeScript + Tailwind (Vercel)
-- **Backend:** FastAPI + Groq LLM + Supabase PostgreSQL (Render, Docker)
+- **Backend:** FastAPI + Groq LLM + Supabase PostgreSQL (grzegorz152 Docker, Cloudflare Tunnel)
 - **Proxy:** Frontend `/api/proxy/[...path]` → injects `X-API-Key` server-side → backend
 - **Auth:** `APIKeyMiddleware` in `middleware/auth.py` — checks ALL requests except PUBLIC_PATHS
 - **LLM:** Groq `llama-3.3-70b-versatile` (default), 6 API keys for rotation on 429
@@ -15,9 +15,9 @@
 | What | URL |
 |------|-----|
 | Frontend (prod) | https://panel.octohelper.com |
-| Backend (prod) | https://api-listing.feedmasters.org |
+| Backend (prod) | https://api-lbp.feedmasters.org |
 | Frontend (alt) | https://listing-builder-pro.vercel.app |
-| Backend (alt) | https://listingbuilderpro.onrender.com |
+| Backend (legacy) | https://listingbuilderpro.onrender.com (Render, may be decommissioned) |
 | Health check | `GET /health` |
 
 ## Deploy
@@ -26,11 +26,11 @@
 # Frontend (Vercel) — MANUAL
 cd listing_builder/frontend && npx vercel --prod
 
-# Backend (Render) — AUTO on push to main
-git push  # triggers Render auto-deploy
-
-# Self-hosted (grzegorz152) — Docker
+# Backend (grzegorz152) — Docker + Cloudflare Tunnel
 cd listing_builder/deploy/grzegorz152 && bash deploy.sh
+
+# Backend (Render) — LEGACY, do not use for new deploys
+# Render auto-deploy still active on push to main — disable when ready
 ```
 
 ## Key Patterns

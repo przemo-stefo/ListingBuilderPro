@@ -29,8 +29,8 @@ STATE_TTL = 600  # 10 minutes
 def _sign_state(marketplace: str, user_id: str = "default") -> str:
     """Generate signed OAuth state token.
 
-    WHY stateless: Render free tier sleeps after 15 min — in-memory dict would
-    lose state between authorize and callback. HMAC-signed token encodes
+    WHY stateless: In-memory dict would lose state on container restart.
+    HMAC-signed token encodes
     marketplace + timestamp + user_id, verified on callback without any storage.
 
     WHY user_id in state: OAuth callbacks are PUBLIC_PATHS (no JWT) because
@@ -85,7 +85,7 @@ def _backend_url() -> str:
     the proxy's fetch() follows redirects, breaking the browser redirect flow.
     The backend callback is in PUBLIC_PATHS (no API key needed)."""
     if settings.app_env == "production":
-        return "https://api-listing.feedmasters.org"
+        return "https://api-lbp.feedmasters.org"
     return "http://localhost:8000"
 
 
