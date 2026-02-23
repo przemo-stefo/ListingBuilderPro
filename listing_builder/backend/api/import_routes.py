@@ -5,7 +5,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from database import get_db
 from api.dependencies import get_user_id
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
@@ -108,6 +108,89 @@ async def receive_webhook(
 
 
 VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "manual"}
+
+# WHY: Max 100 offers per import from connected account — balances speed vs API rate limits
+MAX_ALLEGRO_IMPORT = 100
+
+
+class AllegroAccountImportRequest(BaseModel):
+    """WHY: Typed request for importing from connected Allegro account."""
+    offer_ids: List[str] = Field(..., min_length=1, max_length=MAX_ALLEGRO_IMPORT)
+
+
+@router.post("/from-allegro")
+@limiter.limit("5/minute")
+async def import_from_allegro_account(
+    request: Request,
+    body: AllegroAccountImportRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+):
+    """
+    Import products from connected Allegro account by offer IDs.
+    Fetches full details via Allegro API, then imports into product database.
+    """
+    from services.allegro_api import get_access_token, fetch_offer_details
+
+    access_token = await get_access_token(db, user_id)
+    if not access_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Allegro nie jest połączone. Połącz konto w Integracje."
+        )
+
+    products = []
+    errors = []
+
+    for offer_id in body.offer_ids:
+        try:
+            data = await fetch_offer_details(offer_id, access_token)
+            if data.get("error"):
+                errors.append(f"{offer_id}: {data['error']}")
+                continue
+
+            # WHY: Convert Allegro API response to ProductImport schema
+            price = None
+            if data.get("price"):
+                try:
+                    price = float(str(data["price"]).replace(",", ".").replace(" ", ""))
+                except (ValueError, AttributeError):
+                    pass
+
+            product = ProductImport(
+                source_platform="allegro",
+                source_id=data.get("source_id", offer_id),
+                source_url=data.get("source_url", f"https://allegro.pl/oferta/{offer_id}"),
+                title=data.get("title", ""),
+                description=data.get("description", ""),
+                category=data.get("category", ""),
+                brand=data.get("brand", ""),
+                price=price,
+                currency=data.get("currency", "PLN"),
+                images=data.get("images", []),
+                attributes={
+                    "parameters": data.get("parameters", {}),
+                    "ean": data.get("ean", ""),
+                    "manufacturer": data.get("manufacturer", ""),
+                },
+            )
+            products.append(product)
+        except Exception as e:
+            errors.append(f"{offer_id}: {str(e)}")
+
+    if not products:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nie udało się pobrać żadnej oferty. Błędy: {'; '.join(errors)}"
+        )
+
+    try:
+        service = ImportService(db)
+        result = service.import_batch(products, source="allegro-account")
+        result["errors"] = errors
+        return {"status": "success", **result}
+    except Exception as e:
+        _handle_import_error(e, "allegro_account_import")
 
 
 class ScrapeRequest(BaseModel):

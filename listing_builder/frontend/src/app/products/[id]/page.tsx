@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { formatDate, getStatusColor, getStatusLabel, cn, getScoreColor } from '@/lib/utils'
 import { ArrowLeft, Sparkles, Download, Pencil, Save, X, Plus, Trash2 } from 'lucide-react'
+import ProductImageGallery from '@/components/ui/ProductImageGallery'
 import type { Product } from '@/lib/types'
 
 // WHY: Next.js 14 passes params as plain object, not Promise (that's Next.js 15+)
@@ -150,6 +151,9 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Product images gallery */}
+          {product.images?.length > 0 && <ProductImageGallery images={product.images} />}
+
           {/* Optimization Score (read-only always) */}
           {product.optimization_score != null && (
             <div>

@@ -6,20 +6,22 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, ArrowLeft, Package, Layers } from 'lucide-react'
+import { Upload, ArrowLeft, Package, Layers, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import SingleImport from './components/SingleImport'
 import BatchImport from './components/BatchImport'
+import AllegroImport from './components/AllegroImport'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const TABS = [
   { id: 'single', label: 'Pojedynczy', icon: Package, desc: 'ASIN, link lub dane ręcznie' },
   { id: 'batch', label: 'Import zbiorczy', icon: Layers, desc: 'CSV z Allegro lub wklej dane' },
+  { id: 'allegro', label: 'Z konta Allegro', icon: Store, desc: 'Wybierz oferty z połączonego konta' },
 ] as const
 
 export default function ImportPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'single' | 'batch'>('batch')
+  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'allegro'>('batch')
 
   return (
     <div className="space-y-6">
@@ -64,7 +66,7 @@ export default function ImportPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'single' ? <SingleImport /> : <BatchImport />}
+      {activeTab === 'single' ? <SingleImport /> : activeTab === 'allegro' ? <AllegroImport /> : <BatchImport />}
 
       {/* FAQ */}
       <FaqSection

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatRelativeTime, getStatusColor, getStatusLabel, truncate, cn } from '@/lib/utils'
-import { Search, Trash2, ExternalLink, Sparkles } from 'lucide-react'
+import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, Package } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const PRODUCTS_FAQ = [
@@ -116,6 +116,25 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
 
+      {/* WHY: Action bar when viewing imported products — nudge user to optimize */}
+      {!isLoading && data && filters.status === 'imported' && data.items.length > 0 && (
+        <Link
+          href="/optimize"
+          className="flex items-center justify-between rounded-lg border border-blue-800 bg-blue-900/20 p-4 hover:bg-blue-900/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-5 w-5 text-blue-400" />
+            <div>
+              <p className="text-sm font-medium text-blue-300">
+                {data.total} {data.total === 1 ? 'produkt czeka' : data.total < 5 ? 'produkty czekaja' : 'produktow czeka'} na optymalizacje
+              </p>
+              <p className="text-xs text-blue-500 mt-0.5">Kliknij aby przejsc do Optymalizatora</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-blue-400" />
+        </Link>
+      )}
+
       {/* Products List */}
       {isLoading ? (
         <div className="grid gap-4">
@@ -146,6 +165,14 @@ export default function ProductsPage() {
               <Card key={product.id} className="hover:border-gray-600 transition-colors">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between gap-4">
+                    {/* WHY: Product thumbnail — shows first image or placeholder icon */}
+                    <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-gray-800 flex items-center justify-center">
+                      {product.images?.length > 0 ? (
+                        <img src={product.images[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <Package className="h-6 w-6 text-gray-600" />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <Link
@@ -209,15 +236,52 @@ export default function ProductsPage() {
             )
           })}
 
-          {/* Pagination */}
-          {data.total_pages > (filters.page || 1) && (
-            <div className="flex justify-center">
+          {/* WHY: Numbered pagination — user sees where they are and can jump to any page */}
+          {data.total_pages > 1 && (
+            <div className="flex items-center justify-center gap-2">
               <Button
                 variant="outline"
+                size="icon"
+                disabled={(filters.page || 1) <= 1}
+                onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) - 1 }))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              {Array.from({ length: data.total_pages }, (_, i) => i + 1)
+                .filter((p) => {
+                  const current = filters.page || 1
+                  return p === 1 || p === data.total_pages || Math.abs(p - current) <= 1
+                })
+                .reduce<(number | 'dots')[]>((acc, p, i, arr) => {
+                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('dots')
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((item, i) =>
+                  item === 'dots' ? (
+                    <span key={`dots-${i}`} className="px-1 text-gray-500">...</span>
+                  ) : (
+                    <Button
+                      key={item}
+                      variant={(filters.page || 1) === item ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setFilters((prev) => ({ ...prev, page: item as number }))}
+                    >
+                      {item}
+                    </Button>
+                  )
+                )}
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={(filters.page || 1) >= data.total_pages}
                 onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
               >
-                Zaladuj wiecej
+                <ChevronRight className="h-4 w-4" />
               </Button>
+              <span className="ml-2 text-sm text-gray-500">
+                {data.total} {data.total === 1 ? 'produkt' : data.total < 5 ? 'produkty' : 'produktow'}
+              </span>
             </div>
           )}
         </div>

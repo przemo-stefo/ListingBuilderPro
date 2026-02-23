@@ -94,6 +94,23 @@ export async function importBatchProducts(
   return response.data!
 }
 
+// Import from connected Allegro account by offer IDs
+export async function importFromAllegro(
+  offerIds: string[]
+): Promise<{ success_count: number; failed_count: number; errors: string[] }> {
+  const response = await apiRequest<{ success_count: number; failed_count: number; errors: string[] }>(
+    'post',
+    '/import/from-allegro',
+    { offer_ids: offerIds }
+  )
+
+  if (response.error) {
+    throw new Error(response.error)
+  }
+
+  return response.data!
+}
+
 // Get import job status
 // WHY: Path without /api/ prefix — the proxy route.ts adds /api/ automatically
 export async function getImportJobStatus(jobId: string): Promise<ImportJobStatus> {
