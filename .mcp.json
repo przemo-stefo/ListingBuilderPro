@@ -4,11 +4,6 @@
       "command": "docker",
       "args": ["mcp", "gateway", "run"],
       "type": "stdio"
-    },
-    "google-ads": {
-      "command": "npx",
-      "args": ["-y", "@trueclicks/google-ads-mcp-js", "--token=${GAQL_TOKEN}"],
-      "type": "stdio"
     }
   }
 }

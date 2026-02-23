@@ -40,6 +40,9 @@ logs/
 *.tmp
 temp/
 
+# Test artifacts
+test-results/
+
 # Output files
 output/
 exports/
