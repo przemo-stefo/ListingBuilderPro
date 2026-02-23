@@ -133,7 +133,9 @@ export default function ProductsPage() {
           {data.items.map((product) => {
             // WHY: Backend has title_original + title_optimized, show optimized if available
             const title = product.title_optimized || product.title_original || 'Bez tytulu'
-            const description = product.description_optimized || product.description_original
+            // WHY: Description may contain HTML from optimizer — strip tags for preview
+            const rawDesc = product.description_optimized || product.description_original
+            const description = rawDesc ? rawDesc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : null
 
             return (
               <Card key={product.id} className="hover:border-gray-600 transition-colors">
@@ -176,7 +178,7 @@ export default function ProductsPage() {
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <Link href={`/optimize?prefill=${encodeURIComponent(JSON.stringify({ product_title: title, brand: product.brand || '', keywords: [] }))}`}>
+                      <Link href={`/optimize?prefill=${encodeURIComponent(title)}&product_id=${product.id}`}>
                         <Button variant="ghost" size="icon" title="Optymalizuj">
                           <Sparkles className="h-4 w-4 text-blue-400" />
                         </Button>
