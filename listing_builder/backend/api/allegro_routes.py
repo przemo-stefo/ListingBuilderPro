@@ -94,4 +94,5 @@ async def update_allegro_offer(
         raise
     except Exception as e:
         logger.error("allegro_offer_update_error", offer_id=offer_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Blad aktualizacji: {str(e)}")
+        # WHY: Generic message — str(e) could leak internal details (paths, config, stack)
+        raise HTTPException(status_code=500, detail="Błąd aktualizacji oferty Allegro")

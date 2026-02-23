@@ -48,9 +48,10 @@ async def list_products(
     # Count total
     total = query.count()
 
-    # Pagination
+    # WHY: ORDER BY is required for deterministic pagination — without it,
+    # rows can shift between pages as the DB optimizer changes row order
     offset = (page - 1) * page_size
-    products = query.offset(offset).limit(page_size).all()
+    products = query.order_by(Product.id.desc()).offset(offset).limit(page_size).all()
 
     # Calculate total pages
     total_pages = (total + page_size - 1) // page_size
