@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useProducts, useDeleteProduct } from '@/lib/hooks/useProducts'
@@ -41,10 +41,15 @@ export default function ProductsPage() {
   const { data, isLoading, error } = useProducts(filters)
   const deleteProduct = useDeleteProduct()
 
-  const handleSearch = (query: string) => {
+  // WHY: Debounce search — only hit API after 300ms of no typing
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query)
-    setFilters((prev) => ({ ...prev, search: query, page: 1 }))
-  }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: query, page: 1 }))
+    }, 300)
+  }, [])
 
   const handleStatusFilter = (status: string) => {
     setFilters((prev) => ({
