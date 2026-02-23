@@ -192,10 +192,19 @@ async def health_check():
     """
     db_status = check_db_connection()
 
-    # WHY: Don't expose environment name — load balancers only need status
+    # WHY: Marketplace config helps diagnose "why isn't X working?" without exposing secrets
+    integrations = {
+        "groq": bool(settings.groq_api_key),
+        "allegro": bool(settings.allegro_client_id),
+        "ebay": bool(settings.ebay_app_id),
+        "bol": bool(settings.bol_client_id),
+        "stripe": bool(settings.stripe_secret_key),
+    }
+
     return {
         "status": "healthy" if db_status else "unhealthy",
         "database": "connected" if db_status else "disconnected",
+        "integrations": integrations,
     }
 
 

@@ -2,6 +2,8 @@
 # Purpose: OAuth authorize/callback endpoints for marketplace connections
 # NOT for: Token refresh or business logic with marketplace APIs
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -28,6 +30,13 @@ from services.oauth_service import (
 logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/oauth", tags=["OAuth"])
+
+
+def _frontend_url() -> str:
+    """WHY helper: avoids repeating production URL check in every callback."""
+    if settings.app_env == "production":
+        return "https://panel.octohelper.com"
+    return "http://localhost:3000"
 
 
 # ── Connection status ─────────────────────────────────────────────────────────
@@ -79,13 +88,12 @@ async def amazon_callback(
 
     result = await handle_amazon_callback(spapi_oauth_code, state, selling_partner_id, db)
 
+    frontend = _frontend_url()
     if "error" in result:
         logger.error("amazon_oauth_callback_error", error=result["error"])
-        # WHY redirect: user is on the callback URL, redirect to frontend with error
-        frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
-        return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=error&msg={result['error']}")
+        # WHY quote: prevents special chars leaking to browser history / referrer
+        return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=error&msg={quote(result['error'])}")
 
-    frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=success&marketplace=amazon")
 
 
@@ -113,12 +121,11 @@ async def allegro_callback(
 
     result = await handle_allegro_callback(code, state, db)
 
+    frontend = _frontend_url()
     if "error" in result:
         logger.error("allegro_oauth_callback_error", error=result["error"])
-        frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
-        return RedirectResponse(f"{frontend}/converter?allegro=error&msg={result['error']}")
+        return RedirectResponse(f"{frontend}/converter?allegro=error&msg={quote(result['error'])}")
 
-    frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/converter?allegro=connected")
 
 
@@ -146,12 +153,11 @@ async def ebay_callback(
 
     result = await handle_ebay_callback(code, state, db)
 
+    frontend = _frontend_url()
     if "error" in result:
         logger.error("ebay_oauth_callback_error", error=result["error"])
-        frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
-        return RedirectResponse(f"{frontend}/integrations?oauth=error&msg={result['error']}")
+        return RedirectResponse(f"{frontend}/integrations?oauth=error&msg={quote(result['error'])}")
 
-    frontend = "https://panel.octohelper.com" if settings.app_env == "production" else "http://localhost:3000"
     return RedirectResponse(f"{frontend}/integrations?oauth=success&marketplace=ebay")
 
 

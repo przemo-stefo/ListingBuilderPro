@@ -55,12 +55,34 @@ class AudienceResearchResponse(BaseModel):
 
 
 def _check_research_limit(request: Request, db: Session):
-    """Free tier = 1 research/day per IP. Premium = unlimited."""
+    """Free tier = 1 research/day per IP. Premium = unlimited.
+
+    WHY per-IP: Without this, free users burn Groq quota unlimited via curl.
+    """
     license_key = request.headers.get("X-License-Key", "")
     if license_key and validate_license(license_key, db):
         return
-    # WHY: Rate limiter handles abuse for v1; per-IP daily count is future enhancement
-    pass
+
+    from datetime import date
+    from models.optimization import OptimizationRun
+
+    client_ip = get_remote_address(request)
+    # WHY: Reuse optimization_runs table — research calls are tracked there too
+    # Count research runs (marketplace='research') for today from this IP
+    today_count = (
+        db.query(OptimizationRun)
+        .filter(
+            OptimizationRun.created_at >= date.today(),
+            OptimizationRun.client_ip == client_ip,
+            OptimizationRun.marketplace == "research",
+        )
+        .count()
+    )
+    if today_count >= FREE_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Darmowy limit ({FREE_DAILY_LIMIT} badanie/dzien) wyczerpany. Wykup Premium!",
+        )
 
 
 def _call_groq_research(system_prompt: str, user_prompt: str) -> dict:
@@ -131,6 +153,25 @@ async def research_audience(
         raise HTTPException(status_code=502, detail=f"Research error: {str(e)[:200]}")
 
     logger.info("research_audience_done", product=body.product[:50], result_len=len(result["text"]))
+
+    # WHY: Track research runs for per-IP daily limit enforcement
+    try:
+        from models.optimization import OptimizationRun
+        run = OptimizationRun(
+            product_title=body.product[:200],
+            brand=skill,
+            marketplace="research",
+            mode="research",
+            coverage_pct=0,
+            compliance_status="N/A",
+            request_data={"skill": skill, "product": body.product[:200]},
+            response_data={"tokens_used": result["tokens_used"]},
+            client_ip=get_remote_address(request),
+        )
+        db.add(run)
+        db.commit()
+    except Exception as save_err:
+        logger.warning("research_history_save_failed", error=str(save_err))
 
     return AudienceResearchResponse(
         skill=skill,

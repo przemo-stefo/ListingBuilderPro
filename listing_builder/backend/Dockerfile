@@ -1,5 +1,5 @@
 # listing_builder/backend/Dockerfile
-# Purpose: Production image for Render deployment
+# Purpose: Production image for grzegorz152 Docker + Render
 # NOT for: Local development (use uvicorn --reload directly)
 
 FROM python:3.11-slim
@@ -19,11 +19,15 @@ RUN grep -v 'playwright' requirements.txt > requirements-prod.txt && \
 
 COPY . .
 
-# WHY: This image runs ONLY on Render production. Default to production
-# so OAuth redirect URLs point to real domains, not localhost.
+# WHY: Non-root user — limits damage if container is compromised
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+# WHY: Production default so OAuth redirects point to real domains
 ENV APP_ENV=production
 
 EXPOSE ${PORT:-8000}
 
-# WHY: Render sets $PORT at runtime
+# WHY: $PORT set at runtime by Render / docker-compose
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

@@ -12,9 +12,13 @@ import structlog
 
 logger = structlog.get_logger()
 
-# SQLAlchemy setup for direct PostgreSQL access
+# WHY: Supabase requires SSL — enforce even if DATABASE_URL omits sslmode
+_db_url = settings.database_url
+if "sslmode" not in _db_url and settings.app_env == "production":
+    _db_url += "?sslmode=require" if "?" not in _db_url else "&sslmode=require"
+
 engine = create_engine(
-    settings.database_url,
+    _db_url,
     pool_pre_ping=True,  # Verify connections before using
     pool_size=10,
     max_overflow=20,

@@ -2,15 +2,21 @@
 # Purpose: Keepa API endpoints — product lookup, batch, Buy Box, token status
 # NOT for: Direct Amazon SP-API calls or stored monitoring data (use monitoring_routes)
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from typing import Optional
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from services.keepa_service import get_product, get_products_batch, get_buybox_history, check_tokens_left
 
+# WHY: Keepa API costs tokens ($) — rate limit prevents quota burn
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/keepa", tags=["Keepa"])
 
 
 @router.get("/product")
+@limiter.limit("10/minute")
 async def lookup_product(
+    request: Request,
     asin: str = Query(..., description="Amazon ASIN to look up"),
     domain: str = Query("amazon.de", description="Amazon domain (e.g. amazon.de, amazon.com)"),
 ):
@@ -22,7 +28,9 @@ async def lookup_product(
 
 
 @router.get("/products")
+@limiter.limit("3/minute")
 async def lookup_products_batch(
+    request: Request,
     asins: str = Query(..., description="Comma-separated ASINs (max 100)"),
     domain: str = Query("amazon.de", description="Amazon domain"),
 ):
@@ -38,7 +46,9 @@ async def lookup_products_batch(
 
 
 @router.get("/buybox")
+@limiter.limit("10/minute")
 async def lookup_buybox(
+    request: Request,
     asin: str = Query(..., description="Amazon ASIN"),
     domain: str = Query("amazon.de", description="Amazon domain"),
 ):

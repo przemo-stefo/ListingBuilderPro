@@ -58,7 +58,9 @@ def verify_webhook_secret(x_webhook_secret: Optional[str] = Header(None)):
 
 
 @router.post("/webhook", dependencies=[Depends(verify_webhook_secret)])
+@limiter.limit("10/minute")
 async def receive_webhook(
+    request: Request,
     payload: WebhookPayload,
     db: Session = Depends(get_db)
 ):

@@ -44,10 +44,13 @@ const ALLOWED_PATH_PREFIXES = [
   'score',
 ]
 
-// WHY: Block destructive methods on sensitive endpoints from unauthenticated proxy access
+// WHY: Block destructive methods on sensitive endpoints — defense in depth
 const BLOCKED_METHODS: Record<string, string[]> = {
-  'import/webhook': ['DELETE'],
+  'import/webhook': ['DELETE', 'PUT', 'PATCH'],
   'settings': ['DELETE'],
+  'admin': ['DELETE', 'PUT', 'PATCH'],
+  'oauth': ['PUT', 'PATCH'],
+  'stripe/webhook': ['DELETE', 'PUT', 'PATCH'],
 }
 
 async function proxyRequest(request: NextRequest, params: { path: string[] }) {
