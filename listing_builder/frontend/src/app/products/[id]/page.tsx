@@ -11,8 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { formatDate, getStatusColor, cn, getScoreColor } from '@/lib/utils'
-import { ArrowLeft, Sparkles, Send, Pencil, Save, X, Plus, Trash2 } from 'lucide-react'
+import { formatDate, getStatusColor, getStatusLabel, cn, getScoreColor } from '@/lib/utils'
+import { ArrowLeft, Sparkles, Download, Pencil, Save, X, Plus, Trash2 } from 'lucide-react'
 import type { Product } from '@/lib/types'
 
 // WHY: Next.js 14 passes params as plain object, not Promise (that's Next.js 15+)
@@ -56,6 +56,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const addBullet = () => setForm({ ...form, attributes: { ...form.attributes, bullet_points: [...bullets, ''] } })
   const removeBullet = (idx: number) => {
     setForm({ ...form, attributes: { ...form.attributes, bullet_points: bullets.filter((_, i) => i !== idx) } })
+  }
+
+  // WHY: Export this specific product as CSV — no need to go to /publish page
+  const handleExportCSV = () => {
+    if (!product) return
+    const bullets = (product.attributes?.bullet_points as string[]) || []
+    const rows = [
+      ['Field', 'Value'],
+      ['Title', product.title_optimized || product.title_original],
+      ['Brand', product.brand || ''],
+      ['Category', product.category || ''],
+      ['Price', product.price?.toString() || ''],
+      ['Description', product.description_optimized || product.description_original || ''],
+      ...bullets.map((b, i) => [`Bullet ${i + 1}`, b]),
+      ['Backend Keywords', ((product.attributes?.seo_keywords as string[]) || []).join(', ')],
+    ]
+    const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `product-${product.id}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // WHY: Pass both title (prefill) and product_id so optimizer can save back to this product
@@ -105,7 +129,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             <>
               <Button variant="outline" onClick={startEditing}><Pencil className="h-4 w-4 mr-1" />Edytuj</Button>
               <Button variant="outline" onClick={handleOptimize}><Sparkles className="h-4 w-4 mr-1" />Optymalizuj</Button>
-              <Button onClick={() => router.push('/publish')}><Send className="h-4 w-4 mr-1" />Eksportuj</Button>
+              <Button onClick={handleExportCSV}><Download className="h-4 w-4 mr-1" />Eksportuj CSV</Button>
             </>
           )}
         </div>
@@ -122,7 +146,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 {product.category && <span>Kategoria: {product.category}</span>}
               </div>
             </div>
-            <Badge className={cn('text-sm', getStatusColor(product.status))}>{product.status}</Badge>
+            <Badge className={cn('text-sm', getStatusColor(product.status))}>{getStatusLabel(product.status)}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

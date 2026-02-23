@@ -5,6 +5,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useProducts, useDeleteProduct } from '@/lib/hooks/useProducts'
 import { ProductFilters } from '@/lib/types'
@@ -12,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { formatRelativeTime, getStatusColor, truncate, cn } from '@/lib/utils'
+import { formatRelativeTime, getStatusColor, getStatusLabel, truncate, cn } from '@/lib/utils'
 import { Search, Trash2, ExternalLink, Sparkles } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
@@ -24,11 +25,16 @@ const PRODUCTS_FAQ = [
 ]
 
 export default function ProductsPage() {
+  // WHY: Read ?status= from URL so dashboard "Do optymalizacji" link pre-filters the list
+  const searchParams = useSearchParams()
+  const initialStatus = searchParams.get('status') as ProductFilters['status'] | null
+
   const [filters, setFilters] = useState<ProductFilters>({
     page: 1,
     page_size: 20,
     sort_by: 'created_at',
     sort_order: 'desc',
+    status: initialStatus || undefined,
   })
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -56,10 +62,10 @@ export default function ProductsPage() {
 
   const statusFilters = [
     { label: 'Wszystkie', value: 'all' },
-    { label: 'Imported', value: 'imported' },
-    { label: 'Optimized', value: 'optimized' },
-    { label: 'Published', value: 'published' },
-    { label: 'Failed', value: 'failed' },
+    { label: 'Zaimportowane', value: 'imported' },
+    { label: 'Zoptymalizowane', value: 'optimized' },
+    { label: 'Wyeksportowane', value: 'published' },
+    { label: 'Bledy', value: 'failed' },
   ]
 
   return (
@@ -142,7 +148,7 @@ export default function ProductsPage() {
                           {truncate(title, 80)}
                         </Link>
                         <Badge className={cn('text-xs', getStatusColor(product.status))}>
-                          {product.status}
+                          {getStatusLabel(product.status)}
                         </Badge>
                       </div>
 

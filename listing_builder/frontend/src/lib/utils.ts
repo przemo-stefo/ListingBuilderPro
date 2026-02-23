@@ -61,16 +61,32 @@ export function formatPrice(price: number, currency: string = 'USD'): string {
 // Get status color class
 export function getStatusColor(status: string): string {
   switch (status) {
-    case 'pending':
+    case 'imported':
       return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+    case 'optimizing':
+      return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
     case 'optimized':
-      return 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-    case 'published':
       return 'bg-green-500/10 text-green-500 border-green-500/20'
+    case 'published':
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    case 'failed':
     case 'error':
       return 'bg-red-500/10 text-red-500 border-red-500/20'
     default:
       return 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+  }
+}
+
+// WHY: Polish labels for product status — user sees "Zaimportowany" instead of "imported"
+export function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'imported': return 'Zaimportowany'
+    case 'optimizing': return 'Optymalizacja...'
+    case 'optimized': return 'Zoptymalizowany'
+    case 'publishing': return 'Eksportowanie...'
+    case 'published': return 'Wyeksportowany'
+    case 'failed': return 'Blad'
+    default: return status
   }
 }
 

@@ -79,47 +79,55 @@ export default function DashboardPage() {
     )
   }
 
-  // WHY: Removed "Opublikowane" and "Ostatnie publikacje" — Publish page hidden in MVP
+  const pendingCount = stats?.pending_optimization || 0
+  const optimizedCount = stats?.optimized_products || 0
+
   const statCards = [
     {
       title: 'Produkty',
       value: stats?.total_products || 0,
       icon: Package,
       description: 'Wszystkie produkty w systemie',
+      href: '/products',
     },
     {
       title: 'Do optymalizacji',
-      value: stats?.pending_optimization || 0,
+      value: pendingCount,
       icon: Clock,
-      description: 'Czekające na optymalizację AI',
-      color: 'text-yellow-500',
+      description: pendingCount > 0 ? 'Kliknij aby zoptymalizowac' : 'Brak czekajacych',
+      color: pendingCount > 0 ? 'text-yellow-500' : 'text-gray-500',
+      // WHY: Link to product list filtered by "imported" status so user sees what to optimize
+      href: '/products?status=imported',
     },
     {
       title: 'Zoptymalizowane',
-      value: stats?.optimized_products || 0,
+      value: optimizedCount,
       icon: Sparkles,
-      description: 'Przetworzone przez AI',
-      color: 'text-blue-500',
+      description: optimizedCount > 0 ? 'Gotowe do eksportu' : 'Brak zoptymalizowanych',
+      color: optimizedCount > 0 ? 'text-green-500' : 'text-gray-500',
+      href: '/products?status=optimized',
     },
     {
-      title: 'Średni wynik',
+      title: 'Sredni wynik',
       value: `${Math.round(stats?.average_optimization_score || 0)}%`,
       icon: TrendingUp,
-      description: 'Średnia ocena optymalizacji',
+      description: 'Srednia ocena optymalizacji',
       color: 'text-green-500',
     },
     {
-      title: 'Błędy',
+      title: 'Bledy',
       value: stats?.failed_products || 0,
       icon: AlertCircle,
       description: 'Produkty z problemami',
       color: 'text-red-500',
+      href: '/products?status=failed',
     },
     {
       title: 'Ostatni import',
       value: stats?.recent_imports || 0,
       icon: Package,
       description: 'Ostatnie 24 godziny',
+      href: '/products/import',
     },
   ]
 
@@ -158,8 +166,8 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat) => {
           const Icon = stat.icon
-          return (
-            <Card key={stat.title}>
+          const inner = (
+            <Card key={stat.title} className={stat.href ? 'hover:border-gray-600 transition-colors cursor-pointer' : ''}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-400">
                   {stat.title}
@@ -176,8 +184,32 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           )
+          return stat.href ? (
+            <Link key={stat.title} href={stat.href}>{inner}</Link>
+          ) : (
+            <div key={stat.title}>{inner}</div>
+          )
         })}
       </div>
+
+      {/* WHY: Action banner — tells user exactly what to do next */}
+      {pendingCount > 0 && (
+        <Link
+          href="/products?status=imported"
+          className="flex items-center justify-between rounded-lg border border-yellow-800 bg-yellow-900/20 p-4 hover:bg-yellow-900/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-5 w-5 text-yellow-500" />
+            <div>
+              <p className="text-sm font-medium text-yellow-400">
+                Masz {pendingCount} {pendingCount === 1 ? 'produkt' : pendingCount < 5 ? 'produkty' : 'produktow'} do optymalizacji
+              </p>
+              <p className="text-xs text-yellow-600 mt-0.5">Kliknij aby przejsc do listy i zoptymalizowac listingi</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-yellow-500" />
+        </Link>
+      )}
 
       {/* WHY: 4 app tiles — each links to a core workflow (Import, Products, Converter, Optimizer) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
