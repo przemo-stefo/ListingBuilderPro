@@ -32,7 +32,7 @@ export default function RecoverLicensePage() {
       })
 
       if (!res.ok) {
-        setError('Blad serwera. Sprobuj ponownie.')
+        setError('Błąd serwera. Spróbuj ponownie.')
         return
       }
 
@@ -41,10 +41,10 @@ export default function RecoverLicensePage() {
         setLicenseKey(data.license_key)
         unlockPremium(data.license_key)
       } else {
-        setError('Nie znaleziono aktywnej licencji dla tego emaila.')
+        setError('Nie znaleziono aktywnej licencji dla tego adresu email.')
       }
     } catch {
-      setError('Blad polaczenia. Sprobuj ponownie.')
+      setError('Błąd połączenia. Spróbuj ponownie.')
     } finally {
       setLoading(false)
     }
@@ -63,7 +63,7 @@ export default function RecoverLicensePage() {
       <div className="text-center space-y-2">
         <KeyRound className="h-10 w-10 text-amber-400 mx-auto" />
         <h1 className="text-2xl font-bold text-white">Odzyskaj klucz licencyjny</h1>
-        <p className="text-gray-400 text-sm">Podaj email, ktorego uzyles przy zakupie</p>
+        <p className="text-gray-400 text-sm">Podaj email, którego użyłeś przy zakupie</p>
       </div>
 
       <form onSubmit={handleRecover} className="space-y-4">
@@ -90,7 +90,7 @@ export default function RecoverLicensePage() {
 
       {licenseKey && (
         <div className="space-y-3">
-          <p className="text-green-400 text-sm text-center">Znaleziono! Klucz zostal aktywowany.</p>
+          <p className="text-green-400 text-sm text-center">Znaleziono! Klucz został aktywowany.</p>
           <div className="flex items-center gap-2 bg-[#121212] border border-gray-700 rounded-lg p-3">
             <code className="flex-1 text-sm text-amber-400 break-all">{licenseKey}</code>
             <button onClick={handleCopy} className="shrink-0 p-2 hover:bg-gray-800 rounded">
@@ -101,7 +101,7 @@ export default function RecoverLicensePage() {
             onClick={() => router.push('/dashboard')}
             className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-black hover:bg-amber-400 transition-colors"
           >
-            Przejdz do Dashboard
+            Przejdź do Dashboard
           </button>
         </div>
       )}
@@ -112,7 +112,7 @@ export default function RecoverLicensePage() {
           className="inline-flex items-center gap-1 text-gray-500 text-xs hover:text-gray-400 transition-colors"
         >
           <ArrowLeft className="h-3 w-3" />
-          Wroc na strone glowna
+          Wróć na stronę główną
         </button>
       </div>
     </div>

@@ -13,6 +13,19 @@ import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
 
 type Tab = 'login' | 'register'
 
+// WHY: Supabase returns errors in English — translate common ones to Polish
+const AUTH_ERRORS: Record<string, string> = {
+  'Invalid login credentials': 'Nieprawidłowy email lub hasło',
+  'Email not confirmed': 'Email nie został potwierdzony — sprawdź skrzynkę',
+  'User already registered': 'Konto z tym adresem email już istnieje',
+  'Password should be at least 6 characters': 'Hasło musi mieć co najmniej 6 znaków',
+  'Email rate limit exceeded': 'Zbyt wiele prób — spróbuj za chwilę',
+}
+
+function translateAuthError(msg: string): string {
+  return AUTH_ERRORS[msg] || msg
+}
+
 // WHY: useSearchParams requires Suspense boundary in Next.js 14
 export default function LoginPage() {
   return (
@@ -52,11 +65,11 @@ function LoginContent() {
     try {
       if (tab === 'login') {
         const result = await signIn(email, password)
-        if (result.error) setError(result.error)
+        if (result.error) setError(translateAuthError(result.error))
         else router.push('/dashboard')
       } else {
         const result = await signUp(email, password)
-        if (result.error) setError(result.error)
+        if (result.error) setError(translateAuthError(result.error))
         else setMessage('Sprawdź email — wysłaliśmy link do potwierdzenia konta.')
       }
     } finally {
@@ -68,7 +81,7 @@ function LoginContent() {
     if (!email) { setError('Wpisz email powyżej, a potem kliknij "Zapomniałeś hasła?"'); return }
     setError('')
     const result = await resetPassword(email)
-    if (result.error) setError(result.error)
+    if (result.error) setError(translateAuthError(result.error))
     else setMessage('Link do resetowania hasła wysłany na ' + email)
   }
 

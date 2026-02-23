@@ -75,8 +75,8 @@ function SuccessContent() {
       {status === 'polling' && (
         <>
           <Loader2 className="h-12 w-12 text-amber-400 animate-spin mx-auto" />
-          <h1 className="text-2xl font-bold text-white">Przetwarzanie platnosci...</h1>
-          <p className="text-gray-400">Czekam na potwierdzenie od Stripe. To moze zajac kilka sekund.</p>
+          <h1 className="text-2xl font-bold text-white">Przetwarzanie płatności...</h1>
+          <p className="text-gray-400">Czekam na potwierdzenie od Stripe. To może zająć kilka sekund.</p>
         </>
       )}
 
@@ -84,7 +84,7 @@ function SuccessContent() {
         <>
           <CheckCircle className="h-12 w-12 text-green-400 mx-auto" />
           <h1 className="text-2xl font-bold text-white">Premium aktywny!</h1>
-          <p className="text-gray-400">Twoj klucz licencyjny (zachowaj go!):</p>
+          <p className="text-gray-400">Twój klucz licencyjny (zachowaj go!):</p>
 
           <div className="flex items-center gap-2 bg-[#121212] border border-gray-700 rounded-lg p-3">
             <code className="flex-1 text-sm text-amber-400 break-all text-left">{licenseKey}</code>
@@ -94,14 +94,14 @@ function SuccessContent() {
           </div>
 
           <p className="text-xs text-gray-500">
-            Klucz zostal zapisany automatycznie. Mozesz go odzyskac w kazdej chwili podajac email.
+            Klucz został zapisany automatycznie. Możesz go odzyskać w każdej chwili podając email.
           </p>
 
           <button
             onClick={() => router.push('/dashboard')}
             className="w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors"
           >
-            Przejdz do Dashboard
+            Przejdź do Dashboard
           </button>
         </>
       )}
@@ -111,10 +111,10 @@ function SuccessContent() {
           <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto">
             <span className="text-2xl">!</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Cos poszlo nie tak</h1>
+          <h1 className="text-2xl font-bold text-white">Coś poszło nie tak</h1>
           <p className="text-gray-400">
-            Platnosc zostala przetworzona, ale nie udalo sie pobrac klucza.
-            Uzyj opcji odzyskiwania klucza na stronie glownej.
+            Płatność została przetworzona, ale nie udało się pobrać klucza.
+            Użyj opcji odzyskiwania klucza na stronie głównej.
           </p>
           <button
             onClick={() => router.push('/payment/recover')}

@@ -37,7 +37,7 @@ export function FooterSection() {
           <h4 className="text-xs font-semibold text-white mb-3">Firma</h4>
           <ul className="space-y-2">
             <li><a href="#faq" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">FAQ</a></li>
-            <li><Link href="/login" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Kontakt</Link></li>
+            <li><a href="mailto:kontakt@octohelper.com" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Kontakt</a></li>
           </ul>
         </div>
 
