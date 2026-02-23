@@ -7,7 +7,18 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Settings as SettingsIcon, Link as LinkIcon, Bell, Download, Save, Cpu } from 'lucide-react'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { FaqSection } from '@/components/ui/FaqSection'
+import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
+import type {
+  MarketplaceId,
+  NotificationSettings,
+  ExportFormat,
+  SyncFrequency,
+  LLMProvider,
+} from '@/lib/types'
 
 const SETTINGS_FAQ = [
   { question: 'Jak zmienić domyślny marketplace?', answer: 'W sekcji "Ustawienia ogólne" wybierz nowy marketplace z listy i kliknij "Zapisz". Wszystkie nowe optymalizacje będą domyślnie tworzone dla wybranego rynku.' },
@@ -19,17 +30,6 @@ const SETTINGS_FAQ = [
   { question: 'Czy Groq jest naprawde darmowy?', answer: 'Tak! Groq jest wliczony w cene i nie wymaga klucza API. Uzywa modelu Llama 3.3 70B Versatile — wystarczajaco dobrego do wiekszosci listingow. Platne providery (Gemini Pro, OpenAI) moga dawac lepsza jakosc tekstu.' },
   { question: 'Co sie stanie jesli moj klucz API jest nieprawidlowy?', answer: 'System automatycznie przelacza na Groq (darmowy) jesli Twoj klucz API nie zadziala. Zobaczysz wynik wygenerowany przez Groq zamiast wybranego providera. Sprawdz klucz w Ustawieniach i sprobuj ponownie.' },
 ]
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
-import type {
-  MarketplaceId,
-  NotificationSettings,
-  ExportFormat,
-  SyncFrequency,
-  LLMProvider,
-} from '@/lib/types'
 
 // WHY: Provider options for the AI Model card — Groq is free (included), others need user's key
 const LLM_PROVIDERS: { id: LLMProvider; label: string; desc: string }[] = [
@@ -122,8 +122,6 @@ export default function SettingsPage() {
     }
   }, [data])
 
-  if (isLoading) return <LoadingSkeleton />
-
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20">
@@ -134,6 +132,10 @@ export default function SettingsPage() {
       </div>
     )
   }
+
+  // WHY: isLoading alone misses the gap between SSR hydration and query start —
+  // !data catches the moment when component mounted but query hasn't returned yet
+  if (isLoading || !data) return <LoadingSkeleton />
 
   return (
     <div className="space-y-6">
