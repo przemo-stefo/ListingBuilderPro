@@ -113,3 +113,6 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
+
+// WHY: Single source of truth for DOMPurify — used in product detail + optimizer result
+export const SAFE_HTML_TAGS = ['p', 'ul', 'ol', 'li', 'b', 'strong', 'em', 'br', 'h2', 'h3']

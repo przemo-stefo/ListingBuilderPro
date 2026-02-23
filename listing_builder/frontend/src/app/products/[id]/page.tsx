@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { formatDate, getStatusColor, getStatusLabel, cn, getScoreColor } from '@/lib/utils'
+import { formatDate, getStatusColor, getStatusLabel, cn, getScoreColor, SAFE_HTML_TAGS } from '@/lib/utils'
 import { ArrowLeft, Sparkles, Download, Pencil, Save, X, Plus, Trash2 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import ProductImageGallery from '@/components/ui/ProductImageGallery'
@@ -224,7 +224,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   <div
                     className="text-gray-300 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_li]:mb-1 [&_b]:font-semibold [&_b]:text-white"
                     // WHY: DOMPurify strips <script>, onerror, etc. — imported data could contain XSS
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description_optimized || product.description_original || '', { ALLOWED_TAGS: ['p', 'ul', 'ol', 'li', 'b', 'strong', 'em', 'br', 'h2', 'h3'] }) }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description_optimized || product.description_original || '', { ALLOWED_TAGS: SAFE_HTML_TAGS }) }}
                   />
                 ) : (
                   <p className="text-gray-300 whitespace-pre-wrap">{product.description_optimized || product.description_original || 'Brak opisu'}</p>

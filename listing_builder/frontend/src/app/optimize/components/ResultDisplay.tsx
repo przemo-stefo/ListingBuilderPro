@@ -8,7 +8,7 @@ import DOMPurify from 'dompurify'
 import { Copy, Check } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn, SAFE_HTML_TAGS } from '@/lib/utils'
 import type { OptimizerResponse, LLMProvider } from '@/lib/types'
 
 // WHY: Human-readable labels for provider badges in results
@@ -209,7 +209,7 @@ export function ListingSection({
         <div
           className="listing-html rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_b]:font-semibold [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1"
           // WHY: DOMPurify strips <script>, onerror, etc. — LLM output could contain XSS via prompt injection
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content, { ALLOWED_TAGS: ['p', 'ul', 'ol', 'li', 'b', 'strong', 'em', 'br', 'h2', 'h3'] }) }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content, { ALLOWED_TAGS: SAFE_HTML_TAGS }) }}
         />
       ) : (
         <div
