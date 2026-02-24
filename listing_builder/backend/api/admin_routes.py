@@ -1,5 +1,5 @@
 # backend/api/admin_routes.py
-# Purpose: Admin-only endpoints — cost dashboard, usage stats for Mateusz
+# Purpose: Admin-only endpoints — overview, licenses, cost dashboard for Mateusz
 # NOT for: User-facing features or settings (those are in settings_routes.py)
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -107,4 +107,119 @@ async def get_cost_dashboard(
             }
             for row in daily
         ],
+    }
+
+
+@router.get("/overview")
+async def get_admin_overview(
+    db: Session = Depends(get_db),
+    _admin: str = Depends(require_admin),
+):
+    """Dashboard overview — aggregated stats from all tables in one call.
+
+    WHY: Mateusz needs a single glance at system health without clicking through tabs.
+    """
+
+    # --- Licenses by status ---
+    lic_rows = db.execute(text(
+        "SELECT status, COUNT(*) FROM premium_licenses GROUP BY status"
+    )).fetchall()
+    lic = {row[0]: row[1] for row in lic_rows}
+    licenses = {
+        "total": sum(lic.values()),
+        "active": lic.get("active", 0),
+        "expired": lic.get("expired", 0),
+        "revoked": lic.get("revoked", 0),
+    }
+
+    # --- Products by status ---
+    prod_rows = db.execute(text(
+        "SELECT status, COUNT(*) FROM products GROUP BY status"
+    )).fetchall()
+    prod = {row[0]: row[1] for row in prod_rows}
+    products = {
+        "total": sum(prod.values()),
+        "imported": prod.get("imported", 0),
+        "optimized": prod.get("optimized", 0),
+        "published": prod.get("published", 0),
+        "failed": prod.get("failed", 0),
+    }
+
+    # --- Usage last 30 days (optimizer + research runs, unique IPs) ---
+    usage = db.execute(text("""
+        SELECT
+            COUNT(*) AS total_runs,
+            COUNT(*) FILTER (WHERE marketplace = 'research') AS research_runs,
+            COUNT(DISTINCT client_ip) AS unique_ips
+        FROM optimization_runs
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+    """)).fetchone()
+    usage_30d = {
+        "optimizer_runs": usage[0] - usage[1],
+        "research_runs": usage[1],
+        "unique_ips": usage[2],
+    }
+
+    # --- OAuth connections ---
+    oauth_rows = db.execute(text(
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE status = 'active') FROM oauth_connections"
+    )).fetchone()
+    oauth_connections = {"total": oauth_rows[0], "active": oauth_rows[1]}
+
+    # --- Alerts ---
+    alert_row = db.execute(text("""
+        SELECT
+            COUNT(*),
+            COUNT(*) FILTER (WHERE NOT acknowledged),
+            COUNT(*) FILTER (WHERE severity = 'critical' AND NOT acknowledged)
+        FROM alerts
+    """)).fetchone()
+    alerts = {
+        "total": alert_row[0],
+        "unacknowledged": alert_row[1],
+        "critical": alert_row[2],
+    }
+
+    return {
+        "licenses": licenses,
+        "products": products,
+        "usage_30d": usage_30d,
+        "oauth_connections": oauth_connections,
+        "alerts": alerts,
+    }
+
+
+@router.get("/licenses")
+async def get_admin_licenses(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _admin: str = Depends(require_admin),
+):
+    """Paginated license list for admin management.
+
+    WHY: Mateusz needs to see who has active licenses and when they expire.
+    """
+
+    total = db.execute(text("SELECT COUNT(*) FROM premium_licenses")).scalar()
+
+    rows = db.execute(text("""
+        SELECT email, status, plan_type, expires_at, created_at
+        FROM premium_licenses
+        ORDER BY created_at DESC, id
+        LIMIT :limit OFFSET :offset
+    """), {"limit": limit, "offset": offset}).fetchall()
+
+    return {
+        "items": [
+            {
+                "email": row[0],
+                "status": row[1],
+                "plan_type": row[2],
+                "expires_at": row[3].isoformat() if row[3] else None,
+                "created_at": row[4].isoformat() if row[4] else None,
+            }
+            for row in rows
+        ],
+        "total": total,
     }

@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   Sparkles,
   Brain,
+  ShoppingCart,
   Users,
   BarChart3,
   Search,
@@ -29,6 +30,8 @@ export interface NavItem {
   desc?: string
   // WHY: Expert AI gets green accent to stand out as key feature
   highlight?: boolean
+  // WHY: Beta features get amber badge in sidebar
+  beta?: boolean
 }
 
 export interface NavSection {
@@ -36,7 +39,7 @@ export interface NavSection {
   items: NavItem[]
 }
 
-// WHY: Sidebar order: Pulpit→Import→Baza Produktów→Integracje→Konwerter | Optymalizator→Eksport→Ekspert AI→Badanie rynku
+// WHY: Free tier = Import, Baza Produktów, Konwerter, Listing Score. Premium = rest.
 export const navSections: NavSection[] = [
   {
     label: 'Główne',
@@ -44,25 +47,25 @@ export const navSections: NavSection[] = [
       { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przegląd statystyk i szybkie akcje' },
       { title: 'Import', href: '/products/import', icon: Upload, desc: 'Importuj produkty z CSV lub Allegro' },
       { title: 'Baza Produktów', href: '/products', icon: Database, desc: 'Przeglądaj, filtruj i zarządzaj zaimportowanymi produktami' },
-      { title: 'Integracje', href: '/integrations', icon: Link2, desc: 'Połączenia OAuth z marketplace (Amazon, Allegro, eBay...)' },
       { title: 'Konwerter', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty Allegro na Amazon/eBay/Kaufland' },
     ],
   },
   {
     label: 'Optymalizacja AI',
     items: [
-      { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytuł, bullety, opis i słowa kluczowe backend' },
-      { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace' },
-      { title: 'Ekspert AI', href: '/expert-qa', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedaży na marketplace', highlight: true },
-      { title: 'Reklamy AI', href: '/ad-copy', icon: Megaphone, desc: '3 warianty reklam (hook, story, benefit) z wiedzy ekspertów' },
       { title: 'Listing Score', href: '/listing-score', icon: BarChart3, desc: 'Oceń listing 1-10 w 5 wymiarach copywriterskich' },
-      { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo' },
+      { title: 'Optymalizator', href: '/optimize', icon: Sparkles, desc: 'AI generuje tytuł, bullety, opis i słowa kluczowe backend', premiumOnly: true },
+      { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace', premiumOnly: true },
+      { title: 'Ekspert Amazon', href: '/expert-qa?mode=strict', icon: ShoppingCart, desc: 'Pytania o Amazon — odpowiedzi tylko z bazy wiedzy kursów', premiumOnly: true },
+      { title: 'Ekspert AI', href: '/expert-qa?mode=flexible', icon: Brain, desc: 'Zadaj pytanie ekspertowi AI o sprzedaży na marketplace', highlight: true, premiumOnly: true },
+      { title: 'Reklamy AI', href: '/ad-copy', icon: Megaphone, desc: '3 warianty reklam (hook, story, benefit) z wiedzy ekspertów', premiumOnly: true, beta: true },
+      { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo', premiumOnly: true, beta: true },
     ],
   },
   {
     label: 'Admin',
     items: [
-      { title: 'Koszty API', href: '/admin', icon: DollarSign, desc: 'Zużycie tokenów, koszty per provider, trend dzienny' },
+      { title: 'Panel Admin', href: '/admin', icon: DollarSign, desc: 'Przegląd systemu, licencje, koszty API' },
     ],
   },
 ]

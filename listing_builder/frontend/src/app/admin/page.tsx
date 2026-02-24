@@ -1,92 +1,154 @@
 // frontend/src/app/admin/page.tsx
-// Purpose: Admin cost dashboard — API usage, spend per provider, daily trend
-// NOT for: User-facing features (this is Mateusz's admin view)
+// Purpose: Admin dashboard — overview, licenses, API costs (tabbed layout)
+// NOT for: User-facing features (this is Mateusz/Bartek admin view)
 
 'use client'
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatCard } from '@/components/ui/StatCard'
 import { apiRequest } from '@/lib/api/client'
 import { useAdmin } from '@/lib/hooks/useAdmin'
-import { DollarSign, Zap, TrendingUp, BarChart3, Cpu, ShieldX } from 'lucide-react'
+import {
+  ShieldX, KeyRound, Package, Sparkles, Search,
+  Globe, AlertTriangle,
+} from 'lucide-react'
+import { CostsTab } from './components/CostsTab'
 
-interface CostDashboard {
-  period_days: number
-  totals: {
-    runs: number
-    total_tokens: number
-    prompt_tokens: number
-    completion_tokens: number
-    total_cost_usd: number
-    avg_cost_per_run_usd: number
-  }
-  by_provider: { model: string; runs: number; tokens: number; cost_usd: number }[]
-  daily: { date: string; runs: number; tokens: number; cost_usd: number }[]
+// --- Types ---
+
+interface AdminOverview {
+  licenses: { total: number; active: number; expired: number; revoked: number }
+  products: { total: number; imported: number; optimized: number; published: number; failed: number }
+  usage_30d: { optimizer_runs: number; research_runs: number; unique_ips: number }
+  oauth_connections: { total: number; active: number }
+  alerts: { total: number; unacknowledged: number; critical: number }
 }
 
-// WHY: Model name → friendly label mapping
-const MODEL_LABELS: Record<string, string> = {
-  'llama-3.3-70b-versatile': 'Groq (darmowy)',
-  'gemini-2.0-flash': 'Gemini Flash',
-  'gemini-2.5-pro-preview-06-05': 'Gemini Pro',
-  'gpt-4o-mini': 'OpenAI GPT-4o Mini',
-  'unknown': 'Nieznany',
+interface LicenseItem {
+  email: string
+  status: string
+  plan_type: string
+  expires_at: string | null
+  created_at: string | null
 }
 
-function modelLabel(model: string): string {
-  return MODEL_LABELS[model] || model
+type Tab = 'overview' | 'licenses' | 'costs'
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'overview', label: 'Przegląd' },
+  { key: 'licenses', label: 'Licencje' },
+  { key: 'costs', label: 'Koszty API' },
+]
+
+// WHY: Status → color for license badges
+const STATUS_COLORS: Record<string, string> = {
+  active: 'bg-green-500/10 text-green-400',
+  expired: 'bg-yellow-500/10 text-yellow-400',
+  revoked: 'bg-red-500/10 text-red-400',
 }
 
-// WHY: Color coding — Groq=green (free), Gemini=blue, OpenAI=orange
-function modelColor(model: string): string {
-  if (model.includes('llama')) return 'text-green-400 bg-green-500/10'
-  if (model.includes('gemini-2.0')) return 'text-blue-400 bg-blue-500/10'
-  if (model.includes('gemini-2.5')) return 'text-cyan-400 bg-cyan-500/10'
-  if (model.includes('gpt')) return 'text-orange-400 bg-orange-500/10'
-  return 'text-gray-400 bg-gray-500/10'
-}
+// --- Overview Tab ---
 
-function formatCost(usd: number): string {
-  if (usd === 0) return '$0.00'
-  if (usd < 0.01) return `$${usd.toFixed(4)}`
-  return `$${usd.toFixed(2)}`
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return n.toString()
-}
-
-export default function AdminPage() {
-  const { isAdmin, isLoading: adminLoading } = useAdmin()
-  const [days, setDays] = useState(30)
-
-  const { data, isLoading } = useQuery<CostDashboard>({
-    queryKey: ['admin-costs', days],
+function OverviewTab() {
+  const { data, isLoading } = useQuery<AdminOverview>({
+    queryKey: ['admin-overview'],
     queryFn: async () => {
-      const res = await apiRequest<CostDashboard>('get', `/admin/costs?days=${days}`)
+      const res = await apiRequest<AdminOverview>('get', '/admin/overview')
       if (res.error) throw new Error(res.error)
       return res.data!
     },
-    // WHY: Don't fire query until admin status confirmed — avoids 403 for non-admins
-    enabled: isAdmin,
   })
 
-  const periods = [
-    { label: '7 dni', value: 7 },
-    { label: '30 dni', value: 30 },
-    { label: '90 dni', value: 90 },
-    { label: 'Rok', value: 365 },
-  ]
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-12 text-gray-500">Ładowanie...</div>
+  }
 
-  // WHY: Block non-admins from seeing the page even if they navigate directly
+  if (!data) return null
+
+  return (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <StatCard icon={KeyRound} label="Aktywne licencje" value={data.licenses.active.toString()} sub={`${data.licenses.total} łącznie`} />
+      <StatCard icon={Package} label="Produkty" value={data.products.total.toString()} sub={`${data.products.optimized} zoptymalizowanych`} />
+      <StatCard icon={Sparkles} label="Optymalizacje 30d" value={data.usage_30d.optimizer_runs.toString()} sub="ostatnie 30 dni" />
+      <StatCard icon={Search} label="Research 30d" value={data.usage_30d.research_runs.toString()} sub="badania rynku" />
+      <StatCard icon={Globe} label="Unikalne IP" value={data.usage_30d.unique_ips.toString()} sub="ostatnie 30 dni" />
+      <StatCard icon={AlertTriangle} label="Alerty aktywne" value={data.alerts.unacknowledged.toString()} sub={`${data.alerts.critical} krytycznych`} />
+    </div>
+  )
+}
+
+// --- Licenses Tab ---
+
+function LicensesTab() {
+  const { data, isLoading } = useQuery<{ items: LicenseItem[]; total: number }>({
+    queryKey: ['admin-licenses'],
+    queryFn: async () => {
+      const res = await apiRequest<{ items: LicenseItem[]; total: number }>('get', '/admin/licenses?limit=50')
+      if (res.error) throw new Error(res.error)
+      return res.data!
+    },
+  })
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-12 text-gray-500">Ładowanie...</div>
+  }
+
+  if (!data || data.items.length === 0) {
+    return <p className="text-center py-12 text-gray-500">Brak licencji</p>
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Licencje ({data.total})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-800">
+                <th className="pb-2 text-left font-medium text-gray-400">Email</th>
+                <th className="pb-2 text-left font-medium text-gray-400">Status</th>
+                <th className="pb-2 text-left font-medium text-gray-400">Plan</th>
+                <th className="pb-2 text-left font-medium text-gray-400">Wygasa</th>
+                <th className="pb-2 text-left font-medium text-gray-400">Utworzono</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((lic, i) => (
+                <tr key={i} className="border-b border-gray-800/50">
+                  <td className="py-2 text-white">{lic.email}</td>
+                  <td className="py-2">
+                    <Badge className={`text-xs ${STATUS_COLORS[lic.status] || 'bg-gray-500/10 text-gray-400'}`}>
+                      {lic.status}
+                    </Badge>
+                  </td>
+                  <td className="py-2 text-gray-400">{lic.plan_type}</td>
+                  <td className="py-2 text-gray-400">{lic.expires_at ? new Date(lic.expires_at).toLocaleDateString('pl-PL') : '—'}</td>
+                  <td className="py-2 text-gray-400">{lic.created_at ? new Date(lic.created_at).toLocaleDateString('pl-PL') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// --- Main Page ---
+
+export default function AdminPage() {
+  const { isAdmin, isLoading: adminLoading } = useAdmin()
+  const [tab, setTab] = useState<Tab>('overview')
+
   if (adminLoading) {
     return <div className="flex items-center justify-center py-12 text-gray-500">Sprawdzanie uprawnień...</div>
   }
+
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-gray-500">
@@ -99,108 +161,31 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Panel Administracyjny</h1>
-          <p className="text-sm text-gray-400">Koszty API, zużycie tokenów i statystyki</p>
-        </div>
-        <div className="flex gap-1.5">
-          {periods.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setDays(p.value)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                days === p.value ? 'bg-white text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-white">Panel Administracyjny</h1>
+        <p className="text-sm text-gray-400">Przegląd systemu, licencje i koszty API</p>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-gray-500">Ładowanie danych...</div>
-      ) : data ? (
-        <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard icon={DollarSign} label="Koszt całkowity" value={formatCost(data.totals.total_cost_usd)} sub={`${days} dni`} />
-            <StatCard icon={Zap} label="Optymalizacje" value={data.totals.runs.toString()} sub={`avg ${formatCost(data.totals.avg_cost_per_run_usd)}/szt`} />
-            <StatCard icon={Cpu} label="Tokeny" value={formatTokens(data.totals.total_tokens)} sub={`${formatTokens(data.totals.prompt_tokens)} in / ${formatTokens(data.totals.completion_tokens)} out`} />
-            <StatCard icon={TrendingUp} label="Avg/dzień" value={formatCost(data.totals.total_cost_usd / Math.max(days, 1))} sub={`${Math.round(data.totals.runs / Math.max(days, 1))} runs/dzień`} />
-          </div>
+      {/* WHY: Tab bar — simple buttons, no external tab library needed */}
+      <div className="flex gap-1 border-b border-gray-800 pb-px">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t.key
+                ? 'bg-gray-800 text-white'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Koszty wg providera</CardTitle>
-              <CardDescription>Rozbicie kosztów na modele AI</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {data.by_provider.length === 0 ? (
-                <p className="text-sm text-gray-500">Brak danych w tym okresie</p>
-              ) : (
-                <div className="space-y-3">
-                  {data.by_provider.map((row) => {
-                    const pct = data.totals.runs > 0 ? (row.runs / data.totals.runs) * 100 : 0
-                    return (
-                      <div key={row.model} className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge className={`text-xs ${modelColor(row.model)}`}>{modelLabel(row.model)}</Badge>
-                            <span className="text-xs text-gray-500">{row.runs} runs · {formatTokens(row.tokens)} tokenów</span>
-                          </div>
-                          <span className="text-sm font-medium text-white">{formatCost(row.cost_usd)}</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-gray-800">
-                          <div className="h-2 rounded-full bg-white/20 transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-gray-400" />
-                <CardTitle className="text-lg">Trend dzienny</CardTitle>
-              </div>
-              <CardDescription>Zużycie API dzień po dniu</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {data.daily.length === 0 ? (
-                <p className="text-sm text-gray-500">Brak danych w tym okresie</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-800">
-                        <th className="pb-2 text-left font-medium text-gray-400">Data</th>
-                        <th className="pb-2 text-right font-medium text-gray-400">Runs</th>
-                        <th className="pb-2 text-right font-medium text-gray-400">Tokeny</th>
-                        <th className="pb-2 text-right font-medium text-gray-400">Koszt</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.daily.map((row) => (
-                        <tr key={row.date} className="border-b border-gray-800/50">
-                          <td className="py-2 text-gray-300">{row.date}</td>
-                          <td className="py-2 text-right text-white">{row.runs}</td>
-                          <td className="py-2 text-right text-gray-400">{formatTokens(row.tokens)}</td>
-                          <td className="py-2 text-right font-mono text-white">{formatCost(row.cost_usd)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      ) : null}
+      {tab === 'overview' && <OverviewTab />}
+      {tab === 'licenses' && <LicensesTab />}
+      {tab === 'costs' && <CostsTab />}
     </div>
   )
 }
