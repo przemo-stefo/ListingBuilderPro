@@ -61,8 +61,7 @@ export default function IntegrationsTab() {
     }
   }, [searchParams, toast])
 
-  // WHY: Merge tracked products (legacy) + OAuth connections for status
-  const connectedByOAuth = new Set(oauthConns.filter(c => c.status === 'active').map(c => c.marketplace))
+  // WHY: Tracked products (legacy) — used for marketplace status badges
   const connectedByTracking = new Set(tracked.map(p => p.marketplace))
 
   async function handleStoreScan() {
