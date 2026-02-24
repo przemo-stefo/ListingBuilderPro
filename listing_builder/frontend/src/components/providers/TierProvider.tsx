@@ -5,6 +5,7 @@
 'use client'
 
 import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useAuth } from '@/components/providers/AuthProvider'
 import type { TierLevel, TierContext } from '@/lib/types/tier'
 import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
 
@@ -37,6 +38,7 @@ export const TierCtx = createContext<TierContext>({
 })
 
 export function TierProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth()
   // WHY: Start as 'free' + loading=true during SSR — useEffect reads localStorage on client
   const [tier, setTier] = useState<TierLevel>('free')
   const [usageToday, setUsageToday] = useState(0)
@@ -77,6 +79,30 @@ export function TierProvider({ children }: { children: ReactNode }) {
         // WHY: Backend unavailable — trust stored key as fallback
       })
   }, [])
+
+  // WHY: Auto-recover license after login — if user has a license in DB, activate it
+  // without requiring manual key entry
+  useEffect(() => {
+    if (authLoading || !user?.email) return
+    // WHY: Skip if already premium — no need to recover
+    if (localStorage.getItem(LICENSE_KEY_STORAGE)) return
+
+    fetch('/api/proxy/stripe/recover-license', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email }),
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.found && data?.license_key) {
+          localStorage.setItem(LICENSE_KEY_STORAGE, data.license_key)
+          setLicenseKey(data.license_key)
+          setTier('premium')
+          setIsLoading(false)
+        }
+      })
+      .catch(() => {})
+  }, [authLoading, user?.email])
 
   const isPremium = tier === 'premium'
 

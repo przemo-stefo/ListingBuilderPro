@@ -36,7 +36,8 @@ import { PPCRecommendationsCard } from './PPCRecommendationsCard'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { useUpdateProduct } from '@/lib/hooks/useProducts'
 import { ListingScoreCard } from './ListingScoreCard'
-import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider, ScoreResult } from '@/lib/types'
+import { ProductPicker } from './ProductPicker'
+import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider, ScoreResult, Product } from '@/lib/types'
 
 // WHY: Same provider list as settings — keeps UI consistent
 const LLM_PROVIDERS: { id: LLMProvider; label: string; hint: string }[] = [
@@ -64,6 +65,9 @@ interface SingleTabProps {
 }
 
 export default function SingleTab({ loadedResult, initialTitle, productId }: SingleTabProps) {
+  // WHY: Track whether form was filled from product picker (vs manual input)
+  const [pickedProductTitle, setPickedProductTitle] = useState<string | undefined>()
+
   // Form state — WHY initialTitle: prefill from Allegro Manager's "Optymalizuj z AI" button
   const [productTitle, setProductTitle] = useState(initialTitle ?? '')
   const [brand, setBrand] = useState('')
@@ -203,6 +207,23 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   const keywordCount = parseKeywords().length
   const canSubmit = productTitle.length >= 3 && brand.length >= 1 && keywordCount >= 1
 
+  // WHY: Auto-fill form fields when user picks a product from the database
+  const handleProductSelect = (product: Product) => {
+    setProductTitle(product.title_original)
+    setBrand(product.brand ?? '')
+    setAsin(product.source_id ?? '')
+    setCategory(product.category ?? '')
+    setPickedProductTitle(product.title_original)
+  }
+
+  const handleProductClear = () => {
+    setProductTitle('')
+    setBrand('')
+    setAsin('')
+    setCategory('')
+    setPickedProductTitle(undefined)
+  }
+
   const handleGenerate = () => {
     // WHY: Free tier daily limit check
     if (!canOptimize()) {
@@ -262,6 +283,13 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
 
   return (
     <div className="space-y-6">
+      {/* WHY: Product picker — lets user select from imported products instead of typing manually */}
+      <ProductPicker
+        onSelect={handleProductSelect}
+        onClear={handleProductClear}
+        selectedTitle={pickedProductTitle}
+      />
+
       {/* Section 1: Product Info */}
       <Card>
         <CardHeader>

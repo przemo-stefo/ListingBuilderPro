@@ -3,8 +3,10 @@
 # NOT for: Auth verification logic (that's middleware/)
 
 from fastapi import HTTPException, Request, status
+from sqlalchemy.orm import Session
 
 from config import settings
+from services.stripe_service import validate_license
 
 
 def get_user_id(request: Request) -> str:
@@ -30,3 +32,19 @@ def require_admin(request: Request) -> str:
             detail="Admin access required",
         )
     return email
+
+
+def require_premium(request: Request, db: Session):
+    """Check if request has valid premium license. Raises 402 if not.
+
+    WHY: Premium-only endpoints (Expert Q&A, Ad Copy, Compliance, Export)
+    have no free tier — license key required for any access.
+    SECURITY: Server-side check — frontend PremiumGate is cosmetic only.
+    """
+    license_key = request.headers.get("X-License-Key", "")
+    if license_key and validate_license(license_key, db):
+        return
+    raise HTTPException(
+        status_code=402,
+        detail="Ta funkcja wymaga planu Premium. Wykup subskrypcję!",
+    )

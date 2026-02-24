@@ -9,6 +9,7 @@ from slowapi.util import get_remote_address
 from database import get_db
 from schemas import BulkJobCreate, BulkJobResponse
 from services.export_service import ExportService
+from api.dependencies import require_premium
 import structlog
 
 logger = structlog.get_logger()
@@ -37,6 +38,8 @@ async def publish_product(
     Returns:
         Publishing result
     """
+    require_premium(request, db)
+
     # WHY: Validate marketplace before passing to service — prevents unexpected behavior
     if marketplace not in ALLOWED_MARKETPLACES:
         raise HTTPException(
@@ -79,6 +82,8 @@ async def bulk_publish(
             "product_ids": [1, 2, 3, 4, 5]
         }
     """
+    require_premium(request, db)
+
     logger.info("bulk_publish_requested",
                 count=len(job_data.product_ids),
                 marketplace=job_data.target_marketplace)

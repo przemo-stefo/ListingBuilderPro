@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatRelativeTime, getStatusColor, getStatusLabel, truncate, cn } from '@/lib/utils'
-import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, Package } from 'lucide-react'
+import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, ArrowRightLeft, Package, Globe } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const PRODUCTS_FAQ = [
@@ -210,9 +210,22 @@ export default function ProductsPage() {
                     </div>
 
                     <div className="flex items-center gap-1">
+                      {/* WHY: Link to live listing — lets user see the actual offer on marketplace */}
+                      {product.source_url && (
+                        <a href={product.source_url} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="icon" title="Zobacz ofertę na marketplace">
+                            <Globe className="h-4 w-4 text-green-400" />
+                          </Button>
+                        </a>
+                      )}
                       <Link href={`/optimize?prefill=${encodeURIComponent(title)}&product_id=${product.id}`}>
                         <Button variant="ghost" size="icon" title="Optymalizuj">
                           <Sparkles className="h-4 w-4 text-blue-400" />
+                        </Button>
+                      </Link>
+                      <Link href={`/converter?title=${encodeURIComponent(title)}&product_id=${product.id}`}>
+                        <Button variant="ghost" size="icon" title="Konwertuj na inny marketplace">
+                          <ArrowRightLeft className="h-4 w-4 text-amber-400" />
                         </Button>
                       </Link>
                       <Link href={`/products/${product.id}`}>

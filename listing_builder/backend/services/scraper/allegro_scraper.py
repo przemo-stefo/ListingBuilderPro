@@ -292,12 +292,44 @@ def _parse_html_product(html: str, product: AllegroProduct) -> None:
             product.manufacturer = param_val
 
     # ── Description HTML ──
+    # WHY multiple patterns: Allegro uses different HTML structures for descriptions
+    # Pattern 1: data-box-name="Description" (most common in static HTML)
     desc_match = re.search(
         r'data-box-name="Description"[^>]*>(.*?)(?:data-box-name=|$)',
         html, re.DOTALL
     )
     if desc_match:
-        product.description = desc_match.group(1).strip()[:5000]
+        raw = desc_match.group(1).strip()
+        # WHY: Filter out empty divs — sometimes Description box exists but is empty
+        text_content = re.sub(r'<[^>]+>', '', raw).strip()
+        if text_content:
+            product.description = raw[:5000]
+
+    # Pattern 2: __NEXT_DATA__ JSON (Allegro is Next.js — has full data in script tag)
+    if not product.description:
+        next_data_match = re.search(
+            r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL
+        )
+        if next_data_match:
+            try:
+                next_data = json.loads(next_data_match.group(1))
+                # WHY: Navigate Allegro's nested __NEXT_DATA__ to find description
+                props = next_data.get("props", {}).get("pageProps", {})
+                offer = props.get("offer", {}) or props.get("offerDetails", {})
+                desc_sections = offer.get("description", {}).get("sections", [])
+                desc_parts = []
+                for section in desc_sections:
+                    for item in section.get("items", []):
+                        if item.get("type") == "TEXT":
+                            desc_parts.append(item.get("content", ""))
+                        elif item.get("type") == "COLUMN":
+                            for sub in item.get("items", []):
+                                if sub.get("type") == "TEXT":
+                                    desc_parts.append(sub.get("content", ""))
+                if desc_parts:
+                    product.description = "\n".join(desc_parts)[:5000]
+            except (json.JSONDecodeError, KeyError, TypeError):
+                pass  # WHY: __NEXT_DATA__ format may vary, fail silently
 
     # ── Condition (from "Stan" parameter) ──
     for key, val in product.parameters.items():

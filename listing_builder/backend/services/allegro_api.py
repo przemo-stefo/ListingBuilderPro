@@ -53,16 +53,26 @@ def _parse_parameters(param_list: list) -> Dict[str, str]:
 
 
 def _parse_description(data: Dict) -> str:
-    """Extract text content from Allegro description sections."""
+    """Extract text content from Allegro description sections.
+
+    WHY multiple types: Allegro description has TEXT, IMAGE, COLUMN items.
+    TEXT = HTML content, COLUMN = nested items. We extract text from all.
+    """
     desc_section = data.get("description", {})
     if not desc_section or not desc_section.get("sections"):
         return ""
     parts = []
     for section in desc_section["sections"]:
         for item in section.get("items", []):
-            if item.get("type") == "TEXT":
+            item_type = item.get("type", "")
+            if item_type == "TEXT":
                 parts.append(item.get("content", ""))
-    return "\n".join(parts)
+            # WHY COLUMN: nested layout with sub-items containing TEXT
+            elif item_type == "COLUMN":
+                for sub in item.get("items", []):
+                    if sub.get("type") == "TEXT":
+                        parts.append(sub.get("content", ""))
+    return "\n".join(p for p in parts if p)
 
 
 def _extract_ean(parameters: Dict[str, str], data: Dict = None) -> str:
@@ -153,10 +163,11 @@ async def get_client_credentials_token() -> Optional[str]:
 
 
 async def fetch_public_offer_details(offer_id: str) -> Dict:
-    """Fetch offer details using public API (no seller login needed).
+    """Fetch offer details using Client Credentials (no user OAuth needed).
 
-    WHY public endpoint: Uses GET /offers/{offerId} which works with
-    Client Credentials token. No user OAuth required — app token is enough.
+    WHY: When user doesn't own the offer, /sale/product-offers returns 403.
+    Client Credentials token can access the same endpoint for ANY offer
+    if the app has the right scopes. Falls back gracefully if access denied.
     """
     token = await get_client_credentials_token()
     if not token:
@@ -169,20 +180,34 @@ async def fetch_public_offer_details(offer_id: str) -> Dict:
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
+            # WHY /sale/product-offers: the only endpoint that returns description
+            # Client Credentials may work if app has allegro:api:sale:offers:read scope
             resp = await client.get(
-                f"{ALLEGRO_API_BASE}/offers/{offer_id}",
+                f"{ALLEGRO_API_BASE}/sale/product-offers/{offer_id}",
                 headers=headers,
             )
 
             if resp.status_code != 200:
-                logger.error("allegro_public_offer_failed",
-                             offer_id=offer_id, status=resp.status_code)
+                logger.warning("allegro_public_offer_failed",
+                               offer_id=offer_id, status=resp.status_code)
                 return {"error": f"Allegro API {resp.status_code}"}
 
             data = resp.json()
             images = _parse_images(data)
-            parameters = _parse_parameters(data.get("parameters", []))
-            ean = _extract_ean(parameters)
+
+            # WHY productSet: same parsing as fetch_offer_details
+            parameters = {}
+            product_set = data.get("productSet", [])
+            if product_set:
+                parameters = _parse_parameters(
+                    product_set[0].get("product", {}).get("parameters", [])
+                )
+            top_params = _parse_parameters(data.get("parameters", []))
+            for name, val in top_params.items():
+                if name not in parameters:
+                    parameters[name] = val
+
+            ean = _extract_ean(parameters, data)
             description = _parse_description(data)
             result = _build_offer_result(offer_id, data, parameters, ean, images, description)
 

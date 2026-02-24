@@ -238,15 +238,16 @@ async def scrape_product_url(
     if marketplace != "allegro":
         raise HTTPException(status_code=400, detail=f"Scraping not yet supported for {marketplace}")
 
-    # WHY: 2-tier fallback: seller API → Scrape.do
-    # Public API (Client Credentials) doesn't work — Allegro requires app verification
-    # for GET /offers/listing, and GET /offers/{id} endpoint doesn't exist (406).
+    # WHY: 3-tier fallback: seller OAuth API → public Client Credentials API → Scrape.do
     from services.scraper.allegro_scraper import extract_offer_id
-    from services.allegro_api import get_access_token, fetch_offer_details
+    from services.allegro_api import get_access_token, fetch_offer_details, fetch_public_offer_details
 
-    offer_id = extract_offer_id(body.url)
+    # WHY: Normalize business.allegro.pl → allegro.pl for scraping
+    scrape_url = body.url.replace("business.allegro.pl", "allegro.pl")
+    offer_id = extract_offer_id(scrape_url)
+
+    # Tier 1: User OAuth — works for seller's OWN offers
     allegro_token = await get_access_token(db, user_id)
-
     if allegro_token and offer_id:
         data = await fetch_offer_details(offer_id, allegro_token)
         if not data.get("error"):
@@ -257,17 +258,31 @@ async def scrape_product_url(
                     data["price"] = None
             return {"status": "success", "product": data, "source": "allegro_api"}
 
-    # Fallback: Scrape.do (paid, has monthly limits)
+    # Tier 2: Public API (Client Credentials) — works for ANY offer if app verified
+    if offer_id:
+        data = await fetch_public_offer_details(offer_id)
+        if not data.get("error"):
+            if data.get("price"):
+                try:
+                    data["price"] = float(str(data["price"]).replace(",", ".").replace(" ", ""))
+                except (ValueError, AttributeError):
+                    data["price"] = None
+            return {"status": "success", "product": data, "source": "allegro_public_api"}
+
+    # Tier 3: Scrape.do web scraping (fallback when API unavailable)
     from services.scraper.allegro_scraper import scrape_allegro_product
     from dataclasses import asdict
-    product = await scrape_allegro_product(body.url)
+    product = await scrape_allegro_product(scrape_url)
 
     if product.error:
-        # WHY: Clear message when both methods fail
+        # WHY: Clear message when all methods fail
         error_msg = product.error
-        if "limit" in error_msg.lower() or "exceeded" in error_msg.lower():
-            error_msg = "Połącz konto Allegro w Konwerterze — scraping niedostępny"
-        raise HTTPException(status_code=502, detail=f"Scraping failed: {error_msg}")
+        if "401" in error_msg or "limit" in error_msg.lower() or "exceeded" in error_msg.lower():
+            error_msg = (
+                "Nie udało się pobrać danych produktu. "
+                "Połącz konto Allegro (Konwerter → OAuth) lub popraw token Scrape.do."
+            )
+        raise HTTPException(status_code=502, detail=error_msg)
 
     data = asdict(product)
     if data.get("price"):

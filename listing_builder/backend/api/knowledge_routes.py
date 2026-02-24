@@ -13,6 +13,7 @@ import structlog
 from database import get_db
 from services.knowledge_service import search_knowledge
 from services.qa_service import ask_expert
+from api.dependencies import require_premium
 
 logger = structlog.get_logger()
 
@@ -64,6 +65,7 @@ async def expert_chat(
     db: Session = Depends(get_db),
 ):
     """Expert Q&A — ask Amazon questions, answered using Inner Circle transcript RAG."""
+    require_premium(request, db)
     try:
         result = await ask_expert(body.question, db, mode=body.mode)
         return result

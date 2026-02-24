@@ -15,6 +15,7 @@ import { useToast } from '@/lib/hooks/useToast'
 import { cn, getStatusColor, truncate } from '@/lib/utils'
 import { Send, CheckCircle2, Globe } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
+import { PremiumGate } from '@/components/tier/PremiumGate'
 
 const PUBLISH_FAQ = [
   { question: 'Co oznacza "Publikacja"?', answer: 'Publikacja eksportuje Twoje zoptymalizowane produkty na wybrany marketplace. Tylko produkty o statusie "zoptymalizowane" są gotowe do publikacji.' },
@@ -116,7 +117,8 @@ export default function PublishPage() {
   const isLoading = productsLoading || marketplacesLoading
 
   return (
-    <div className="space-y-6">
+    <PremiumGate feature="Eksport do pliku">
+      <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-white">Publikacja na marketplace&apos;y</h1>
         <p className="text-gray-400 mt-2">
@@ -285,6 +287,7 @@ export default function PublishPage() {
         subtitle="Eksport i publikacja"
         items={PUBLISH_FAQ}
       />
-    </div>
+      </div>
+    </PremiumGate>
   )
 }

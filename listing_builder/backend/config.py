@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     bol_client_id: str = ""  # WHY: BOL.com Retailer API credentials (Client Credentials grant)
     bol_client_secret: str = ""
 
+    baselinker_api_token: str = ""  # WHY: Empty = BaseLinker sync disabled
+
     kaufland_client_key: str = ""
     kaufland_secret_key: str = ""
 

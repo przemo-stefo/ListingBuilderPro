@@ -48,7 +48,7 @@ const ALLOWED_PATH_PREFIXES = [
 const BLOCKED_METHODS: Record<string, string[]> = {
   'import/webhook': ['DELETE', 'PUT', 'PATCH'],
   'settings': ['DELETE'],
-  'admin': ['DELETE', 'PUT', 'PATCH'],
+  'admin': ['DELETE', 'PUT'],
   'oauth': ['PUT', 'PATCH'],
   'stripe/webhook': ['DELETE', 'PUT', 'PATCH'],
 }

@@ -10,6 +10,7 @@ import { Layers, FileText, Clock, Crown, Loader2 } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
+import { PremiumGate } from '@/components/tier/PremiumGate'
 import { useToast } from '@/lib/hooks/useToast'
 import SingleTab from './components/SingleTab'
 import BatchTab from './components/BatchTab'
@@ -49,7 +50,8 @@ function OptimizeContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <PremiumGate feature="Optymalizator">
+      <div className="space-y-6">
       {/* Page header + tab toggle */}
       <div className="flex items-center justify-between">
         <div>
@@ -119,7 +121,8 @@ function OptimizeContent() {
           { question: 'Jaka jest roznica miedzy Groq, Gemini i OpenAI?', answer: 'Groq (Llama 3.3): darmowy, dobra jakosc, najszybszy. Gemini Flash: tani, szybki, nieco lepsza jakosc. Gemini Pro: najlepsza jakosc tekstu, wolniejszy, drozszy. OpenAI (GPT-4o Mini): dobra jakosc, srednia cena. Jesli nie wiesz co wybrac — zostaw Groq, jest wystarczajaco dobry.' },
         ]}
       />
-    </div>
+      </div>
+    </PremiumGate>
   )
 }
 

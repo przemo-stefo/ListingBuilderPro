@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 import structlog
 
+from config import settings
 from models.monitoring import TrackedProduct, MonitoringSnapshot
 from services.alert_service import get_alert_service
 
@@ -241,6 +242,16 @@ def start_scheduler(session_factory) -> AsyncIOScheduler:
         args=[session_factory, "ebay"],
         id="poll_ebay", replace_existing=True,
     )
+
+    # WHY: Only start BaseLinker sync if token configured — empty = disabled
+    if settings.baselinker_api_token:
+        from services.baselinker_sync import sync_bol_orders
+        _scheduler.add_job(
+            sync_bol_orders, "interval", minutes=15,
+            args=[session_factory],
+            id="bol_baselinker_sync", replace_existing=True,
+            max_instances=1, misfire_grace_time=300,
+        )
 
     _scheduler.start()
     logger.info("monitor_scheduler_started", jobs=len(_scheduler.get_jobs()))

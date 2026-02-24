@@ -10,7 +10,8 @@ from typing import Optional, Set
 
 # WHY: Marketplaces we actually support — everything else is rejected
 ALLOWED_MARKETPLACE_DOMAINS: dict[str, Set[str]] = {
-    "allegro": {"allegro.pl", "www.allegro.pl"},
+    # WHY business.allegro.pl: sellers copy URLs from business panel
+    "allegro": {"allegro.pl", "www.allegro.pl", "business.allegro.pl"},
     "amazon": {
         "amazon.de", "www.amazon.de",
         "amazon.fr", "www.amazon.fr",

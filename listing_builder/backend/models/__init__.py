@@ -13,6 +13,7 @@ from .epr_country import EprCountryRule
 from .oauth_connection import OAuthConnection
 from .subscription import Subscription
 from .premium_license import PremiumLicense
+from .baselinker_sync import BaseLinkerSyncLog
 
 __all__ = [
     "Product",
@@ -37,4 +38,5 @@ __all__ = [
     "OAuthConnection",
     "Subscription",
     "PremiumLicense",
+    "BaseLinkerSyncLog",
 ]

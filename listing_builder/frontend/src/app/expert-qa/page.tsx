@@ -6,10 +6,11 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Send, Loader2, Brain, BookOpen, Settings2, FileText, Sparkles, Database, Zap } from 'lucide-react'
+import { Send, Loader2, Brain, ShoppingCart, Store, BookOpen, Settings2, FileText, Sparkles, Database, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/ui/FaqSection'
+import { PremiumGate } from '@/components/tier/PremiumGate'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -26,7 +27,7 @@ const RAG_MODES = [
   { value: 'bypass', label: 'Bez RAG', desc: 'Czysty LLM, bez transkrypcji' },
 ] as const
 
-const SUGGESTED_QUESTIONS = [
+const AMAZON_QUESTIONS = [
   'Jak znaleźć najlepsze słowa kluczowe dla mojego listingu na Amazon?',
   'Jaka jest idealna struktura tytułu na Amazon DE?',
   'Jak działa algorytm A9/COSMO i jak rankuje listingi?',
@@ -35,14 +36,81 @@ const SUGGESTED_QUESTIONS = [
   'Jak tworzyć skuteczne reklamy wideo na Amazon?',
 ]
 
+const KAUFLAND_QUESTIONS = [
+  'Jak zbudować skuteczny tytuł produktu na Kaufland.de?',
+  'Jakie są wymagania Kaufland dotyczące EAN/GTIN?',
+  'Jak działa system kategorii na Kaufland i jak wybrać właściwą?',
+  'Jakie są opcje wysyłki i fulfillment na Kaufland?',
+  'Jak optymalizować opisy produktów pod SEO Kaufland?',
+  'Jakie są najczęstsze błędy sprzedawców na Kaufland.de?',
+]
+
+// WHY: Per-expert config avoids ternary chains — one place to add new experts
+// WHY: Full Tailwind class names — dynamic `bg-${color}` doesn't work with JIT
+const EXPERT_CONFIG = {
+  strict: {
+    title: 'Ekspert Amazon',
+    subtitle: 'Wiedza z kursów Amazon — odpowiedzi oparte na źródłach',
+    heroTitle: 'Wiedza ekspertów Amazon w zasięgu pytania',
+    heroDesc: 'Baza wiedzy budowana latami z kursów najlepszych praktyków Amazon, PPC i e-commerce. Zadaj pytanie — dostaniesz konkretną odpowiedź z podaniem źródeł.',
+    placeholder: 'Zapytaj o słowa kluczowe, listingi, PPC, ranking, reklamy...',
+    iconBg: 'bg-orange-500/20',
+    iconText: 'text-orange-400',
+    hoverBorder: 'hover:border-orange-800 hover:text-orange-300',
+    icon: ShoppingCart,
+    ragDefault: 'strict' as const,
+    questions: AMAZON_QUESTIONS,
+    gate: 'Ekspert Amazon',
+  },
+  kaufland: {
+    title: 'Ekspert Kaufland',
+    subtitle: 'Listingi, SEO, kategorie, EAN i wysyłka na Kaufland.de',
+    heroTitle: 'Ekspert Kaufland — wszystko o sprzedaży na Kaufland.de',
+    heroDesc: 'AI doradca specjalizujący się w Kaufland marketplace. Pytaj o listingi, kategorie, EAN, wysyłkę, prowizje i optymalizację SEO.',
+    placeholder: 'Zapytaj o tytuły, kategorie, EAN, wysyłkę na Kaufland...',
+    iconBg: 'bg-red-500/20',
+    iconText: 'text-red-400',
+    hoverBorder: 'hover:border-red-800 hover:text-red-300',
+    icon: Store,
+    ragDefault: 'balanced' as const,
+    questions: KAUFLAND_QUESTIONS,
+    gate: 'Ekspert Kaufland',
+  },
+  flexible: {
+    title: 'Ekspert AI',
+    subtitle: 'Twój osobisty doradca e-commerce',
+    heroTitle: 'Wiedza ekspertów w zasięgu pytania',
+    heroDesc: 'Baza wiedzy budowana latami z kursów najlepszych praktyków Amazon, PPC i e-commerce. Zadaj pytanie — dostaniesz konkretną odpowiedź z podaniem źródeł.',
+    placeholder: 'Zapytaj o słowa kluczowe, listingi, PPC, ranking, reklamy...',
+    iconBg: 'bg-green-500/20',
+    iconText: 'text-green-400',
+    hoverBorder: 'hover:border-green-800 hover:text-green-300',
+    icon: Brain,
+    ragDefault: 'flexible' as const,
+    questions: AMAZON_QUESTIONS,
+    gate: 'Ekspert AI',
+  },
+} as const
+
+type ExpertKey = keyof typeof EXPERT_CONFIG
+
 // WHY: Next.js 14 requires Suspense boundary around useSearchParams()
 function ExpertQAContent() {
   const searchParams = useSearchParams()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [mode, setMode] = useState('balanced')
+  // WHY: URL ?mode= selects expert config — defaults to flexible
+  const urlMode = searchParams.get('mode') as ExpertKey | null
+  const expertKey: ExpertKey = urlMode && urlMode in EXPERT_CONFIG ? urlMode : 'flexible'
+  const expert = EXPERT_CONFIG[expertKey]
+  const [mode, setMode] = useState<string>(expert.ragDefault)
   const [showModeSelector, setShowModeSelector] = useState(false)
+
+  // WHY: Sync mode state when user navigates between experts via sidebar
+  useEffect(() => {
+    setMode(expert.ragDefault)
+  }, [expert.ragDefault])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const initialQuestionSent = useRef(false)
 
@@ -101,16 +169,17 @@ function ExpertQAContent() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-2rem)] flex-col space-y-4">
+    <PremiumGate feature={expert.gate}>
+      <div className="flex h-[calc(100vh-2rem)] flex-col space-y-4">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-green-500/20 p-2">
-            <Brain className="h-6 w-6 text-green-400" />
+          <div className={cn('rounded-lg p-2', expert.iconBg)}>
+            <expert.icon className={cn('h-6 w-6', expert.iconText)} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Ekspert AI</h1>
-            <p className="text-xs text-green-400">Twój osobisty doradca e-commerce</p>
+            <h1 className="text-2xl font-bold text-white">{expert.title}</h1>
+            <p className={cn('text-xs', expert.iconText)}>{expert.subtitle}</p>
           </div>
           {/* WHY: Mode selector toggle — small gear icon keeps header clean */}
           <button
@@ -171,19 +240,21 @@ function ExpertQAContent() {
                 <Sparkles className="h-10 w-10 text-green-400" />
               </div>
               <h2 className="text-xl font-bold text-white">
-                Wiedza ekspertów w zasięgu pytania
+                {expert.heroTitle}
               </h2>
               <p className="text-sm text-gray-400 max-w-md">
-                Baza wiedzy budowana latami z kursów najlepszych praktyków Amazon, PPC i e-commerce.
-                Zadaj pytanie — dostaniesz konkretną odpowiedź z podaniem źródeł.
+                {expert.heroDesc}
               </p>
             </div>
             <div className="grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
-              {SUGGESTED_QUESTIONS.map((q, i) => (
+              {expert.questions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => handleSend(q)}
-                  className="rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-left text-sm text-gray-400 transition-colors hover:border-green-800 hover:text-green-300"
+                  className={cn(
+                    'rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-left text-sm text-gray-400 transition-colors',
+                    expert.hoverBorder
+                  )}
                 >
                   {q}
                 </button>
@@ -251,7 +322,7 @@ function ExpertQAContent() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Zapytaj o słowa kluczowe, listingi, PPC, ranking, reklamy..."
+          placeholder={expert.placeholder}
           className="flex-1 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-green-800"
           disabled={isLoading}
         />
@@ -271,9 +342,14 @@ function ExpertQAContent() {
       {/* WHY: FAQ at bottom — visible when chat is empty or user scrolls down */}
       {messages.length === 0 && (
         <FaqSection
-          title="FAQ — Ekspert AI"
-          subtitle="Jak korzystać z bazy wiedzy eksperckiej"
-          items={[
+          title={`FAQ — ${expert.title}`}
+          subtitle={`Jak korzystać z: ${expert.title}`}
+          items={expertKey === 'kaufland' ? [
+            { question: 'Co to jest Ekspert Kaufland?', answer: 'Chatbot AI specjalizujący się w sprzedaży na Kaufland.de. Odpowiada na pytania o listingach, kategoriach, EAN, SEO, wysyłce i wymaganiach marketplace.' },
+            { question: 'Jakie pytania mogę zadawać?', answer: 'Jak pisać tytuły na Kaufland, jak wybrać kategorię, jakie są wymagania EAN/GTIN, jak działa fulfillment, jak optymalizować opisy pod SEO Kaufland, jakie są prowizje i opłaty.' },
+            { question: 'Czy odpowiedzi dotyczą Kaufland.de?', answer: 'Tak — ekspert jest skonfigurowany pod Kaufland.de (rynek niemiecki). Odpowiedzi uwzględniają specyfikę tego marketplace, wymagania i best practices.' },
+            { question: 'Skąd pochodzi wiedza?', answer: 'Baza wiedzy e-commerce + wiedza AI o Kaufland marketplace. Używa trybu zbalansowanego — łączy sprawdzone źródła z ogólną wiedzą o e-commerce.' },
+          ] : [
             { question: 'Co to jest Ekspert AI?', answer: 'Chatbot AI z dostępem do bazy wiedzy o sprzedaży na marketplace. Odpowiada na pytania o Amazon, eBay, Kaufland — słowa kluczowe, listingi, PPC, strategie cenowe, backend keywords i wiele więcej.' },
             { question: 'Skąd pochodzi wiedza?', answer: 'Baza wiedzy zawiera ponad 10 000 fragmentów z kursów ekspertów marketplace, poradników e-commerce i sprawdzonych strategii sprzedażowych. Wiedza jest regularnie aktualizowana.' },
             { question: 'Co oznaczają tryby RAG?', answer: 'Ścisły = odpowiedzi tylko z bazy wiedzy. Zbalansowany = baza + ogólna wiedza AI. Elastyczny = łączy wszystkie źródła. Bez RAG = czysty LLM bez bazy wiedzy. Domyślnie: Zbalansowany.' },
@@ -281,7 +357,8 @@ function ExpertQAContent() {
           ]}
         />
       )}
-    </div>
+      </div>
+    </PremiumGate>
   )
 }
 

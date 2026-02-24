@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { PremiumGate } from '@/components/tier/PremiumGate'
 
 // WHY: Match backend platform options exactly
 const PLATFORMS = [
@@ -103,7 +104,8 @@ export default function AdCopyPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PremiumGate feature="Reklamy AI">
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-amber-500/20 p-2">
@@ -329,6 +331,7 @@ export default function AdCopyPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </PremiumGate>
   )
 }

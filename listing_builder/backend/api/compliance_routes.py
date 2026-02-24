@@ -18,7 +18,7 @@ from schemas.compliance import (
 from schemas.audit import AuditRequest, AuditResult
 from services.audit_service import audit_product, audit_product_from_data
 from services.allegro_api import fetch_seller_offers, fetch_offer_details
-from api.dependencies import get_user_id
+from api.dependencies import get_user_id, require_premium
 from models.compliance import ComplianceReport, ComplianceReportItem
 from models.oauth_connection import OAuthConnection
 from typing import Optional
@@ -80,6 +80,8 @@ async def validate_template(
         )
     if len(file_bytes) == 0:
         raise HTTPException(status_code=400, detail="File is empty")
+
+    require_premium(request, db)
 
     logger.info("compliance_upload_received", filename=filename, size=len(file_bytes))
 
@@ -171,13 +173,14 @@ def _report_to_response(report) -> ComplianceReportResponse:
 
 @router.post("/audit", response_model=AuditResult)
 @limiter.limit("10/minute")
-async def audit_product_card(request: Request, body: AuditRequest):
+async def audit_product_card(request: Request, body: AuditRequest, db: Session = Depends(get_db)):
     """
     Audit a single product card by URL or ASIN.
 
     Scrapes the product page, runs compliance checks,
     and returns issues with AI-generated fix suggestions.
     """
+    require_premium(request, db)
     url = body.url
     marketplace = body.marketplace.lower()
 
@@ -207,6 +210,7 @@ MAX_STORE_SCAN = 50  # WHY: 50 parallel API calls is safe for Allegro rate limit
 @limiter.limit("2/minute")
 async def audit_store(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """Scan connected Allegro store — fetch offers via API, audit each, save report."""
+    require_premium(request, db)
 
     # Step 1: Verify Allegro OAuth is active + get access token
     conn = db.query(OAuthConnection).filter(
