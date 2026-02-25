@@ -38,9 +38,10 @@ def _sign_state(marketplace: str, user_id: str = "default") -> str:
     """
     payload = json.dumps({"m": marketplace, "t": int(time.time()), "u": user_id})
     encoded = urlsafe_b64encode(payload.encode()).decode().rstrip("=")
-    sig = hmac.new(
-        settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
-    ).hexdigest()[:32]
+    # WHY: Derive separate key for OAuth state — don't reuse webhook_secret directly
+    # so compromise of webhook auth doesn't enable OAuth CSRF attacks
+    oauth_key = b"oauth-state:" + settings.webhook_secret.encode()
+    sig = hmac.new(oauth_key, encoded.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{encoded}.{sig}"
 
 
@@ -51,9 +52,9 @@ def _verify_state(state: str) -> Optional[Dict]:
         return None
 
     encoded, sig = parts
-    expected = hmac.new(
-        settings.webhook_secret.encode(), encoded.encode(), hashlib.sha256
-    ).hexdigest()[:32]
+    # WHY: Must match derived key from _sign_state
+    oauth_key = b"oauth-state:" + settings.webhook_secret.encode()
+    expected = hmac.new(oauth_key, encoded.encode(), hashlib.sha256).hexdigest()[:32]
 
     if not hmac.compare_digest(sig, expected):
         return None

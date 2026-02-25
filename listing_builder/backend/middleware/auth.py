@@ -41,7 +41,10 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None)) -> str:
         )
 
     if not hmac.compare_digest(x_api_key, settings.api_secret_key):
-        logger.warning("api_key_invalid", key_prefix=x_api_key[:8] if x_api_key else None)
+        # WHY: Hash prefix instead of raw chars — avoids leaking key material in logs
+        import hashlib
+        key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()[:8] if x_api_key else None
+        logger.warning("api_key_invalid", key_hash=key_hash)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
@@ -119,11 +122,14 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             return self._unauthorized_response("Missing authentication. Include Authorization or X-API-Key header.")
 
         if not hmac.compare_digest(api_key, settings.api_secret_key):
+            # WHY: Hash prefix instead of raw chars — avoids leaking key material in logs
+            import hashlib
+            key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:8] if api_key else None
             logger.warning(
                 "api_key_invalid",
                 path=path,
                 ip=request.client.host,
-                key_prefix=api_key[:8] if api_key else None,
+                key_hash=key_hash,
             )
             return self._unauthorized_response("Invalid API key")
 

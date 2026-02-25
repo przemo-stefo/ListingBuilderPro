@@ -53,9 +53,9 @@ def validate_marketplace_url(url: str, marketplace: Optional[str] = None) -> str
 
     parsed = urlparse(url)
 
-    # WHY: Only HTTPS in production — HTTP is a downgrade attack vector
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"Invalid URL scheme: {parsed.scheme}")
+    # WHY: HTTPS only — HTTP allows MITM/downgrade attacks on marketplace scraping
+    if parsed.scheme != "https":
+        raise ValueError(f"Invalid URL scheme: {parsed.scheme} — only HTTPS allowed")
 
     hostname = parsed.hostname
     if not hostname:
