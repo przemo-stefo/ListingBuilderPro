@@ -38,6 +38,7 @@ from api import allegro_offers_routes
 from api import research_routes
 from api import auth_routes
 from api import admin_routes
+from api import admin_monitoring_routes
 from api import alert_settings_routes
 from api import ad_copy_routes
 from api import listing_score_routes
@@ -171,6 +172,7 @@ app.include_router(allegro_offers_routes.router)
 app.include_router(research_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(admin_routes.router)
+app.include_router(admin_monitoring_routes.router)
 app.include_router(alert_settings_routes.router)
 app.include_router(ad_copy_routes.router)
 app.include_router(listing_score_routes.router)

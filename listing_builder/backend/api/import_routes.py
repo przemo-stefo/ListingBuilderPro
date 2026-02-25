@@ -19,6 +19,17 @@ import structlog
 
 logger = structlog.get_logger()
 
+
+def _parse_price(raw) -> Optional[float]:
+    """WHY: DRY — price string→float conversion used by all 3 import tiers."""
+    if raw is None:
+        return None
+    try:
+        return float(str(raw).replace(",", ".").replace(" ", ""))
+    except (ValueError, AttributeError):
+        return None
+
+
 # WHY: Rate limiter prevents batch import abuse
 limiter = Limiter(key_func=get_remote_address)
 # WHY: Server-side limit prevents DoS via huge payloads
@@ -152,12 +163,7 @@ async def import_from_allegro_account(
                 continue
 
             # WHY: Convert Allegro API response to ProductImport schema
-            price = None
-            if data.get("price"):
-                try:
-                    price = float(str(data["price"]).replace(",", ".").replace(" ", ""))
-                except (ValueError, AttributeError):
-                    pass
+            price = _parse_price(data.get("price"))
 
             product = ProductImport(
                 source_platform="allegro",
@@ -251,22 +257,14 @@ async def scrape_product_url(
     if allegro_token and offer_id:
         data = await fetch_offer_details(offer_id, allegro_token)
         if not data.get("error"):
-            if data.get("price"):
-                try:
-                    data["price"] = float(str(data["price"]).replace(",", ".").replace(" ", ""))
-                except (ValueError, AttributeError):
-                    data["price"] = None
+            data["price"] = _parse_price(data.get("price"))
             return {"status": "success", "product": data, "source": "allegro_api"}
 
     # Tier 2: Public API (Client Credentials) — works for ANY offer if app verified
     if offer_id:
         data = await fetch_public_offer_details(offer_id)
         if not data.get("error"):
-            if data.get("price"):
-                try:
-                    data["price"] = float(str(data["price"]).replace(",", ".").replace(" ", ""))
-                except (ValueError, AttributeError):
-                    data["price"] = None
+            data["price"] = _parse_price(data.get("price"))
             return {"status": "success", "product": data, "source": "allegro_public_api"}
 
     # Tier 3: Scrape.do web scraping (fallback when API unavailable)
@@ -285,11 +283,7 @@ async def scrape_product_url(
         raise HTTPException(status_code=502, detail=error_msg)
 
     data = asdict(product)
-    if data.get("price"):
-        try:
-            data["price"] = float(data["price"].replace(",", ".").replace(" ", ""))
-        except (ValueError, AttributeError):
-            data["price"] = None
+    data["price"] = _parse_price(data.get("price"))
 
     return {"status": "success", "product": data, "source": "scrape_do"}
 

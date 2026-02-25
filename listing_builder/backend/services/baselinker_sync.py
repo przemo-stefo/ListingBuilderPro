@@ -20,6 +20,26 @@ BOL_API_BASE = "https://api.bol.com/retailer"
 BOL_ACCEPT = "application/vnd.retailer.v10+json"
 BASELINKER_URL = "https://api.baselinker.com/connector.php"
 
+# WHY: PII fields in BOL orders — strip before storing in DB (recursive, all levels)
+_PII_KEYS = {
+    "firstName", "surname", "email", "streetName", "houseNumber",
+    "houseNumberExtension", "zipCode", "phone", "company",
+    "vatNumber", "chamberOfCommerceNumber", "deliveryPhoneNumber",
+}
+
+
+def _strip_pii(data):
+    """Recursively remove customer PII from BOL order before storing in sync log.
+
+    WHY: GDPR — we only need orderId, items, and status for debugging.
+    Recursive to catch PII in nested structures regardless of BOL API schema changes.
+    """
+    if isinstance(data, dict):
+        return {k: "***" if k in _PII_KEYS else _strip_pii(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_strip_pii(item) for item in data]
+    return data
+
 
 async def sync_bol_orders(session_factory) -> Dict:
     """Main cron entry point — fetch BOL open orders, push new ones to BaseLinker.
@@ -37,6 +57,15 @@ async def sync_bol_orders(session_factory) -> Dict:
         if not orders:
             return {"synced": 0, "skipped": 0, "errors": 0}
 
+        # WHY: Batch dedup — one query instead of N queries per order
+        all_bol_ids = [o.get("orderId", "") for o in orders if o.get("orderId")]
+        existing_ids = set()
+        if all_bol_ids:
+            rows = db.query(BaseLinkerSyncLog.bol_order_id).filter(
+                BaseLinkerSyncLog.bol_order_id.in_(all_bol_ids)
+            ).all()
+            existing_ids = {r[0] for r in rows}
+
         synced = 0
         skipped = 0
         errors = 0
@@ -46,11 +75,7 @@ async def sync_bol_orders(session_factory) -> Dict:
             if not bol_order_id:
                 continue
 
-            # WHY: Deduplicate — check if already synced
-            existing = db.query(BaseLinkerSyncLog).filter(
-                BaseLinkerSyncLog.bol_order_id == bol_order_id
-            ).first()
-            if existing:
+            if bol_order_id in existing_ids:
                 skipped += 1
                 continue
 
@@ -61,7 +86,7 @@ async def sync_bol_orders(session_factory) -> Dict:
                 baselinker_order_id=result.get("order_id"),
                 status="synced" if result["ok"] else "error",
                 error_message=result.get("error"),
-                bol_order_data=order,
+                bol_order_data=_strip_pii(order),
             )
             db.add(log_entry)
             db.commit()
