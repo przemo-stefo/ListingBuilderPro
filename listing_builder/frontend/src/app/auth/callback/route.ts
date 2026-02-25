@@ -8,7 +8,11 @@ import { createServerClient } from '@supabase/ssr'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
+  const rawNext = searchParams.get('next') ?? '/dashboard'
+
+  // WHY: Prevent open redirect — "//evil.com" becomes "https://origin//evil.com"
+  // which browsers resolve to evil.com. Only allow paths starting with single "/".
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard'
 
   // WHY: Default redirect — if code exchange fails, send to login
   const fallback = `${origin}/login`

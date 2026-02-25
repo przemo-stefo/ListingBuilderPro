@@ -118,9 +118,18 @@ async def recover(request: Request, body: RecoverLicenseRequest, db: Session = D
 
 
 @router.get("/session/{session_id}/license", response_model=SessionLicenseResponse)
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 async def session_license(request: Request, session_id: str, db: Session = Depends(get_db)):
-    """Get license key after successful Stripe checkout redirect."""
+    """Get license key after successful Stripe checkout redirect.
+
+    WHY JWT required: Without auth, anyone with a session_id (leaked via
+    browser history, referrer, logs) could steal the associated license key.
+    JWT proves the caller is the same person who initiated checkout.
+    """
+    jwt_email = _get_email_from_jwt(request)
+    if not jwt_email:
+        raise HTTPException(status_code=401, detail="Zaloguj się aby pobrać klucz licencji")
+
     key = get_license_by_session(session_id, db)
     if key:
         return SessionLicenseResponse(license_key=key, status="ready")

@@ -57,8 +57,14 @@ def get_user_id_from_jwt(request: Request) -> Optional[str]:
                 algorithms=["ES256"],
                 audience="authenticated",
             )
-        except Exception:
-            pass  # Fall through to HS256
+        except jwt.ExpiredSignatureError:
+            logger.debug("jwt_expired_es256")
+            return None  # WHY: Token IS expired — don't try HS256, just reject
+        except jwt.InvalidTokenError:
+            pass  # WHY: Might be HS256 token — fall through
+        except Exception as e:
+            logger.debug("jwks_error", error=str(e))
+            pass  # WHY: JWKS fetch failed — try HS256 as fallback
 
     # WHY HS256 fallback: Legacy Supabase projects or test environments
     if payload is None and settings.supabase_jwt_secret:
