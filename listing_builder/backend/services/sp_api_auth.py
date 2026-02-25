@@ -85,8 +85,8 @@ async def get_access_token(db: Optional[Session] = None) -> str:
             await asyncio.sleep(wait)
             continue
 
-        logger.error("sp_api_token_failed", status=resp.status_code, body=resp.text[:200])
-        raise RuntimeError(f"LWA token exchange failed: {resp.status_code} — {resp.text[:200]}")
+        logger.error("sp_api_token_failed", status=resp.status_code)
+        raise RuntimeError(f"LWA token exchange failed: {resp.status_code}")
 
     raise RuntimeError("LWA token exchange failed after 3 retries (rate limited)")
 

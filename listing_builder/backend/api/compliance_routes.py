@@ -90,10 +90,11 @@ async def validate_template(
         service = ComplianceService(db)
         report = service.validate_file(file_bytes, filename, marketplace)
     except ValueError as e:
+        # WHY: Only our own ValueErrors here — safe user-facing messages
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("compliance_validation_failed", error=str(e), filename=filename)
-        raise HTTPException(status_code=500, detail="Validation failed")
+        raise HTTPException(status_code=500, detail="Walidacja nie powiodła się")
 
     # Build response from ORM objects
     return _report_to_response(report)

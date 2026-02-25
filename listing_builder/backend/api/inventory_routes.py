@@ -33,9 +33,10 @@ async def get_inventory(
         "FROM inventory_items"
     )).fetchone()
 
-    # WHY: Filtered query for the table view
-    conditions = []
+    # WHY: Filtered query for the table view — built with text() fragments, never f-string user input
+    clauses = ["SELECT * FROM inventory_items"]
     params = {}
+    conditions = []
     if marketplace:
         conditions.append("marketplace = :mp")
         params["mp"] = marketplace
@@ -46,11 +47,10 @@ async def get_inventory(
         conditions.append("(LOWER(sku) LIKE :q OR LOWER(product_title) LIKE :q)")
         params["q"] = f"%{search.lower()}%"
 
-    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = db.execute(
-        text(f"SELECT * FROM inventory_items {where} ORDER BY marketplace, sku"),
-        params,
-    ).fetchall()
+    if conditions:
+        clauses.append("WHERE " + " AND ".join(conditions))
+    clauses.append("ORDER BY marketplace, sku")
+    rows = db.execute(text(" ".join(clauses)), params).fetchall()
 
     items = [
         InventoryItem(

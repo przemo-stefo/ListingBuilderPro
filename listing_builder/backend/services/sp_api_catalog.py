@@ -79,8 +79,8 @@ async def fetch_catalog_item(asin: str, marketplace: str = "DE", db: Optional[Se
             return {"error": "Brak dostępu do Catalog API — sprawdź uprawnienia aplikacji SP-API"}
 
         if resp.status_code != 200:
-            logger.warning("sp_api_catalog_error", status=resp.status_code, body=resp.text[:200])
-            return {"error": f"SP-API error {resp.status_code}: {resp.text[:100]}"}
+            logger.warning("sp_api_catalog_error", status=resp.status_code)
+            return {"error": f"Błąd Amazon SP-API (kod {resp.status_code})"}
 
         data = resp.json()
         return _parse_catalog_response(data, asin, marketplace)

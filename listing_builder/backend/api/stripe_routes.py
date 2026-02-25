@@ -55,8 +55,8 @@ async def checkout(request: Request, body: CheckoutRequest):
     try:
         url = create_checkout_session(body.plan_type, body.email)
         return CheckoutResponse(checkout_url=url)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Nieprawidłowy plan lub email")
     except Exception as e:
         logger.error("stripe_checkout_failed", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to create checkout session")

@@ -31,9 +31,10 @@ async def get_competitors(
         "FROM competitors"
     )).fetchone()
 
-    # WHY: Filtered query for the table view
-    conditions = []
+    # WHY: Filtered query for the table view — built with text() fragments, never f-string user input
+    clauses = ["SELECT * FROM competitors"]
     params = {}
+    conditions = []
     if marketplace:
         conditions.append("marketplace = :mp")
         params["mp"] = marketplace
@@ -43,11 +44,10 @@ async def get_competitors(
         )
         params["q"] = f"%{search.lower()}%"
 
-    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = db.execute(
-        text(f"SELECT * FROM competitors {where} ORDER BY marketplace, competitor_name"),
-        params,
-    ).fetchall()
+    if conditions:
+        clauses.append("WHERE " + " AND ".join(conditions))
+    clauses.append("ORDER BY marketplace, competitor_name")
+    rows = db.execute(text(" ".join(clauses)), params).fetchall()
 
     items = [
         CompetitorItem(

@@ -54,7 +54,8 @@ async def create_report(report_type: str, marketplace_ids: List[str]) -> str:
         resp = await client.post(f"{REPORTS_API}/reports", json=body, headers=headers)
 
     if resp.status_code not in (200, 202):
-        raise RuntimeError(f"createReport failed: {resp.status_code} — {resp.text[:300]}")
+        logger.error("epr_create_report_failed", status=resp.status_code)
+        raise RuntimeError(f"createReport failed: {resp.status_code}")
 
     data = resp.json()
     report_id = data.get("reportId")
@@ -111,7 +112,8 @@ async def download_report(document_id: str) -> str:
         resp = await client.get(f"{REPORTS_API}/documents/{document_id}", headers=headers)
 
     if resp.status_code != 200:
-        raise RuntimeError(f"getDocument failed: {resp.status_code} — {resp.text[:300]}")
+        logger.error("epr_get_document_failed", status=resp.status_code)
+        raise RuntimeError(f"getDocument failed: {resp.status_code}")
 
     data = resp.json()
     download_url = data.get("url")
