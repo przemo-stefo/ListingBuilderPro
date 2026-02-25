@@ -139,14 +139,16 @@ AMAZON_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
 
 def get_amazon_authorize_url(user_id: str = "default") -> Dict:
     """Generate Amazon Seller Central OAuth URL with CSRF state."""
-    if not settings.amazon_client_id:
-        return {"error": "Amazon client_id not configured"}
+    if not settings.amazon_app_id:
+        return {"error": "Amazon app_id not configured"}
 
     state = _sign_state("amazon", user_id)
     redirect_uri = f"{_backend_url()}/api/oauth/amazon/callback"
 
+    # WHY amazon_app_id not amazon_client_id: Authorize URL needs SP-API App ID
+    # (amzn1.sp.solution.xxx), LWA Client ID is only for token exchange
     params = {
-        "application_id": settings.amazon_client_id,
+        "application_id": settings.amazon_app_id,
         "state": state,
         "redirect_uri": redirect_uri,
     }

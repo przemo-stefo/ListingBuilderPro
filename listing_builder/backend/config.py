@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     amazon_refresh_token: str = ""
     amazon_client_id: str = ""
     amazon_client_secret: str = ""
+    amazon_app_id: str = ""  # WHY: SP-API App ID (amzn1.sp.solution.xxx) — used in authorize URL, different from LWA client_id
     amazon_region: str = "eu-west-1"
 
     ebay_app_id: str = ""  # WHY: eBay OAuth app credentials (from Mateusz)
