@@ -19,6 +19,22 @@ def get_user_id(request: Request) -> str:
     return getattr(request.state, "user_id", "default")
 
 
+def require_user_id(request: Request) -> str:
+    """Extract user_id and REJECT if it's the generic "default" fallback.
+
+    WHY: Defense-in-depth for data-sensitive endpoints (OAuth, products,
+    settings). Even if frontend JWT breaks, backend won't leak user data.
+    "default" means no real user was identified — block access.
+    """
+    user_id = getattr(request.state, "user_id", "default")
+    if user_id == "default":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please log in.",
+        )
+    return user_id
+
+
 def require_admin(request: Request) -> str:
     """Verify the current user is an admin (email in ADMIN_EMAILS env var).
 

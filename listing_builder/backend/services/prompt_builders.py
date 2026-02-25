@@ -6,11 +6,52 @@ from __future__ import annotations
 
 from typing import List, Dict, Any
 
+# WHY: Rules from Amazon FBA Revolution Module 7 "Złota Formuła Listingu"
+# Injected ONLY for amazon marketplaces — other platforms have different best practices
+AMAZON_TITLE_RULES = """
+AMAZON-SPECIFIC TITLE RULES:
+- Start with brand name, then front-load the most important keywords
+- Mobile shows only 70-90 characters — put critical keywords FIRST
+- Use " - " dash separators between keyword groups
+- Never repeat the same word more than twice in the title
+- Title must be readable for the customer, not a keyword dump
+- Capitalize all words except prepositions and conjunctions
+"""
+
+AMAZON_BULLETS_RULES = """
+AMAZON-SPECIFIC BULLET RULES:
+- Structure each bullet: [CAPS BENEFIT HEADER] – [proof/explanation with keywords]
+- Apply CZAKO rule: Feature → Advantage → Benefit (most important!)
+- Strongest bullet on top, weakest at bottom — shoppers read top 2-3 only
+- Weave 2-3 keyword phrases per bullet NATURALLY into sentences
+- Use concrete benefits: "saves 2h/week" NOT "highest quality"
+- Each bullet should answer: "Why should I care about this feature?"
+"""
+
+AMAZON_DESC_RULES = """
+AMAZON-SPECIFIC DESCRIPTION RULES:
+- Structure: Intro → Summarize bullet benefits → Brand message → Subtle CTA
+- Each keyword should appear ONCE only — repetition degrades ranking!
+- Use synonyms for words already in title/bullets
+- Max 2000 characters, natural conversational language
+- Focus on use cases and lifestyle benefits, not specs
+"""
+
+AMAZON_BACKEND_RULES = """
+AMAZON-SPECIFIC BACKEND KEYWORD RULES:
+- 250 bytes max, all lowercase, space-separated
+- NEVER include competitor ASINs or brand names (permanent ban risk!)
+- Include common misspellings shoppers actually type
+- Only words NOT ALREADY in visible listing (title, bullets, description)
+- No commas, no punctuation, no repeated words
+"""
+
 
 def build_title_prompt(
     product_title: str, brand: str, product_line: str,
     tier1_phrases: List[str], lang: str, max_chars: int,
     expert_context: str = "",
+    marketplace: str = "",
 ) -> str:
     kw_list = ", ".join(tier1_phrases[:10])
     # WHY: Expert context from knowledge base teaches proven title strategies
@@ -41,7 +82,7 @@ Rules:
 - No promotional words (bestseller, #1, günstig, etc.)
 - No special characters (!, €, ™, etc.)
 - The ENTIRE title must be in {lang} — no words in other languages
-
+{AMAZON_TITLE_RULES if marketplace.startswith("amazon") else ""}
 Return ONLY the optimized title, nothing else."""
 
 
@@ -50,6 +91,7 @@ def build_bullets_prompt(
     lang: str, max_chars: int,
     expert_context: str = "",
     bullet_count: int = 5,
+    marketplace: str = "",
 ) -> str:
     kw_list = ", ".join(tier2_phrases[:15])
     context_block = ""
@@ -87,7 +129,7 @@ Rules:
 - Each bullet MUST be between 100 and {max_chars} characters — use the full space
 - The ENTIRE text must be in {lang} — no words in other languages
 - No promotional words{vendor_guidance}
-
+{AMAZON_BULLETS_RULES if marketplace.startswith("amazon") else ""}
 Return ONLY {bullet_count} bullet points, one per line, no numbering or bullet symbols."""
 
 
@@ -133,13 +175,14 @@ Rules:
 - The ENTIRE text must be in {lang} — no words in other languages
 - Format as simple HTML: use <p> for paragraphs, <ul><li> for feature lists, <b> for emphasis{bold_rule}
 - Keep HTML clean and minimal — no classes, no inline styles, no <div> or <span>
-
+{AMAZON_DESC_RULES if "amazon" in marketplace else ""}
 Return ONLY the HTML description, nothing else."""
 
 
 def build_backend_prompt(
     product_title: str, brand: str, title_text: str,
     keywords: List[Dict[str, Any]], lang: str, max_bytes: int,
+    marketplace: str = "",
 ) -> str:
     """Prompt for LLM to suggest additional backend search terms.
 
@@ -172,5 +215,5 @@ Rules:
 - Space-separated, lowercase, no commas or punctuation
 - No brand names, no promotional words, no special characters
 - Every word must be UNIQUE (no repetition)
-
+{AMAZON_BACKEND_RULES if marketplace.startswith("amazon") else ""}
 Return ONLY space-separated search terms in {lang}, nothing else."""

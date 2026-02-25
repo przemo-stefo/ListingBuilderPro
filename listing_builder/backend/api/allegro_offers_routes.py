@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import require_user_id
 from services.allegro_api import get_access_token, fetch_offer_details, ALLEGRO_API_BASE
 
 logger = structlog.get_logger()
@@ -104,7 +104,7 @@ async def list_offers(
     status: Optional[Literal["ACTIVE", "INACTIVE", "ENDED"]] = None,
     search: Optional[str] = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """List seller's offers from Allegro with pagination and filtering."""
     access_token = await _require_token(db, user_id)
@@ -172,7 +172,7 @@ async def get_offer_detail(
     request: Request,
     offer_id: str,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Get full details of a single offer. Reuses existing fetch_offer_details()."""
     if not OFFER_ID_PATTERN.match(offer_id):
@@ -194,7 +194,7 @@ async def update_offer(
     offer_id: str,
     body: OfferManagerUpdateRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Partial update of a single offer — name, price, description."""
     if not OFFER_ID_PATTERN.match(offer_id):
@@ -252,7 +252,7 @@ async def bulk_change_status(
     request: Request,
     body: BulkStatusRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Bulk ACTIVATE or END offers. Allegro processes this async via command ID."""
     access_token = await _require_token(db, user_id)
@@ -296,7 +296,7 @@ async def bulk_change_price(
     request: Request,
     body: BulkPriceRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Bulk price change for multiple offers. Allegro processes async."""
     access_token = await _require_token(db, user_id)

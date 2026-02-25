@@ -189,3 +189,46 @@ def client(mock_settings, db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# WHY: Test user UUID used in auth_client fixture — stable across tests
+TEST_USER_ID = "test-user-aaaa-bbbb-cccc-111111111111"
+TEST_USER_EMAIL = "testuser@test.com"
+
+
+@pytest.fixture
+def auth_client(mock_settings, db_session):
+    """FastAPI TestClient that simulates a JWT-authenticated user.
+
+    WHY: After adding require_user_id() to data-sensitive endpoints,
+    tests MUST provide a real user_id (not "default") to pass auth.
+    This fixture patches get_user_id_from_jwt so middleware sets
+    a real user_id + email on request.state.
+    """
+    from fastapi.testclient import TestClient
+    from database import get_db
+    from unittest.mock import patch
+
+    def _override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    # WHY: Mock behaves like real get_user_id_from_jwt — returns user_id
+    # AND sets request.state.user_email (needed by stripe routes)
+    def _fake_jwt(request):
+        request.state.user_email = TEST_USER_EMAIL
+        return TEST_USER_ID
+
+    # WHY: Patch at source — middleware.auth does `from middleware.supabase_auth import`
+    # inside dispatch(), and stripe routes also import from supabase_auth.
+    # Patching at the source ensures ALL callers get the mock.
+    with patch("middleware.supabase_auth.get_user_id_from_jwt", side_effect=_fake_jwt):
+
+        from main import app
+        app.dependency_overrides[get_db] = _override_get_db
+
+        with TestClient(app) as c:
+            yield c
+        app.dependency_overrides.clear()

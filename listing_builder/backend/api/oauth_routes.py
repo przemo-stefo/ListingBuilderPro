@@ -13,7 +13,7 @@ import structlog
 
 from config import settings
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import require_user_id
 from pydantic import BaseModel, field_validator
 from services.oauth_service import (
     get_amazon_authorize_url,
@@ -37,7 +37,7 @@ router = APIRouter(prefix="/api/oauth", tags=["OAuth"])
 # ── Connection status ─────────────────────────────────────────────────────────
 
 @router.get("/connections")
-async def list_connections(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+async def list_connections(request: Request, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """List all OAuth connections with status."""
     conns = get_connections(db, user_id)
     return {
@@ -59,7 +59,7 @@ async def list_connections(request: Request, db: Session = Depends(get_db), user
 
 @router.get("/amazon/authorize")
 @limiter.limit("10/minute")
-async def amazon_authorize(request: Request, user_id: str = Depends(get_user_id)):
+async def amazon_authorize(request: Request, user_id: str = Depends(require_user_id)):
     """Generate Amazon Seller Central OAuth URL."""
     result = get_amazon_authorize_url(user_id)
     if "error" in result:
@@ -123,7 +123,7 @@ async def amazon_credentials(
     request: Request,
     body: AmazonCredentialsRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Validate Amazon SP-API credentials and save connection.
 
@@ -142,7 +142,7 @@ async def amazon_credentials(
 
 @router.get("/allegro/authorize")
 @limiter.limit("10/minute")
-async def allegro_authorize(request: Request, user_id: str = Depends(get_user_id)):
+async def allegro_authorize(request: Request, user_id: str = Depends(require_user_id)):
     """Generate Allegro OAuth URL."""
     result = get_allegro_authorize_url(user_id)
     if "error" in result:
@@ -176,7 +176,7 @@ async def allegro_callback(
 
 @router.get("/ebay/authorize")
 @limiter.limit("10/minute")
-async def ebay_authorize(request: Request, user_id: str = Depends(get_user_id)):
+async def ebay_authorize(request: Request, user_id: str = Depends(require_user_id)):
     """Generate eBay OAuth URL."""
     result = get_ebay_authorize_url(user_id)
     if "error" in result:
@@ -225,7 +225,7 @@ async def bol_connect(
     request: Request,
     body: BolConnectRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Validate BOL.com credentials and save connection.
 
@@ -241,7 +241,7 @@ async def bol_connect(
 # ── Connection status (all marketplaces) ──────────────────────────────────
 
 @router.get("/status")
-async def connection_status(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+async def connection_status(request: Request, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Return status of all OAuth connections — frontend uses for reconnect banners."""
     from datetime import datetime as dt, timezone as tz, timedelta as td
     conns = get_connections(db, user_id)
@@ -263,7 +263,7 @@ async def connection_status(request: Request, db: Session = Depends(get_db), use
 # ── Disconnect ────────────────────────────────────────────────────────────────
 
 @router.delete("/{marketplace}")
-async def disconnect_marketplace(request: Request, marketplace: str, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+async def disconnect_marketplace(request: Request, marketplace: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Remove an OAuth connection."""
     if not disconnect(db, marketplace, user_id):
         raise HTTPException(status_code=404, detail=f"No connection for {marketplace}")

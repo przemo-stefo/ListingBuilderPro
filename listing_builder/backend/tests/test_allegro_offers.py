@@ -30,7 +30,18 @@ def mock_get_db():
     return MagicMock()
 
 
-app.dependency_overrides = {}
+# WHY: require_user_id rejects "default" user_id — override with a real user_id
+# so endpoint tests can focus on business logic, not auth.
+from api.dependencies import require_user_id
+
+
+def mock_require_user_id():
+    return "test-user-aaaa-bbbb-cccc-111111111111"
+
+
+app.dependency_overrides = {
+    require_user_id: mock_require_user_id,
+}
 
 
 # --- Pydantic Model Validation Tests ---

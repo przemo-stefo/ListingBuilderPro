@@ -45,7 +45,7 @@ async def run_direct_groq(
 
     title_prompt = build_title_prompt(
         product_title, brand, product_line, tier1_phrases, lang, limits["title"],
-        expert_context=title_context,
+        expert_context=title_context, marketplace=marketplace,
     )
 
     with span(trace, "llm_title") as s:
@@ -56,7 +56,7 @@ async def run_direct_groq(
     # WHY: bullets, description, and backend suggestions are independent — run all 3 in parallel
     bullets_prompt = build_bullets_prompt(
         product_title, brand, tier2_phrases, lang, bullet_char_limit,
-        expert_context=bullets_context, bullet_count=bullet_count,
+        expert_context=bullets_context, bullet_count=bullet_count, marketplace=marketplace,
     )
     desc_prompt = build_description_prompt(
         product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
@@ -64,6 +64,7 @@ async def run_direct_groq(
     )
     backend_prompt = build_backend_prompt(
         product_title, brand, title_text, all_kw, lang, limits["backend"],
+        marketplace=marketplace,
     )
 
     # WHY: return_exceptions so optional backend call can fail without killing essential calls

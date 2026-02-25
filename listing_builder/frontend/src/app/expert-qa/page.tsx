@@ -141,7 +141,7 @@ function ExpertQAContent() {
       const res = await fetch('/api/proxy/knowledge/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, mode }),
+        body: JSON.stringify({ question: q, mode, expert: expertKey }),
       })
 
       if (!res.ok) {

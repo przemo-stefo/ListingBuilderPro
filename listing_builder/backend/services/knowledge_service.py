@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 import structlog
 
@@ -203,13 +204,26 @@ async def search_knowledge(
 
 async def search_all_categories(
     db: Session, query: str, max_chunks: int = 8,
+    category_prefix: str | None = None,
 ) -> tuple[str, list[str]]:
-    """Search ALL knowledge chunks regardless of category (for Expert Q&A)."""
+    """Search knowledge chunks for Expert Q&A.
+
+    WHY category_prefix: Kaufland expert should prefer kaufland_ chunks,
+    Amazon expert should search all. Prefix filter narrows results.
+    """
     try:
         search_query = await _expand_query(query)
         query_embedding = await _get_embedding_if_needed(search_query)
 
-        rows = await _get_search_rows(db, search_query, None, max_chunks, query_embedding)
+        # WHY: If expert has a category prefix, search those first, then fall back to all
+        categories = None
+        if category_prefix:
+            categories = [
+                cat for cat in _get_all_categories(db)
+                if cat.startswith(category_prefix) or cat == "listing_optimization"
+            ] or None
+
+        rows = await _get_search_rows(db, search_query, categories, max_chunks, query_embedding)
 
         # WHY: If expanded query returned nothing, retry with the user's original query.
         # Groq expansion can produce generic words that miss tsvector; original keywords
@@ -217,7 +231,12 @@ async def search_all_categories(
         if not rows and search_query != query:
             logger.info("search_fallback_to_original", expanded=search_query[:60])
             query_embedding = await _get_embedding_if_needed(query)
-            rows = await _get_search_rows(db, query, None, max_chunks, query_embedding)
+            rows = await _get_search_rows(db, query, categories, max_chunks, query_embedding)
+
+        # WHY: If category-filtered search found nothing, search all categories as fallback
+        if not rows and categories:
+            logger.info("search_fallback_all_categories", prefix=category_prefix)
+            rows = await _get_search_rows(db, search_query, None, max_chunks, query_embedding)
 
         if not rows:
             return "", []
@@ -226,3 +245,9 @@ async def search_all_categories(
     except Exception as e:
         logger.warning("knowledge_search_all_error", error=str(e))
         return "", []
+
+
+def _get_all_categories(db: Session) -> list[str]:
+    """Get distinct category names from DB. Cached per session."""
+    rows = db.execute(text("SELECT DISTINCT category FROM knowledge_chunks")).fetchall()
+    return [r[0] for r in rows]

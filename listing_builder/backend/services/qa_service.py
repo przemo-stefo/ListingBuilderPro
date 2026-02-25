@@ -16,6 +16,22 @@ logger = structlog.get_logger()
 
 MODEL = "llama-3.3-70b-versatile"
 
+# WHY: Expert-specific persona and category filter — each expert gets specialized knowledge
+EXPERT_CONFIG = {
+    "strict": {
+        "persona": "expert Amazon and e-commerce marketplace consultant with deep knowledge covering: Amazon keywords, listings, PPC, ranking strategies, video ads, creative strategies, AI tools, and marketing psychology",
+        "category_prefix": None,
+    },
+    "kaufland": {
+        "persona": "expert Kaufland.de marketplace consultant specializing in: Kaufland product listings, SEO, categories, EAN/GTIN requirements, shipping, fees, Buy Box optimization, and German marketplace best practices",
+        "category_prefix": "kaufland",
+    },
+    "flexible": {
+        "persona": "expert e-commerce marketplace consultant covering Amazon, Kaufland, Allegro, BOL.com and other European marketplaces",
+        "category_prefix": None,
+    },
+}
+
 # WHY: Mode-specific system prompt rules — controls how strictly LLM uses transcript knowledge
 MODE_RULES = {
     "strict": (
@@ -47,13 +63,15 @@ MODE_RULES = {
 }
 
 
-def _build_qa_prompt(question: str, context: str, mode: str = "balanced") -> str:
+def _build_qa_prompt(question: str, context: str, mode: str = "balanced", expert: str = "strict") -> str:
     """Build system prompt with expert knowledge context and mode-specific rules."""
     rules = MODE_RULES.get(mode, MODE_RULES["balanced"])
+    expert_cfg = EXPERT_CONFIG.get(expert, EXPERT_CONFIG["strict"])
+    persona = expert_cfg["persona"]
 
     # WHY: In bypass mode, skip RAG context entirely — pure LLM
     if mode == "bypass":
-        return f"""You are an expert Amazon and e-commerce marketplace consultant. Answer the user's question.
+        return f"""You are an {persona}. Answer the user's question.
 
 Rules:
 {rules}
@@ -68,7 +86,7 @@ EXPERT KNOWLEDGE BASE:
 {context}
 
 """
-    return f"""You are an expert Amazon and e-commerce marketplace consultant with deep knowledge covering: Amazon keywords, listings, PPC, ranking strategies, as well as video ads, creative strategies, AI tools, and marketing psychology. Answer the user's question using the expert knowledge provided below.
+    return f"""You are an {persona}. Answer the user's question using the expert knowledge provided below.
 
 {context_block}Rules:
 {rules}
@@ -81,26 +99,32 @@ async def ask_expert(
     question: str,
     db: Session,
     mode: str = "balanced",
+    expert: str = "strict",
 ) -> Dict:
     """
     RAG-powered Q&A: search knowledge base → inject into Groq prompt → return answer.
     """
+    expert_cfg = EXPERT_CONFIG.get(expert, EXPERT_CONFIG["strict"])
+
     # WHY: Bypass mode skips RAG entirely — no search needed
     context = ""
     source_names = []
     if mode != "bypass":
-        context, source_names = await search_all_categories(db, question)
+        context, source_names = await search_all_categories(
+            db, question, category_prefix=expert_cfg["category_prefix"],
+        )
 
     logger.info(
         "qa_question",
         question=question[:80],
         mode=mode,
+        expert=expert,
         context_len=len(context),
         has_context=bool(context),
         sources=len(source_names),
     )
 
-    prompt = _build_qa_prompt(question, context, mode)
+    prompt = _build_qa_prompt(question, context, mode, expert)
 
     # WHY: Higher temperature (0.6) for more natural conversational answers
     # WHY: Try all available keys to handle 429 rate limits

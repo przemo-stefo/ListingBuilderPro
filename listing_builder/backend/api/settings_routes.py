@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import require_user_id
 from schemas import (
     SettingsResponse,
     GeneralSettings,
@@ -142,7 +142,7 @@ def _build_response(data: dict) -> SettingsResponse:
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings(request: Request, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+async def get_settings(request: Request, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Get all application settings (from DB)."""
     data = _load_settings(db, user_id)
     return _build_response(data)
@@ -154,7 +154,7 @@ async def update_settings(
     request: Request,
     payload: SettingsUpdateRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Update settings — merges each section independently.

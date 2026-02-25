@@ -5,6 +5,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from models.premium_license import PremiumLicense
+from tests.conftest import TEST_USER_EMAIL
 
 
 class TestValidateLicenseRoute:
@@ -50,18 +51,27 @@ class TestValidateLicenseRoute:
 
 class TestRecoverLicenseRoute:
 
-    def test_recover_no_license(self, client, test_settings):
+    def test_recover_no_jwt_rejects(self, client, test_settings):
+        """WHY: recover-license requires JWT — API key only should be rejected."""
         resp = client.post(
             "/api/stripe/recover-license",
             json={"email": "nobody@test.com"},
             headers={"X-API-Key": test_settings.api_secret_key},
         )
+        assert resp.status_code == 401
+
+    def test_recover_no_license(self, auth_client):
+        """No license for this email → found=False."""
+        resp = auth_client.post(
+            "/api/stripe/recover-license",
+            json={"email": TEST_USER_EMAIL},
+        )
         assert resp.status_code == 200
         assert resp.json()["found"] is False
 
-    def test_recover_existing_license(self, client, test_settings, db_session):
+    def test_recover_existing_license(self, auth_client, db_session):
         lic = PremiumLicense(
-            email="recover@test.com",
+            email=TEST_USER_EMAIL,
             license_key="recover-test-key-123",
             plan_type="monthly",
             status="active",
@@ -69,28 +79,40 @@ class TestRecoverLicenseRoute:
         db_session.add(lic)
         db_session.commit()
 
-        resp = client.post(
+        resp = auth_client.post(
             "/api/stripe/recover-license",
-            json={"email": "recover@test.com"},
-            headers={"X-API-Key": test_settings.api_secret_key},
+            json={"email": TEST_USER_EMAIL},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["found"] is True
         assert data["license_key"] == "recover-test-key-123"
 
+    def test_recover_wrong_email_rejects(self, auth_client):
+        """WHY: JWT email must match request email — prevents stealing keys."""
+        resp = auth_client.post(
+            "/api/stripe/recover-license",
+            json={"email": "someone_else@test.com"},
+        )
+        assert resp.status_code == 403
+
 
 class TestSessionLicenseRoute:
 
-    def test_session_not_found(self, client, test_settings):
+    def test_session_no_jwt_rejects(self, client, test_settings):
+        """WHY: session-license requires JWT — prevents session_id theft."""
         resp = client.get(
             "/api/stripe/session/cs_nonexistent/license",
             headers={"X-API-Key": test_settings.api_secret_key},
         )
+        assert resp.status_code == 401
+
+    def test_session_not_found(self, auth_client):
+        resp = auth_client.get("/api/stripe/session/cs_nonexistent/license")
         assert resp.status_code == 200
         assert resp.json()["status"] == "pending"
 
-    def test_session_found(self, client, test_settings, db_session):
+    def test_session_found(self, auth_client, db_session):
         lic = PremiumLicense(
             email="session@test.com",
             license_key="session-route-key-12",
@@ -101,10 +123,7 @@ class TestSessionLicenseRoute:
         db_session.add(lic)
         db_session.commit()
 
-        resp = client.get(
-            "/api/stripe/session/cs_route_test/license",
-            headers={"X-API-Key": test_settings.api_secret_key},
-        )
+        resp = auth_client.get("/api/stripe/session/cs_route_test/license")
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ready"

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field, ValidationError
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import get_user_id, require_user_id
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
 from services.import_service import ImportService
 from config import settings
@@ -137,7 +137,7 @@ async def import_from_allegro_account(
     request: Request,
     body: AllegroAccountImportRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Import products from connected Allegro account by offer IDs.
@@ -213,7 +213,7 @@ async def scrape_product_url(
     request: Request,
     body: ScrapeRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Scrape product data from a marketplace URL.

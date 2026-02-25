@@ -46,6 +46,8 @@ class ChatRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=1000)
     # WHY: RAG behavior modes — controls how strictly the LLM sticks to transcript knowledge
     mode: str = Field(default="balanced", pattern="^(strict|balanced|flexible|bypass)$")
+    # WHY: Expert type tells QA service which persona + knowledge categories to use
+    expert: str = Field(default="strict", pattern="^(strict|kaufland|flexible)$")
 
 
 class ChatResponse(BaseModel):
@@ -67,7 +69,7 @@ async def expert_chat(
     """Expert Q&A — ask Amazon questions, answered using Inner Circle transcript RAG."""
     require_premium(request, db)
     try:
-        result = await ask_expert(body.question, db, mode=body.mode)
+        result = await ask_expert(body.question, db, mode=body.mode, expert=body.expert)
         return result
     except Exception as e:
         logger.error("expert_chat_error", error=str(e))

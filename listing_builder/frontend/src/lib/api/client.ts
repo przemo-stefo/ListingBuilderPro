@@ -3,6 +3,7 @@
 // NOT for: Business logic or component-specific code
 
 import axios, { AxiosError, AxiosInstance } from 'axios'
+import { createClient } from '@/lib/supabase'
 import type { ApiError, ApiResponse } from '../types'
 
 // Route all API calls through Next.js proxy (/api/proxy/*)
@@ -18,9 +19,9 @@ export const apiClient: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor - prevent caching on GET requests + inject license key
+// Request interceptor - prevent caching on GET requests + inject auth headers
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     // Add timestamp to prevent caching
     if (config.method === 'get') {
       config.params = {
@@ -29,8 +30,19 @@ apiClient.interceptors.request.use(
       }
     }
 
-    // WHY: Send license key with every request for backend tier enforcement
+    // WHY: Send Supabase JWT so backend identifies the user (user_id isolation)
     if (typeof window !== 'undefined') {
+      try {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          config.headers['Authorization'] = `Bearer ${session.access_token}`
+        }
+      } catch {
+        // WHY: Auth failure should not block API calls — proxy adds API key as fallback
+      }
+
+      // WHY: Send license key with every request for backend tier enforcement
       const licenseKey = localStorage.getItem('lbp_license_key')
       if (licenseKey) {
         config.headers['X-License-Key'] = licenseKey

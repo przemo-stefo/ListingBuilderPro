@@ -18,7 +18,7 @@ import structlog
 
 from config import settings
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import require_user_id
 from services.allegro_api import (
     fetch_seller_offers, fetch_offer_details,
     get_access_token,
@@ -265,7 +265,7 @@ async def _fetch_products_smart(
 @router.post("/scrape", response_model=ScrapeResponse)
 @limiter.limit("5/minute")
 async def scrape_allegro(
-    request: Request, body: ScrapeRequest = None, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
+    request: Request, body: ScrapeRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
 ):
     """Fetch product data from Allegro (API if OAuth connected, else scrape).
 
@@ -289,7 +289,7 @@ async def scrape_allegro(
 @router.post("/convert", response_model=ConvertResponse)
 @limiter.limit("5/minute")
 async def convert_to_marketplace(
-    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
+    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
 ):
     """Full pipeline: Fetch Allegro (API or scrape) → Translate → Map → JSON.
 
@@ -344,7 +344,7 @@ async def convert_to_marketplace(
 @router.post("/download")
 @limiter.limit("3/minute")
 async def download_template(
-    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
+    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
 ):
     """Full pipeline: Fetch (API/scrape) → Translate → Map → Download file.
 
@@ -448,7 +448,7 @@ async def start_store_convert(
     request: Request,
     body: StoreConvertRequest,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Start async conversion of store products.
 
@@ -529,7 +529,7 @@ async def download_store_job(job_id: str):
 async def get_allegro_offers(
     request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Fetch seller's offers via Allegro REST API (requires OAuth connection).
 
@@ -546,7 +546,7 @@ async def get_allegro_offers(
 async def get_bol_offers(
     request: Request,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """Fetch seller's offers via BOL.com Retailer API (requires connection).
 
