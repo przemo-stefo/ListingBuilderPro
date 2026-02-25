@@ -6,17 +6,37 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { KeyRound, Copy, Check, ArrowLeft } from 'lucide-react'
+import { KeyRound, Copy, Check, ArrowLeft, LogIn } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
+import { useAuth } from '@/components/providers/AuthProvider'
 
 export default function RecoverLicensePage() {
   const router = useRouter()
   const { unlockPremium } = useTier()
+  const { user, session, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [licenseKey, setLicenseKey] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // WHY: Backend requires JWT — user must be logged in to recover their own key
+  if (!authLoading && !user) {
+    return (
+      <div className="max-w-lg mx-auto space-y-6 pt-16 text-center">
+        <KeyRound className="h-10 w-10 text-amber-400 mx-auto" />
+        <h1 className="text-2xl font-bold text-white">Odzyskaj klucz licencyjny</h1>
+        <p className="text-gray-400 text-sm">Zaloguj się, aby odzyskać swój klucz</p>
+        <button
+          onClick={() => router.push('/login?next=/payment/recover')}
+          className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors"
+        >
+          <LogIn className="h-4 w-4" />
+          Zaloguj się
+        </button>
+      </div>
+    )
+  }
 
   const handleRecover = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,8 +47,11 @@ export default function RecoverLicensePage() {
     try {
       const res = await fetch('/api/proxy/stripe/recover-license', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ email: email || user?.email }),
       })
 
       if (!res.ok) {
@@ -63,16 +86,16 @@ export default function RecoverLicensePage() {
       <div className="text-center space-y-2">
         <KeyRound className="h-10 w-10 text-amber-400 mx-auto" />
         <h1 className="text-2xl font-bold text-white">Odzyskaj klucz licencyjny</h1>
-        <p className="text-gray-400 text-sm">Podaj email, którego użyłeś przy zakupie</p>
+        <p className="text-gray-400 text-sm">Klucz zostanie odzyskany dla Twojego konta</p>
       </div>
 
       <form onSubmit={handleRecover} className="space-y-4">
         <input
           type="email"
-          value={email}
+          value={email || user?.email || ''}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="email@example.com"
-          required
+          disabled
           className="w-full rounded-lg border border-gray-700 bg-[#121212] px-4 py-3 text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none"
         />
         <button

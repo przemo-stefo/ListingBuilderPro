@@ -100,7 +100,17 @@ async def validate(request: Request, body: ValidateLicenseRequest, db: Session =
 @router.post("/recover-license", response_model=RecoverLicenseResponse)
 @limiter.limit("5/minute")
 async def recover(request: Request, body: RecoverLicenseRequest, db: Session = Depends(get_db)):
-    """Recover license key by email address."""
+    """Recover license key by email address.
+
+    WHY JWT required: Without auth, anyone who knows an email could steal
+    a license key. JWT proves the caller owns the email they're querying.
+    """
+    jwt_email = _get_email_from_jwt(request)
+    if not jwt_email:
+        raise HTTPException(status_code=401, detail="Zaloguj się aby odzyskać klucz")
+    if jwt_email.lower() != body.email.strip().lower():
+        raise HTTPException(status_code=403, detail="Email nie pasuje do zalogowanego konta")
+
     key = get_license_by_email(body.email, db)
     if key:
         return RecoverLicenseResponse(found=True, license_key=key)

@@ -38,7 +38,7 @@ export const TierCtx = createContext<TierContext>({
 })
 
 export function TierProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth()
+  const { user, session, loading: authLoading } = useAuth()
   // WHY: Start as 'free' + loading=true during SSR — useEffect reads localStorage on client
   const [tier, setTier] = useState<TierLevel>('free')
   const [usageToday, setUsageToday] = useState(0)
@@ -83,13 +83,17 @@ export function TierProvider({ children }: { children: ReactNode }) {
   // WHY: Auto-recover license after login — if user has a license in DB, activate it
   // without requiring manual key entry
   useEffect(() => {
-    if (authLoading || !user?.email) return
+    if (authLoading || !user?.email || !session?.access_token) return
     // WHY: Skip if already premium — no need to recover
     if (localStorage.getItem(LICENSE_KEY_STORAGE)) return
 
+    // WHY: JWT required by backend — proves caller owns the email they're querying
     fetch('/api/proxy/stripe/recover-license', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
       body: JSON.stringify({ email: user.email }),
     })
       .then((r) => r.ok ? r.json() : null)
@@ -102,7 +106,7 @@ export function TierProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {})
-  }, [authLoading, user?.email])
+  }, [authLoading, user?.email, session?.access_token])
 
   const isPremium = tier === 'premium'
 
