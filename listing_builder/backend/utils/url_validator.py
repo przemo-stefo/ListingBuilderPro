@@ -1,11 +1,11 @@
 # backend/utils/url_validator.py
-# Purpose: Validate user-supplied URLs to prevent SSRF attacks
+# Purpose: Validate user-supplied URLs to prevent SSRF attacks + safe HTTP fetching
 # NOT for: Business logic, scraping, or URL building
 
 import ipaddress
 import socket
 from urllib.parse import urlparse
-from typing import Optional, Set
+from typing import Optional, Set, List, Tuple
 
 
 # WHY: Marketplaces we actually support — everything else is rejected
@@ -108,6 +108,16 @@ def _reject_private_host(hostname: str) -> None:
     Reject hostnames that resolve to private/internal IPs.
     SECURITY: Core SSRF protection — prevents fetching localhost, metadata APIs, etc.
     """
+    _resolve_and_check(hostname)
+
+
+def _resolve_and_check(hostname: str) -> List[Tuple]:
+    """Resolve hostname, reject private IPs, return validated addr_info.
+
+    WHY return addr_info: Callers can pin the resolved IP for the actual HTTP
+    request, preventing DNS rebinding (TOCTOU) attacks where an attacker returns
+    a public IP during validation but a private IP during the real request.
+    """
     # WHY: Reject obvious private hostnames before DNS resolution
     private_hostnames = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}
     if hostname.lower() in private_hostnames:
@@ -121,6 +131,18 @@ def _reject_private_host(hostname: str) -> None:
             ip = ipaddress.ip_address(ip_str)
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
                 raise ValueError(f"URL resolves to private/internal IP ({ip_str})")
+        return addr_info
     except socket.gaierror:
         # WHY: DNS resolution failed — could be a crafted hostname, reject it
         raise ValueError(f"Cannot resolve hostname: {hostname}")
+
+
+def get_validated_ip(hostname: str) -> str:
+    """Resolve hostname, validate it's not private, return first public IP.
+
+    WHY: Use this IP to pin the connection in httpx, preventing DNS rebinding.
+    Example: httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(local_address=...))
+    Or pass as Host header override.
+    """
+    addr_info = _resolve_and_check(hostname)
+    return addr_info[0][4][0]

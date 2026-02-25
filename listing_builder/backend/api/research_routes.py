@@ -15,6 +15,7 @@ from config import settings
 from services.stripe_service import validate_license
 from services.ov_skills import build_skill_prompt
 from database import get_db
+from utils.privacy import hash_ip
 
 limiter = Limiter(key_func=get_remote_address)
 logger = structlog.get_logger()
@@ -66,14 +67,14 @@ def _check_research_limit(request: Request, db: Session):
     from datetime import date
     from models.optimization import OptimizationRun
 
-    client_ip = get_remote_address(request)
+    ip_hash = hash_ip(get_remote_address(request))
     # WHY: Reuse optimization_runs table — research calls are tracked there too
-    # Count research runs (marketplace='research') for today from this IP
+    # Count research runs (marketplace='research') for today from this hashed IP
     today_count = (
         db.query(OptimizationRun)
         .filter(
             OptimizationRun.created_at >= date.today(),
-            OptimizationRun.client_ip == client_ip,
+            OptimizationRun.client_ip == ip_hash,
             OptimizationRun.marketplace == "research",
         )
         .count()
@@ -167,7 +168,7 @@ async def research_audience(
             compliance_status="N/A",
             request_data={"skill": skill, "product": body.product[:200]},
             response_data={"tokens_used": result["tokens_used"]},
-            client_ip=get_remote_address(request),
+            client_ip=ip_hash,
         )
         db.add(run)
         db.commit()

@@ -150,7 +150,7 @@ async def get_activity_log(
         "period_days": days,
         "optimizations": [
             {"id": row[0], "title": row[1], "marketplace": row[2], "mode": row[3],
-             "client_ip": row[4], "created_at": row[5].isoformat() if row[5] else None}
+             "ip_hash": row[4][:12] if row[4] else None, "created_at": row[5].isoformat() if row[5] else None}
             for row in optimizations
         ],
         "imports": [

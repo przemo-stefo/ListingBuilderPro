@@ -16,10 +16,16 @@ from services.llm_providers import PROVIDERS
 from services.stripe_service import validate_license
 from database import get_db
 from models.optimization import OptimizationRun
+from utils.privacy import hash_ip
 
 limiter = Limiter(key_func=get_remote_address)
 
 logger = structlog.get_logger()
+
+
+def _hashed_ip(request: Request) -> str:
+    """WHY: GDPR — store hashed IP, not raw. Rate limiting still works (same hash = same person)."""
+    return hash_ip(get_remote_address(request))
 
 router = APIRouter(prefix="/api/optimizer", tags=["optimizer"])
 
@@ -36,14 +42,14 @@ def _check_tier_limit(request: Request, db: Session, requested_count: int = 1):
     if license_key and validate_license(license_key, db):
         return  # unlimited
 
-    # WHY: Per-IP limit prevents abuse — DB count per client IP, not global
+    # WHY: Per-IP limit prevents abuse — hashed IP for GDPR, same hash = same person
     from datetime import date
-    client_ip = get_remote_address(request)
+    ip_hash = _hashed_ip(request)
     today_count = (
         db.query(OptimizationRun)
         .filter(
             OptimizationRun.created_at >= date.today(),
-            OptimizationRun.client_ip == client_ip,
+            OptimizationRun.client_ip == ip_hash,
         )
         .count()
     )
@@ -239,7 +245,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
                 request_data={k: v for k, v in body.model_dump().items() if k != "llm_api_key"},
                 response_data=result,
                 trace_data=result.get("trace"),
-                client_ip=get_remote_address(request),
+                client_ip=_hashed_ip(request),
             )
             db.add(run)
             db.commit()
