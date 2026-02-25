@@ -90,6 +90,60 @@ async def _get_fresh_token(conn: OAuthConnection, db: Session) -> Optional[str]:
     return conn.access_token
 
 
+def _empty_result(error: str) -> Dict:
+    """WHY extracted: 8 return points used the same dict shape — DRY."""
+    return {"store_name": "", "urls": [], "total": 0, "error": error, "capped": False}
+
+
+async def _start_export(client: httpx.AsyncClient, headers: Dict) -> Dict:
+    """Step 1: Request BOL CSV export, return processStatusId or error."""
+    resp = await client.post(
+        f"{BOL_API_BASE}/offers/export", headers=headers, json={"format": "CSV"},
+    )
+    if resp.status_code not in (200, 202):
+        logger.error("bol_export_start_failed", status=resp.status_code)
+        return {"error": f"BOL.com export error: {resp.status_code}"}
+
+    process_id = resp.json().get("processStatusId")
+    if not process_id:
+        return {"error": "BOL.com nie zwrócił processStatusId"}
+    return {"process_id": process_id}
+
+
+async def _poll_export(client: httpx.AsyncClient, process_id: str, token: str) -> Dict:
+    """Step 2: Poll until SUCCESS (max 30s = 10 polls * 3s), return entityId or error."""
+    poll_headers = {"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT}
+    for _ in range(10):
+        await asyncio.sleep(3)
+        poll = await client.get(f"{BOL_PROCESS_URL}/{process_id}", headers=poll_headers)
+        if poll.status_code != 200:
+            continue
+        data = poll.json()
+        status = data.get("status", "")
+        if status == "SUCCESS":
+            return {"entity_id": data.get("entityId")}
+        if status in ("FAILURE", "TIMEOUT"):
+            return {"error": f"BOL.com export failed: {status}"}
+    return {"error": "BOL.com export timeout — spróbuj ponownie"}
+
+
+def _parse_offers_csv(csv_text: str) -> List[str]:
+    """Step 3: Parse CSV for offerId/EAN → build BOL.com product URLs.
+
+    WHY EAN first: BOL product URLs use EAN (public page), offerId as search fallback.
+    """
+    urls: List[str] = []
+    for row in csv.DictReader(io.StringIO(csv_text)):
+        offer_id = row.get("offerId", "")
+        ean = row.get("ean", "")
+        if offer_id:
+            if ean:
+                urls.append(f"https://www.bol.com/nl/nl/p/-/{ean}/")
+            else:
+                urls.append(f"https://www.bol.com/nl/nl/s/?searchtext={offer_id}")
+    return urls
+
+
 async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
     """Fetch all offers from connected BOL.com seller account.
 
@@ -104,84 +158,34 @@ async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
     ).first()
 
     if not conn or conn.status != "active":
-        return {"store_name": "", "urls": [], "total": 0,
-                "error": "BOL.com nie jest połączony. Kliknij 'Połącz' w Integracje.",
-                "capped": False}
+        return _empty_result("BOL.com nie jest połączony. Kliknij 'Połącz' w Integracje.")
 
     token = await _get_fresh_token(conn, db)
     if not token:
-        return {"store_name": "", "urls": [], "total": 0,
-                "error": "Token BOL.com wygasł. Połącz ponownie.",
-                "capped": False}
+        return _empty_result("Token BOL.com wygasł. Połącz ponownie.")
 
     json_headers = {"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT,
                     "Content-Type": BOL_ACCEPT}
 
     try:
         async with httpx.AsyncClient(timeout=60) as client:
-            # Step 1: Request CSV export
-            resp = await client.post(
-                f"{BOL_API_BASE}/offers/export",
-                headers=json_headers,
-                json={"format": "CSV"},
-            )
-            if resp.status_code not in (200, 202):
-                logger.error("bol_export_start_failed", status=resp.status_code, body=resp.text[:300])
-                return {"store_name": "", "urls": [], "total": 0,
-                        "error": f"BOL.com export error: {resp.status_code}", "capped": False}
+            step1 = await _start_export(client, json_headers)
+            if "error" in step1:
+                return _empty_result(step1["error"])
 
-            process_id = resp.json().get("processStatusId")
-            if not process_id:
-                return {"store_name": "", "urls": [], "total": 0,
-                        "error": "BOL.com nie zwrócił processStatusId", "capped": False}
+            step2 = await _poll_export(client, step1["process_id"], token)
+            if "error" in step2:
+                return _empty_result(step2["error"])
 
-            # Step 2: Poll until SUCCESS (max 30s = 10 polls * 3s)
-            entity_id = None
-            for _ in range(10):
-                await asyncio.sleep(3)
-                poll = await client.get(
-                    f"{BOL_PROCESS_URL}/{process_id}",
-                    headers={"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT},
-                )
-                if poll.status_code != 200:
-                    continue
-                data = poll.json()
-                status = data.get("status", "")
-                if status == "SUCCESS":
-                    entity_id = data.get("entityId")
-                    break
-                if status in ("FAILURE", "TIMEOUT"):
-                    return {"store_name": "", "urls": [], "total": 0,
-                            "error": f"BOL.com export failed: {status}", "capped": False}
-
-            if not entity_id:
-                return {"store_name": "", "urls": [], "total": 0,
-                        "error": "BOL.com export timeout — spróbuj ponownie", "capped": False}
-
-            # Step 3: Download CSV
             csv_resp = await client.get(
-                f"{BOL_API_BASE}/offers/export/{entity_id}",
+                f"{BOL_API_BASE}/offers/export/{step2['entity_id']}",
                 headers={"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT_CSV},
             )
             if csv_resp.status_code != 200:
                 logger.error("bol_export_download_failed", status=csv_resp.status_code)
-                return {"store_name": "", "urls": [], "total": 0,
-                        "error": f"BOL.com CSV download error: {csv_resp.status_code}", "capped": False}
+                return _empty_result(f"BOL.com CSV download error: {csv_resp.status_code}")
 
-        # WHY: Parse CSV for offerId column → build BOL.com product URLs
-        all_urls: List[str] = []
-        reader = csv.DictReader(io.StringIO(csv_resp.text))
-        for row in reader:
-            offer_id = row.get("offerId", "")
-            ean = row.get("ean", "")
-            if offer_id:
-                # WHY: BOL product URLs use EAN, not offerId. But offerId is unique per seller.
-                # Use EAN-based URL when available (public product page), offerId as fallback.
-                if ean:
-                    all_urls.append(f"https://www.bol.com/nl/nl/p/-/{ean}/")
-                else:
-                    all_urls.append(f"https://www.bol.com/nl/nl/s/?searchtext={offer_id}")
-
+        all_urls = _parse_offers_csv(csv_resp.text)
         logger.info("bol_offers_fetched", total=len(all_urls))
         return {
             "store_name": conn.seller_name or "Twoje konto BOL.com",
@@ -192,9 +196,7 @@ async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
         }
 
     except httpx.TimeoutException:
-        return {"store_name": "", "urls": [], "total": 0,
-                "error": "BOL.com API timeout", "capped": False}
+        return _empty_result("BOL.com API timeout")
     except Exception as e:
         logger.error("bol_api_error", error=str(e))
-        return {"store_name": "", "urls": [], "total": 0,
-                "error": f"BOL.com API error: {str(e)}", "capped": False}
+        return _empty_result(f"BOL.com API error: {str(e)}")

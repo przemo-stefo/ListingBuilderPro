@@ -94,6 +94,15 @@ async def amazon_callback(
     return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=success&marketplace=amazon")
 
 
+# ── Shared validator ──────────────────────────────────────────────────────────
+
+def _not_empty(v: str) -> str:
+    """WHY extracted: Amazon + BOL forms both need the same strip+empty check."""
+    if not v.strip():
+        raise ValueError("Pole nie może być puste")
+    return v.strip()
+
+
 # ── Amazon Credentials (form-based, like BOL) ────────────────────────────────
 
 class AmazonCredentialsRequest(BaseModel):
@@ -105,9 +114,7 @@ class AmazonCredentialsRequest(BaseModel):
     @field_validator("client_id", "client_secret", "refresh_token")
     @classmethod
     def not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Pole nie może być puste")
-        return v.strip()
+        return _not_empty(v)
 
 
 @router.post("/amazon/credentials")
@@ -209,9 +216,7 @@ class BolConnectRequest(BaseModel):
     @field_validator("client_id", "client_secret")
     @classmethod
     def not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Pole nie może być puste")
-        return v.strip()
+        return _not_empty(v)
 
 
 @router.post("/bol/connect")

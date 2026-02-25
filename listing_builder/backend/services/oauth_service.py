@@ -185,7 +185,8 @@ async def handle_amazon_callback(
         resp = await client.post(AMAZON_TOKEN_URL, data=data)
 
     if resp.status_code != 200:
-        logger.error("amazon_oauth_token_failed", status=resp.status_code, body=resp.text[:200])
+        # WHY no resp.text: API error responses may contain token fragments
+        logger.error("amazon_oauth_token_failed", status=resp.status_code)
         return {"error": f"Token exchange failed: {resp.status_code}"}
 
     data = resp.json()
@@ -222,7 +223,8 @@ async def connect_amazon_credentials(
         })
 
     if resp.status_code != 200:
-        logger.error("amazon_credentials_validation_failed", status=resp.status_code, body=resp.text[:200])
+        # WHY no resp.text: API error responses may contain token fragments
+        logger.error("amazon_credentials_validation_failed", status=resp.status_code)
         return {"error": f"Nieprawidłowe dane Amazon (HTTP {resp.status_code})"}
 
     data = resp.json()
@@ -296,7 +298,8 @@ async def handle_allegro_callback(
         )
 
     if resp.status_code != 200:
-        logger.error("allegro_oauth_token_failed", status=resp.status_code, body=resp.text[:200])
+        # WHY no resp.text: token exchange errors may contain credential fragments
+        logger.error("allegro_oauth_token_failed", status=resp.status_code)
         return {"error": f"Token exchange failed: {resp.status_code}"}
 
     data = resp.json()
@@ -383,7 +386,8 @@ async def handle_ebay_callback(
         )
 
     if resp.status_code != 200:
-        logger.error("ebay_oauth_token_failed", status=resp.status_code, body=resp.text[:200])
+        # WHY no resp.text: token exchange errors may contain credential fragments
+        logger.error("ebay_oauth_token_failed", status=resp.status_code)
         return {"error": f"Token exchange failed: {resp.status_code}"}
 
     data = resp.json()
