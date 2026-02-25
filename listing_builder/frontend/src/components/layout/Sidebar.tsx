@@ -50,10 +50,11 @@ export function Sidebar({ onClose }: SidebarProps) {
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const basePath = item.href.split('?')[0]
-                // WHY: /expert-qa?mode=strict vs ?mode=kaufland — compare full path+query
-                const hrefParams = new URLSearchParams(item.href.split('?')[1] || '')
+                const hrefQuery = item.href.split('?')[1] || ''
+                // WHY: Items sharing a base path (e.g. /expert-qa?mode=strict vs ?mode=kaufland)
+                // must match ALL query params from href, not just pathname
                 const isActive = pathname === basePath && (
-                  !hrefParams.toString() || hrefParams.get('mode') === searchParams.get('mode')
+                  !hrefQuery || [...new URLSearchParams(hrefQuery)].every(([k, v]) => searchParams.get(k) === v)
                 )
                 const Icon = item.icon
                 // WHY: Premium items without license → show crown and redirect to upgrade
