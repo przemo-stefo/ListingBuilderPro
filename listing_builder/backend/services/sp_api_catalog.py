@@ -5,13 +5,16 @@
 import httpx
 import structlog
 from typing import Dict, Optional
+from sqlalchemy.orm import Session
 
+from config import settings
 from services.sp_api_auth import get_access_token, credentials_configured
 
 logger = structlog.get_logger()
 
-SP_API_BASE = "https://sellingpartnerapi-eu.amazon.com"
-CATALOG_API = f"{SP_API_BASE}/catalog/2022-04-01/items"
+# WHY two bases: Sandbox app uses sandbox endpoint, production app uses production endpoint
+SP_API_BASE_PROD = "https://sellingpartnerapi-eu.amazon.com"
+SP_API_BASE_SANDBOX = "https://sandbox.sellingpartnerapi-eu.amazon.com"
 
 # WHY: Map marketplace code → Amazon marketplace ID for SP-API
 MARKETPLACE_IDS = {
@@ -28,11 +31,12 @@ MARKETPLACE_IDS = {
 }
 
 
-async def fetch_catalog_item(asin: str, marketplace: str = "DE") -> Dict:
+async def fetch_catalog_item(asin: str, marketplace: str = "DE", db: Optional[Session] = None) -> Dict:
     """Fetch product data from SP-API Catalog Items by ASIN.
 
     WHY SP-API over scraping: Reliable, no anti-bot, structured data,
     returns title, bullet points, images, and product attributes.
+    WHY db param: Check oauth_connections for token if not in env.
     """
     if not credentials_configured():
         return {"error": "Amazon SP-API nie skonfigurowane (brak client_id/secret)"}
@@ -40,7 +44,7 @@ async def fetch_catalog_item(asin: str, marketplace: str = "DE") -> Dict:
     marketplace_id = MARKETPLACE_IDS.get(marketplace.upper(), MARKETPLACE_IDS["DE"])
 
     try:
-        token = await get_access_token()
+        token = await get_access_token(db=db)
     except (ValueError, RuntimeError) as e:
         return {"error": f"Błąd autoryzacji SP-API: {str(e)[:100]}"}
 
@@ -56,10 +60,14 @@ async def fetch_catalog_item(asin: str, marketplace: str = "DE") -> Dict:
         "includedData": "summaries,attributes,images",
     }
 
+    # WHY: Sandbox apps must call sandbox endpoint; production apps call production
+    base = SP_API_BASE_SANDBOX if settings.amazon_sandbox else SP_API_BASE_PROD
+    catalog_url = f"{base}/catalog/2022-04-01/items/{asin}"
+
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(
-                f"{CATALOG_API}/{asin}",
+                catalog_url,
                 headers=headers,
                 params=params,
             )

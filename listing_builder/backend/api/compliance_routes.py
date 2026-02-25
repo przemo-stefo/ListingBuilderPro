@@ -193,7 +193,7 @@ async def audit_product_card(request: Request, body: AuditRequest, db: Session =
         raise HTTPException(status_code=400, detail="URL lub ASIN jest wymagany")
 
     try:
-        result = await audit_product(url, marketplace)
+        result = await audit_product(url, marketplace, db=db)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -4,7 +4,8 @@
 
 import re
 import structlog
-from typing import List, Dict
+from typing import List, Dict, Optional
+from sqlalchemy.orm import Session
 
 from config import settings
 from services.scraper.allegro_scraper import scrape_allegro_product, AllegroProduct
@@ -253,15 +254,16 @@ def audit_product_from_data(data: Dict) -> Dict:
     }
 
 
-async def audit_product(url: str, marketplace: str) -> Dict:
+async def audit_product(url: str, marketplace: str, db: Optional[Session] = None) -> Dict:
     """
     Full audit pipeline: scrape → base rules → parameter rules → AI suggestions.
+    WHY db: Pass to SP-API for oauth_connections token lookup.
     """
     # Step 1: Scrape based on marketplace
     if marketplace == "allegro":
         return await _audit_allegro(url, marketplace)
     elif marketplace == "amazon":
-        return await _audit_amazon(url, marketplace)
+        return await _audit_amazon(url, marketplace, db=db)
     elif marketplace == "ebay":
         return await _audit_ebay(url, marketplace)
     else:
@@ -349,7 +351,7 @@ async def _audit_allegro(url: str, marketplace: str) -> Dict:
     )
 
 
-async def _audit_amazon(url: str, marketplace: str) -> Dict:
+async def _audit_amazon(url: str, marketplace: str, db: Optional[Session] = None) -> Dict:
     """Amazon audit: parse ASIN/URL → SP-API (preferred) or HTML scraping (fallback).
 
     WHY fallback: SP-API needs refresh_token from Mateusz. Until he authorizes,
@@ -363,8 +365,9 @@ async def _audit_amazon(url: str, marketplace: str) -> Dict:
     data = None
 
     # WHY: Try SP-API first (structured data, reliable), fall back to scraping
-    if sp_api_configured() and has_refresh_token():
-        sp_data = await fetch_catalog_item(listing.asin, mp_code)
+    # WHY db: Check oauth_connections for token if not in env
+    if sp_api_configured() and has_refresh_token(db=db):
+        sp_data = await fetch_catalog_item(listing.asin, mp_code, db=db)
         if not sp_data.get("error"):
             data = sp_data
         else:

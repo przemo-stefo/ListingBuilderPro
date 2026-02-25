@@ -58,7 +58,7 @@ class FetchResponse(BaseModel):
 
 @router.post("/fetch", response_model=FetchResponse)
 @limiter.limit("10/minute")
-async def fetch_listing_endpoint(request: Request, body: FetchRequest):
+async def fetch_listing_endpoint(request: Request, body: FetchRequest, db: Session = Depends(get_db)):
     """Parse Amazon URL/ASIN, detect marketplace, fetch listing data via SP-API."""
     parsed = parse_input(body.input)
 
@@ -72,8 +72,9 @@ async def fetch_listing_endpoint(request: Request, body: FetchRequest):
         return FetchResponse(asin="", marketplace=marketplace, url=url)
 
     # WHY: Try SP-API first (official, reliable), fall back to HTML scraping
-    if credentials_configured() and has_refresh_token():
-        catalog = await fetch_catalog_item(parsed.asin, marketplace)
+    # WHY db: Check oauth_connections for token if not in env
+    if credentials_configured() and has_refresh_token(db=db):
+        catalog = await fetch_catalog_item(parsed.asin, marketplace, db=db)
         if not catalog.get("error"):
             return FetchResponse(
                 asin=parsed.asin, marketplace=marketplace,
