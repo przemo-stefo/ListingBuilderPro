@@ -2,6 +2,9 @@
 # Purpose: BOL.com Retailer API v10 client — fetch offers via Client Credentials
 # NOT for: OAuth browser redirect flow (BOL uses server-to-server only)
 
+import asyncio
+import csv
+import io
 import httpx
 import structlog
 from datetime import datetime, timezone, timedelta
@@ -15,6 +18,8 @@ logger = structlog.get_logger()
 BOL_TOKEN_URL = "https://login.bol.com/token"
 BOL_API_BASE = "https://api.bol.com/retailer"
 BOL_ACCEPT = "application/vnd.retailer.v10+json"
+BOL_ACCEPT_CSV = "application/vnd.retailer.v10+csv"
+BOL_PROCESS_URL = "https://api.bol.com/shared/process-status"
 
 
 async def validate_bol_credentials(client_id: str, client_secret: str) -> Dict:
@@ -88,8 +93,10 @@ async def _get_fresh_token(conn: OAuthConnection, db: Session) -> Optional[str]:
 async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
     """Fetch all offers from connected BOL.com seller account.
 
-    WHY paginated: BOL returns max 50 offers/page. We loop through all pages
-    to get the full catalog, same pattern as Allegro fetch_seller_offers().
+    WHY 3-step async export: BOL v10 API removed GET /offers. New flow is:
+    1. POST /offers/export {"format":"CSV"} → processStatusId
+    2. Poll /shared/process-status/{id} until SUCCESS → entityId
+    3. GET /offers/export/{entityId} with CSV accept → parse offer IDs
     """
     conn = db.query(OAuthConnection).filter(
         OAuthConnection.user_id == user_id,
@@ -107,44 +114,73 @@ async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
                 "error": "Token BOL.com wygasł. Połącz ponownie.",
                 "capped": False}
 
-    all_urls: List[str] = []
-    page = 1
-    max_pages = 100  # WHY: Guard against infinite loop — 100 pages * 50 = 5K offers
+    json_headers = {"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT,
+                    "Content-Type": BOL_ACCEPT}
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            for _ in range(max_pages):
-                resp = await client.get(
-                    f"{BOL_API_BASE}/offers",
-                    params={"page": page, "size": 50},
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Accept": BOL_ACCEPT,
-                    },
+        async with httpx.AsyncClient(timeout=60) as client:
+            # Step 1: Request CSV export
+            resp = await client.post(
+                f"{BOL_API_BASE}/offers/export",
+                headers=json_headers,
+                json={"format": "CSV"},
+            )
+            if resp.status_code not in (200, 202):
+                logger.error("bol_export_start_failed", status=resp.status_code, body=resp.text[:300])
+                return {"store_name": "", "urls": [], "total": 0,
+                        "error": f"BOL.com export error: {resp.status_code}", "capped": False}
+
+            process_id = resp.json().get("processStatusId")
+            if not process_id:
+                return {"store_name": "", "urls": [], "total": 0,
+                        "error": "BOL.com nie zwrócił processStatusId", "capped": False}
+
+            # Step 2: Poll until SUCCESS (max 30s = 10 polls * 3s)
+            entity_id = None
+            for _ in range(10):
+                await asyncio.sleep(3)
+                poll = await client.get(
+                    f"{BOL_PROCESS_URL}/{process_id}",
+                    headers={"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT},
                 )
-
-                if resp.status_code == 401:
-                    return {"store_name": "", "urls": [], "total": 0,
-                            "error": "Token BOL.com wygasł. Połącz ponownie.",
-                            "capped": False}
-
-                if resp.status_code != 200:
-                    return {"store_name": "", "urls": [], "total": 0,
-                            "error": f"BOL.com API error: {resp.status_code}",
-                            "capped": False}
-
-                data = resp.json()
-                offers = data.get("offers", [])
-
-                for offer in offers:
-                    offer_id = offer.get("offerId", "")
-                    if offer_id:
-                        all_urls.append(f"https://www.bol.com/nl/nl/p/-/{offer_id}/")
-
-                # WHY: No more pages when fewer than 50 results
-                if len(offers) < 50:
+                if poll.status_code != 200:
+                    continue
+                data = poll.json()
+                status = data.get("status", "")
+                if status == "SUCCESS":
+                    entity_id = data.get("entityId")
                     break
-                page += 1
+                if status in ("FAILURE", "TIMEOUT"):
+                    return {"store_name": "", "urls": [], "total": 0,
+                            "error": f"BOL.com export failed: {status}", "capped": False}
+
+            if not entity_id:
+                return {"store_name": "", "urls": [], "total": 0,
+                        "error": "BOL.com export timeout — spróbuj ponownie", "capped": False}
+
+            # Step 3: Download CSV
+            csv_resp = await client.get(
+                f"{BOL_API_BASE}/offers/export/{entity_id}",
+                headers={"Authorization": f"Bearer {token}", "Accept": BOL_ACCEPT_CSV},
+            )
+            if csv_resp.status_code != 200:
+                logger.error("bol_export_download_failed", status=csv_resp.status_code)
+                return {"store_name": "", "urls": [], "total": 0,
+                        "error": f"BOL.com CSV download error: {csv_resp.status_code}", "capped": False}
+
+        # WHY: Parse CSV for offerId column → build BOL.com product URLs
+        all_urls: List[str] = []
+        reader = csv.DictReader(io.StringIO(csv_resp.text))
+        for row in reader:
+            offer_id = row.get("offerId", "")
+            ean = row.get("ean", "")
+            if offer_id:
+                # WHY: BOL product URLs use EAN, not offerId. But offerId is unique per seller.
+                # Use EAN-based URL when available (public product page), offerId as fallback.
+                if ean:
+                    all_urls.append(f"https://www.bol.com/nl/nl/p/-/{ean}/")
+                else:
+                    all_urls.append(f"https://www.bol.com/nl/nl/s/?searchtext={offer_id}")
 
         logger.info("bol_offers_fetched", total=len(all_urls))
         return {

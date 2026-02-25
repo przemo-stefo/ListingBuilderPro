@@ -204,6 +204,42 @@ async def handle_amazon_callback(
     return {"status": "connected", "marketplace": "amazon", "seller_id": selling_partner_id}
 
 
+async def connect_amazon_credentials(
+    client_id: str, client_secret: str, refresh_token: str, db: Session, user_id: str = "default",
+) -> Dict:
+    """Validate Amazon credentials via LWA token exchange, save to DB.
+
+    WHY direct credentials: Amazon SP-API app is in Sandbox (no OAuth redirect for
+    external users). Mateusz provides client_id/secret/refresh_token via UI form.
+    WHY raw_data stores client_id/secret: sp_api_auth.py needs them for token refresh.
+    """
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(AMAZON_TOKEN_URL, data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        })
+
+    if resp.status_code != 200:
+        logger.error("amazon_credentials_validation_failed", status=resp.status_code, body=resp.text[:200])
+        return {"error": f"Nieprawidłowe dane Amazon (HTTP {resp.status_code})"}
+
+    data = resp.json()
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
+
+    _save_connection(
+        db, user_id, "amazon",
+        access_token=data["access_token"],
+        refresh_token=refresh_token,
+        expires_at=expires_at,
+        raw_data={"client_id": client_id, "client_secret": client_secret},
+    )
+    logger.info("amazon_credentials_connected", user_id=user_id)
+
+    return {"status": "connected", "marketplace": "amazon"}
+
+
 # ── Allegro OAuth ────────────────────────────────────────────────────────────
 
 ALLEGRO_AUTH_URL = "https://allegro.pl/auth/oauth/authorize"

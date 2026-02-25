@@ -43,6 +43,8 @@ def create_checkout_session(plan_type: str, email: str) -> str:
         mode=mode,
         customer_email=email,
         line_items=[{"price": price_id, "quantity": 1}],
+        # WHY: Mateusz (spotkanie 24.02) — promo 39 zł na start, kody tworzone w Stripe Dashboard
+        allow_promotion_codes=True,
         success_url=f"{FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{FRONTEND_URL}/payment/cancel",
         metadata={"plan_type": plan_type},

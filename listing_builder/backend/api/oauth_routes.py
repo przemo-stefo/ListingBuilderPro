@@ -18,6 +18,7 @@ from pydantic import BaseModel, field_validator
 from services.oauth_service import (
     get_amazon_authorize_url,
     handle_amazon_callback,
+    connect_amazon_credentials,
     get_allegro_authorize_url,
     handle_allegro_callback,
     get_ebay_authorize_url,
@@ -91,6 +92,43 @@ async def amazon_callback(
         return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=error&msg={quote(result['error'])}")
 
     return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=success&marketplace=amazon")
+
+
+# ── Amazon Credentials (form-based, like BOL) ────────────────────────────────
+
+class AmazonCredentialsRequest(BaseModel):
+    """WHY POST body: SP-API app in Sandbox — user provides keys via UI form."""
+    client_id: str
+    client_secret: str
+    refresh_token: str
+
+    @field_validator("client_id", "client_secret", "refresh_token")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Pole nie może być puste")
+        return v.strip()
+
+
+@router.post("/amazon/credentials")
+@limiter.limit("5/minute")
+async def amazon_credentials(
+    request: Request,
+    body: AmazonCredentialsRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id),
+):
+    """Validate Amazon SP-API credentials and save connection.
+
+    WHY separate from /amazon/authorize: SP-API app is in Sandbox, no OAuth redirect
+    for external users. User enters client_id/secret/refresh_token in form.
+    """
+    result = await connect_amazon_credentials(
+        body.client_id, body.client_secret, body.refresh_token, db, user_id,
+    )
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # ── Allegro OAuth ─────────────────────────────────────────────────────────────

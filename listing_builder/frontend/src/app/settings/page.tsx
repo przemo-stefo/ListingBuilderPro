@@ -5,8 +5,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Settings as SettingsIcon, Link as LinkIcon, Bell, Download, Save, Cpu } from 'lucide-react'
+import { Suspense } from 'react'
+import { Settings as SettingsIcon, Bell, Download, Save, Cpu } from 'lucide-react'
+import IntegrationsTab from '@/app/compliance/components/IntegrationsTab'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -292,24 +293,10 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* WHY: Marketplace connections moved to /integrations — link only */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <LinkIcon className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Połączenia z marketplace&apos;ami</CardTitle>
-          </div>
-          <CardDescription>Zarządzaj OAuth i API marketplace&apos;ów w jednym miejscu</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link
-            href="/integrations"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-white/5 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
-          >
-            Zarządzaj w Integracje →
-          </Link>
-        </CardContent>
-      </Card>
+      {/* WHY: Mateusz (spotkanie 24.02) — integracje mają być w ustawieniach, nie osobno */}
+      <Suspense>
+        <IntegrationsTab />
+      </Suspense>
 
       {/* Card 3 — Preferencje powiadomien */}
       <Card>

@@ -26,6 +26,16 @@ export async function connectBol(clientId: string, clientSecret: string): Promis
   return response.data!
 }
 
+export async function connectAmazon(clientId: string, clientSecret: string, refreshToken: string): Promise<{ status: string; marketplace: string }> {
+  const response = await apiRequest<{ status: string; marketplace: string }>('post', '/oauth/amazon/credentials', {
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  })
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
 export async function disconnectMarketplace(marketplace: string): Promise<void> {
   const response = await apiRequest<void>('delete', `/oauth/${marketplace}`)
   if (response.error) throw new Error(response.error)

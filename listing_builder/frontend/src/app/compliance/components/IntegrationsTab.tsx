@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useTrackedProducts } from '@/lib/hooks/useMonitoring'
 import { useOAuthConnections, useOAuthAuthorize, useOAuthDisconnect } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
+import AmazonConnectForm from './AmazonConnectForm'
 import BolConnectForm from './BolConnectForm'
 
 // WHY: Marketplaces with OAuth flow ready — others show "Wkrótce"
@@ -43,7 +44,8 @@ export default function IntegrationsTab() {
   const authorizeMutation = useOAuthAuthorize()
   const disconnectMutation = useOAuthDisconnect()
   const [scanning, setScanning] = useState(false)
-  // WHY: BOL uses Client Credentials — form toggle only, form logic in BolConnectForm
+  // WHY: Amazon/BOL use form-based connect, not browser redirect
+  const [amazonFormOpen, setAmazonFormOpen] = useState(false)
   const [bolFormOpen, setBolFormOpen] = useState(false)
 
   const tracked = trackedQuery.data?.items ?? []
@@ -182,8 +184,10 @@ export default function IntegrationsTab() {
                   <button
                     onClick={() => {
                       if (!hasOAuth || isOAuthActive) return
-                      // WHY: BOL uses form-based connect, others use browser redirect
-                      if (mp.id === 'bol') {
+                      // WHY: Amazon/BOL use form-based connect, others use browser redirect
+                      if (mp.id === 'amazon') {
+                        setAmazonFormOpen(true)
+                      } else if (mp.id === 'bol') {
                         setBolFormOpen(true)
                       } else {
                         authorizeMutation.mutate(mp.id)
@@ -214,7 +218,13 @@ export default function IntegrationsTab() {
         })}
       </div>
 
-      {/* WHY: BOL Client Credentials — extracted to own component for maintainability */}
+      {/* WHY: Amazon/BOL — form-based connect, extracted to own components */}
+      {amazonFormOpen && (
+        <AmazonConnectForm
+          onSuccess={() => { setAmazonFormOpen(false); oauthQuery.refetch() }}
+          onCancel={() => setAmazonFormOpen(false)}
+        />
+      )}
       {bolFormOpen && (
         <BolConnectForm
           onSuccess={() => { setBolFormOpen(false); oauthQuery.refetch() }}

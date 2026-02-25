@@ -3,13 +3,14 @@
 # NOT for: User-facing features or settings (those are in settings_routes.py)
 
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db
 from api.dependencies import require_admin
 from config import settings
 from typing import Literal, Optional
+import secrets
 import structlog
 
 logger = structlog.get_logger()
@@ -213,3 +214,45 @@ async def update_license(
     }
 
 
+class GrantPremiumRequest(BaseModel):
+    """WHY: Admin-granted lifetime premium — no Stripe, no expiry."""
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def valid_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v:
+            raise ValueError("Nieprawidłowy email")
+        return v
+
+
+@router.post("/grant-premium")
+async def grant_premium(
+    body: GrantPremiumRequest,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(require_admin),
+):
+    """Grant lifetime premium to email — admin use only.
+
+    WHY: Mateusz (spotkanie 24.02) — admin accounts get premium without Stripe payment.
+    Idempotent: if active license exists for email, returns existing key.
+    """
+    # WHY: Check if already has active license — don't create duplicates
+    existing = db.execute(text(
+        "SELECT license_key FROM premium_licenses WHERE email = :email AND status = 'active' LIMIT 1"
+    ), {"email": body.email}).fetchone()
+
+    if existing:
+        logger.info("grant_premium_already_exists", email=body.email)
+        return {"email": body.email, "license_key": existing[0], "created": False}
+
+    license_key = secrets.token_urlsafe(32)
+    db.execute(text("""
+        INSERT INTO premium_licenses (email, license_key, plan_type, status, expires_at)
+        VALUES (:email, :key, 'lifetime', 'active', NULL)
+    """), {"email": body.email, "key": license_key})
+    db.commit()
+
+    logger.info("grant_premium_created", email=body.email)
+    return {"email": body.email, "license_key": license_key, "created": True}
