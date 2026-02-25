@@ -50,7 +50,11 @@ export function Sidebar({ onClose }: SidebarProps) {
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const basePath = item.href.split('?')[0]
-                const isActive = pathname === basePath
+                // WHY: /expert-qa?mode=strict vs ?mode=kaufland — compare full path+query
+                const hrefParams = new URLSearchParams(item.href.split('?')[1] || '')
+                const isActive = pathname === basePath && (
+                  !hrefParams.toString() || hrefParams.get('mode') === searchParams.get('mode')
+                )
                 const Icon = item.icon
                 // WHY: Premium items without license → show crown and redirect to upgrade
                 const isLocked = item.premiumOnly && !isPremium
