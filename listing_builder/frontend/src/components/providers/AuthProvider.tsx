@@ -72,10 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    // WHY: Clear license key on logout — prevents next user inheriting premium
+    // WHY: Clear license key + owner on logout — prevents next user inheriting premium
     // localStorage is per-domain, not per-user. Without this, logging into
     // a different account would inherit the previous user's premium status.
     localStorage.removeItem('lbp_license_key')
+    localStorage.removeItem('lbp_license_owner')
     setUser(null)
     setSession(null)
   }, [])

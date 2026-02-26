@@ -49,14 +49,14 @@ export interface SingleProductImport {
   source_platform?: string
   source_id?: string
   source_url?: string
-  asin?: string
   title?: string
   description?: string
-  bullet_points?: string[]
   price?: number
   brand?: string
   category?: string
-  image_urls?: string[]
+  // WHY: Must match backend ProductImport schema field names
+  images?: string[]
+  attributes?: Record<string, unknown>
 }
 
 export interface BatchProductImport {

@@ -2,6 +2,8 @@
 # Purpose: GET endpoints for listing change history (timeline view)
 # NOT for: Change detection logic (that's listing_diff_service + monitor_scheduler)
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
@@ -18,7 +20,7 @@ def get_listing_changes(
     user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
     product_id: str | None = Query(None),
-    change_type: str | None = Query(None),
+    change_type: Literal["title", "bullets", "description", "images", "price", "brand"] | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -30,17 +32,19 @@ def get_listing_changes(
     if change_type:
         q = q.filter(ListingChange.change_type == change_type)
 
-    total = q.count()
+    # WHY: Fetch limit+1 to detect "has more" without a separate COUNT query
     items = (
         q.order_by(ListingChange.detected_at.desc())
         .offset(offset)
-        .limit(limit)
+        .limit(limit + 1)
         .all()
     )
+    has_more = len(items) > limit
+    items = items[:limit]
 
     return {
         "items": [_serialize(c) for c in items],
-        "total": total,
+        "has_more": has_more,
         "limit": limit,
         "offset": offset,
     }

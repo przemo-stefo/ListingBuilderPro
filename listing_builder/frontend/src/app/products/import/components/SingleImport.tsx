@@ -70,6 +70,8 @@ export default function SingleImport() {
   const [brand, setBrand] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState('')
+  // WHY: Store images from scrape so they get sent with the import request
+  const [images, setImages] = useState<string[]>([])
   const [scraped, setScraped] = useState(false)
 
   // WHY: Auto-detect marketplace when user pastes a URL
@@ -93,6 +95,7 @@ export default function SingleImport() {
       if (data.description) setDescription(data.description)
       if (data.source_id) setAsin(data.source_id)
       if (data.bullet_points?.length) setBullets(data.bullet_points)
+      if (data.images?.length) setImages(data.images)
       setShowDetails(true)
       setScraped(true)
       toast({ title: 'Dane pobrane', description: `${data.title?.slice(0, 60)}...` })
@@ -104,17 +107,20 @@ export default function SingleImport() {
 
   const importMutation = useMutation({
     mutationFn: async () => {
+      const cleanBullets = bullets.filter(b => b.trim())
       const product = {
         source_platform: marketplace,
         source_id: asin || 'manual',
         source_url: productUrl || undefined,
         title: title || asin || (productUrl ? titleFromUrl(productUrl) : 'Produkt bez nazwy'),
-        asin: asin || undefined,
         brand: brand || undefined,
         price: price ? parseFloat(price) : undefined,
         category: category || undefined,
         description: description || undefined,
-        bullet_points: bullets.filter(b => b.trim()),
+        // WHY: Backend ProductImport expects images as top-level field
+        images: images.length > 0 ? images : undefined,
+        // WHY: Backend stores bullet_points inside attributes JSONB, not as top-level field
+        attributes: cleanBullets.length > 0 ? { bullet_points: cleanBullets } : undefined,
       }
       return await importSingleProduct(product)
     },
