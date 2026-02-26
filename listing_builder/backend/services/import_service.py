@@ -37,7 +37,7 @@ class ImportService:
         logger.info("import_job_created", job_id=job.id, source=source, total=total_products)
         return job
 
-    def import_product(self, data: ProductImport, job_id: int = None) -> Product:
+    def import_product(self, data: ProductImport, job_id: int = None, user_id: str = "default") -> Product:
         """
         Import a single product.
         Checks for duplicates by source_id and updates if exists.
@@ -49,10 +49,11 @@ class ImportService:
         Returns:
             Product: Created or updated product
         """
-        # Check if product already exists
+        # WHY: Check for duplicates scoped to user — different users can import the same product
         existing = self.db.query(Product).filter(
             Product.source_id == data.source_id,
-            Product.source_platform == data.source_platform
+            Product.source_platform == data.source_platform,
+            Product.user_id == user_id,
         ).first()
 
         if existing:
@@ -72,6 +73,7 @@ class ImportService:
         else:
             # Create new product
             product = Product(
+                user_id=user_id,
                 source_platform=data.source_platform,
                 source_id=data.source_id,
                 source_url=data.source_url,
@@ -92,7 +94,7 @@ class ImportService:
         self.db.refresh(product)
         return product
 
-    def import_batch(self, products: List[ProductImport], source: str = "allegro") -> Dict[str, Any]:
+    def import_batch(self, products: List[ProductImport], source: str = "allegro", user_id: str = "default") -> Dict[str, Any]:
         """
         Import multiple products in batch.
         Creates import job and processes each product.
@@ -107,7 +109,7 @@ class ImportService:
 
         for product_data in products:
             try:
-                self.import_product(product_data, job.id)
+                self.import_product(product_data, job.id, user_id=user_id)
                 success_count += 1
                 job.processed_products = success_count
                 self.db.commit()

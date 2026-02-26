@@ -66,10 +66,11 @@ class TestAPIKeyMiddleware:
         resp = client.get("/api/products", headers={"X-API-Key": "bad-key"})
         assert resp.status_code == 401
 
-    def test_protected_endpoint_accepts_valid_key(self, client, test_settings):
-        resp = client.get(
+    def test_protected_endpoint_accepts_valid_key(self, auth_client, test_settings):
+        # WHY: auth_client mocks JWT so require_user_id passes too
+        resp = auth_client.get(
             "/api/products",
             headers={"X-API-Key": test_settings.api_secret_key},
         )
-        # 200 = auth passed (may return empty list)
+        # 200 = API key middleware + JWT auth both passed
         assert resp.status_code == 200

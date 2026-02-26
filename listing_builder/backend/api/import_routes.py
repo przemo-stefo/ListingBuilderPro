@@ -194,7 +194,7 @@ async def import_from_allegro_account(
 
     try:
         service = ImportService(db)
-        result = service.import_batch(products, source="allegro-account")
+        result = service.import_batch(products, source="allegro-account", user_id=user_id)
         result["errors"] = errors
         return {"status": "success", **result}
     except Exception as e:
@@ -293,7 +293,8 @@ async def scrape_product_url(
 async def import_single_product(
     request: Request,
     product: ProductImport,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Import a single product manually.
@@ -303,7 +304,7 @@ async def import_single_product(
 
     try:
         service = ImportService(db)
-        result = service.import_product(product)
+        result = service.import_product(product, user_id=user_id)
         return {"status": "success", "product_id": result.id}
     except Exception as e:
         _handle_import_error(e, "product_import")
@@ -315,7 +316,8 @@ async def import_batch(
     request: Request,
     products: List[ProductImport],
     source: Literal["allegro", "amazon", "ebay", "kaufland", "manual"] = "allegro",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Import multiple products as a batch.
@@ -331,7 +333,7 @@ async def import_batch(
 
     try:
         service = ImportService(db)
-        result = service.import_batch(products, source)
+        result = service.import_batch(products, source, user_id=user_id)
         return {"status": "success", **result}
     except Exception as e:
         _handle_import_error(e, "batch_import")

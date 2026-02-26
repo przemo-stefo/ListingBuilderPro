@@ -67,8 +67,9 @@ class TestSingleProductImport:
         })
         assert resp.status_code == 401
 
-    def test_import_product_success(self, client, test_settings):
-        resp = client.post(
+    def test_import_product_success(self, auth_client, test_settings):
+        # WHY: auth_client provides JWT — require_user_id needs it
+        resp = auth_client.post(
             "/api/import/product",
             json={
                 "source_id": "p-002",
@@ -83,20 +84,22 @@ class TestSingleProductImport:
 
 class TestBatchImport:
 
-    def test_batch_empty_returns_400(self, client, test_settings):
-        resp = client.post(
+    def test_batch_empty_returns_400(self, auth_client, test_settings):
+        # WHY: auth_client provides JWT — require_user_id needs it
+        resp = auth_client.post(
             "/api/import/batch",
             json=[],
             headers={"X-API-Key": test_settings.api_secret_key},
         )
         assert resp.status_code == 400
 
-    def test_batch_success(self, client, test_settings):
+    def test_batch_success(self, auth_client, test_settings):
+        # WHY: auth_client provides JWT — require_user_id needs it
         products = [
             {"source_id": f"b-{i}", "title": f"Batch {i}", "source_platform": "allegro"}
             for i in range(3)
         ]
-        resp = client.post(
+        resp = auth_client.post(
             "/api/import/batch",
             json=products,
             headers={"X-API-Key": test_settings.api_secret_key},

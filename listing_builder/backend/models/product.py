@@ -24,13 +24,16 @@ class Product(Base):
     Stores scraped product data + optimized listings + marketplace info.
     """
     __tablename__ = "products"
-    # WHY: Same source_id can exist on different platforms (e.g. "B08XXX" on Amazon + eBay)
+    # WHY: Same source_id can exist for different users and platforms
     __table_args__ = (
-        UniqueConstraint('source_platform', 'source_id', name='uq_platform_source'),
+        UniqueConstraint('user_id', 'source_platform', 'source_id', name='uq_user_platform_source'),
     )
 
     # Primary Key
     id = Column(Integer, primary_key=True, index=True)
+
+    # WHY: Multi-tenant isolation — each user sees only their own products
+    user_id = Column(String(255), nullable=False, default="default", index=True)
 
     # Source Data (from Allegro scraper)
     source_platform = Column(String(50), default="allegro")

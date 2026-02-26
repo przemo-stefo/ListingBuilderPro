@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 from database import get_db
 from models import Product, ProductStatus
 from schemas import ProductResponse, ProductList, DashboardStatsResponse, ProductUpdate
+from api.dependencies import require_user_id
 from typing import Optional
 import structlog
 
@@ -27,6 +28,7 @@ async def list_products(
     status: Optional[str] = None,
     source: Optional[str] = None,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     List products with pagination and filters.
@@ -37,7 +39,8 @@ async def list_products(
         - status: Filter by status (imported, optimized, published, etc)
         - source: Filter by source platform (allegro, etc)
     """
-    query = db.query(Product)
+    # WHY: Multi-tenant — each user sees only their own products
+    query = db.query(Product).filter(Product.user_id == user_id)
 
     # Apply filters
     if status:
@@ -69,7 +72,7 @@ async def list_products(
 # matches "stats" as a product_id and returns 422
 @router.get("/stats/summary", response_model=DashboardStatsResponse)
 @limiter.limit("30/minute")
-async def get_stats(request: Request, db: Session = Depends(get_db)):
+async def get_stats(request: Request, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """
     Dashboard stats — 8 cards on the main dashboard page.
     Returns counts by status + aggregate metrics the frontend expects.
@@ -77,12 +80,13 @@ async def get_stats(request: Request, db: Session = Depends(get_db)):
     # WHY: Single GROUP BY instead of N+1 (was 7 queries, now 2)
     status_rows = db.query(
         Product.status, func.count(Product.id)
-    ).group_by(Product.status).all()
+    ).filter(Product.user_id == user_id).group_by(Product.status).all()
     counts = {str(s.value) if hasattr(s, 'value') else str(s): c for s, c in status_rows}
     total = sum(counts.values())
 
     # WHY: Real avg from DB instead of hardcoded 78.5
     avg_score = db.query(func.avg(Product.optimization_score)).filter(
+        Product.user_id == user_id,
         Product.optimization_score.isnot(None)
     ).scalar()
 
@@ -100,11 +104,11 @@ async def get_stats(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/{product_id}", response_model=ProductResponse)
 @limiter.limit("30/minute")
-async def get_product(request: Request, product_id: int, db: Session = Depends(get_db)):
+async def get_product(request: Request, product_id: int, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """
     Get a single product by ID.
     """
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id, Product.user_id == user_id).first()
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -119,9 +123,10 @@ async def update_product(
     product_id: int,
     payload: ProductUpdate,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Update product fields — only provided (non-null) fields are changed."""
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id, Product.user_id == user_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -137,11 +142,11 @@ async def update_product(
 
 @router.delete("/{product_id}")
 @limiter.limit("5/minute")
-async def delete_product(request: Request, product_id: int, db: Session = Depends(get_db)):
+async def delete_product(request: Request, product_id: int, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """
     Delete a product by ID.
     """
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id, Product.user_id == user_id).first()
 
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

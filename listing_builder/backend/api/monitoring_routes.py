@@ -13,6 +13,7 @@ import structlog
 
 from database import get_db
 from models.monitoring import TrackedProduct, MonitoringSnapshot, AlertConfig, Alert
+from api.dependencies import require_user_id
 from utils.validators import validate_uuid
 from schemas.monitoring import (
     TrackProductRequest,
@@ -32,8 +33,7 @@ logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/monitoring", tags=["Monitoring & Alerts"])
 
-# WHY hardcoded user_id: V1 is internal-only, no multi-tenant auth yet
-DEFAULT_USER_ID = "internal"
+# WHY: Multi-tenant — each user manages their own tracked products and alerts
 
 
 # ── Product Tracking ──
@@ -44,12 +44,13 @@ async def track_product(
     request: Request,
     body: TrackProductRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Start monitoring a product on a marketplace."""
     existing = (
         db.query(TrackedProduct)
         .filter(
-            TrackedProduct.user_id == DEFAULT_USER_ID,
+            TrackedProduct.user_id == user_id,
             TrackedProduct.marketplace == body.marketplace.value,
             TrackedProduct.product_id == body.product_id,
         )
@@ -59,7 +60,7 @@ async def track_product(
         raise HTTPException(status_code=409, detail="Product already tracked")
 
     product = TrackedProduct(
-        user_id=DEFAULT_USER_ID,
+        user_id=user_id,
         marketplace=body.marketplace.value,
         product_id=body.product_id,
         product_url=body.product_url,
@@ -80,9 +81,10 @@ async def list_tracked_products(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """List all tracked products."""
-    query = db.query(TrackedProduct).filter(TrackedProduct.user_id == DEFAULT_USER_ID)
+    query = db.query(TrackedProduct).filter(TrackedProduct.user_id == user_id)
     if marketplace:
         query = query.filter(TrackedProduct.marketplace == marketplace)
 
@@ -92,12 +94,12 @@ async def list_tracked_products(
 
 
 @router.delete("/track/{product_id}")
-async def untrack_product(product_id: str, db: Session = Depends(get_db)):
+async def untrack_product(product_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Stop tracking a product. Deletes snapshots via CASCADE."""
     validate_uuid(product_id, "product_id")
     product = (
         db.query(TrackedProduct)
-        .filter(TrackedProduct.id == product_id, TrackedProduct.user_id == DEFAULT_USER_ID)
+        .filter(TrackedProduct.id == product_id, TrackedProduct.user_id == user_id)
         .first()
     )
     if not product:
@@ -109,12 +111,12 @@ async def untrack_product(product_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/track/{product_id}/toggle")
-async def toggle_tracking(product_id: str, db: Session = Depends(get_db)):
+async def toggle_tracking(product_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Enable/disable polling for a tracked product."""
     validate_uuid(product_id, "product_id")
     product = (
         db.query(TrackedProduct)
-        .filter(TrackedProduct.id == product_id, TrackedProduct.user_id == DEFAULT_USER_ID)
+        .filter(TrackedProduct.id == product_id, TrackedProduct.user_id == user_id)
         .first()
     )
     if not product:
@@ -153,10 +155,11 @@ async def create_alert_config(
     request: Request,
     body: AlertConfigCreate,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Create an alert rule."""
     config = AlertConfig(
-        user_id=DEFAULT_USER_ID,
+        user_id=user_id,
         alert_type=body.alert_type.value,
         name=body.name,
         enabled=body.enabled,
@@ -176,9 +179,10 @@ async def create_alert_config(
 async def list_alert_configs(
     alert_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """List all alert configs."""
-    query = db.query(AlertConfig).filter(AlertConfig.user_id == DEFAULT_USER_ID)
+    query = db.query(AlertConfig).filter(AlertConfig.user_id == user_id)
     if alert_type:
         query = query.filter(AlertConfig.alert_type == alert_type)
 
@@ -188,12 +192,12 @@ async def list_alert_configs(
 
 
 @router.delete("/alerts/config/{config_id}")
-async def delete_alert_config(config_id: str, db: Session = Depends(get_db)):
+async def delete_alert_config(config_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Delete an alert config and its alert history."""
     validate_uuid(config_id, "config_id")
     config = (
         db.query(AlertConfig)
-        .filter(AlertConfig.id == config_id, AlertConfig.user_id == DEFAULT_USER_ID)
+        .filter(AlertConfig.id == config_id, AlertConfig.user_id == user_id)
         .first()
     )
     if not config:
@@ -205,12 +209,12 @@ async def delete_alert_config(config_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/alerts/config/{config_id}/toggle")
-async def toggle_alert_config(config_id: str, db: Session = Depends(get_db)):
+async def toggle_alert_config(config_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Enable/disable an alert config."""
     validate_uuid(config_id, "config_id")
     config = (
         db.query(AlertConfig)
-        .filter(AlertConfig.id == config_id, AlertConfig.user_id == DEFAULT_USER_ID)
+        .filter(AlertConfig.id == config_id, AlertConfig.user_id == user_id)
         .first()
     )
     if not config:
@@ -229,11 +233,12 @@ async def list_alerts(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Get alert history."""
     from services.alert_service import get_alert_service
     svc = get_alert_service()
-    alerts, total = svc.get_alerts(db, DEFAULT_USER_ID, limit, offset, severity)
+    alerts, total = svc.get_alerts(db, user_id, limit, offset, severity)
     return AlertsListResponse(items=alerts, total=total)
 
 
@@ -301,17 +306,17 @@ async def trigger_poll(request: Request, marketplace: str, db: Session = Depends
 # ── Dashboard ──
 
 @router.get("/dashboard", response_model=DashboardStats)
-async def get_dashboard(db: Session = Depends(get_db)):
+async def get_dashboard(db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Aggregated monitoring dashboard stats."""
     tracked_count = (
         db.query(sa_func.count(TrackedProduct.id))
-        .filter(TrackedProduct.user_id == DEFAULT_USER_ID)
+        .filter(TrackedProduct.user_id == user_id)
         .scalar()
     )
 
     active_configs = (
         db.query(sa_func.count(AlertConfig.id))
-        .filter(AlertConfig.user_id == DEFAULT_USER_ID, AlertConfig.enabled == True)
+        .filter(AlertConfig.user_id == user_id, AlertConfig.enabled == True)
         .scalar()
     )
 
@@ -319,14 +324,14 @@ async def get_dashboard(db: Session = Depends(get_db)):
     alerts_today = (
         db.query(sa_func.count(Alert.id))
         .join(AlertConfig)
-        .filter(AlertConfig.user_id == DEFAULT_USER_ID, Alert.triggered_at >= today_start)
+        .filter(AlertConfig.user_id == user_id, Alert.triggered_at >= today_start)
         .scalar()
     )
 
     last_snapshot = (
         db.query(MonitoringSnapshot.created_at)
         .join(TrackedProduct)
-        .filter(TrackedProduct.user_id == DEFAULT_USER_ID)
+        .filter(TrackedProduct.user_id == user_id)
         .order_by(MonitoringSnapshot.created_at.desc())
         .first()
     )
@@ -334,7 +339,7 @@ async def get_dashboard(db: Session = Depends(get_db)):
     # Count tracked products per marketplace
     marketplace_counts = (
         db.query(TrackedProduct.marketplace, sa_func.count(TrackedProduct.id))
-        .filter(TrackedProduct.user_id == DEFAULT_USER_ID)
+        .filter(TrackedProduct.user_id == user_id)
         .group_by(TrackedProduct.marketplace)
         .all()
     )
