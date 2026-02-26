@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/ui/FaqSection'
 import { PremiumGate } from '@/components/tier/PremiumGate'
+import { apiClient } from '@/lib/api/client'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -138,17 +139,8 @@ function ExpertQAContent() {
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/proxy/knowledge/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, mode, expert: expertKey }),
-      })
-
-      if (!res.ok) {
-        throw new Error(`${res.status}`)
-      }
-
-      const data = await res.json()
+      // WHY: apiClient sends JWT + License-Key headers (raw fetch() was missing them → 402)
+      const { data } = await apiClient.post('/knowledge/chat', { question: q, mode, expert: expertKey })
       setMessages(prev => [
         ...prev,
         {

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { PremiumGate } from '@/components/tier/PremiumGate'
+import { apiClient } from '@/lib/api/client'
 
 // WHY: Match backend platform options exactly
 const PLATFORMS = [
@@ -78,23 +79,13 @@ export default function AdCopyPage() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/proxy/ads/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_title: productTitle,
-          product_features: validFeatures,
-          target_audience: targetAudience || undefined,
-          platform,
-        }),
+      // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
+      const { data } = await apiClient.post<AdCopyResult>('/ads/generate', {
+        product_title: productTitle,
+        product_features: validFeatures,
+        target_audience: targetAudience || undefined,
+        platform,
       })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Błąd ${res.status}`)
-      }
-
-      const data: AdCopyResult = await res.json()
       setResult(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Nieznany błąd')

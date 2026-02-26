@@ -9,6 +9,7 @@ import { Loader2, Users, Target, Lightbulb, Megaphone, PenTool, Video, Mail, Roc
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PremiumGate } from '@/components/tier/PremiumGate'
+import { apiClient } from '@/lib/api/client'
 
 interface ResearchResult {
   skill: string
@@ -91,18 +92,9 @@ export default function ResearchPage() {
         }
       }
 
-      const res = await fetch('/api/proxy/research/audience', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Błąd ${res.status}`)
-      }
-
-      setResult(await res.json())
+      // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
+      const { data } = await apiClient.post('/research/audience', body)
+      setResult(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Nieznany błąd')
     } finally {

@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { formatNumber } from '@/lib/utils'
+import { apiClient } from '@/lib/api/client'
 import { Package, Sparkles, AlertCircle, TrendingUp, Clock, Brain, Send, ArrowRight, Link2, Upload, Database, ArrowRightLeft } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
@@ -32,10 +33,11 @@ export default function DashboardPage() {
   const [expiredConnections, setExpiredConnections] = useState<string[]>([])
 
   // WHY: Check OAuth status on mount — show reconnect banner for expired connections
+  // WHY: apiClient sends JWT (raw fetch() was missing it → 401 after require_user_id fix)
   useEffect(() => {
-    fetch('/api/proxy/oauth/status')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
+    apiClient.get('/oauth/status')
+      .then(res => {
+        const data = res.data
         if (!data?.connections) return
         const expired = Object.entries(data.connections)
           .filter(([_, v]: [string, any]) => v.status === 'expired')

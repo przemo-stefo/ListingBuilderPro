@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useTrackedProducts } from '@/lib/hooks/useMonitoring'
 import { useOAuthConnections, useOAuthAuthorize, useOAuthDisconnect } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
+import { apiClient } from '@/lib/api/client'
 import AmazonConnectForm from './AmazonConnectForm'
 import BolConnectForm from './BolConnectForm'
 
@@ -69,18 +70,8 @@ export default function IntegrationsTab() {
   async function handleStoreScan() {
     setScanning(true)
     try {
-      const resp = await fetch('/api/proxy/compliance/audit-store', { method: 'POST' })
-      const data = await resp.json()
-
-      if (!resp.ok) {
-        toast({
-          title: 'Błąd skanowania',
-          description: data.detail || 'Nie udało się przeskanować sklepu',
-          variant: 'destructive',
-        })
-        return
-      }
-
+      // WHY: apiClient sends JWT (raw fetch() was missing it → 401 after require_user_id fix)
+      const { data } = await apiClient.post('/compliance/audit-store')
       toast({
         title: `Skan zakończony — ${data.overall_score}%`,
         description: `${data.total_products} produktów: ${data.compliant_count} OK, ${data.warning_count} ostrzeżeń, ${data.error_count} błędów`,

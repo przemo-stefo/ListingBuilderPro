@@ -37,6 +37,7 @@ import { useSettings } from '@/lib/hooks/useSettings'
 import { useUpdateProduct } from '@/lib/hooks/useProducts'
 import { ListingScoreCard } from './ListingScoreCard'
 import { ProductPicker } from './ProductPicker'
+import { apiClient } from '@/lib/api/client'
 import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider, ScoreResult, Product } from '@/lib/types'
 
 // WHY: Same provider list as settings — keeps UI consistent
@@ -126,19 +127,13 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setScoreLoading(true)
     setScoreResult(null)
     try {
-      const res = await fetch('/api/proxy/score/listing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: listing.title,
-          bullets: listing.bullet_points,
-          description: stripHtml(listing.description),
-        }),
+      // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
+      const { data } = await apiClient.post<ScoreResult>('/score/listing', {
+        title: listing.title,
+        bullets: listing.bullet_points,
+        description: stripHtml(listing.description),
       })
-      if (res.ok) {
-        const data: ScoreResult = await res.json()
-        setScoreResult(data)
-      }
+      setScoreResult(data)
     } catch {
       // WHY: Score is non-critical — don't break the flow if it fails
     } finally {

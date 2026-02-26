@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { KeyRound, Copy, Check, ArrowLeft, LogIn } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
 import { useAuth } from '@/components/providers/AuthProvider'
+import { apiClient } from '@/lib/api/client'
 
 export default function RecoverLicensePage() {
   const router = useRouter()
@@ -45,21 +46,10 @@ export default function RecoverLicensePage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/proxy/stripe/recover-license', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ email: email || user?.email }),
+      // WHY: apiClient sends JWT automatically (no manual Authorization header needed)
+      const { data } = await apiClient.post('/stripe/recover-license', {
+        email: email || user?.email,
       })
-
-      if (!res.ok) {
-        setError('Błąd serwera. Spróbuj ponownie.')
-        return
-      }
-
-      const data = await res.json()
       if (data.found && data.license_key) {
         setLicenseKey(data.license_key)
         unlockPremium(data.license_key)

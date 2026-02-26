@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { Crown, Sparkles, ArrowRight } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
 import { cn } from '@/lib/utils'
+import { apiClient } from '@/lib/api/client'
 
 interface UpgradeCTAProps {
   variant?: 'inline' | 'card'
@@ -18,20 +19,16 @@ async function redirectToCheckout() {
   const email = prompt('Podaj email (do odzyskania klucza licencyjnego):')
   if (!email) return
 
-  const res = await fetch('/api/proxy/stripe/create-checkout', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plan_type: 'monthly', email }),
-  })
-
-  if (!res.ok) {
+  try {
+    // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
+    const { data } = await apiClient.post('/stripe/create-checkout', {
+      plan_type: 'monthly', email,
+    })
+    if (data.checkout_url) {
+      window.location.href = data.checkout_url
+    }
+  } catch {
     alert('Blad tworzenia sesji platnosci. Sprobuj ponownie.')
-    return
-  }
-
-  const data = await res.json()
-  if (data.checkout_url) {
-    window.location.href = data.checkout_url
   }
 }
 

@@ -9,6 +9,7 @@ import { useAuth } from '@/components/providers/AuthProvider'
 import { useTier } from '@/lib/hooks/useTier'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { User, CreditCard, LogOut } from 'lucide-react'
+import { apiClient } from '@/lib/api/client'
 
 interface SubscriptionInfo {
   plan: string
@@ -24,18 +25,17 @@ export default function AccountPage() {
   const [sub, setSub] = useState<SubscriptionInfo | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
 
+  // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
   useEffect(() => {
-    fetch('/api/proxy/stripe/subscription')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setSub(data) })
+    apiClient.get('/stripe/subscription')
+      .then(res => { if (res.data) setSub(res.data) })
       .catch(() => {})
   }, [])
 
   const handlePortal = async () => {
     setPortalLoading(true)
     try {
-      const resp = await fetch('/api/proxy/stripe/portal-session', { method: 'POST' })
-      const data = await resp.json()
+      const { data } = await apiClient.post('/stripe/portal-session')
       if (data.portal_url) {
         window.location.href = data.portal_url
       }
@@ -47,12 +47,9 @@ export default function AccountPage() {
   const handleCheckout = async () => {
     if (!user?.email) return
     try {
-      const resp = await fetch('/api/proxy/stripe/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_type: 'monthly', email: user.email }),
+      const { data } = await apiClient.post('/stripe/create-checkout', {
+        plan_type: 'monthly', email: user.email,
       })
-      const data = await resp.json()
       if (data.checkout_url) {
         window.location.href = data.checkout_url
       }

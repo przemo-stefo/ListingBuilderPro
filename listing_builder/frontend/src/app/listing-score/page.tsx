@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { apiClient } from '@/lib/api/client'
 
 interface DimensionScore {
   name: string
@@ -136,18 +137,8 @@ export default function ListingScorePage() {
     setImportError('')
 
     try {
-      const res = await fetch('/api/proxy/score/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: importInput.trim() }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Błąd ${res.status}`)
-      }
-
-      const data: FetchResult = await res.json()
+      // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
+      const { data } = await apiClient.post<FetchResult>('/score/fetch', { input: importInput.trim() })
 
       if (data.error && !data.title) {
         setImportError(data.error)
@@ -190,22 +181,12 @@ export default function ListingScorePage() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/proxy/score/listing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          bullets: validBullets,
-          description: description || undefined,
-        }),
+      // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
+      const { data } = await apiClient.post<ScoreResult>('/score/listing', {
+        title,
+        bullets: validBullets,
+        description: description || undefined,
       })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Błąd ${res.status}`)
-      }
-
-      const data: ScoreResult = await res.json()
       setResult(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Nieznany błąd')
