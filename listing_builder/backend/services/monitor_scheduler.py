@@ -122,29 +122,52 @@ async def _fetch_product_data(marketplace: str, product_id: str, product_url: Op
             return {"error": str(e)}
 
     if marketplace == "amazon":
-        # WHY: Use Keepa API for Amazon monitoring (no seller credentials needed)
-        # Falls back to SP-API when available
+        # WHY: Keepa for price/BSR/reviews + SP-API for content (title, bullets, images)
+        data = {}
         try:
             from services.keepa_service import get_product, KEEPA_API_KEY
             if KEEPA_API_KEY:
                 result = await get_product(product_id, "amazon.de")
                 if result:
-                    return {
+                    data = {
                         "title": result.get("title"),
                         "price": result.get("current_price"),
                         "buybox_price": result.get("buybox_price"),
                         "buy_box_owner": "fba" if result.get("offers_fba", 0) > 0 else "fbm",
-                        "stock": None,  # Keepa doesn't give exact stock
+                        "stock": None,
                         "listing_active": result.get("is_alive", False),
                         "rating": result.get("rating"),
                         "review_count": result.get("review_count"),
                         "offers_fba": result.get("offers_fba", 0),
                         "offers_fbm": result.get("offers_fbm", 0),
                     }
-                return {"error": f"Keepa: product {product_id} not found"}
-            return {"error": "No Keepa API key and no Amazon SP-API credentials"}
+                elif not data:
+                    return {"error": f"Keepa: product {product_id} not found"}
         except Exception as e:
-            return {"error": str(e)}
+            if not data:
+                return {"error": str(e)}
+
+        # WHY: SP-API adds content fields (bullets, description, images, brand)
+        # that Keepa doesn't provide — needed for listing change detection
+        try:
+            from services.sp_api_auth import credentials_configured
+            if credentials_configured():
+                from services.sp_api_catalog import fetch_catalog_item
+                sp_data = await fetch_catalog_item(product_id)
+                if not sp_data.get("error"):
+                    # Merge SP-API content into Keepa data (SP-API title wins if available)
+                    if sp_data.get("title"):
+                        data["title"] = sp_data["title"]
+                    data["bullets"] = sp_data.get("bullets", [])
+                    data["description"] = sp_data.get("description", "")
+                    data["images"] = sp_data.get("images", [])
+                    data["brand"] = sp_data.get("brand", "")
+        except Exception as e:
+            logger.warning("sp_api_content_fetch_failed", product_id=product_id, error=str(e)[:100])
+
+        if not data:
+            return {"error": "No Keepa API key and no Amazon SP-API credentials"}
+        return data
 
     if marketplace == "kaufland":
         try:
@@ -214,6 +237,35 @@ def _compare_and_alert(
             db, product.user_id, product.marketplace,
             product.product_id, old_active, new_active,
         )
+
+    # WHY: Listing content diff — only if SP-API data present (bullets key = SP-API enriched)
+    if "bullets" in old_data and "bullets" in new_data:
+        try:
+            from services.listing_diff_service import compare_listing_snapshots
+            diffs = compare_listing_snapshots(old_data, new_data)
+            if diffs:
+                _save_listing_changes(db, product, diffs)
+        except Exception as e:
+            logger.error("listing_diff_failed", product_id=product.product_id, error=str(e)[:100])
+
+
+def _save_listing_changes(db: Session, product: TrackedProduct, diffs: list[dict]) -> None:
+    """Persist field-level listing changes to DB."""
+    from models.listing_change import ListingChange
+    for diff in diffs:
+        change = ListingChange(
+            tracked_product_id=product.id,
+            user_id=product.user_id,
+            marketplace=product.marketplace,
+            product_id=product.product_id,
+            change_type=diff["change_type"],
+            field_name=diff.get("field_name"),
+            old_value=diff.get("old_value"),
+            new_value=diff.get("new_value"),
+        )
+        db.add(change)
+    db.commit()
+    logger.info("listing_changes_saved", product_id=product.product_id, count=len(diffs))
 
 
 def start_scheduler(session_factory) -> AsyncIOScheduler:

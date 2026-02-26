@@ -25,7 +25,8 @@ class TestScoreListing:
         mock_cov.return_value = (85.0, [], [])
         mock_exact.return_value = 10
         mock_compliance.return_value = {
-            "status": "PASS", "warnings": [], "warning_count": 0
+            "status": "PASS", "warnings": [], "warning_count": 0,
+            "errors": [], "error_count": 0
         }
         mock_stuffing.return_value = []
         mock_multi_cov.return_value = {"missing_keywords": []}
@@ -68,7 +69,8 @@ class TestScoreListing:
         mock_cov.return_value = (90.0, [], [])
         mock_exact.return_value = 8
         mock_compliance.return_value = {
-            "status": "PASS", "warnings": [], "warning_count": 0
+            "status": "PASS", "warnings": [], "warning_count": 0,
+            "errors": [], "error_count": 0
         }
         mock_stuffing.return_value = ["Keyword stuffing: 'test' appears 5x"]
         mock_multi_cov.return_value = {"missing_keywords": []}
@@ -102,7 +104,8 @@ class TestScoreListing:
         mock_cov.return_value = (80.0, [], [])
         mock_exact.return_value = 5
         mock_compliance.return_value = {
-            "status": "PASS", "warnings": [], "warning_count": 0
+            "status": "PASS", "warnings": [], "warning_count": 0,
+            "errors": [], "error_count": 0
         }
         mock_stuffing.return_value = []
         mock_multi_cov.return_value = {"missing_keywords": []}

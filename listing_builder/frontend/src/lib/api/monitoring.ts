@@ -14,6 +14,8 @@ import type {
   PollResult,
   TraceItem,
   TraceStats,
+  ListingChangesResponse,
+  ListingChangeSummary,
 } from '../types'
 
 export async function fetchDashboardStats(): Promise<MonitoringDashboardStats> {
@@ -127,6 +129,27 @@ export async function fetchTraces(
 
 export async function fetchTraceStats(): Promise<TraceStats> {
   const response = await apiRequest<TraceStats>('get', '/optimizer/traces/stats')
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
+export async function fetchListingChanges(params: {
+  product_id?: string
+  change_type?: string
+  limit?: number
+  offset?: number
+} = {}): Promise<ListingChangesResponse> {
+  const response = await apiRequest<ListingChangesResponse>(
+    'get', '/monitoring/listing-changes', undefined, params
+  )
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
+export async function fetchListingChangesSummary(): Promise<{ items: ListingChangeSummary[] }> {
+  const response = await apiRequest<{ items: ListingChangeSummary[] }>(
+    'get', '/monitoring/listing-changes/summary'
+  )
   if (response.error) throw new Error(response.error)
   return response.data!
 }

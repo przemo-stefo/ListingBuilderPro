@@ -5,7 +5,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BarChart3, Package, Bell, AlertTriangle, TrendingUp, Settings } from 'lucide-react'
+import { BarChart3, Package, Bell, AlertTriangle, TrendingUp, Settings, GitCompareArrows } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/ui/FaqSection'
 
@@ -22,8 +22,9 @@ import AlertRulesTab from './components/AlertRulesTab'
 import AlertHistoryTab from './components/AlertHistoryTab'
 import SnapshotsTab from './components/SnapshotsTab'
 import AlertSettingsTab from './components/AlertSettingsTab'
+import ListingChangesTab from './components/ListingChangesTab'
 
-type Tab = 'dashboard' | 'products' | 'rules' | 'alerts' | 'snapshots' | 'alert-settings'
+type Tab = 'dashboard' | 'products' | 'rules' | 'alerts' | 'snapshots' | 'alert-settings' | 'changes'
 
 const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -32,6 +33,7 @@ const tabs: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'alerts', label: 'Alerts', icon: AlertTriangle },
   { key: 'snapshots', label: 'Snapshots', icon: TrendingUp },
   { key: 'alert-settings', label: 'Alert Settings', icon: Settings },
+  { key: 'changes', label: 'Zmiany', icon: GitCompareArrows },
 ]
 
 export default function MonitoringPage() {
@@ -73,6 +75,7 @@ export default function MonitoringPage() {
         {activeTab === 'alerts' && <AlertHistoryTab />}
         {activeTab === 'snapshots' && <SnapshotsTab />}
         {activeTab === 'alert-settings' && <AlertSettingsTab />}
+        {activeTab === 'changes' && <ListingChangesTab />}
 
         <FaqSection
           title="Najczesciej zadawane pytania"

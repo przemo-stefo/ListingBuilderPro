@@ -2,9 +2,10 @@
 # Purpose: Fetch Amazon product data via SP-API Catalog Items v2022-04-01
 # NOT for: Token management (sp_api_auth) or report fetching (epr_service)
 
+import asyncio
 import httpx
 import structlog
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -145,3 +146,68 @@ def _parse_catalog_response(data: Dict, asin: str, marketplace: str) -> Dict:
                 images=len(result["images"]))
 
     return result
+
+
+async def fetch_catalog_items_batch(
+    asins: List[str], marketplace: str = "DE", db: Optional[Session] = None
+) -> Dict[str, Dict]:
+    """Fetch multiple ASINs in one SP-API call (max 20 per request).
+
+    WHY batch: Single item fetch per product = N API calls.
+    SP-API searchCatalogItems supports up to 20 identifiers per request.
+    Returns: {asin: parsed_result, ...}
+    """
+    if not credentials_configured() or not asins:
+        return {}
+
+    marketplace_id = MARKETPLACE_IDS.get(marketplace.upper(), MARKETPLACE_IDS["DE"])
+
+    try:
+        token = await get_access_token(db=db)
+    except (ValueError, RuntimeError) as e:
+        logger.error("sp_api_batch_auth_error", error=str(e)[:100])
+        return {}
+
+    base = SP_API_BASE_SANDBOX if settings.amazon_sandbox else SP_API_BASE_PROD
+    results: Dict[str, Dict] = {}
+
+    # WHY chunks of 20: SP-API limit for searchCatalogItems identifiers
+    for i in range(0, len(asins), 20):
+        chunk = asins[i:i + 20]
+        if i > 0:
+            await asyncio.sleep(0.5)  # WHY: Rate limit protection
+
+        try:
+            headers = {
+                "x-amz-access-token": token,
+                "Content-Type": "application/json",
+            }
+            params = {
+                "identifiers": ",".join(chunk),
+                "identifiersType": "ASIN",
+                "marketplaceIds": marketplace_id,
+                "includedData": "summaries,attributes,images",
+            }
+
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.get(
+                    f"{base}/catalog/2022-04-01/items",
+                    headers=headers,
+                    params=params,
+                )
+
+            if resp.status_code != 200:
+                logger.warning("sp_api_batch_error", status=resp.status_code, chunk_size=len(chunk))
+                continue
+
+            data = resp.json()
+            for item in data.get("items", []):
+                asin = item.get("asin", "")
+                if asin:
+                    results[asin] = _parse_catalog_response(item, asin, marketplace)
+
+        except Exception as e:
+            logger.error("sp_api_batch_chunk_error", error=str(e)[:100], chunk_size=len(chunk))
+
+    logger.info("sp_api_batch_done", requested=len(asins), fetched=len(results))
+    return results

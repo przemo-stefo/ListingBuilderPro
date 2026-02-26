@@ -137,7 +137,9 @@ async def score_listing_endpoint(
         )
         return result
     except Exception as e:
-        logger.error("listing_score_endpoint_error", error=str(e))
+        logger.error("listing_score_endpoint_error", error=str(e), exc_info=True)
+        # WHY: Return structured error with 0 score — frontend shows "scoring failed" message
+        # Re-raising would return raw 500 with no useful info for the user
         return ScoreResponse(
             overall_score=0.0,
             dimensions=[],

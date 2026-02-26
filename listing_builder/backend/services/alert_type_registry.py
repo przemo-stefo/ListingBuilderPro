@@ -44,5 +44,9 @@ ALERT_TYPE_MAP: Dict[str, Dict] = {a["type"]: a for a in ALERT_TYPES}
 
 CATEGORIES = ["product", "financial", "performance"]
 
-# Types that work NOW (no SP-API needed)
-ACTIVE_TYPES = {a["type"] for a in ALERT_TYPES if a["data_source"] == "keepa"}
+# WHY: SP-API content types now active — listing diff engine detects these
+_SP_API_ACTIVE = {
+    "product.title_changed", "product.listing_text_changed",
+    "product.main_image_changed", "product.brand_changed",
+}
+ACTIVE_TYPES = {a["type"] for a in ALERT_TYPES if a["data_source"] == "keepa"} | _SP_API_ACTIVE

@@ -958,6 +958,34 @@ export interface ScoreResult {
   sources_used: number
 }
 
+// Listing Changes types (field-level change tracking)
+export interface ListingChange {
+  id: string
+  tracked_product_id: string | null
+  user_id: string
+  marketplace: string
+  product_id: string
+  change_type: 'title' | 'bullets' | 'description' | 'images' | 'price' | 'brand'
+  field_name: string | null
+  old_value: string | null
+  new_value: string | null
+  detected_at: string
+}
+
+export interface ListingChangesResponse {
+  items: ListingChange[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface ListingChangeSummary {
+  product_id: string
+  marketplace: string
+  change_count: number
+  last_change: string | null
+}
+
 // Error types
 export interface ApiError {
   message: string

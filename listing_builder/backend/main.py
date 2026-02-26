@@ -42,6 +42,7 @@ from api import admin_monitoring_routes
 from api import alert_settings_routes
 from api import ad_copy_routes
 from api import listing_score_routes
+from api import listing_changes_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -176,6 +177,7 @@ app.include_router(admin_monitoring_routes.router)
 app.include_router(alert_settings_routes.router)
 app.include_router(ad_copy_routes.router)
 app.include_router(listing_score_routes.router)
+app.include_router(listing_changes_routes.router)
 
 
 @app.get("/")

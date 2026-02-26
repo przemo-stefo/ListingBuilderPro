@@ -19,6 +19,8 @@ import {
   pollMarketplace,
   fetchTraces,
   fetchTraceStats,
+  fetchListingChanges,
+  fetchListingChangesSummary,
 } from '../api/monitoring'
 import type { TrackProductRequest, AlertConfigCreateRequest } from '../types'
 import { useToast } from './useToast'
@@ -206,6 +208,27 @@ export function useTraceStats() {
   return useQuery({
     queryKey: ['trace-stats'],
     queryFn: fetchTraceStats,
+    staleTime: STALE_TIME,
+  })
+}
+
+export function useListingChanges(params: {
+  product_id?: string
+  change_type?: string
+  limit?: number
+  offset?: number
+} = {}) {
+  return useQuery({
+    queryKey: ['listing-changes', params],
+    queryFn: () => fetchListingChanges(params),
+    staleTime: STALE_TIME,
+  })
+}
+
+export function useListingChangesSummary() {
+  return useQuery({
+    queryKey: ['listing-changes-summary'],
+    queryFn: fetchListingChangesSummary,
     staleTime: STALE_TIME,
   })
 }

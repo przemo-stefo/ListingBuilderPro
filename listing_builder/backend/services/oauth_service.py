@@ -85,7 +85,7 @@ def _backend_url() -> str:
     the proxy's fetch() follows redirects, breaking the browser redirect flow.
     The backend callback is in PUBLIC_PATHS (no API key needed)."""
     if settings.app_env == "production":
-        return "https://api-lbp.feedmasters.org"
+        return "https://api.octohelper.com"
     return "http://localhost:8000"
 
 

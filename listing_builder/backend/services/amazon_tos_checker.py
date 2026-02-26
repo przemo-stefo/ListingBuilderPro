@@ -1,69 +1,15 @@
 # backend/services/amazon_tos_checker.py
 # Purpose: Amazon TOS compliance checker — detects listing suppression risks
-# NOT for: LLM scoring or keyword placement — purely rule-based validation
+# NOT for: LLM scoring, keyword placement, or rule data (that's amazon_tos_rules.py)
 
 from __future__ import annotations
 
-import re
 from typing import List, Dict, Any
-
-# WHY: Amazon auto-suppresses listings with these promotional phrases (2025+ enforcement)
-PROMO_PHRASES = [
-    "best seller", "bestseller", "best selling", "top seller", "top rated",
-    "best deal", "best price", "#1", "nr 1", "no. 1", "number one",
-    "hot item", "sale", "discount", "free shipping", "free gift",
-    "on sale", "limited time", "special offer", "huge sale", "close-out",
-    "deal", "cheap", "cheapest", "buy now", "shop now", "don't miss out",
-    "guaranteed", "money back", "risk-free", "award winning", "proven",
-    "100% natural", "100% effective", "100% quality", "premium quality",
-    "highest quality", "buy with confidence", "unlike other brands",
-    "perfect", "ultimate", "amazing", "incredible", "unbeatable",
-    "fooled", "lush", "angebot", "sonderangebot", "ausverkauf",
-    "günstig", "billig", "gratis", "rabatt", "preiswert",
-]
-
-# WHY: Health/medical claims trigger FDA review → immediate suppression
-HEALTH_CLAIMS = [
-    "cure", "cures", "treat", "treats", "treatment", "heal", "healing",
-    "remedy", "remedies", "medication", "diagnose", "prevent", "prevents",
-    "mitigate", "weight loss", "fat burning", "appetite suppressant",
-    "boosts metabolism", "reduces cholesterol", "aids digestion",
-    "detox", "detoxify", "detoxification", "reduce anxiety",
-    "insomnia", "increases energy", "joint pain", "heartburn",
-    "inflammation", "arthritis", "immune booster",
-]
-
-# WHY: Pesticide/antimicrobial claims require EPA registration → suppression
-PESTICIDE_CLAIMS = [
-    "antibacterial", "anti-bacterial", "antimicrobial", "anti-microbial",
-    "antifungal", "fungicide", "sanitize", "sanitizes", "disinfect",
-    "kills bacteria", "kills viruses", "kills germs", "mold resistant",
-    "mildew resistant", "repels insects", "antiseptic",
-]
-
-# WHY: Drug-related keywords → immediate takedown, possible account ban
-DRUG_KEYWORDS = [
-    "cbd", "cannabinoid", "thc", "full spectrum hemp", "marijuana",
-    "kratom", "psilocybin", "ephedrine", "ketamine",
-]
-
-# WHY: Eco claims without certification = suppression (Amazon Green Claims policy)
-ECO_CLAIMS = [
-    "eco-friendly", "eco friendly", "biodegradable", "compostable",
-    "environmentally friendly", "carbon neutral", "carbon-reducing",
-    "decomposable", "degradable",
-]
-
-# WHY: These special characters are prohibited in Amazon titles
-FORBIDDEN_TITLE_CHARS = set("!$?_{}^~#<>|*;\\\"¡€™®©")
-
-# WHY: Amazon suppresses listings with any external references
-EXTERNAL_PATTERNS = [
-    (r"https?://\S+", "URL found"),
-    (r"www\.\S+", "URL found"),
-    (r"\b[\w.-]+@[\w.-]+\.\w+\b", "Email address found"),
-    (r"\+?\d[\d\s-]{8,}", "Phone number found"),
-]
+from services.amazon_tos_rules import (
+    FORBIDDEN_TITLE_CHARS, EXTERNAL_PATTERNS, TITLE_WORD_RE,
+    PROMO_RE, HEALTH_RE, PESTICIDE_RE, DRUG_RE, ECO_RE,
+    BACKEND_SUBJ_RE, ASIN_RE,
+)
 
 
 def check_amazon_tos(
@@ -79,23 +25,19 @@ def check_amazon_tos(
     This catches suppression-level violations BEFORE the listing goes live.
     """
     if not marketplace.startswith("amazon"):
-        return {"violations": [], "severity": "PASS", "suppression_risk": False}
+        return {"violations": [], "severity": "PASS", "suppression_risk": False, "violation_count": 0}
 
     violations: List[Dict[str, str]] = []
 
-    # --- TITLE CHECKS ---
     _check_title_format(title, violations)
 
-    # --- CONTENT CHECKS (title + bullets + description) ---
     full_visible = f"{title} {' '.join(bullets)} {description}"
     _check_prohibited_claims(full_visible, violations)
     _check_external_references(full_visible, violations)
 
-    # --- BACKEND KEYWORDS CHECKS ---
     if backend_keywords:
         _check_backend_keywords(backend_keywords, violations)
 
-    # --- SEVERITY ---
     has_suppression = any(v["severity"] == "SUPPRESSION" for v in violations)
     has_warning = any(v["severity"] == "WARNING" for v in violations)
 
@@ -138,7 +80,7 @@ def _check_title_format(title: str, violations: List[Dict]) -> None:
 
     # WHY: Same word >2x in title = suppression (Amazon 2025 rule)
     word_counts: Dict[str, int] = {}
-    for w in re.findall(r"[a-zA-ZäöüßÄÖÜąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+", title.lower()):
+    for w in TITLE_WORD_RE.findall(title.lower()):
         if len(w) > 2:
             word_counts[w] = word_counts.get(w, 0) + 1
     for word, count in word_counts.items():
@@ -162,64 +104,32 @@ def _check_title_format(title: str, violations: List[Dict]) -> None:
 
 
 def _check_prohibited_claims(text: str, violations: List[Dict]) -> None:
-    """Check for promotional, health, pesticide, drug, eco claims."""
-    text_lower = text.lower()
+    """Check for promotional, health, pesticide, drug, eco claims.
 
-    # Promotional phrases
-    for phrase in PROMO_PHRASES:
-        if re.search(rf"\b{re.escape(phrase)}\b", text_lower):
-            violations.append({
-                "rule": "promo_phrase",
-                "severity": "SUPPRESSION",
-                "message": f"Zabroniona fraza promocyjna: '{phrase}'",
-                "field": "content",
-            })
+    WHY: Uses pre-compiled single-pattern regexes instead of ~100 individual re.search() calls.
+    """
+    claim_checks = [
+        (PROMO_RE, "promo_phrase", "SUPPRESSION", "Zabroniona fraza promocyjna"),
+        (HEALTH_RE, "health_claim", "SUPPRESSION", "Roszczenie zdrowotne (FDA)"),
+        (PESTICIDE_RE, "pesticide_claim", "SUPPRESSION", "Roszczenie pestycydowe (EPA)"),
+        (DRUG_RE, "drug_keyword", "SUPPRESSION", "Słowo kluczowe narkotykowe"),
+        (ECO_RE, "eco_claim", "WARNING", "Roszczenie ekologiczne bez certyfikatu"),
+    ]
 
-    # Health claims
-    for claim in HEALTH_CLAIMS:
-        if re.search(rf"\b{re.escape(claim)}\b", text_lower):
+    for pattern, rule, severity, label in claim_checks:
+        for match in pattern.finditer(text):
             violations.append({
-                "rule": "health_claim",
-                "severity": "SUPPRESSION",
-                "message": f"Roszczenie zdrowotne (FDA): '{claim}'",
-                "field": "content",
-            })
-
-    # Pesticide claims
-    for claim in PESTICIDE_CLAIMS:
-        if re.search(rf"\b{re.escape(claim)}\b", text_lower):
-            violations.append({
-                "rule": "pesticide_claim",
-                "severity": "SUPPRESSION",
-                "message": f"Roszczenie pestycydowe (EPA): '{claim}'",
-                "field": "content",
-            })
-
-    # Drug keywords
-    for kw in DRUG_KEYWORDS:
-        if re.search(rf"\b{re.escape(kw)}\b", text_lower):
-            violations.append({
-                "rule": "drug_keyword",
-                "severity": "SUPPRESSION",
-                "message": f"Słowo kluczowe narkotykowe: '{kw}'",
-                "field": "content",
-            })
-
-    # Eco claims without certification
-    for claim in ECO_CLAIMS:
-        if re.search(rf"\b{re.escape(claim)}\b", text_lower):
-            violations.append({
-                "rule": "eco_claim",
-                "severity": "WARNING",
-                "message": f"Roszczenie ekologiczne bez certyfikatu: '{claim}'",
+                "rule": rule,
+                "severity": severity,
+                "message": f"{label}: '{match.group()}'",
                 "field": "content",
             })
 
 
 def _check_external_references(text: str, violations: List[Dict]) -> None:
     """Check for URLs, emails, phone numbers — all prohibited."""
-    for pattern, description in EXTERNAL_PATTERNS:
-        if re.search(pattern, text):
+    for compiled_re, description in EXTERNAL_PATTERNS:
+        if compiled_re.search(text):
             violations.append({
                 "rule": "external_reference",
                 "severity": "SUPPRESSION",
@@ -241,7 +151,7 @@ def _check_backend_keywords(keywords: str, violations: List[Dict]) -> None:
         })
 
     # WHY: ASINs in backend = IP violation risk
-    if re.search(r"\bB0[A-Z0-9]{8}\b", keywords.upper()):
+    if ASIN_RE.search(keywords.upper()):
         violations.append({
             "rule": "backend_asin",
             "severity": "SUPPRESSION",
@@ -250,13 +160,10 @@ def _check_backend_keywords(keywords: str, violations: List[Dict]) -> None:
         })
 
     # WHY: Subjective claims waste bytes and can trigger review
-    subjective = ["best", "amazing", "perfect", "cheapest", "top-rated", "new", "on sale"]
-    kw_lower = keywords.lower()
-    for word in subjective:
-        if re.search(rf"\b{re.escape(word)}\b", kw_lower):
-            violations.append({
-                "rule": "backend_subjective",
-                "severity": "WARNING",
-                "message": f"Subiektywne słowo w backend keywords: '{word}' — marnuje bajty",
-                "field": "backend_keywords",
-            })
+    for match in BACKEND_SUBJ_RE.finditer(keywords):
+        violations.append({
+            "rule": "backend_subjective",
+            "severity": "WARNING",
+            "message": f"Subiektywne słowo w backend keywords: '{match.group()}' — marnuje bajty",
+            "field": "backend_keywords",
+        })
