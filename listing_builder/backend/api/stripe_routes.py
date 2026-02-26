@@ -89,8 +89,29 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 @router.post("/validate-license", response_model=ValidateLicenseResponse)
 @limiter.limit("30/minute")
 async def validate(request: Request, body: ValidateLicenseRequest, db: Session = Depends(get_db)):
-    """Validate a license key — returns tier."""
+    """Validate a license key — returns tier.
+
+    WHY email check: License key is stored in localStorage (per-domain, not per-user).
+    If user A logs out and user B logs in, browser still has user A's key.
+    Without this check, user B gets free premium. JWT email must match license email.
+    """
     is_valid = validate_license(body.license_key, db)
+
+    # WHY: If JWT present, verify the license belongs to this user
+    if is_valid:
+        jwt_email = _get_email_from_jwt(request)
+        if jwt_email:
+            from models.premium_license import PremiumLicense
+            license_obj = db.query(PremiumLicense).filter(
+                PremiumLicense.license_key == body.license_key,
+                PremiumLicense.status == "active",
+            ).first()
+            if license_obj and license_obj.email.lower() != jwt_email.lower():
+                logger.warning("license_email_mismatch",
+                               jwt_email=jwt_email[:3] + "***",
+                               license_email=license_obj.email[:3] + "***")
+                is_valid = False
+
     return ValidateLicenseResponse(
         valid=is_valid,
         tier="premium" if is_valid else "free",
