@@ -2,7 +2,7 @@
 # Purpose: GET endpoints for listing change history (timeline view)
 # NOT for: Change detection logic (that's listing_diff_service + monitor_scheduler)
 
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/monitoring", tags=["Listing Changes"])
 def get_listing_changes(
     user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
-    product_id: str | None = Query(None),
-    change_type: Literal["title", "bullets", "description", "images", "price", "brand"] | None = Query(None),
+    product_id: Optional[str] = Query(None),
+    change_type: Optional[Literal["title", "bullets", "description", "images", "price", "brand"]] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
