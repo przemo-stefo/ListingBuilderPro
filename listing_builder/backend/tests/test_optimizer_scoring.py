@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 
 class TestScoreListing:
 
+    @patch("services.optimizer_scoring.check_amazon_tos")
     @patch("services.optimizer_scoring.generate_ppc_recommendations")
     @patch("services.optimizer_scoring.calculate_ranking_juice")
     @patch("services.optimizer_scoring.calculate_multi_tier_coverage")
@@ -17,7 +18,7 @@ class TestScoreListing:
     @patch("services.optimizer_scoring.coverage_for_text")
     def test_score_listing_returns_all_fields(
         self, mock_cov, mock_exact, mock_compliance, mock_stuffing,
-        mock_multi_cov, mock_rj, mock_ppc
+        mock_multi_cov, mock_rj, mock_ppc, mock_tos
     ):
         from services.optimizer_scoring import score_listing
 
@@ -30,6 +31,7 @@ class TestScoreListing:
         mock_multi_cov.return_value = {"missing_keywords": []}
         mock_rj.return_value = {"total_score": 75}
         mock_ppc.return_value = {"campaigns": []}
+        mock_tos.return_value = {"violations": [], "severity": "PASS", "suppression_risk": False, "violation_count": 0}
 
         result = score_listing(
             all_kw=[{"keyword": "test", "tier": 1}],
@@ -49,6 +51,7 @@ class TestScoreListing:
         assert "missing" in result
         assert result["coverage_pct"] == 85.0
 
+    @patch("services.optimizer_scoring.check_amazon_tos")
     @patch("services.optimizer_scoring.generate_ppc_recommendations")
     @patch("services.optimizer_scoring.calculate_ranking_juice")
     @patch("services.optimizer_scoring.calculate_multi_tier_coverage")
@@ -58,7 +61,7 @@ class TestScoreListing:
     @patch("services.optimizer_scoring.coverage_for_text")
     def test_stuffing_warnings_merge_into_compliance(
         self, mock_cov, mock_exact, mock_compliance, mock_stuffing,
-        mock_multi_cov, mock_rj, mock_ppc
+        mock_multi_cov, mock_rj, mock_ppc, mock_tos
     ):
         from services.optimizer_scoring import score_listing
 
@@ -71,6 +74,7 @@ class TestScoreListing:
         mock_multi_cov.return_value = {"missing_keywords": []}
         mock_rj.return_value = {"total_score": 70}
         mock_ppc.return_value = {"campaigns": []}
+        mock_tos.return_value = {"violations": [], "severity": "PASS", "suppression_risk": False, "violation_count": 0}
 
         result = score_listing(
             all_kw=[], tier1=[], title_text="test test test",
@@ -81,6 +85,7 @@ class TestScoreListing:
         assert result["compliance"]["status"] == "WARN"
         assert result["compliance"]["warning_count"] == 1
 
+    @patch("services.optimizer_scoring.check_amazon_tos")
     @patch("services.optimizer_scoring.generate_ppc_recommendations")
     @patch("services.optimizer_scoring.calculate_ranking_juice")
     @patch("services.optimizer_scoring.calculate_multi_tier_coverage")
@@ -90,7 +95,7 @@ class TestScoreListing:
     @patch("services.optimizer_scoring.coverage_for_text")
     def test_backend_utilization_calculation(
         self, mock_cov, mock_exact, mock_compliance, mock_stuffing,
-        mock_multi_cov, mock_rj, mock_ppc
+        mock_multi_cov, mock_rj, mock_ppc, mock_tos
     ):
         from services.optimizer_scoring import score_listing
 
@@ -103,6 +108,7 @@ class TestScoreListing:
         mock_multi_cov.return_value = {"missing_keywords": []}
         mock_rj.return_value = {}
         mock_ppc.return_value = {}
+        mock_tos.return_value = {"violations": [], "severity": "PASS", "suppression_risk": False, "violation_count": 0}
 
         result = score_listing(
             all_kw=[], tier1=[], title_text="Title",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # backend/scripts/ingest_amazon_fba.py
-# Purpose: Ingest 112 Amazon FBA Revolution transcripts into knowledge_chunks for RAG
+# Purpose: Ingest Amazon FBA Revolution course transcripts into knowledge_chunks for RAG
 # NOT for: Runtime — run once from dev machine
 
 """
@@ -10,7 +10,8 @@ Usage:
     python scripts/ingest_amazon_fba.py --dry-run  # preview only
     python scripts/ingest_amazon_fba.py --no-embed  # ingest without embeddings
 
-112 Polish transcripts (9 modules). ON CONFLICT DO NOTHING = safe to re-run.
+115 Polish transcripts, 9 modules (product research → PPC).
+ON CONFLICT DO NOTHING = safe to re-run.
 """
 
 import os
@@ -35,27 +36,31 @@ SOURCE_TYPE = "amazon_fba_revolution"
 PREFIX = "AmazonFBA"
 BASE_DIR = os.path.expanduser("~/Documents/AmazonFBARevolution")
 
-# WHY: Map module number (first digit of filename) to RAG category
-MODULE_CATEGORY = {
-    1: "amazon_intro",
-    2: "business_setup",
-    3: "product_research",
-    4: "manufacturing",
-    5: "import_logistics",
-    6: "seller_central",
-    7: "listing_optimization",
-    8: "product_launch",
-    9: "ppc",
+# WHY: Map module number → category for RAG filtering
+# Modules 1-9 cover full Amazon FBA journey from intro to PPC
+MODULE_CATEGORIES = {
+    1: "amazon_intro",           # strategia, opłaty, narzędzia
+    2: "business_setup",         # firma, podatki, VAT, EU/USA
+    3: "product_research",       # nisze, walidacja, 14 elementów
+    4: "manufacturing",          # Alibaba, próbki, producent
+    5: "import_logistics",       # import, cło, forwarder
+    6: "seller_central",         # konto, FBA, Seller Central
+    7: "listing_optimization",   # tytuł, bullets, opis, zdjęcia, SEO
+    8: "product_launch",         # launch, recenzje, ranking
+    9: "ppc",                    # PPC kampanie, optymalizacja
 }
 
 
+def get_module_number(filename: str) -> int:
+    """Extract module number from filename like '7.14._Bullet_Points.txt'."""
+    match = re.match(r'^(\d+)\.', filename)
+    return int(match.group(1)) if match else 0
+
+
 def get_category(filename: str) -> str:
-    """Extract module number from filename like '7.14._Bullet_Points.txt' → 'listing_optimization'."""
-    match = re.match(r"^(\d+)\.", filename)
-    if match:
-        module = int(match.group(1))
-        return MODULE_CATEGORY.get(module, "amazon_intro")
-    return "amazon_intro"
+    """Map filename to category via module number."""
+    module = get_module_number(filename)
+    return MODULE_CATEGORIES.get(module, "amazon_intro")
 
 
 def chunk_text(content: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
@@ -89,6 +94,7 @@ def chunk_text(content: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_
 
 
 def sanitize_filename(name: str, max_len: int = 80) -> str:
+    """Create a safe filename for DB unique constraint."""
     return re.sub(r'[^a-zA-Z0-9_-]', '', name.replace(' ', '_'))[:max_len]
 
 
@@ -109,16 +115,16 @@ def main():
     ), {"src": SOURCE_TAG}).scalar()
     print(f"Existing '{SOURCE_TAG}' chunks: {existing}")
 
-    # WHY: Flat directory — all .txt files directly in BASE_DIR
-    files = sorted(f for f in os.listdir(BASE_DIR) if f.endswith(".txt"))
-    print(f"Found {len(files)} transcript files in {BASE_DIR}\n")
+    txt_files = sorted([f for f in os.listdir(BASE_DIR) if f.endswith('.txt')])
+    print(f"Found {len(txt_files)} transcript files in {BASE_DIR}\n")
 
     total_chunks = 0
     inserted = 0
     skipped_small = 0
     stats_by_category = {}
+    stats_by_module = {}
 
-    for file_idx, filename in enumerate(files):
+    for file_idx, filename in enumerate(txt_files):
         filepath = os.path.join(BASE_DIR, filename)
         basename = os.path.splitext(filename)[0]
 
@@ -130,11 +136,12 @@ def main():
             continue
 
         category = get_category(filename)
+        module = get_module_number(filename)
         chunks = chunk_text(content)
+
         db_filename = f"{PREFIX}_{sanitize_filename(basename)}"
 
         for chunk_idx, chunk in enumerate(chunks):
-            # WHY: Prepend course + lesson context for better RAG retrieval
             chunk_with_context = f"[Amazon FBA Revolution - {basename}]\n{chunk}"
 
             if not dry_run:
@@ -162,10 +169,12 @@ def main():
             total_chunks += 1
             stats_by_category[category] = stats_by_category.get(category, 0) + 1
 
-        if (file_idx + 1) % 25 == 0:
+        stats_by_module[module] = stats_by_module.get(module, 0) + len(chunks)
+
+        if (file_idx + 1) % 20 == 0:
             if not dry_run:
                 db.commit()
-            print(f"  Progress: {file_idx + 1}/{len(files)} files, {total_chunks} chunks")
+            print(f"  Progress: {file_idx + 1}/{len(txt_files)} files, {total_chunks} chunks")
 
     if not dry_run:
         db.commit()
@@ -174,11 +183,16 @@ def main():
     print(f"\n{'='*60}")
     print(f"SUMMARY {'(DRY RUN)' if dry_run else ''}")
     print(f"{'='*60}")
-    print(f"Files processed: {len(files) - skipped_small}")
+    print(f"Files processed: {len(txt_files) - skipped_small}")
     print(f"Files skipped (too small): {skipped_small}")
     print(f"Total chunks: {total_chunks}")
     if not dry_run:
         print(f"Inserted to DB: {inserted}")
+
+    print(f"\nBy module:")
+    for mod in sorted(stats_by_module):
+        cat = MODULE_CATEGORIES.get(mod, "?")
+        print(f"  Module {mod} ({cat}): {stats_by_module[mod]} chunks")
 
     print(f"\nBy category:")
     for cat, count in sorted(stats_by_category.items(), key=lambda x: -x[1]):

@@ -27,6 +27,8 @@ class ScoreRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=500)
     bullets: list[str] = Field(..., min_length=1, max_length=10)
     description: str = Field(default="", max_length=5000)
+    backend_keywords: str = Field(default="", max_length=500)
+    marketplace: str = Field(default="amazon", max_length=50)
 
 
 class DimensionScore(BaseModel):
@@ -36,10 +38,25 @@ class DimensionScore(BaseModel):
     tip: str
 
 
+class TosViolation(BaseModel):
+    rule: str
+    severity: str
+    message: str
+    field: str
+
+
+class TosCheckResult(BaseModel):
+    violations: list[TosViolation] = []
+    severity: str = "PASS"
+    suppression_risk: bool = False
+    violation_count: int = 0
+
+
 class ScoreResponse(BaseModel):
     overall_score: float
     dimensions: list[DimensionScore]
     sources_used: int
+    tos_check: TosCheckResult = None
 
 
 class FetchRequest(BaseModel):
@@ -108,13 +125,15 @@ async def score_listing_endpoint(
     body: ScoreRequest,
     db: Session = Depends(get_db),
 ):
-    """Score an Amazon listing 1-10 on 5 copywriting dimensions with actionable tips."""
+    """Score a listing on 6 dimensions (TOS + 5 copywriting) with actionable tips."""
     try:
         result = await score_listing(
             title=body.title,
             bullets=body.bullets,
             description=body.description,
             db=db,
+            backend_keywords=body.backend_keywords,
+            marketplace=body.marketplace,
         )
         return result
     except Exception as e:

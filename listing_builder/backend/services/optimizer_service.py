@@ -174,7 +174,7 @@ async def optimize_listing(
     with span(trace, "scoring"):
         full_listing = title_text + " " + " ".join(bullet_lines) + " " + desc_text
         backend_kw = pack_backend_keywords(all_kw, full_listing, limits["backend"], backend_suggestions)
-        scores = score_listing(all_kw, tier1, title_text, bullet_lines, desc_text, backend_kw, brand, limits)
+        scores = score_listing(all_kw, tier1, title_text, bullet_lines, desc_text, backend_kw, brand, limits, marketplace)
 
     # 6. Self-learning
     listing_history_id = None
