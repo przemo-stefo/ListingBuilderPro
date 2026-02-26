@@ -114,7 +114,7 @@ class TestSessionLicenseRoute:
 
     def test_session_found(self, auth_client, db_session):
         lic = PremiumLicense(
-            email="session@test.com",
+            email="testuser@test.com",
             license_key="session-route-key-12",
             stripe_checkout_session_id="cs_route_test",
             plan_type="monthly",
@@ -128,6 +128,21 @@ class TestSessionLicenseRoute:
         data = resp.json()
         assert data["status"] == "ready"
         assert data["license_key"] == "session-route-key-12"
+
+    def test_session_email_mismatch_returns_403(self, auth_client, db_session):
+        """WHY: Defense-in-depth — JWT email must match license email."""
+        lic = PremiumLicense(
+            email="someone-else@test.com",
+            license_key="stolen-key-99",
+            stripe_checkout_session_id="cs_mismatch",
+            plan_type="monthly",
+            status="active",
+        )
+        db_session.add(lic)
+        db_session.commit()
+
+        resp = auth_client.get("/api/stripe/session/cs_mismatch/license")
+        assert resp.status_code == 403
 
 
 class TestWebhookRoute:

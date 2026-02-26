@@ -2,7 +2,7 @@
 # Purpose: Ad copy generation endpoint — Facebook/Meta ad variations from product listings
 # NOT for: Listing optimization (optimizer_routes) or Expert Q&A (knowledge_routes)
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -62,9 +62,5 @@ async def generate_ads(
         return result
     except Exception as e:
         logger.error("ad_copy_endpoint_error", error=str(e))
-        return AdCopyResponse(
-            variations=[],
-            sources_used=0,
-            sources=[],
-            platform=body.platform,
-        )
+        # WHY: Raise 500 instead of silent empty response — user must know generation failed
+        raise HTTPException(status_code=500, detail="Generowanie reklam nie powiodlo sie")

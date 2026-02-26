@@ -53,7 +53,9 @@ async def get_keywords(
         filtered = filtered.filter(TrackedKeyword.marketplace == marketplace)
     if search:
         # WHY ilike: case-insensitive partial match
-        filtered = filtered.filter(TrackedKeyword.keyword.ilike(f"%{search}%"))
+        # WHY escape: prevent LIKE wildcard injection (% and _ are wildcards)
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        filtered = filtered.filter(TrackedKeyword.keyword.ilike(f"%{safe_search}%"))
 
     items = filtered.order_by(TrackedKeyword.last_updated.desc()).all()
 

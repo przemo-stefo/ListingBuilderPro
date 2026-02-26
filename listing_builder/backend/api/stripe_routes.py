@@ -130,9 +130,17 @@ async def session_license(request: Request, session_id: str, db: Session = Depen
     if not jwt_email:
         raise HTTPException(status_code=401, detail="Zaloguj się aby pobrać klucz licencji")
 
-    key = get_license_by_session(session_id, db)
-    if key:
-        return SessionLicenseResponse(license_key=key, status="ready")
+    # WHY: Verify the session belongs to the JWT user — defense-in-depth
+    # Even though session_ids are long random strings, verify email ownership
+    from models.premium_license import PremiumLicense
+    license_obj = db.query(PremiumLicense).filter(
+        PremiumLicense.stripe_checkout_session_id == session_id,
+    ).first()
+
+    if license_obj:
+        if license_obj.email and license_obj.email.lower() != jwt_email.lower():
+            raise HTTPException(status_code=403, detail="Sesja nie należy do tego konta")
+        return SessionLicenseResponse(license_key=license_obj.license_key, status="ready")
     # WHY: Webhook may not have fired yet — tell frontend to poll
     return SessionLicenseResponse(status="pending")
 
