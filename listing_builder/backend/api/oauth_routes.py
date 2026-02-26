@@ -89,9 +89,9 @@ async def amazon_callback(
     if "error" in result:
         logger.error("amazon_oauth_callback_error", error=result["error"])
         # WHY quote: prevents special chars leaking to browser history / referrer
-        return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=error&msg={quote(result['error'])}")
+        return RedirectResponse(f"{frontend}/settings?oauth=error&msg={quote(result['error'])}")
 
-    return RedirectResponse(f"{frontend}/compliance?tab=integrations&oauth=success&marketplace=amazon")
+    return RedirectResponse(f"{frontend}/settings?oauth=success&marketplace=amazon")
 
 
 # ── Shared validator ──────────────────────────────────────────────────────────
@@ -167,9 +167,9 @@ async def allegro_callback(
     frontend = _frontend_url()
     if "error" in result:
         logger.error("allegro_oauth_callback_error", error=result["error"])
-        return RedirectResponse(f"{frontend}/converter?allegro=error&msg={quote(result['error'])}")
+        return RedirectResponse(f"{frontend}/settings?oauth=error&msg={quote(result['error'])}")
 
-    return RedirectResponse(f"{frontend}/converter?allegro=connected")
+    return RedirectResponse(f"{frontend}/settings?oauth=success&marketplace=allegro")
 
 
 # ── eBay OAuth ────────────────────────────────────────────────────────────────
@@ -201,9 +201,9 @@ async def ebay_callback(
     frontend = _frontend_url()
     if "error" in result:
         logger.error("ebay_oauth_callback_error", error=result["error"])
-        return RedirectResponse(f"{frontend}/integrations?oauth=error&msg={quote(result['error'])}")
+        return RedirectResponse(f"{frontend}/settings?oauth=error&msg={quote(result['error'])}")
 
-    return RedirectResponse(f"{frontend}/integrations?oauth=success&marketplace=ebay")
+    return RedirectResponse(f"{frontend}/settings?oauth=success&marketplace=ebay")
 
 
 # ── BOL.com (Client Credentials — no browser redirect) ───────────────────
