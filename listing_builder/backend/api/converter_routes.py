@@ -479,7 +479,7 @@ async def start_store_convert(
 
 
 @router.get("/store-job/{job_id}", response_model=StoreJobStatus)
-async def get_store_job_status(job_id: str):
+async def get_store_job_status(job_id: str, _user_id: str = Depends(require_user_id)):
     """Get the status of a store conversion job."""
     job = get_store_job(job_id)
     if not job:
@@ -497,7 +497,7 @@ async def get_store_job_status(job_id: str):
 
 
 @router.get("/store-job/{job_id}/download")
-async def download_store_job(job_id: str):
+async def download_store_job(job_id: str, _user_id: str = Depends(require_user_id)):
     """Download the converted file for a completed store job."""
     job = get_store_job(job_id)
     if not job:

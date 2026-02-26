@@ -47,6 +47,7 @@ async def validate_template(
         description="Force marketplace (amazon/ebay/kaufland). Auto-detected from extension if not provided.",
     ),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Upload a marketplace template file and get a compliance validation report.
@@ -89,6 +90,9 @@ async def validate_template(
     try:
         service = ComplianceService(db)
         report = service.validate_file(file_bytes, filename, marketplace)
+        # WHY: Set user_id after service creates report — tenant isolation
+        report.user_id = user_id
+        db.commit()
     except ValueError as e:
         # WHY: Only our own ValueErrors here — safe user-facing messages
         raise HTTPException(status_code=400, detail=str(e))
@@ -106,10 +110,15 @@ async def list_reports(
     offset: int = Query(0, ge=0),
     marketplace: Optional[str] = Query(None, description="Filter by marketplace"),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """List past compliance reports with pagination."""
-    service = ComplianceService(db)
-    reports, total = service.get_reports(limit=limit, offset=offset, marketplace=marketplace)
+    # WHY: Filter by user_id for tenant isolation instead of using unfiltered service method
+    query = db.query(ComplianceReport).filter(ComplianceReport.user_id == user_id)
+    if marketplace:
+        query = query.filter(ComplianceReport.marketplace == marketplace.lower())
+    total = query.count()
+    reports = query.order_by(ComplianceReport.created_at.desc()).offset(offset).limit(limit).all()
 
     return ComplianceReportsListResponse(
         items=[
@@ -133,11 +142,13 @@ async def list_reports(
 
 
 @router.get("/reports/{report_id}", response_model=ComplianceReportResponse)
-async def get_report(report_id: str, db: Session = Depends(get_db)):
+async def get_report(report_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Get a single compliance report with all product items."""
-    service = ComplianceService(db)
-    report = service.get_report(report_id)
-
+    report = (
+        db.query(ComplianceReport)
+        .filter(ComplianceReport.id == report_id, ComplianceReport.user_id == user_id)
+        .first()
+    )
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
@@ -268,6 +279,7 @@ async def audit_store(request: Request, db: Session = Depends(get_db), user_id: 
 
     # Step 5: Save as ComplianceReport + items
     report = ComplianceReport(
+        user_id=user_id,
         marketplace="allegro",
         filename=f"Skan sklepu Allegro ({len(results)} produktów)",
         total_products=len(results),

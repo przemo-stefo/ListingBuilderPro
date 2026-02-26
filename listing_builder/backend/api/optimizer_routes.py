@@ -16,6 +16,7 @@ from services.llm_providers import PROVIDERS
 from services.stripe_service import validate_license
 from database import get_db
 from models.optimization import OptimizationRun
+from api.dependencies import require_user_id, get_user_id
 from utils.privacy import hash_ip
 
 limiter = Limiter(key_func=get_remote_address)
@@ -164,7 +165,7 @@ class OptimizerResponse(BaseModel):
 
 @router.post("/generate", response_model=OptimizerResponse)
 @limiter.limit("10/minute")
-async def generate_listing(request: Request, body: OptimizerRequest, db: Session = Depends(get_db)):
+async def generate_listing(request: Request, body: OptimizerRequest, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """
     Generate an optimized listing using Groq LLM + keyword analysis.
 
@@ -192,8 +193,6 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
         # WHY: If frontend didn't send a key, try to read the saved key from user settings
         if not api_key:
             from api.settings_routes import _load_settings
-            from api.dependencies import get_user_id
-            user_id = get_user_id(request)
             settings_data = _load_settings(db, user_id)
             saved_providers = settings_data.get("llm", {}).get("providers", {})
             saved_conf = saved_providers.get(body.llm_provider, {})
@@ -235,6 +234,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
         # WHY: Auto-save to history — non-blocking, don't fail the response if DB save fails
         try:
             run = OptimizationRun(
+                user_id=user_id,
                 product_title=body.product_title,
                 brand=body.brand,
                 marketplace=body.marketplace,
@@ -375,12 +375,14 @@ async def list_history(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """List optimization runs, newest first."""
     offset = (page - 1) * page_size
-    total = db.query(OptimizationRun).count()
+    total = db.query(OptimizationRun).filter(OptimizationRun.user_id == user_id).count()
     runs = (
         db.query(OptimizationRun)
+        .filter(OptimizationRun.user_id == user_id)
         .order_by(OptimizationRun.created_at.desc())
         .offset(offset)
         .limit(page_size)
@@ -406,9 +408,9 @@ async def list_history(
 
 
 @router.get("/history/{run_id}")
-async def get_history_detail(run_id: int, db: Session = Depends(get_db)):
+async def get_history_detail(run_id: int, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Get a single run with full response_data for reload."""
-    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id).first()
+    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id, OptimizationRun.user_id == user_id).first()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return {
@@ -427,9 +429,9 @@ async def get_history_detail(run_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/history/{run_id}")
 @limiter.limit("10/minute")
-async def delete_history(request: Request, run_id: int, db: Session = Depends(get_db)):
+async def delete_history(request: Request, run_id: int, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Delete a single optimization run."""
-    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id).first()
+    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id, OptimizationRun.user_id == user_id).first()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     db.delete(run)
@@ -448,6 +450,7 @@ async def submit_feedback(
     listing_id: str,
     body: FeedbackRequest,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """User rates a listing 1-5. Updates listing_history table."""
     from services.learning_service import submit_feedback as do_feedback
@@ -489,17 +492,18 @@ async def list_traces(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """List optimization runs that have trace data, with summary info."""
     runs = (
         db.query(OptimizationRun)
-        .filter(OptimizationRun.trace_data.isnot(None))
+        .filter(OptimizationRun.trace_data.isnot(None), OptimizationRun.user_id == user_id)
         .order_by(OptimizationRun.created_at.desc())
         .offset(offset)
         .limit(limit)
         .all()
     )
-    total = db.query(OptimizationRun).filter(OptimizationRun.trace_data.isnot(None)).count()
+    total = db.query(OptimizationRun).filter(OptimizationRun.trace_data.isnot(None), OptimizationRun.user_id == user_id).count()
 
     return {
         "items": [
@@ -519,9 +523,10 @@ async def list_traces(
 
 
 @router.get("/traces/stats")
-async def trace_stats(db: Session = Depends(get_db)):
+async def trace_stats(db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Aggregate trace stats: avg tokens, avg latency, total cost, run count."""
     # WHY: JSONB operators let us aggregate without pulling all rows into Python
+    # WHY :user_id param: tenant isolation — only show stats for the current user
     row = db.execute(text("""
         SELECT
             COUNT(*) AS runs,
@@ -530,8 +535,8 @@ async def trace_stats(db: Session = Depends(get_db)):
             COALESCE(SUM((trace_data->>'estimated_cost_usd')::numeric), 0) AS total_cost_usd,
             COALESCE(SUM((trace_data->>'total_tokens')::numeric), 0) AS total_tokens
         FROM optimization_runs
-        WHERE trace_data IS NOT NULL
-    """)).fetchone()
+        WHERE trace_data IS NOT NULL AND user_id = :user_id
+    """), {"user_id": user_id}).fetchone()
 
     return {
         "runs_with_traces": row[0],

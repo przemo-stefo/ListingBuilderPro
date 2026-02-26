@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 from typing import Optional
 
 from database import get_db
+from api.dependencies import require_user_id
 from models.listing import TrackedKeyword
 from schemas import KeywordCreate, KeywordItem, KeywordsResponse
 from utils.validators import validate_uuid
@@ -20,15 +21,18 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.get("", response_model=KeywordsResponse)
 async def get_keywords(
+    request: Request,
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     search: Optional[str] = Query(None, description="Search keyword text"),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     List tracked keywords with rank, volume, and relevance data.
-    Summary stats are computed from the FULL dataset (before filtering).
+    Summary stats are computed from the user's FULL dataset (before filtering).
     """
-    all_query = db.query(TrackedKeyword)
+    # WHY: Scope all queries to the authenticated user for tenant isolation
+    all_query = db.query(TrackedKeyword).filter(TrackedKeyword.user_id == user_id)
     total_count = all_query.count()
 
     # WHY full-dataset stats: dashboard cards must stay consistent
@@ -40,7 +44,7 @@ async def get_keywords(
 
     avg_relevance = 0.0
     if total_count > 0:
-        avg_val = db.query(sa_func.avg(TrackedKeyword.relevance_score)).scalar()
+        avg_val = all_query.with_entities(sa_func.avg(TrackedKeyword.relevance_score)).scalar()
         avg_relevance = round(float(avg_val or 0), 1)
 
     # Apply filters for the table view
@@ -82,17 +86,24 @@ async def create_keyword(
     request: Request,
     body: KeywordCreate,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Add a keyword to track."""
+    # WHY: Check uniqueness within this user's keywords only
     existing = (
         db.query(TrackedKeyword)
-        .filter(TrackedKeyword.keyword == body.keyword, TrackedKeyword.marketplace == body.marketplace)
+        .filter(
+            TrackedKeyword.keyword == body.keyword,
+            TrackedKeyword.marketplace == body.marketplace,
+            TrackedKeyword.user_id == user_id,
+        )
         .first()
     )
     if existing:
         raise HTTPException(status_code=409, detail="Keyword already tracked for this marketplace")
 
     kw = TrackedKeyword(
+        user_id=user_id,
         keyword=body.keyword,
         marketplace=body.marketplace,
         search_volume=body.search_volume,
@@ -117,10 +128,18 @@ async def create_keyword(
 
 
 @router.delete("/{keyword_id}")
-async def delete_keyword(keyword_id: str, db: Session = Depends(get_db)):
+async def delete_keyword(
+    request: Request,
+    keyword_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
     """Stop tracking a keyword."""
     validate_uuid(keyword_id, "keyword_id")
-    kw = db.query(TrackedKeyword).filter(TrackedKeyword.id == keyword_id).first()
+    # WHY: Filter by user_id prevents deleting another user's keyword
+    kw = db.query(TrackedKeyword).filter(
+        TrackedKeyword.id == keyword_id, TrackedKeyword.user_id == user_id
+    ).first()
     if not kw:
         raise HTTPException(status_code=404, detail="Keyword not found")
 

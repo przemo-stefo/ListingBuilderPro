@@ -2,10 +2,11 @@
 # Purpose: Competitors endpoint — DB-backed price comparison, ratings, win/loss status
 # NOT for: Product CRUD or inventory tracking (separate files)
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db
+from api.dependencies import require_user_id
 from schemas import CompetitorsResponse, CompetitorItem
 from typing import Optional
 
@@ -14,27 +15,29 @@ router = APIRouter(prefix="/api/competitors", tags=["Competitors"])
 
 @router.get("", response_model=CompetitorsResponse)
 async def get_competitors(
+    request: Request,
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     search: Optional[str] = Query(None, description="Search competitor name or product title"),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     List competitors with price comparison and rating data.
-    Summary stats are computed from the FULL dataset (before filtering).
+    Summary stats are computed from the user's FULL dataset (before filtering).
     """
-    # WHY: Summary stats from full dataset for dashboard cards
+    # WHY: Summary stats from user's full dataset for dashboard cards
     stats = db.execute(text(
         "SELECT "
         "  COUNT(*) FILTER (WHERE status = 'winning') AS winning, "
         "  COUNT(*) FILTER (WHERE status = 'losing') AS losing, "
         "  COALESCE(ROUND(AVG(ABS(price_difference))::numeric, 2), 0) AS avg_gap "
-        "FROM competitors"
-    )).fetchone()
+        "FROM competitors WHERE user_id = :uid"
+    ), {"uid": user_id}).fetchone()
 
     # WHY: Filtered query for the table view — built with text() fragments, never f-string user input
     clauses = ["SELECT * FROM competitors"]
-    params = {}
-    conditions = []
+    params = {"uid": user_id}
+    conditions = ["user_id = :uid"]
     if marketplace:
         conditions.append("marketplace = :mp")
         params["mp"] = marketplace
@@ -44,8 +47,7 @@ async def get_competitors(
         )
         params["q"] = f"%{search.lower()}%"
 
-    if conditions:
-        clauses.append("WHERE " + " AND ".join(conditions))
+    clauses.append("WHERE " + " AND ".join(conditions))
     clauses.append("ORDER BY marketplace, competitor_name")
     rows = db.execute(text(" ".join(clauses)), params).fetchall()
 

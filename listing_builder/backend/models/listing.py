@@ -15,6 +15,8 @@ class Listing(Base):
 
     # WHY PG_UUID(as_uuid=False): Returns plain strings, matches monitoring.py pattern
     id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    # WHY: Multi-tenant isolation
+    user_id = Column(String(255), nullable=False, default="default", index=True)
     sku = Column(String(50), nullable=False, unique=True, index=True)
     title = Column(Text, nullable=False)
     marketplace = Column(String(50), nullable=False, index=True)
@@ -29,6 +31,8 @@ class TrackedKeyword(Base):
     __tablename__ = "tracked_keywords"
 
     id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    # WHY: Multi-tenant isolation
+    user_id = Column(String(255), nullable=False, default="default", index=True)
     keyword = Column(Text, nullable=False)
     search_volume = Column(Integer, default=0)
     current_rank = Column(Integer, nullable=True)

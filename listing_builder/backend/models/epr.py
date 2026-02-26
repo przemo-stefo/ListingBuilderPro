@@ -17,6 +17,8 @@ class EprReport(Base):
     __tablename__ = "epr_reports"
 
     id = Column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    # WHY: Multi-tenant isolation
+    user_id = Column(String(255), nullable=False, default="default", index=True)
     report_type = Column(Text, nullable=False)
     marketplace_id = Column(Text, nullable=False, default="A1PA6795UKMFR9")
     status = Column(Text, nullable=False, default="pending")

@@ -13,7 +13,7 @@ import structlog
 
 from database import get_db
 from models.monitoring import TrackedProduct, MonitoringSnapshot, AlertConfig, Alert
-from api.dependencies import require_user_id
+from api.dependencies import require_user_id, require_admin
 from utils.validators import validate_uuid
 from schemas.monitoring import (
     TrackProductRequest,
@@ -135,9 +135,14 @@ async def get_snapshots(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Get price/stock history for a tracked product."""
     validate_uuid(tracked_id, "tracked_id")
+    # WHY: Verify the tracked product belongs to the current user before returning snapshots
+    tracked = db.query(TrackedProduct).filter(TrackedProduct.id == tracked_id, TrackedProduct.user_id == user_id).first()
+    if not tracked:
+        raise HTTPException(status_code=404, detail="Tracked product not found")
     query = (
         db.query(MonitoringSnapshot)
         .filter(MonitoringSnapshot.tracked_product_id == tracked_id)
@@ -243,14 +248,21 @@ async def list_alerts(
 
 
 @router.patch("/alerts/{alert_id}/ack")
-async def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)):
+async def acknowledge_alert(alert_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Acknowledge an alert."""
     validate_uuid(alert_id, "alert_id")
-    from services.alert_service import get_alert_service
-    svc = get_alert_service()
-    alert = svc.acknowledge_alert(db, alert_id)
+    # WHY: Verify alert belongs to user via AlertConfig join before acknowledging
+    alert = (
+        db.query(Alert)
+        .join(AlertConfig)
+        .filter(Alert.id == alert_id, AlertConfig.user_id == user_id)
+        .first()
+    )
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+    alert.acknowledged = True
+    alert.acknowledged_at = datetime.now(timezone.utc)
+    db.commit()
     return {"id": alert_id, "acknowledged": True}
 
 
@@ -285,7 +297,7 @@ async def scheduler_status():
 
 @router.post("/poll/{marketplace}")
 @limiter.limit("5/minute")
-async def trigger_poll(request: Request, marketplace: str, db: Session = Depends(get_db)):
+async def trigger_poll(request: Request, marketplace: str, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     """Manually trigger a poll for a marketplace. For testing — don't wait 6 hours."""
     valid = {"allegro", "amazon", "kaufland", "ebay"}
     if marketplace not in valid:

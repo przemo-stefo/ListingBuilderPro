@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from database import get_db
+from api.dependencies import require_user_id
 from schemas import (
     AnalyticsResponse,
     MarketplaceRevenue,
@@ -27,17 +28,19 @@ async def get_analytics(
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     period: Optional[str] = Query(None, description="Time period: 7d, 30d, 90d, 12m"),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Revenue analytics with marketplace breakdown, monthly trend, and top products.
     Period param slices monthly data. Marketplace param filters everything.
     """
     # WHY: Helper avoids f-string SQL interpolation — all conditions built safely
-    params: dict = {}
-    where = ""
+    params: dict = {"uid": user_id}
+    conditions = ["user_id = :uid"]
     if marketplace:
-        where = "WHERE marketplace = :mp"
+        conditions.append("marketplace = :mp")
         params["mp"] = marketplace
+    where = "WHERE " + " AND ".join(conditions)
 
     mp_rows = db.execute(
         text(

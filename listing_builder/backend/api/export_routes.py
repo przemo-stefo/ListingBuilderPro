@@ -9,7 +9,8 @@ from slowapi.util import get_remote_address
 from database import get_db
 from schemas import BulkJobCreate, BulkJobResponse
 from services.export_service import ExportService
-from api.dependencies import require_premium
+from api.dependencies import require_premium, require_user_id
+from models.product import Product
 import structlog
 
 logger = structlog.get_logger()
@@ -27,6 +28,7 @@ async def publish_product(
     product_id: int,
     marketplace: str,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Publish a single product to marketplace.
@@ -39,6 +41,11 @@ async def publish_product(
         Publishing result
     """
     require_premium(request, db)
+
+    # WHY: Verify product belongs to current user before publishing
+    product = db.query(Product).filter(Product.id == product_id, Product.user_id == user_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
 
     # WHY: Validate marketplace before passing to service — prevents unexpected behavior
     if marketplace not in ALLOWED_MARKETPLACES:

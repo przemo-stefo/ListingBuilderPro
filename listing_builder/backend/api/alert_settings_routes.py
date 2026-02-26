@@ -10,6 +10,7 @@ from typing import List
 import structlog
 
 from database import get_db
+from api.dependencies import require_user_id
 
 limiter = Limiter(key_func=get_remote_address)
 from models.monitoring import AlertTypeSetting
@@ -22,9 +23,6 @@ from services.alert_type_registry import ALERT_TYPES, ALERT_TYPE_MAP, ACTIVE_TYP
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/alert-settings", tags=["Alert Settings"])
-
-# WHY hardcoded: V1 internal-only, same pattern as monitoring_routes.py
-DEFAULT_USER_ID = "internal"
 
 
 @router.get("/types", response_model=List[AlertTypeInfo])
@@ -44,11 +42,11 @@ async def get_alert_types():
 
 
 @router.get("", response_model=List[AlertSettingResponse])
-async def get_alert_settings(db: Session = Depends(get_db)):
+async def get_alert_settings(db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """User's saved settings merged with registry defaults."""
     saved = (
         db.query(AlertTypeSetting)
-        .filter(AlertTypeSetting.user_id == DEFAULT_USER_ID)
+        .filter(AlertTypeSetting.user_id == user_id)
         .all()
     )
     saved_map = {s.alert_type: s for s in saved}
@@ -77,6 +75,7 @@ async def update_alert_settings(
     request: Request,
     body: AlertSettingsBulkUpdate,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Bulk upsert all alert settings (Save button)."""
     # WHY: Reject payload with duplicate alert_type entries
@@ -91,7 +90,7 @@ async def update_alert_settings(
     # WHY batch: Avoid N+1 — one SELECT instead of 24
     existing_rows = (
         db.query(AlertTypeSetting)
-        .filter(AlertTypeSetting.user_id == DEFAULT_USER_ID)
+        .filter(AlertTypeSetting.user_id == user_id)
         .all()
     )
     existing_map = {row.alert_type: row for row in existing_rows}
@@ -107,7 +106,7 @@ async def update_alert_settings(
             existing.enabled = item.enabled
         else:
             db.add(AlertTypeSetting(
-                user_id=DEFAULT_USER_ID,
+                user_id=user_id,
                 alert_type=item.alert_type,
                 category=reg["category"],
                 priority=item.priority,
@@ -128,6 +127,7 @@ async def toggle_alert_setting(
     request: Request,
     alert_type: str,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Quick toggle a single alert type on/off."""
     if alert_type not in ALERT_TYPE_MAP:
@@ -137,7 +137,7 @@ async def toggle_alert_setting(
     existing = (
         db.query(AlertTypeSetting)
         .filter(
-            AlertTypeSetting.user_id == DEFAULT_USER_ID,
+            AlertTypeSetting.user_id == user_id,
             AlertTypeSetting.alert_type == alert_type,
         )
         .first()
@@ -150,7 +150,7 @@ async def toggle_alert_setting(
 
     # WHY: First toggle on a never-saved type — create with defaults but disabled
     new_setting = AlertTypeSetting(
-        user_id=DEFAULT_USER_ID,
+        user_id=user_id,
         alert_type=alert_type,
         category=reg["category"],
         priority=reg["default_priority"],

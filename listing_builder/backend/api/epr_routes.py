@@ -21,6 +21,7 @@ from schemas.epr import (
 )
 from services.sp_api_auth import credentials_configured, has_refresh_token
 from services.epr_service import fetch_epr_report_pipeline
+from api.dependencies import require_user_id
 from utils.validators import validate_uuid
 
 logger = structlog.get_logger()
@@ -44,6 +45,7 @@ async def fetch_epr_report(
     body: EprFetchRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Start fetching an EPR report from Amazon SP-API.
@@ -56,6 +58,7 @@ async def fetch_epr_report(
 
     # Create DB record
     report = EprReport(
+        user_id=user_id,
         report_type=body.report_type,
         marketplace_id=body.marketplace_ids[0],
         status="pending",
@@ -82,10 +85,11 @@ async def fetch_epr_report(
 
 
 @router.get("/reports", response_model=EprReportsListResponse)
-async def list_epr_reports(db: Session = Depends(get_db)):
+async def list_epr_reports(db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """List all EPR reports, newest first."""
     reports = (
         db.query(EprReport)
+        .filter(EprReport.user_id == user_id)
         .order_by(EprReport.created_at.desc())
         .limit(50)
         .all()
@@ -94,10 +98,10 @@ async def list_epr_reports(db: Session = Depends(get_db)):
 
 
 @router.get("/reports/{report_id}", response_model=EprReportResponse)
-async def get_epr_report(report_id: str, db: Session = Depends(get_db)):
+async def get_epr_report(report_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Get a single EPR report with all rows."""
     validate_uuid(report_id, "report_id")
-    report = db.query(EprReport).filter(EprReport.id == report_id).first()
+    report = db.query(EprReport).filter(EprReport.id == report_id, EprReport.user_id == user_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
@@ -110,10 +114,10 @@ async def get_epr_report(report_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/reports/{report_id}", status_code=204)
-async def delete_epr_report(report_id: str, db: Session = Depends(get_db)):
+async def delete_epr_report(report_id: str, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """Delete an EPR report and its rows (CASCADE)."""
     validate_uuid(report_id, "report_id")
-    report = db.query(EprReport).filter(EprReport.id == report_id).first()
+    report = db.query(EprReport).filter(EprReport.id == report_id, EprReport.user_id == user_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 

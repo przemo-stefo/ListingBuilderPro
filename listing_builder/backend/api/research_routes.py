@@ -157,6 +157,8 @@ async def research_audience(
     logger.info("research_audience_done", product=body.product[:50], result_len=len(result["text"]))
 
     # WHY: Track research runs for per-IP daily limit enforcement
+    # WHY: Compute ip_hash here — _check_research_limit has its own local scope
+    ip_hash = hash_ip(get_remote_address(request))
     try:
         from models.optimization import OptimizationRun
         run = OptimizationRun(

@@ -12,6 +12,8 @@ class OptimizationRun(Base):
     __tablename__ = "optimization_runs"
 
     id = Column(Integer, primary_key=True, index=True)
+    # WHY: Multi-tenant isolation
+    user_id = Column(String(255), nullable=False, default="default", index=True)
     product_title = Column(String(500), nullable=False)
     brand = Column(String(200), nullable=False)
     marketplace = Column(String(50), nullable=False)

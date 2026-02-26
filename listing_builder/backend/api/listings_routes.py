@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 from typing import Optional
 
 from database import get_db
+from api.dependencies import require_user_id
 from models.listing import Listing
 from schemas import ListingCreate, ListingItem, ListingsResponse
 from utils.validators import validate_uuid
@@ -20,16 +21,18 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.get("", response_model=ListingsResponse)
 async def get_listings(
+    request: Request,
     marketplace: Optional[str] = Query(None, description="Filter by marketplace name"),
     compliance_status: Optional[str] = Query(None, description="Filter by compliance status"),
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     List all product listings with compliance status.
-    Summary counts are computed from the FULL dataset (before filtering).
+    Summary counts are computed from the user's FULL dataset (before filtering).
     """
-    # WHY full-dataset counts: dashboard cards must stay consistent regardless of filters
-    all_query = db.query(Listing)
+    # WHY: Scope all queries to the authenticated user for tenant isolation
+    all_query = db.query(Listing).filter(Listing.user_id == user_id)
 
     compliant_count = all_query.filter(Listing.compliance_status == "compliant").count()
     warning_count = all_query.filter(Listing.compliance_status == "warning").count()
@@ -75,13 +78,18 @@ async def create_listing(
     request: Request,
     body: ListingCreate,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """Add a new product listing."""
-    existing = db.query(Listing).filter(Listing.sku == body.sku).first()
+    # WHY: Check uniqueness within this user's listings only
+    existing = db.query(Listing).filter(
+        Listing.sku == body.sku, Listing.user_id == user_id
+    ).first()
     if existing:
         raise HTTPException(status_code=409, detail=f"Listing with SKU {body.sku} already exists")
 
     listing = Listing(
+        user_id=user_id,
         sku=body.sku,
         title=body.title,
         marketplace=body.marketplace,
@@ -104,10 +112,18 @@ async def create_listing(
 
 
 @router.delete("/{listing_id}")
-async def delete_listing(listing_id: str, db: Session = Depends(get_db)):
+async def delete_listing(
+    request: Request,
+    listing_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
     """Remove a listing by ID."""
     validate_uuid(listing_id, "listing_id")
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    # WHY: Filter by user_id prevents deleting another user's listing
+    listing = db.query(Listing).filter(
+        Listing.id == listing_id, Listing.user_id == user_id
+    ).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 

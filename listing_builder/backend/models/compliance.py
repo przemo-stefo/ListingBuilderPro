@@ -21,6 +21,8 @@ class ComplianceReport(Base):
     __tablename__ = "compliance_reports"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    # WHY: Multi-tenant isolation
+    user_id = Column(String(255), nullable=False, default="default", index=True)
     marketplace = Column(String(50), nullable=False, index=True)  # amazon, ebay, kaufland
     filename = Column(String(500), nullable=False)
 
