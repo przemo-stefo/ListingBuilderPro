@@ -78,7 +78,42 @@ services:
         limits:
           memory: 300M
 
-  # Cloudflare Tunnel — routes guard.feedmasters.org + api-lbp.feedmasters.org
+  # LBP Frontend — Next.js Listing Builder Pro UI (port 3002 externally, 3000 internally)
+  lbp-frontend:
+    build:
+      context: ./lbp-frontend
+      dockerfile: Dockerfile
+      # WHY args: NEXT_PUBLIC_ vars must be available at build time (inlined into JS bundles)
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    container_name: lbp-frontend
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      # WHY internal URL: frontend and backend share Docker lbp network — no tunnel needed
+      - BACKEND_URL=http://lbp-backend:8001
+      - API_KEY=${API_SECRET_KEY}
+      - NODE_ENV=production
+    ports:
+      # WHY 3002: port 3000 is taken by compliance-frontend
+      - "127.0.0.1:3002:3000"
+    networks: [lbp]
+    depends_on:
+      lbp-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Cloudflare Tunnel — routes guard.feedmasters.org + api-lbp.feedmasters.org + panel.octohelper.com
   cloudflared:
     image: cloudflare/cloudflared:2026.2.0
     container_name: compliance-tunnel
@@ -86,10 +121,12 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    # WHY both networks: tunnel routes to Compliance Guard frontend AND LBP backend
+    # WHY both networks: tunnel routes to CG frontend, LBP backend, AND LBP frontend
     networks: [compliance, lbp]
     depends_on:
       frontend:
+        condition: service_healthy
+      lbp-frontend:
         condition: service_healthy
     deploy:
       resources:

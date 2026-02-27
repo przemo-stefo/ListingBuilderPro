@@ -4,8 +4,8 @@
 
 ## Architecture
 
-- **Frontend:** Next.js 14 + TypeScript + Tailwind (Vercel)
-- **Backend:** FastAPI + Groq LLM + Supabase PostgreSQL (grzegorz152 Docker, Cloudflare Tunnel)
+- **Frontend:** Next.js 14 + TypeScript + Tailwind (grzegorz152 Docker, port 3002, Cloudflare Tunnel)
+- **Backend:** FastAPI + Groq LLM + Supabase PostgreSQL (grzegorz152 Docker, port 8001, Cloudflare Tunnel)
 - **Proxy:** Frontend `/api/proxy/[...path]` → injects `X-API-Key` server-side → backend
 - **Auth:** JWT (Supabase ES256 JWKS + HS256 fallback) → `middleware/supabase_auth.py`, API key fallback → `middleware/auth.py`
 - **LLM:** Groq `llama-3.3-70b-versatile` (default), 6 API keys for rotation on 429
@@ -16,18 +16,18 @@
 |------|-----|
 | Frontend (prod) | https://panel.octohelper.com |
 | Backend (prod) | https://api-lbp.feedmasters.org |
-| Frontend (alt) | https://listing-builder-pro.vercel.app |
+| Frontend (Vercel, legacy) | https://listing-builder-pro.vercel.app |
 | Backend (Render) | SUSPENDED + auto-deploy OFF — nie używać |
+| Frontend health | `GET /health` → `{"status":"ok","service":"frontend"}` |
 | Health check | `GET /health` |
 
 ## Deploy
 
 ```bash
-# Frontend (Vercel) — MANUAL
-cd listing_builder/frontend && npx vercel --prod
-
-# Backend (grzegorz152) — Docker + Cloudflare Tunnel
+# Full stack (grzegorz152) — Docker + Cloudflare Tunnel (6 containers)
 cd listing_builder/deploy/grzegorz152 && bash deploy.sh
+# Uses: docker compose --env-file .env --env-file .env-lbp
+# 9 steps: sync CG backend/frontend, LBP backend/frontend, config, prune, build, restart, health
 
 # Render — SUSPENDED + auto-deploy OFF (2026-02-23)
 # To resume: Render Dashboard → Resume Service → Enable auto-deploy
