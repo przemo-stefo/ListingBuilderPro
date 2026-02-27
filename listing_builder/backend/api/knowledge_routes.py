@@ -66,6 +66,7 @@ async def expert_chat(
     request: Request,
     body: ChatRequest,
     db: Session = Depends(get_db),
+    _user_id: str = Depends(require_user_id),
 ):
     """Expert Q&A — ask Amazon questions, answered using Inner Circle transcript RAG."""
     require_premium(request, db)
