@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Sparkles,
   Loader2,
@@ -84,7 +84,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   const { data: settingsData } = useSettings()
   const savedLlmKey = settingsData?.llm?.providers?.[llmProvider]?.api_key || ''
   // WHY: Masked key (****) means backend HAS a saved key — backend will read it directly
-  const hasSavedKey = savedLlmKey.length > 0 && savedLlmKey !== '****'
+  const hasSavedKey = savedLlmKey === '****'
 
   // Results — use loaded result from history if provided
   const [results, setResults] = useState<OptimizerResponse | null>(null)
@@ -97,6 +97,8 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
 
   // WHY: Audience research result feeds into optimizer as LLM context
   const [audienceContext, setAudienceContext] = useState('')
+  // WHY: Ref avoids stale closure in handleImprove → setTimeout → handleGenerate chain
+  const audienceContextRef = useRef(audienceContext)
 
   // Collapsible sections
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -142,18 +144,17 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   }
 
   // WHY: "Popraw" button — re-generates with improvement hints from low-scoring dimensions
+  // WHY: Build new context inline and pass to handleGenerate via ref to avoid stale closure
   const handleImprove = () => {
     if (!scoreResult) return
     const tips = scoreResult.dimensions
       .filter((d) => d.score < 7)
       .map((d) => `${d.name}: ${d.tip}`)
       .join('\n')
-    // WHY: Inject tips into audience_context so LLM uses them as improvement guidance
-    setAudienceContext((prev) => {
-      const prefix = prev ? prev + '\n\n' : ''
-      return prefix + '--- IMPROVEMENT HINTS ---\n' + tips
-    })
-    // WHY: Small delay to ensure state updates before re-trigger
+    const newContext = (audienceContext ? audienceContext + '\n\n' : '') + '--- IMPROVEMENT HINTS ---\n' + tips
+    // WHY: Set state AND use the new value directly — avoids stale closure in setTimeout
+    setAudienceContext(newContext)
+    audienceContextRef.current = newContext
     setTimeout(() => handleGenerate(), 50)
   }
 
@@ -239,7 +240,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
       mode,
       asin: asin || undefined,
       category: category || undefined,
-      audience_context: audienceContext || undefined,
+      audience_context: audienceContextRef.current || audienceContext || undefined,
       account_type: accountType,
       // WHY: Only send provider info when not default Groq
       ...(llmProvider !== 'groq' && {

@@ -17,20 +17,24 @@ _token_cache: dict = {"access_token": None, "expires_at": 0}
 LWA_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
 
 
-def _get_refresh_token_from_db(db: Optional[Session]) -> Optional[str]:
+def _get_refresh_token_from_db(db: Optional[Session], user_id: Optional[str] = None) -> Optional[str]:
     """Check oauth_connections for an active Amazon connection.
 
     WHY: When user connects via panel OAuth flow, refresh_token is stored in DB,
     not in env. This bridges the gap so SP-API works after OAuth connect.
+    WHY user_id filter: Prevents cross-tenant token leak — each user gets their own token.
     """
     if not db:
         return None
     try:
         from models.oauth_connection import OAuthConnection
-        conn = db.query(OAuthConnection).filter(
+        filters = [
             OAuthConnection.marketplace == "amazon",
             OAuthConnection.status == "active",
-        ).first()
+        ]
+        if user_id:
+            filters.append(OAuthConnection.user_id == user_id)
+        conn = db.query(OAuthConnection).filter(*filters).first()
         if conn and conn.refresh_token:
             return conn.refresh_token
     except Exception as e:
@@ -38,7 +42,7 @@ def _get_refresh_token_from_db(db: Optional[Session]) -> Optional[str]:
     return None
 
 
-async def get_access_token(db: Optional[Session] = None) -> str:
+async def get_access_token(db: Optional[Session] = None, user_id: Optional[str] = None) -> str:
     """
     Exchange refresh_token for a short-lived access_token via LWA.
     Caches result for 55 minutes (token valid 3600s).
@@ -54,7 +58,7 @@ async def get_access_token(db: Optional[Session] = None) -> str:
         return _token_cache["access_token"]
 
     # WHY: DB first (OAuth flow), then env fallback (manual config)
-    refresh_token = _get_refresh_token_from_db(db) or settings.amazon_refresh_token
+    refresh_token = _get_refresh_token_from_db(db, user_id) or settings.amazon_refresh_token
     if not refresh_token:
         raise ValueError("Amazon refresh token not configured — połącz Amazon w Integracje")
 
@@ -96,8 +100,8 @@ def credentials_configured() -> bool:
     return bool(settings.amazon_client_id and settings.amazon_client_secret)
 
 
-def has_refresh_token(db: Optional[Session] = None) -> bool:
+def has_refresh_token(db: Optional[Session] = None, user_id: Optional[str] = None) -> bool:
     """Check if refresh token is available (env or DB)."""
     if settings.amazon_refresh_token:
         return True
-    return bool(_get_refresh_token_from_db(db))
+    return bool(_get_refresh_token_from_db(db, user_id))

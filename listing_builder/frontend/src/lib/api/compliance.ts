@@ -37,18 +37,18 @@ export interface ComplianceReportsParams {
 }
 
 // WHY: File upload needs FormData, not JSON — uses apiClient directly to set multipart headers
+// WHY: marketplace sent as query param (not FormData) — backend reads it via Query(), not Form()
 export async function uploadComplianceFile(
   file: File,
   marketplace?: string
 ): Promise<ComplianceReportResponse> {
   const formData = new FormData()
   formData.append('file', file)
-  if (marketplace) {
-    formData.append('marketplace', marketplace)
-  }
+
+  const params = marketplace ? `?marketplace=${encodeURIComponent(marketplace)}` : ''
 
   const response = await apiClient.post(
-    '/compliance/validate',
+    `/compliance/validate${params}`,
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },

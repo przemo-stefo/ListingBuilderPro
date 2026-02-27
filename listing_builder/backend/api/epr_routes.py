@@ -30,8 +30,10 @@ router = APIRouter(prefix="/api/epr", tags=["EPR Reports"])
 
 
 @router.get("/status", response_model=EprStatusResponse)
-async def epr_status():
-    """Check if Amazon SP-API credentials are configured."""
+async def epr_status(_user_id: str = Depends(require_user_id)):
+    """Check if Amazon SP-API credentials are configured.
+    WHY require_user_id: Prevents unauthenticated probing of server credential state.
+    """
     return EprStatusResponse(
         credentials_configured=credentials_configured(),
         has_refresh_token=has_refresh_token(),

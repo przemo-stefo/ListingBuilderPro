@@ -431,11 +431,12 @@ async def list_marketplaces():
 
 @router.post("/store-urls", response_model=StoreUrlsResponse)
 @limiter.limit("3/minute")
-async def get_store_urls(request: Request, body: StoreUrlsRequest):
+async def get_store_urls(request: Request, body: StoreUrlsRequest, _user_id: str = Depends(require_user_id)):
     """Fetch all product URLs from an Allegro store page.
 
     Accepts store name (e.g. 'electronics-shop-pl') or full URL.
     Scrapes up to 5 pages (~300 products max).
+    WHY require_user_id: Prevents unauthenticated Scrape.do API credit burn.
     """
     logger.info("store_urls_request", store=body.store)
     result = await scrape_allegro_store_urls(body.store)

@@ -47,7 +47,8 @@ export function useEprFetch() {
     mutationFn: (body: EprFetchRequest) => triggerEprFetch(body),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['epr-reports'] })
-      toast({ title: 'Raport EPR', description: data.message })
+      // WHY: Backend returns EprReport object (no .message), use static text
+      toast({ title: 'Raport EPR', description: data.message || 'Raport EPR został wygenerowany' })
     },
     onError: (error: Error) => {
       toast({ title: 'Błąd pobierania EPR', description: error.message, variant: 'destructive' })

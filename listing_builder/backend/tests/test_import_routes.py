@@ -110,8 +110,9 @@ class TestBatchImport:
 
 class TestJobStatus:
 
-    def test_nonexistent_job_404(self, client, test_settings):
-        resp = client.get(
+    def test_nonexistent_job_404(self, auth_client, test_settings):
+        # WHY: auth_client provides JWT — require_user_id needs it after security fix
+        resp = auth_client.get(
             "/api/import/job/99999",
             headers={"X-API-Key": test_settings.api_secret_key},
         )

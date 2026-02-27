@@ -35,7 +35,7 @@ class BulkJobCreate(BaseModel):
     """Create bulk operation"""
     job_type: str = Field(..., description="publish, update, or sync")
     target_marketplace: str = Field(..., description="amazon, ebay, or kaufland")
-    product_ids: List[int] = Field(..., min_items=1)
+    product_ids: List[int] = Field(..., min_length=1)
 
 
 class BulkJobResponse(BaseModel):

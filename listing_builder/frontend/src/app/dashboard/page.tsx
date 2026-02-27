@@ -39,8 +39,9 @@ export default function DashboardPage() {
       .then(res => {
         const data = res.data
         if (!data?.connections) return
+        // WHY: Backend sets expires_soon=true but keeps status='active' — check both
         const expired = Object.entries(data.connections)
-          .filter(([_, v]: [string, any]) => v.status === 'expired')
+          .filter(([_, v]: [string, any]) => v.status === 'expired' || v.expires_soon)
           .map(([k]) => k)
         setExpiredConnections(expired)
       })

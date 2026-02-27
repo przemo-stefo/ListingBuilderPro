@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useProducts, useDeleteProduct } from '@/lib/hooks/useProducts'
@@ -24,7 +24,16 @@ const PRODUCTS_FAQ = [
   { question: 'Jak filtrowac produkty?', answer: 'Uzyj paska wyszukiwania aby znalezc produkt po nazwie, ASIN lub marce. Przyciski statusu filtruja wedlug etapu przetwarzania.' },
 ]
 
+// WHY: Suspense boundary required for useSearchParams() in Next.js 14 App Router
 export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="space-y-6"><h1 className="text-3xl font-bold text-white">Produkty</h1></div>}>
+      <ProductsContent />
+    </Suspense>
+  )
+}
+
+function ProductsContent() {
   // WHY: Read ?status= from URL so dashboard "Do optymalizacji" link pre-filters the list
   const searchParams = useSearchParams()
   const initialStatus = searchParams.get('status') as ProductFilters['status'] | null

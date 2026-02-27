@@ -165,7 +165,7 @@ class OptimizerResponse(BaseModel):
 
 @router.post("/generate", response_model=OptimizerResponse)
 @limiter.limit("10/minute")
-async def generate_listing(request: Request, body: OptimizerRequest, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+async def generate_listing(request: Request, body: OptimizerRequest, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """
     Generate an optimized listing using Groq LLM + keyword analysis.
 
@@ -286,7 +286,7 @@ class BatchOptimizerResponse(BaseModel):
 
 @router.post("/generate-batch", response_model=BatchOptimizerResponse)
 @limiter.limit("3/minute")
-async def generate_batch(request: Request, body: BatchOptimizerRequest = None, db: Session = Depends(get_db)):
+async def generate_batch(request: Request, body: BatchOptimizerRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """
     Generate optimized listings for multiple products.
 

@@ -77,6 +77,7 @@ async def bulk_publish(
     request: Request,
     job_data: BulkJobCreate,
     db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Publish multiple products to marketplace.
@@ -91,13 +92,23 @@ async def bulk_publish(
     """
     require_premium(request, db)
 
+    # WHY: Filter product_ids to only those belonging to current user — prevents cross-tenant publish
+    owned_ids = [
+        p.id for p in db.query(Product.id).filter(
+            Product.id.in_(job_data.product_ids),
+            Product.user_id == user_id,
+        ).all()
+    ]
+    if not owned_ids:
+        raise HTTPException(status_code=404, detail="No products found")
+
     logger.info("bulk_publish_requested",
-                count=len(job_data.product_ids),
+                count=len(owned_ids),
                 marketplace=job_data.target_marketplace)
 
     try:
         service = ExportService(db)
-        job = service.bulk_publish(job_data.product_ids, job_data.target_marketplace)
+        job = service.bulk_publish(owned_ids, job_data.target_marketplace)
         return job
     except Exception as e:
         logger.error("bulk_publish_failed", error=str(e))

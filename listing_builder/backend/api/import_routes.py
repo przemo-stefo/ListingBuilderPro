@@ -340,9 +340,14 @@ async def import_batch(
 
 
 @router.get("/job/{job_id}", response_model=ImportJobResponse)
-async def get_import_job(job_id: int, db: Session = Depends(get_db)):
+async def get_import_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
     """
     Get import job status by ID.
+    WHY require_user_id: Prevents cross-tenant job data exposure.
     """
     service = ImportService(db)
     job = service.get_job_status(job_id)

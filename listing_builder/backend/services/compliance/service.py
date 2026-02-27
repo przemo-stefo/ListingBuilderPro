@@ -46,7 +46,8 @@ class ComplianceService:
         self.db = db
 
     def validate_file(
-        self, file_bytes: bytes, filename: str, marketplace: Optional[str] = None
+        self, file_bytes: bytes, filename: str, marketplace: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> ComplianceReport:
         """
         Full validation pipeline:
@@ -125,6 +126,7 @@ class ComplianceService:
         score = (compliant_count / total * 100) if total > 0 else 0.0
 
         report = ComplianceReport(
+            user_id=user_id,
             marketplace=marketplace,
             filename=filename,
             total_products=total,

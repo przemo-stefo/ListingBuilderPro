@@ -16,6 +16,14 @@ class AlertTypeEnum(str, Enum):
     NEGATIVE_REVIEW = "negative_review"
     RETURN_SPIKE = "return_spike"
     COMPLIANCE_FAIL = "compliance_fail"
+    # WHY: Frontend AlertSettingsTab defines these — backend must accept them
+    COMPETITOR_PRICE = "competitor_price"
+    RANKING_DROP = "ranking_drop"
+    NEW_REVIEW = "new_review"
+    SHIPPING_DELAY = "shipping_delay"
+    POLICY_VIOLATION = "policy_violation"
+    ACCOUNT_HEALTH = "account_health"
+    PAYMENT_ISSUE = "payment_issue"
 
 
 class SeverityEnum(str, Enum):

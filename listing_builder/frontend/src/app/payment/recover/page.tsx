@@ -90,7 +90,7 @@ export default function RecoverLicensePage() {
         />
         <button
           type="submit"
-          disabled={loading || !email}
+          disabled={loading || !(email || user?.email)}
           className="w-full rounded-lg bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors disabled:opacity-50"
         >
           {loading ? 'Szukam...' : 'Odzyskaj klucz'}

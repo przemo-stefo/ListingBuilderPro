@@ -44,7 +44,8 @@ async def validate_template(
     file: UploadFile = File(..., description="XLSM, XLSX, or CSV template file"),
     marketplace: Optional[str] = Query(
         None,
-        description="Force marketplace (amazon/ebay/kaufland). Auto-detected from extension if not provided.",
+        description="Force marketplace (amazon/ebay/kaufland). Auto-detected from extension if not provided. "
+        "Send as query param: /validate?marketplace=amazon",
     ),
     db: Session = Depends(get_db),
     user_id: str = Depends(require_user_id),
@@ -89,10 +90,8 @@ async def validate_template(
     # Run validation
     try:
         service = ComplianceService(db)
-        report = service.validate_file(file_bytes, filename, marketplace)
-        # WHY: Set user_id after service creates report — tenant isolation
-        report.user_id = user_id
-        db.commit()
+        # WHY: Pass user_id directly to avoid double-commit race condition
+        report = service.validate_file(file_bytes, filename, marketplace, user_id=user_id)
     except ValueError as e:
         # WHY: Only our own ValueErrors here — safe user-facing messages
         raise HTTPException(status_code=400, detail=str(e))

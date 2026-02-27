@@ -8,6 +8,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { CheckCircle, Loader2, Copy, Check } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
+import { apiClient } from '@/lib/api/client'
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -29,12 +30,11 @@ function SuccessContent() {
     const maxAttempts = 20
 
     // WHY: Webhook may arrive after redirect — poll until license key appears
+    // WHY apiClient: raw fetch() was missing JWT Authorization header → 401 from require_user_id
     const poll = async () => {
       try {
-        const res = await fetch(`/api/proxy/stripe/session/${sessionId}/license`)
-        if (!res.ok) throw new Error('fetch failed')
-
-        const data = await res.json()
+        const res = await apiClient.get(`/stripe/session/${sessionId}/license`)
+        const data = res.data
         if (data.status === 'ready' && data.license_key) {
           setLicenseKey(data.license_key)
           setStatus('ready')
