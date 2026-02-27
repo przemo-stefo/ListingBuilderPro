@@ -448,7 +448,7 @@ def convert_batch(
 _store_jobs: Dict[str, dict] = {}
 
 
-def create_store_job(urls: List[str], marketplace: str) -> str:
+def create_store_job(urls: List[str], marketplace: str, user_id: str = "default") -> str:
     """Create a new store conversion job, return job_id."""
     job_id = str(uuid.uuid4())
     _store_jobs[job_id] = {
@@ -459,13 +459,17 @@ def create_store_job(urls: List[str], marketplace: str) -> str:
         "failed": 0,
         "marketplace": marketplace,
         "file_bytes": None,
+        "user_id": user_id,
     }
     return job_id
 
 
-def get_store_job(job_id: str) -> Optional[dict]:
-    """Get job status by ID."""
-    return _store_jobs.get(job_id)
+def get_store_job(job_id: str, user_id: str = None) -> Optional[dict]:
+    """Get job status by ID. If user_id provided, verify ownership."""
+    job = _store_jobs.get(job_id)
+    if job and user_id and job.get("user_id") != user_id:
+        return None
+    return job
 
 
 async def process_store_job(

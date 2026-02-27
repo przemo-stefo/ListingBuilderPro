@@ -79,7 +79,7 @@ class TestNewsFeedEndpoint:
     @patch("api.news_routes._translate_all", new_callable=AsyncMock)
     @patch("api.news_routes._resolve_thumbnails", new_callable=AsyncMock)
     @patch("api.news_routes._fetch_all_feeds", new_callable=AsyncMock)
-    async def test_feed_returns_articles(self, mock_fetch, mock_thumbs, mock_translate, client, test_settings):
+    async def test_feed_returns_articles(self, mock_fetch, mock_thumbs, mock_translate, auth_client, test_settings):
         # Clear cache
         _cache["articles"] = []
         _cache["timestamp"] = 0
@@ -87,7 +87,7 @@ class TestNewsFeedEndpoint:
         mock_fetch.return_value = [{"title": "Test", "link": "https://x.com"}]
         mock_translate.return_value = [{"title": "Test PL", "link": "https://x.com"}]
 
-        resp = client.get(
+        resp = auth_client.get(
             "/api/news/feed",
             headers={"X-API-Key": test_settings.api_secret_key},
         )
@@ -95,11 +95,11 @@ class TestNewsFeedEndpoint:
         data = resp.json()
         assert "articles" in data
 
-    def test_cached_feed_served(self, client, test_settings):
+    def test_cached_feed_served(self, auth_client, test_settings):
         _cache["articles"] = [{"title": "Cached", "link": "https://x.com"}]
         _cache["timestamp"] = time.time()
 
-        resp = client.get(
+        resp = auth_client.get(
             "/api/news/feed",
             headers={"X-API-Key": test_settings.api_secret_key},
         )

@@ -238,6 +238,16 @@ class GPSRSettings(BaseModel):
     kaufland_category: str = ""
 
 
+# WHY: Company data for invoicing and Stripe (NIP not natively supported in Stripe)
+class CompanySettings(BaseModel):
+    company_name: str = ""
+    nip: str = ""
+    address: str = ""
+    city: str = ""
+    postal_code: str = ""
+    country: str = "Polska"
+
+
 class SettingsResponse(BaseModel):
     general: GeneralSettings
     marketplace_connections: list[MarketplaceConnection]
@@ -245,6 +255,7 @@ class SettingsResponse(BaseModel):
     data_export: DataExportSettings
     llm: Optional[LLMSettings] = None
     gpsr: Optional[GPSRSettings] = None
+    company: Optional[CompanySettings] = None
 
 
 # --- Dashboard Stats ---

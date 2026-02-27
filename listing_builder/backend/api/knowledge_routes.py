@@ -13,7 +13,7 @@ import structlog
 from database import get_db
 from services.knowledge_service import search_knowledge
 from services.qa_service import ask_expert
-from api.dependencies import require_premium
+from api.dependencies import require_premium, require_user_id
 
 logger = structlog.get_logger()
 
@@ -31,6 +31,7 @@ async def knowledge_search(
     prompt_type: str = Query("title", pattern="^(title|bullets|description)$"),
     max_chunks: int = Query(5, ge=1, le=20),
     db: Session = Depends(get_db),
+    _user_id: str = Depends(require_user_id),
 ):
     """Search knowledge base — debug endpoint for testing retrieval quality."""
     context = await search_knowledge(db, q, prompt_type, max_chunks)
@@ -81,7 +82,7 @@ async def expert_chat(
 
 
 @router.get("/stats")
-async def knowledge_stats(db: Session = Depends(get_db)):
+async def knowledge_stats(db: Session = Depends(get_db), _user_id: str = Depends(require_user_id)):
     """Chunk and file counts per category."""
     rows = db.execute(text(
         "SELECT category, COUNT(*) as chunks, COUNT(DISTINCT filename) as files "

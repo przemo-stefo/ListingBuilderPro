@@ -107,8 +107,9 @@ async def receive_webhook(
         # Validate and parse products
         products = [ProductImport(**p) for p in products_data]
 
-        # Import batch
-        result = service.import_batch(products, source=payload.source)
+        # WHY: Webhook imports use "webhook" user_id — not tied to a user session
+        # Products imported via webhook must be claimed later by the actual user
+        result = service.import_batch(products, source=payload.source, user_id="webhook")
 
         return {
             "status": "success",

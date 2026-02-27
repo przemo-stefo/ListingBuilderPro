@@ -15,6 +15,7 @@ from config import settings
 from services.stripe_service import validate_license
 from services.ov_skills import build_skill_prompt
 from database import get_db
+from api.dependencies import require_user_id
 from utils.privacy import hash_ip
 
 limiter = Limiter(key_func=get_remote_address)
@@ -122,6 +123,7 @@ async def research_audience(
     request: Request,
     body: AudienceResearchRequest,
     db: Session = Depends(get_db),
+    _user_id: str = Depends(require_user_id),
 ):
     """
     Run audience research via Groq directly (6-key rotation).

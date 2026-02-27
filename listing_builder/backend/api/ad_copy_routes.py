@@ -11,7 +11,7 @@ import structlog
 
 from database import get_db
 from services.ad_copy_service import generate_ad_copy
-from api.dependencies import require_premium
+from api.dependencies import require_premium, require_user_id
 
 logger = structlog.get_logger()
 
@@ -48,6 +48,7 @@ async def generate_ads(
     request: Request,
     body: AdCopyRequest,
     db: Session = Depends(get_db),
+    _user_id: str = Depends(require_user_id),
 ):
     """Generate 3 ad copy variations (hook, story, benefit) using RAG from ad creative courses."""
     require_premium(request, db)

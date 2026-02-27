@@ -239,6 +239,10 @@ class AlertService:
         """Send alert via webhook. Email delivery is a future enhancement."""
         if config.webhook_url:
             try:
+                # SECURITY: Re-validate at delivery time to prevent DNS rebinding (TOCTOU)
+                from utils.url_validator import validate_webhook_url
+                validate_webhook_url(config.webhook_url)
+
                 httpx.post(
                     config.webhook_url,
                     json={
@@ -252,6 +256,8 @@ class AlertService:
                     timeout=10.0,
                 )
                 logger.info("webhook_delivered", url=config.webhook_url[:50])
+            except ValueError as e:
+                logger.error("webhook_url_rejected", url=config.webhook_url[:50], error=str(e))
             except Exception as e:
                 logger.error("webhook_failed", url=config.webhook_url[:50], error=str(e))
 

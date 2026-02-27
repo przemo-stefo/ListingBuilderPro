@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 import structlog
 
 from database import get_db
+from api.dependencies import require_user_id
 from services.listing_score_service import score_listing
 from services.scraper.amazon_scraper import parse_input, fetch_listing
 from services.sp_api_catalog import fetch_catalog_item
@@ -75,7 +76,7 @@ class FetchResponse(BaseModel):
 
 @router.post("/fetch", response_model=FetchResponse)
 @limiter.limit("10/minute")
-async def fetch_listing_endpoint(request: Request, body: FetchRequest, db: Session = Depends(get_db)):
+async def fetch_listing_endpoint(request: Request, body: FetchRequest, db: Session = Depends(get_db), _user_id: str = Depends(require_user_id)):
     """Parse Amazon URL/ASIN, detect marketplace, fetch listing data via SP-API."""
     parsed = parse_input(body.input)
 
@@ -124,6 +125,7 @@ async def score_listing_endpoint(
     request: Request,
     body: ScoreRequest,
     db: Session = Depends(get_db),
+    _user_id: str = Depends(require_user_id),
 ):
     """Score a listing on 6 dimensions (TOS + 5 copywriting) with actionable tips."""
     try:

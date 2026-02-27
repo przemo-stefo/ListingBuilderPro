@@ -21,6 +21,7 @@ from schemas import (
     LLMSettings,
     LLMProviderConfig,
     GPSRSettings,
+    CompanySettings,
 )
 from services.llm_providers import mask_api_key
 import structlog
@@ -42,6 +43,7 @@ class SettingsUpdateRequest(BaseModel):
     data_export: Optional[DataExportSettings] = None
     llm: Optional[LLMSettings] = None
     gpsr: Optional[GPSRSettings] = None
+    company: Optional[CompanySettings] = None
 
 
 limiter = Limiter(key_func=get_remote_address)
@@ -89,6 +91,14 @@ _DEFAULT_SETTINGS = {
         "amazon_product_type": "",
         "ebay_category_id": "",
         "kaufland_category": "",
+    },
+    "company": {
+        "company_name": "",
+        "nip": "",
+        "address": "",
+        "city": "",
+        "postal_code": "",
+        "country": "Polska",
     },
 }
 
@@ -138,6 +148,7 @@ def _build_response(data: dict) -> SettingsResponse:
             providers=masked_providers,
         ),
         gpsr=GPSRSettings(**data.get("gpsr", _DEFAULT_SETTINGS["gpsr"])),
+        company=CompanySettings(**data.get("company", _DEFAULT_SETTINGS["company"])),
     )
 
 
@@ -196,6 +207,11 @@ async def update_settings(
         if "gpsr" not in data:
             data["gpsr"] = dict(_DEFAULT_SETTINGS["gpsr"])
         data["gpsr"].update(payload.gpsr.model_dump(exclude_unset=True))
+
+    if payload.company is not None:
+        if "company" not in data:
+            data["company"] = dict(_DEFAULT_SETTINGS["company"])
+        data["company"].update(payload.company.model_dump(exclude_unset=True))
 
     _save_settings(db, data, user_id)
     logger.info("settings_saved", user_id=user_id)

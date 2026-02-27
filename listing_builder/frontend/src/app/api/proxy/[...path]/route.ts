@@ -57,14 +57,17 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   const path = params.path.join('/')
 
   // Security: only allow known API paths
-  const isAllowed = ALLOWED_PATH_PREFIXES.some(prefix => path.startsWith(prefix))
+  // WHY boundary check: "admin" must match "admin/..." or "admin" exactly, not "administrator"
+  const isAllowed = ALLOWED_PATH_PREFIXES.some(prefix =>
+    path === prefix || path.startsWith(prefix + '/')
+  )
   if (!isAllowed) {
     return NextResponse.json({ detail: 'Forbidden: path not allowed' }, { status: 403 })
   }
 
   // Security: block destructive methods on sensitive paths
   for (const [blockedPath, methods] of Object.entries(BLOCKED_METHODS)) {
-    if (path.startsWith(blockedPath) && methods.includes(request.method)) {
+    if ((path === blockedPath || path.startsWith(blockedPath + '/')) && methods.includes(request.method)) {
       return NextResponse.json({ detail: 'Method not allowed' }, { status: 405 })
     }
   }

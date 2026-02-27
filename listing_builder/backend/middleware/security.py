@@ -45,10 +45,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = "default-src 'self'"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-        # Add CORS headers if not already set by CORS middleware
-        if "Access-Control-Allow-Origin" not in response.headers:
-            response.headers["Access-Control-Allow-Origin"] = settings.cors_origins_list[0]
-
         return response
 
 

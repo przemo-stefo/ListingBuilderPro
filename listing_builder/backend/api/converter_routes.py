@@ -459,7 +459,7 @@ async def start_store_convert(
     # WHY try API first: Allegro API = free + fast, Scrape.do = paid + slow
     allegro_token = await get_access_token(db, user_id)
 
-    job_id = create_store_job(body.urls, body.marketplace)
+    job_id = create_store_job(body.urls, body.marketplace, user_id=user_id)
     logger.info("store_convert_started", job_id=job_id,
                 urls=len(body.urls), marketplace=body.marketplace,
                 method="api" if allegro_token else "scraper")
@@ -482,7 +482,7 @@ async def start_store_convert(
 @router.get("/store-job/{job_id}", response_model=StoreJobStatus)
 async def get_store_job_status(job_id: str, _user_id: str = Depends(require_user_id)):
     """Get the status of a store conversion job."""
-    job = get_store_job(job_id)
+    job = get_store_job(job_id, user_id=_user_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -500,7 +500,7 @@ async def get_store_job_status(job_id: str, _user_id: str = Depends(require_user
 @router.get("/store-job/{job_id}/download")
 async def download_store_job(job_id: str, _user_id: str = Depends(require_user_id)):
     """Download the converted file for a completed store job."""
-    job = get_store_job(job_id)
+    job = get_store_job(job_id, user_id=_user_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job["status"] != "done":

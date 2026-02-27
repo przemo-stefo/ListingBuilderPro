@@ -2,11 +2,12 @@
 # Purpose: Keepa API endpoints — product lookup, batch, Buy Box, token status
 # NOT for: Direct Amazon SP-API calls or stored monitoring data (use monitoring_routes)
 
-from fastapi import APIRouter, Query, HTTPException, Request
+from fastapi import APIRouter, Query, HTTPException, Request, Depends
 from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from services.keepa_service import get_product, get_products_batch, get_buybox_history, check_tokens_left
+from api.dependencies import require_user_id
 
 # WHY: Keepa API costs tokens ($) — rate limit prevents quota burn
 limiter = Limiter(key_func=get_remote_address)
@@ -19,6 +20,7 @@ async def lookup_product(
     request: Request,
     asin: str = Query(..., description="Amazon ASIN to look up"),
     domain: str = Query("amazon.de", description="Amazon domain (e.g. amazon.de, amazon.com)"),
+    _user_id: str = Depends(require_user_id),
 ):
     """Look up a single product: price, Buy Box, rating, stock."""
     result = await get_product(asin, domain)
@@ -33,6 +35,7 @@ async def lookup_products_batch(
     request: Request,
     asins: str = Query(..., description="Comma-separated ASINs (max 100)"),
     domain: str = Query("amazon.de", description="Amazon domain"),
+    _user_id: str = Depends(require_user_id),
 ):
     """Batch lookup up to 100 products in one call."""
     asin_list = [a.strip() for a in asins.split(",") if a.strip()]
@@ -51,6 +54,7 @@ async def lookup_buybox(
     request: Request,
     asin: str = Query(..., description="Amazon ASIN"),
     domain: str = Query("amazon.de", description="Amazon domain"),
+    _user_id: str = Depends(require_user_id),
 ):
     """Get Buy Box history and current seller info."""
     result = await get_buybox_history(asin, domain)
@@ -60,6 +64,6 @@ async def lookup_buybox(
 
 
 @router.get("/tokens")
-async def get_token_status():
+async def get_token_status(_user_id: str = Depends(require_user_id)):
     """Check remaining Keepa API tokens (rate limit)."""
     return await check_tokens_left()
