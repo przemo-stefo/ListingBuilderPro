@@ -351,7 +351,8 @@ async def get_import_job(
     WHY require_user_id: Prevents cross-tenant job data exposure.
     """
     service = ImportService(db)
-    job = service.get_job_status(job_id)
+    # WHY: user_id filter prevents IDOR — user can only see their own jobs
+    job = service.get_job_status(job_id, user_id=user_id)
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")

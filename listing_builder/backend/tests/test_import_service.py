@@ -13,18 +13,25 @@ class TestImportServiceCreateJob:
     def test_create_job(self, db_session):
         from services.import_service import ImportService
         svc = ImportService(db_session)
-        job = svc.create_import_job("allegro", 5)
+        job = svc.create_import_job("allegro", 5, user_id="user-abc")
         assert job.id is not None
         assert job.source == "allegro"
         assert job.total_products == 5
         assert job.status == JobStatus.RUNNING
+        assert job.user_id == "user-abc"
 
     def test_get_job_status(self, db_session):
         from services.import_service import ImportService
         svc = ImportService(db_session)
-        job = svc.create_import_job("amazon", 3)
-        fetched = svc.get_job_status(job.id)
+        job = svc.create_import_job("amazon", 3, user_id="user-abc")
+        fetched = svc.get_job_status(job.id, user_id="user-abc")
         assert fetched.id == job.id
+
+    def test_get_job_wrong_user_returns_none(self, db_session):
+        from services.import_service import ImportService
+        svc = ImportService(db_session)
+        job = svc.create_import_job("amazon", 3, user_id="user-abc")
+        assert svc.get_job_status(job.id, user_id="user-other") is None
 
     def test_get_nonexistent_job(self, db_session):
         from services.import_service import ImportService

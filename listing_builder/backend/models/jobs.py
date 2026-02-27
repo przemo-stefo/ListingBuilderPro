@@ -25,6 +25,8 @@ class ImportJob(Base):
     __tablename__ = "import_jobs"
 
     id = Column(Integer, primary_key=True, index=True)
+    # WHY: user_id scopes jobs to owners — prevents IDOR across tenants
+    user_id = Column(String(255), index=True, default="webhook")
     source = Column(String(50), default="allegro")  # Which scraper
     status = Column(Enum(JobStatus), default=JobStatus.PENDING, index=True)
 

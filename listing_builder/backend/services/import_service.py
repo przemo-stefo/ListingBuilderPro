@@ -21,7 +21,7 @@ class ImportService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_import_job(self, source: str, total_products: int) -> ImportJob:
+    def create_import_job(self, source: str, total_products: int, user_id: str = "webhook") -> ImportJob:
         """
         Create a new import job to track batch import.
         """
@@ -29,6 +29,7 @@ class ImportService:
             source=source,
             total_products=total_products,
             status=JobStatus.RUNNING,
+            user_id=user_id,
         )
         self.db.add(job)
         self.db.commit()
@@ -102,7 +103,7 @@ class ImportService:
         Returns:
             Dict with job_id, success_count, failed_count, errors
         """
-        job = self.create_import_job(source, len(products))
+        job = self.create_import_job(source, len(products), user_id=user_id)
         success_count = 0
         failed_count = 0
         errors = []
@@ -143,6 +144,9 @@ class ImportService:
             "errors": errors,
         }
 
-    def get_job_status(self, job_id: int) -> ImportJob:
-        """Get import job by ID"""
-        return self.db.query(ImportJob).filter(ImportJob.id == job_id).first()
+    def get_job_status(self, job_id: int, user_id: str = None) -> ImportJob:
+        """Get import job by ID, scoped to user_id if provided."""
+        q = self.db.query(ImportJob).filter(ImportJob.id == job_id)
+        if user_id:
+            q = q.filter(ImportJob.user_id == user_id)
+        return q.first()
