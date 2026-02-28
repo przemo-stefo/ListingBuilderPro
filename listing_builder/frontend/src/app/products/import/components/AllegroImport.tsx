@@ -21,6 +21,7 @@ import {
   Link2,
   CheckCircle2,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react'
 import type { AllegroOffersParams } from '@/lib/types'
 
@@ -155,8 +156,15 @@ export default function AllegroImport() {
         )}
         <div className="mt-6 flex justify-center gap-3">
           <Link
+            href="/optimize"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            <Sparkles className="h-4 w-4" />
+            Optymalizuj teraz
+          </Link>
+          <Link
             href="/products"
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-200 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors"
           >
             Zobacz produkty
           </Link>

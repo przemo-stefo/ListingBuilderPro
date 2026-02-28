@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatRelativeTime, getStatusColor, getStatusLabel, truncate, cn } from '@/lib/utils'
-import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, ArrowRightLeft, Package, Globe } from 'lucide-react'
+import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, ArrowRightLeft, Package, Globe, Send } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const PRODUCTS_FAQ = [
@@ -127,21 +127,34 @@ function ProductsContent() {
 
       {/* WHY: Action bar when viewing imported products — nudge user to optimize */}
       {!isLoading && data && filters.status === 'imported' && data.items.length > 0 && (
-        <Link
-          href="/optimize"
-          className="flex items-center justify-between rounded-lg border border-blue-800 bg-blue-900/20 p-4 hover:bg-blue-900/30 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-blue-400" />
-            <div>
-              <p className="text-sm font-medium text-blue-300">
-                {data.total} {data.total === 1 ? 'produkt czeka' : data.total < 5 ? 'produkty czekaja' : 'produktow czeka'} na optymalizacje
-              </p>
-              <p className="text-xs text-blue-500 mt-0.5">Kliknij aby przejsc do Optymalizatora</p>
+        <div className="space-y-2">
+          <Link
+            href="/optimize"
+            className="flex items-center justify-between rounded-lg border border-blue-800 bg-blue-900/20 p-4 hover:bg-blue-900/30 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-blue-400" />
+              <div>
+                <p className="text-sm font-medium text-blue-300">
+                  {data.total} {data.total === 1 ? 'produkt czeka' : data.total < 5 ? 'produkty czekaja' : 'produktow czeka'} na optymalizacje
+                </p>
+                <p className="text-xs text-blue-500 mt-0.5">Kliknij aby przejsc do Optymalizatora</p>
+              </div>
             </div>
-          </div>
-          <ArrowRight className="h-4 w-4 text-blue-400" />
-        </Link>
+            <ArrowRight className="h-4 w-4 text-blue-400" />
+          </Link>
+          {/* WHY: Bulk optimize shortcut — sends user to batch tab with all imported products */}
+          <Link
+            href="/optimize?tab=batch"
+            className="flex items-center gap-2 rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 hover:border-gray-600 transition-colors"
+          >
+            <Sparkles className="h-4 w-4 text-amber-400" />
+            <span className="text-sm font-medium text-white">
+              Zoptymalizuj wszystkie {data.total} {data.total === 1 ? 'produkt' : data.total < 5 ? 'produkty' : 'produktów'}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 text-gray-500 ml-auto" />
+          </Link>
+        </div>
       )}
 
       {/* Products List */}
@@ -218,7 +231,24 @@ function ProductsContent() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      {/* WHY: Visible next-step button — guides user to optimize or export */}
+                      {product.status === 'imported' && (
+                        <Link href={`/optimize?prefill=${encodeURIComponent(title)}&product_id=${product.id}`}>
+                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Optymalizuj
+                          </Button>
+                        </Link>
+                      )}
+                      {product.status === 'optimized' && (
+                        <Link href="/publish">
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs gap-1.5">
+                            <Send className="h-3.5 w-3.5" />
+                            Eksportuj
+                          </Button>
+                        </Link>
+                      )}
                       {/* WHY: Link to live listing — lets user see the actual offer on marketplace */}
                       {product.source_url && (
                         <a href={product.source_url} target="_blank" rel="noopener noreferrer">
@@ -227,11 +257,14 @@ function ProductsContent() {
                           </Button>
                         </a>
                       )}
-                      <Link href={`/optimize?prefill=${encodeURIComponent(title)}&product_id=${product.id}`}>
-                        <Button variant="ghost" size="icon" title="Optymalizuj">
-                          <Sparkles className="h-4 w-4 text-blue-400" />
-                        </Button>
-                      </Link>
+                      {/* WHY: Hide icon-only optimize when text button already visible (imported status) */}
+                      {product.status !== 'imported' && (
+                        <Link href={`/optimize?prefill=${encodeURIComponent(title)}&product_id=${product.id}`}>
+                          <Button variant="ghost" size="icon" title="Optymalizuj">
+                            <Sparkles className="h-4 w-4 text-blue-400" />
+                          </Button>
+                        </Link>
+                      )}
                       <Link href={`/converter?title=${encodeURIComponent(title)}&product_id=${product.id}`}>
                         <Button variant="ghost" size="icon" title="Konwertuj na inny marketplace">
                           <ArrowRightLeft className="h-4 w-4 text-amber-400" />

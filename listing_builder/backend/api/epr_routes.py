@@ -132,7 +132,7 @@ async def delete_epr_report(report_id: str, db: Session = Depends(get_db), user_
 
 
 @router.get("/countries", response_model=EprCountryRulesListResponse)
-async def list_country_rules(db: Session = Depends(get_db)):
+async def list_country_rules(db: Session = Depends(get_db), _user_id: str = Depends(require_user_id)):
     """List all EPR country rules (7 countries × 3 categories)."""
     rules = (
         db.query(EprCountryRule)
@@ -143,7 +143,7 @@ async def list_country_rules(db: Session = Depends(get_db)):
 
 
 @router.get("/countries/{country_code}", response_model=EprCountryRulesListResponse)
-async def get_country_rules(country_code: str, db: Session = Depends(get_db)):
+async def get_country_rules(country_code: str, db: Session = Depends(get_db), _user_id: str = Depends(require_user_id)):
     """Get EPR rules for a specific country (3 categories)."""
     rules = (
         db.query(EprCountryRule)

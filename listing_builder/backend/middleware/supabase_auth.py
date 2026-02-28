@@ -47,6 +47,9 @@ def get_user_id_from_jwt(request: Request) -> Optional[str]:
 
     payload = None
 
+    # WHY: Issuer must match Supabase project to reject tokens from other projects
+    expected_issuer = f"{settings.supabase_url}/auth/v1" if settings.supabase_url else None
+
     # WHY ES256 first: Supabase production uses asymmetric keys (JWKS)
     jwks = _get_jwks_client()
     if jwks:
@@ -56,6 +59,7 @@ def get_user_id_from_jwt(request: Request) -> Optional[str]:
                 token, signing_key.key,
                 algorithms=["ES256"],
                 audience="authenticated",
+                issuer=expected_issuer,
             )
         except jwt.ExpiredSignatureError:
             logger.debug("jwt_expired_es256")
@@ -66,13 +70,17 @@ def get_user_id_from_jwt(request: Request) -> Optional[str]:
             logger.debug("jwks_error", error=str(e))
             pass  # WHY: JWKS fetch failed — try HS256 as fallback
 
-    # WHY HS256 fallback: Legacy Supabase projects or test environments
+    # WHY HS256 fallback: Legacy Supabase projects or test environments.
+    # SECURITY NOTE: HS256 uses a symmetric secret — anyone with the JWT secret
+    # can forge tokens. Remove this fallback once ES256 (JWKS) is confirmed
+    # working reliably in production. Target removal: after 30 days of stable ES256.
     if payload is None and settings.supabase_jwt_secret:
         try:
             payload = jwt.decode(
                 token, settings.supabase_jwt_secret,
                 algorithms=["HS256"],
                 audience="authenticated",
+                issuer=expected_issuer,
             )
         except jwt.ExpiredSignatureError:
             logger.debug("jwt_expired")

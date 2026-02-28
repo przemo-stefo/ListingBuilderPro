@@ -390,7 +390,7 @@ async def download_template(
 
 
 @router.get("/marketplaces")
-async def list_marketplaces():
+async def list_marketplaces(_user_id: str = Depends(require_user_id)):
     """List supported target marketplaces and their output formats."""
     return {
         "marketplaces": [

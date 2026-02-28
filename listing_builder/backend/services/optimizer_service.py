@@ -28,7 +28,7 @@ logger = structlog.get_logger()
 
 async def _fetch_knowledge(
     db: Session | None, product_title: str, tier1_phrases: List[str],
-    marketplace: str, audience_context: str,
+    marketplace: str, audience_context: str, user_id: str = "",
 ) -> tuple:
     """Fetch RAG context and past successes from DB."""
     title_ctx = bullets_ctx = desc_ctx = ""
@@ -40,7 +40,8 @@ async def _fetch_knowledge(
         title_ctx = knowledge.get("title", "")
         bullets_ctx = knowledge.get("bullets", "")
         desc_ctx = knowledge.get("description", "")
-        past_successes = get_past_successes(db, marketplace)
+        # WHY: user_id scopes few-shot examples to prevent cross-tenant data leak
+        past_successes = get_past_successes(db, marketplace, user_id=user_id)
 
     # WHY: Audience research gives buyer language — prepend so LLM uses real customer phrases
     if audience_context:
@@ -83,6 +84,7 @@ async def optimize_listing(
     account_type: str = "seller",
     category: str = "",
     provider_config: dict | None = None,
+    user_id: str = "",
     **kwargs,
 ) -> Dict[str, Any]:
     """Run full listing optimization: keyword prep, LLM calls, packing, scoring."""
@@ -111,7 +113,7 @@ async def optimize_listing(
     # 2. RAG knowledge
     with span(trace, "rag_search"):
         title_ctx, bullets_ctx, desc_ctx, past_successes = await _fetch_knowledge(
-            db, product_title, tier1_phrases, marketplace, audience_context,
+            db, product_title, tier1_phrases, marketplace, audience_context, user_id=user_id,
         )
 
     logger.info(
@@ -189,6 +191,7 @@ async def optimize_listing(
                     "keyword_count": len(all_kw),
                 },
                 ranking_juice_data=scores["rj"],
+                user_id=user_id,
             )
         except Exception as e:
             logger.warning("self_learning_save_failed", error=str(e))

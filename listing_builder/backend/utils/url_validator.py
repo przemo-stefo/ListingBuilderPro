@@ -117,9 +117,19 @@ def _resolve_and_check(hostname: str) -> List[Tuple]:
     WHY return addr_info: Callers can pin the resolved IP for the actual HTTP
     request, preventing DNS rebinding (TOCTOU) attacks where an attacker returns
     a public IP during validation but a private IP during the real request.
+
+    WHY TOCTOU risk: This validates at DNS resolution time, but the HTTP client
+    resolves DNS again independently. An attacker's DNS server could return a
+    public IP here (passes validation) then a private IP for the real request.
+    For high-security contexts, use get_validated_ip() to pin the resolved IP
+    and pass it directly to the HTTP client. See: DNS rebinding attack pattern.
     """
     # WHY: Reject obvious private hostnames before DNS resolution
-    private_hostnames = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}
+    # WHY ::ffff: prefixes: IPv4-mapped IPv6 addresses bypass naive blocklists
+    private_hostnames = {
+        "localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]",
+        "::ffff:127.0.0.1", "::ffff:0.0.0.0",
+    }
     if hostname.lower() in private_hostnames:
         raise ValueError("Internal/private URLs are not allowed")
 

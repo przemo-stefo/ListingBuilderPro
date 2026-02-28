@@ -525,18 +525,38 @@ async def scrape_allegro_product(url: str, _browser=None) -> AllegroProduct:
     except ValueError as e:
         return AllegroProduct(source_url=url, error=f"Invalid URL: {e}")
 
+    # WHY cascade: If one strategy fails (rate limit, token expired, blocked),
+    # try the next one instead of returning error immediately.
+    # WHY first_error: keep the MOST RELEVANT error (e.g. Scrape.do limit) for user message
+    first_error = None
+
     # Strategy 1: Scrape.do API (recommended, handles DataDome)
     token = _get_scrape_do_token()
     if token:
-        return await _scrape_via_scrape_do(url, token)
+        result = await _scrape_via_scrape_do(url, token)
+        if not result.error:
+            return result
+        first_error = result.error
+        logger.warning("scrape_do_cascade", error=result.error, url=url[:80])
 
     # Strategy 2: ScraperAPI (same HTTP approach, different provider)
     scraperapi_key = _get_scraperapi_key()
     if scraperapi_key:
-        return await _scrape_via_scraperapi(url, scraperapi_key)
+        result = await _scrape_via_scraperapi(url, scraperapi_key)
+        if not result.error:
+            return result
+        if not first_error:
+            first_error = result.error
+        logger.warning("scraperapi_cascade", error=result.error, url=url[:80])
 
-    # Strategy 3: Playwright fallback
-    return await _scrape_via_playwright(url, _browser)
+    # Strategy 3: Playwright fallback (last resort)
+    result = await _scrape_via_playwright(url, _browser)
+    if not result.error:
+        return result
+
+    # WHY first_error: Scrape.do limit is more useful than "playwright not installed"
+    result.error = first_error or result.error
+    return result
 
 
 async def scrape_allegro_batch(

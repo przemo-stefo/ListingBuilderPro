@@ -6,7 +6,8 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useMutation } from '@tanstack/react-query'
+import Link from 'next/link'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { importSingleProduct, scrapeProductUrl } from '@/lib/api/import'
 import { useToast } from '@/lib/hooks/useToast'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ import {
   Loader2,
   Download,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react'
 import { MARKETPLACES } from '../constants'
 
@@ -59,6 +61,7 @@ function titleFromUrl(url: string): string {
 export default function SingleImport() {
   const router = useRouter()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   const [marketplace, setMarketplace] = useState('amazon')
   const [asin, setAsin] = useState('')
@@ -73,6 +76,7 @@ export default function SingleImport() {
   // WHY: Store images from scrape so they get sent with the import request
   const [images, setImages] = useState<string[]>([])
   const [scraped, setScraped] = useState(false)
+  const [importSuccess, setImportSuccess] = useState(false)
 
   // WHY: Auto-detect marketplace when user pastes a URL
   const handleUrlChange = useCallback((url: string) => {
@@ -126,7 +130,10 @@ export default function SingleImport() {
     },
     onSuccess: () => {
       toast({ title: 'Produkt zaimportowany', description: 'Produkt został dodany do systemu' })
-      router.push('/products')
+      // WHY: Invalidate so dashboard stats + product list reflect the new import
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      setImportSuccess(true)
     },
     onError: (error: Error) => {
       toast({ title: 'Błąd importu', description: error.message, variant: 'destructive' })
@@ -150,6 +157,32 @@ export default function SingleImport() {
   }
 
   const inputCls = 'w-full rounded-lg border border-gray-700 bg-[#121212] px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-white/20'
+
+  // WHY: Post-import success view — nudge user to optimize instead of just showing product list
+  if (importSuccess) {
+    return (
+      <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] p-8 text-center">
+        <CheckCircle2 className="mx-auto h-10 w-10 text-green-500 mb-4" />
+        <h3 className="text-lg font-semibold text-white mb-2">Produkt zaimportowany!</h3>
+        <p className="text-sm text-gray-400 mb-6">Co chcesz zrobić dalej?</p>
+        <div className="flex justify-center gap-3">
+          <Link
+            href="/optimize"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            <Sparkles className="h-4 w-4" />
+            Optymalizuj teraz
+          </Link>
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 px-5 py-2.5 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors"
+          >
+            Zobacz produkty
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

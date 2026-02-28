@@ -123,7 +123,7 @@ async def research_audience(
     request: Request,
     body: AudienceResearchRequest,
     db: Session = Depends(get_db),
-    _user_id: str = Depends(require_user_id),
+    user_id: str = Depends(require_user_id),
 ):
     """
     Run audience research via Groq directly (6-key rotation).
@@ -164,6 +164,7 @@ async def research_audience(
     try:
         from models.optimization import OptimizationRun
         run = OptimizationRun(
+            user_id=user_id,
             product_title=body.product[:200],
             brand=skill,
             marketplace="research",

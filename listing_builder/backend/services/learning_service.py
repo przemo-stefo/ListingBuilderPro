@@ -17,6 +17,7 @@ def store_successful_listing(
     db: Session,
     listing_data: Dict,
     ranking_juice_data: Dict,
+    user_id: str = "",
 ) -> Optional[str]:
     """
     INSERT into listing_history when RJ >= 75.
@@ -27,14 +28,15 @@ def store_successful_listing(
         return None
 
     try:
+        # WHY: user_id for tenant isolation — each user's listings are scoped
         result = db.execute(
             text("""
                 INSERT INTO listing_history
                     (brand, marketplace, product_title, title, bullets, description,
-                     backend_keywords, ranking_juice, grade, keyword_count)
+                     backend_keywords, ranking_juice, grade, keyword_count, user_id)
                 VALUES
                     (:brand, :marketplace, :product_title, :title, CAST(:bullets AS jsonb),
-                     :description, :backend_keywords, :ranking_juice, :grade, :keyword_count)
+                     :description, :backend_keywords, :ranking_juice, :grade, :keyword_count, :user_id)
                 RETURNING id
             """),
             {
@@ -48,6 +50,7 @@ def store_successful_listing(
                 "ranking_juice": score,
                 "grade": ranking_juice_data.get("grade", ""),
                 "keyword_count": listing_data.get("keyword_count", 0),
+                "user_id": user_id or None,
             },
         )
         row = result.fetchone()
@@ -62,22 +65,31 @@ def store_successful_listing(
 
 
 def get_past_successes(
-    db: Session, marketplace: str, limit: int = 3
+    db: Session, marketplace: str, limit: int = 3, user_id: str = ""
 ) -> List[Dict]:
     """
     SELECT top listings by ranking_juice WHERE RJ >= 75 AND marketplace matches.
     Returns few-shot examples for prompt injection.
+    WHY: user_id filter prevents cross-tenant data leak (User A's listings → User B's prompts).
     """
     try:
+        # WHY: Single query with dynamic user_id filter — DRY, prevents cross-tenant data leak
+        params: Dict = {"min_rj": MIN_RANKING_JUICE, "marketplace": marketplace, "limit": limit}
+        if user_id:
+            user_filter = "AND user_id = :user_id"
+            params["user_id"] = user_id
+        else:
+            user_filter = "AND user_id IS NULL"
+
         result = db.execute(
-            text("""
+            text(f"""
                 SELECT title, bullets, description, backend_keywords, ranking_juice, grade
                 FROM listing_history
-                WHERE ranking_juice >= :min_rj AND marketplace = :marketplace
+                WHERE ranking_juice >= :min_rj AND marketplace = :marketplace {user_filter}
                 ORDER BY ranking_juice DESC
                 LIMIT :limit
             """),
-            {"min_rj": MIN_RANKING_JUICE, "marketplace": marketplace, "limit": limit},
+            params,
         )
         rows = result.fetchall()
         return [
@@ -96,12 +108,16 @@ def get_past_successes(
         return []
 
 
-def submit_feedback(db: Session, listing_id: str, rating: int) -> bool:
-    """UPDATE user_rating on a listing_history row. Returns True on success."""
+def submit_feedback(db: Session, listing_id: str, rating: int, user_id: str) -> bool:
+    """UPDATE user_rating on a listing_history row. Verifies ownership via user_id column."""
     try:
+        # WHY: Direct user_id check — simpler than JOIN through optimization_runs
         result = db.execute(
-            text("UPDATE listing_history SET user_rating = :rating WHERE id = :id"),
-            {"rating": rating, "id": listing_id},
+            text("""
+                UPDATE listing_history SET user_rating = :rating
+                WHERE id = :id AND user_id = :user_id
+            """),
+            {"rating": rating, "id": listing_id, "user_id": user_id},
         )
         db.commit()
         return result.rowcount > 0

@@ -269,7 +269,7 @@ async def acknowledge_alert(alert_id: str, db: Session = Depends(get_db), user_i
 # ── Scheduler Status ──
 
 @router.get("/status")
-async def scheduler_status():
+async def scheduler_status(_admin: str = Depends(require_admin)):
     """Show scheduler and alert service health. Used to verify startup."""
     from services.monitor_scheduler import _scheduler
     from services.alert_service import get_alert_service

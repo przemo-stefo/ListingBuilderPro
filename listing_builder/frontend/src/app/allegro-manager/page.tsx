@@ -16,6 +16,7 @@ const ALLEGRO_FAQ = [
 import { FeatureGate } from '@/components/tier/FeatureGate'
 import { getOAuthConnections, startAllegroOAuth } from '@/lib/api/converter'
 import { useToast } from '@/lib/hooks/useToast'
+import { safeRedirect } from '@/lib/utils/redirect'
 import OffersTable from './components/OffersTable'
 
 export default function AllegroManagerPage() {
@@ -39,7 +40,7 @@ export default function AllegroManagerPage() {
     setConnecting(true)
     try {
       const { authorize_url } = await startAllegroOAuth()
-      window.location.href = authorize_url
+      safeRedirect(authorize_url)
     } catch {
       setConnecting(false)
       toast({ title: 'Nie udało się rozpocząć autoryzacji Allegro', variant: 'destructive' })

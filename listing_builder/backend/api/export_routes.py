@@ -117,7 +117,7 @@ async def bulk_publish(
 
 @router.get("/marketplaces")
 @limiter.limit("30/minute")
-async def list_marketplaces(request: Request):
+async def list_marketplaces(request: Request, _user_id: str = Depends(require_user_id)):
     """
     List available marketplaces.
     """

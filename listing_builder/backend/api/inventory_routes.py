@@ -47,8 +47,10 @@ async def get_inventory(
         conditions.append("status = :st")
         params["st"] = status
     if search:
-        conditions.append("(LOWER(sku) LIKE :q OR LOWER(product_title) LIKE :q)")
-        params["q"] = f"%{search.lower()}%"
+        # WHY: Escape SQL LIKE wildcards to prevent wildcard injection (% and _ are special in LIKE)
+        safe_search = search.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        conditions.append("(LOWER(sku) LIKE :q ESCAPE '\\' OR LOWER(product_title) LIKE :q ESCAPE '\\')")
+        params["q"] = f"%{safe_search}%"
 
     clauses.append("WHERE " + " AND ".join(conditions))
     clauses.append("ORDER BY marketplace, sku")

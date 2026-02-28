@@ -12,9 +12,11 @@ from services.stripe_service import validate_license
 def get_user_id(request: Request) -> str:
     """Extract user_id from request state (set by auth middleware).
 
-    WHY dependency: Routes call this via Depends() to get the current user_id
-    without importing middleware directly. Falls back to "default" for
-    backward compatibility with API-key-only auth.
+    DEPRECATED: Use require_user_id() instead — it rejects the unsafe "default"
+    fallback. This function is kept only for backward compatibility with tests.
+    No route should use Depends(get_user_id) — all routes should use
+    Depends(require_user_id) which enforces real authentication.
+    Remove once all references are cleaned up.
     """
     return getattr(request.state, "user_id", "default")
 

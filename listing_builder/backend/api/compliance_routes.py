@@ -18,7 +18,7 @@ from schemas.compliance import (
 from schemas.audit import AuditRequest, AuditResult
 from services.audit_service import audit_product, audit_product_from_data
 from services.allegro_api import fetch_seller_offers, fetch_offer_details
-from api.dependencies import get_user_id, require_user_id, require_premium
+from api.dependencies import require_user_id, require_premium
 from models.compliance import ComplianceReport, ComplianceReportItem
 from models.oauth_connection import OAuthConnection
 from typing import Optional
@@ -184,7 +184,7 @@ def _report_to_response(report) -> ComplianceReportResponse:
 
 @router.post("/audit", response_model=AuditResult)
 @limiter.limit("10/minute")
-async def audit_product_card(request: Request, body: AuditRequest, db: Session = Depends(get_db)):
+async def audit_product_card(request: Request, body: AuditRequest, db: Session = Depends(get_db), _user_id: str = Depends(require_user_id)):
     """
     Audit a single product card by URL or ASIN.
 

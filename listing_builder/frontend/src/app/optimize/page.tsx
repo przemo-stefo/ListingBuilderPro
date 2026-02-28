@@ -8,8 +8,10 @@ import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Layers, FileText, Clock, Crown, Loader2 } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
+import { FlowIndicator } from '@/components/ui/FlowIndicator'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
+import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { PremiumGate } from '@/components/tier/PremiumGate'
 import { useToast } from '@/lib/hooks/useToast'
 import SingleTab from './components/SingleTab'
@@ -26,11 +28,14 @@ function OptimizeContent() {
   const prefillTitle = searchParams.get('prefill') ?? undefined
   // WHY: When coming from product detail page, we pass product_id so optimizer can save back
   const productId = searchParams.get('product_id') ?? undefined
-  const [activeTab, setActiveTab] = useState<Tab>('single')
+  // WHY: ?tab=batch from products page "Zoptymalizuj wszystkie" link
+  const initialTab = searchParams.get('tab') as Tab | null
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab === 'batch' ? 'batch' : 'single')
   // WHY: When user clicks "Load" in History, we switch to Single and pass the result
   const [loadedResult, setLoadedResult] = useState<OptimizerResponse | null>(null)
   const { isPremium } = useTier()
   const { toast } = useToast()
+  const { data: dashStats } = useDashboardStats()
 
   const handleLoadFromHistory = (result: OptimizerResponse) => {
     setLoadedResult(result)
@@ -52,6 +57,9 @@ function OptimizeContent() {
   return (
     <PremiumGate feature="Optymalizator">
       <div className="space-y-6">
+      {/* WHY: Flow indicator — user sees where they are in the 3-step workflow */}
+      <FlowIndicator stats={dashStats ?? null} currentStep="optimize" />
+
       {/* Page header + tab toggle */}
       <div className="flex items-center justify-between">
         <div>

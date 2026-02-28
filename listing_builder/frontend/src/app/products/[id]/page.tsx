@@ -262,6 +262,35 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </>
           )}
 
+          {/* WHY: Before/After comparison — visual side-by-side when product has been optimized */}
+          {!isEditing && product.title_optimized && (product.status === 'optimized' || product.status === 'published') && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">Porównanie: Oryginał vs Zoptymalizowane</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Original */}
+                <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase mb-2">Oryginał</p>
+                  <p className="text-sm font-medium text-gray-400 mb-2">{product.title_original || 'Brak tytułu'}</p>
+                  {product.description_original && (
+                    <p className="text-xs text-gray-500 line-clamp-4">
+                      {product.description_original.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)}
+                    </p>
+                  )}
+                </div>
+                {/* Optimized */}
+                <div className="rounded-lg border border-green-800/40 bg-green-900/10 p-4">
+                  <p className="text-xs font-medium text-green-500 uppercase mb-2">Zoptymalizowane</p>
+                  <p className="text-sm font-medium text-white mb-2">{product.title_optimized}</p>
+                  {product.description_optimized && (
+                    <p className="text-xs text-gray-300 line-clamp-4">
+                      {product.description_optimized.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Metadata (always visible) */}
           <div className="border-t border-gray-800 pt-4">
             <div className="grid gap-2 text-sm text-gray-400">

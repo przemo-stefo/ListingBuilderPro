@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field, ValidationError
 from database import get_db
-from api.dependencies import get_user_id, require_user_id
+from api.dependencies import require_user_id
 from schemas import ProductImport, WebhookPayload, ImportJobResponse
 from services.import_service import ImportService
 from config import settings
@@ -243,50 +243,71 @@ async def scrape_product_url(
         raise HTTPException(status_code=400, detail=str(e))
 
     if marketplace != "allegro":
-        raise HTTPException(status_code=400, detail=f"Scraping not yet supported for {marketplace}")
+        raise HTTPException(status_code=400, detail=f"Import po URL nie jest jeszcze wspierany dla {marketplace}")
 
-    # WHY: 3-tier fallback: seller OAuth API → public Client Credentials API → Scrape.do
-    from services.scraper.allegro_scraper import extract_offer_id
-    from services.allegro_api import get_access_token, fetch_offer_details, fetch_public_offer_details
+    # WHY 3-tier: OAuth API (own offers) → /offers/listing (any offer) → Scrape.do (DataDome bypass)
+    # Architecture agreed 2026-02-27 in sessions 1816268a + a638d1c3
+    from services.scraper.allegro_scraper import extract_offer_id, scrape_allegro_product
+    from services.allegro_api import get_access_token, fetch_offer_details, fetch_offer_via_listing
+    from dataclasses import asdict
 
-    # WHY: Normalize business.allegro.pl → allegro.pl for scraping
-    scrape_url = body.url.replace("business.allegro.pl", "allegro.pl")
-    offer_id = extract_offer_id(scrape_url)
+    # WHY: Normalize business.allegro.pl → allegro.pl
+    clean_url = body.url.replace("business.allegro.pl", "allegro.pl")
+    offer_id = extract_offer_id(clean_url)
 
-    # Tier 1: User OAuth — works for seller's OWN offers
+    if not offer_id:
+        raise HTTPException(status_code=400, detail="Nie udało się wyciągnąć ID oferty z URL. Sprawdź link.")
+
+    # Tier 1: User OAuth → /sale/product-offers — full data (own offers only)
     allegro_token = await get_access_token(db, user_id)
-    if allegro_token and offer_id:
+    if allegro_token:
         data = await fetch_offer_details(offer_id, allegro_token)
         if not data.get("error"):
             data["price"] = _parse_price(data.get("price"))
+            logger.info("scrape_url_tier1_success", offer_id=offer_id)
             return {"status": "success", "product": data, "source": "allegro_api"}
+        logger.info("scrape_url_tier1_failed", offer_id=offer_id, error=data.get("error"))
 
-    # Tier 2: Public API (Client Credentials) — works for ANY offer if app verified
-    if offer_id:
-        data = await fetch_public_offer_details(offer_id)
+    # Tier 2: User OAuth → /offers/listing — basic data for ANY public offer
+    if allegro_token:
+        data = await fetch_offer_via_listing(offer_id, allegro_token)
         if not data.get("error"):
             data["price"] = _parse_price(data.get("price"))
-            return {"status": "success", "product": data, "source": "allegro_public_api"}
+            logger.info("scrape_url_tier2_success", offer_id=offer_id, images=len(data.get("images", [])))
+            return {"status": "success", "product": data, "source": "allegro_listing_api"}
+        logger.info("scrape_url_tier2_failed", offer_id=offer_id, error=data.get("error"))
 
-    # Tier 3: Scrape.do web scraping (fallback when API unavailable)
-    from services.scraper.allegro_scraper import scrape_allegro_product
-    from dataclasses import asdict
-    product = await scrape_allegro_product(scrape_url)
+    # Tier 3: Scrape.do — DataDome bypass, works for ANY offer without OAuth
+    # WHY: Agreed architecture (2026-02-27). Handles anti-bot protection.
+    # Free plan: 1000 req/month, resets 1st of each month.
+    product = await scrape_allegro_product(clean_url)
+    if not product.error:
+        data = asdict(product)
+        data["price"] = _parse_price(data.get("price"))
+        logger.info("scrape_url_tier3_success", offer_id=offer_id, images=len(data.get("images", [])))
+        return {"status": "success", "product": data, "source": "scrape_do"}
 
-    if product.error:
-        # WHY: Clear message when all methods fail
-        error_msg = product.error
-        if "401" in error_msg or "limit" in error_msg.lower() or "exceeded" in error_msg.lower():
-            error_msg = (
-                "Nie udało się pobrać danych produktu. "
-                "Połącz konto Allegro (Konwerter → OAuth) lub popraw token Scrape.do."
-            )
-        raise HTTPException(status_code=502, detail=error_msg)
+    # All 3 tiers failed — clear error with guidance
+    scrape_error = product.error or ""
+    logger.error("scrape_url_all_tiers_failed", offer_id=offer_id, scrape_error=scrape_error[:100])
 
-    data = asdict(product)
-    data["price"] = _parse_price(data.get("price"))
+    if "limit" in scrape_error.lower() or "exceeded" in scrape_error.lower():
+        error_msg = (
+            "Limit scrapowania wyczerpany (resetuje się 1. dnia miesiąca). "
+            "Połącz konto Allegro (Integracje → Allegro OAuth) aby importować swoje oferty bez limitu."
+        )
+    elif not allegro_token:
+        error_msg = (
+            "Połącz konto Allegro (Integracje → Allegro OAuth), aby importować produkty. "
+            "Bez połączonego konta dostępny jest tylko scraping (limit wyczerpany)."
+        )
+    else:
+        error_msg = (
+            f"Nie udało się pobrać oferty {offer_id}. "
+            "Sprawdź czy link jest poprawny i oferta aktywna."
+        )
 
-    return {"status": "success", "product": data, "source": "scrape_do"}
+    raise HTTPException(status_code=503, detail=error_msg)
 
 
 @router.post("/product")

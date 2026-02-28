@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/alert-settings", tags=["Alert Settings"])
 
 
 @router.get("/types", response_model=List[AlertTypeInfo])
-async def get_alert_types():
+async def get_alert_types(_user_id: str = Depends(require_user_id)):
     """Return full registry of alert types with active/inactive status."""
     return [
         AlertTypeInfo(

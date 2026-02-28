@@ -9,6 +9,7 @@ import { Crown, Sparkles, ArrowRight } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
 import { cn } from '@/lib/utils'
 import { apiClient } from '@/lib/api/client'
+import { safeRedirect } from '@/lib/utils/redirect'
 
 interface UpgradeCTAProps {
   variant?: 'inline' | 'card'
@@ -25,7 +26,7 @@ async function redirectToCheckout() {
       plan_type: 'monthly', email,
     })
     if (data.checkout_url) {
-      window.location.href = data.checkout_url
+      safeRedirect(data.checkout_url)
     }
   } catch {
     alert('Blad tworzenia sesji platnosci. Sprobuj ponownie.')

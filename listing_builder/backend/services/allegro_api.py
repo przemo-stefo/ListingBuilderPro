@@ -165,9 +165,9 @@ async def get_client_credentials_token() -> Optional[str]:
 async def fetch_public_offer_details(offer_id: str) -> Dict:
     """Fetch offer details using Client Credentials (no user OAuth needed).
 
-    WHY: When user doesn't own the offer, /sale/product-offers returns 403.
-    Client Credentials token can access the same endpoint for ANY offer
-    if the app has the right scopes. Falls back gracefully if access denied.
+    WHY 2-tier: /sale/product-offers returns full data (images, description, params)
+    but requires seller scope. If 401/403, fall back to /offers/listing which returns
+    basic info (title, images, price) — better than nothing.
     """
     token = await get_client_credentials_token()
     if not token:
@@ -180,41 +180,90 @@ async def fetch_public_offer_details(offer_id: str) -> Dict:
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            # WHY /sale/product-offers: the only endpoint that returns description
-            # Client Credentials may work if app has allegro:api:sale:offers:read scope
+            # Tier A: /sale/product-offers — full data (needs seller scope)
             resp = await client.get(
                 f"{ALLEGRO_API_BASE}/sale/product-offers/{offer_id}",
                 headers=headers,
             )
 
-            if resp.status_code != 200:
-                logger.warning("allegro_public_offer_failed",
-                               offer_id=offer_id, status=resp.status_code)
-                return {"error": f"Allegro API {resp.status_code}"}
+            if resp.status_code == 200:
+                data = resp.json()
+                images = _parse_images(data)
+                parameters = {}
+                product_set = data.get("productSet", [])
+                if product_set:
+                    parameters = _parse_parameters(
+                        product_set[0].get("product", {}).get("parameters", [])
+                    )
+                top_params = _parse_parameters(data.get("parameters", []))
+                for name, val in top_params.items():
+                    if name not in parameters:
+                        parameters[name] = val
 
-            data = resp.json()
-            images = _parse_images(data)
+                ean = _extract_ean(parameters, data)
+                description = _parse_description(data)
+                result = _build_offer_result(offer_id, data, parameters, ean, images, description)
+                logger.info("allegro_public_offer_fetched", offer_id=offer_id,
+                            title=result["title"][:60], params=len(parameters))
+                return result
 
-            # WHY productSet: same parsing as fetch_offer_details
-            parameters = {}
-            product_set = data.get("productSet", [])
-            if product_set:
-                parameters = _parse_parameters(
-                    product_set[0].get("product", {}).get("parameters", [])
-                )
-            top_params = _parse_parameters(data.get("parameters", []))
-            for name, val in top_params.items():
-                if name not in parameters:
-                    parameters[name] = val
+            # WHY: /sale/product-offers failed (app not verified) — try public listing endpoint
+            logger.warning("allegro_sale_api_failed", offer_id=offer_id, status=resp.status_code)
 
-            ean = _extract_ean(parameters, data)
-            description = _parse_description(data)
-            result = _build_offer_result(offer_id, data, parameters, ean, images, description)
+            # Tier B: /offers/listing — public endpoint, returns basic data (title, images, price)
+            resp2 = await client.get(
+                f"{ALLEGRO_API_BASE}/offers/listing",
+                params={"offer.id": offer_id},
+                headers=headers,
+            )
+            if resp2.status_code == 200:
+                listing_data = resp2.json()
+                items = listing_data.get("items", {}).get("promoted", []) + listing_data.get("items", {}).get("regular", [])
+                if items:
+                    item = items[0]
+                    images = []
+                    for img in item.get("images", []):
+                        url = img.get("url", "") if isinstance(img, dict) else str(img)
+                        if url:
+                            # WHY: Get original size instead of thumbnail
+                            url = url.replace("/s512/", "/original/").replace("/s256/", "/original/")
+                            images.append(url)
 
-            logger.info("allegro_public_offer_fetched", offer_id=offer_id,
-                        title=result["title"][:60], price=result["price"],
-                        params=len(parameters))
-            return result
+                    parameters = {}
+                    for param in item.get("parameters", []):
+                        name = param.get("name", "")
+                        values = param.get("values", [])
+                        if name and values:
+                            parameters[name] = ", ".join(str(v) for v in values if v)
+
+                    price = ""
+                    selling_mode = item.get("sellingMode", {})
+                    if selling_mode.get("price"):
+                        price = str(selling_mode["price"].get("amount", ""))
+
+                    result = {
+                        "source_url": f"https://allegro.pl/oferta/{offer_id}",
+                        "source_id": offer_id,
+                        "title": item.get("name", ""),
+                        "description": "",  # WHY: listing endpoint doesn't return description
+                        "price": price,
+                        "currency": selling_mode.get("price", {}).get("currency", "PLN") if selling_mode.get("price") else "PLN",
+                        "ean": "",
+                        "images": images,
+                        "category": item.get("category", {}).get("id", ""),
+                        "quantity": "",
+                        "condition": "",
+                        "parameters": parameters,
+                        "brand": parameters.get("Marka", ""),
+                        "manufacturer": parameters.get("Producent", ""),
+                        "error": None,
+                    }
+                    logger.info("allegro_listing_offer_fetched", offer_id=offer_id,
+                                title=result["title"][:60], images=len(images))
+                    return result
+
+            logger.warning("allegro_public_offer_all_failed", offer_id=offer_id)
+            return {"error": f"Allegro API {resp.status_code}"}
 
     except httpx.TimeoutException:
         return {"error": f"Allegro API timeout for offer {offer_id}"}
@@ -449,6 +498,85 @@ async def fetch_offer_details(
         return {"error": f"Allegro API timeout for offer {offer_id}"}
     except Exception as e:
         logger.error("allegro_offer_error", offer_id=offer_id, error=str(e))
+        return {"error": f"Allegro API error: {str(e)}"}
+
+
+async def fetch_offer_via_listing(offer_id: str, access_token: str) -> Dict:
+    """Fetch basic offer data via /offers/listing — works for ANY public offer.
+
+    WHY separate from fetch_offer_details: /sale/product-offers returns full data
+    but ONLY for seller's own offers. /offers/listing returns basic data (title,
+    images, price, params) for ANY offer — using USER's OAuth token.
+    No description available from this endpoint.
+    """
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/vnd.allegro.public.v1+json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{ALLEGRO_API_BASE}/offers/listing",
+                params={"offer.id": offer_id},
+                headers=headers,
+            )
+
+            if resp.status_code != 200:
+                logger.warning("allegro_listing_failed", offer_id=offer_id, status=resp.status_code)
+                return {"error": f"Allegro API {resp.status_code}"}
+
+            listing_data = resp.json()
+            items = (listing_data.get("items", {}).get("promoted", [])
+                     + listing_data.get("items", {}).get("regular", []))
+
+            if not items:
+                return {"error": f"Oferta {offer_id} nie znaleziona w wynikach wyszukiwania"}
+
+            item = items[0]
+
+            # WHY: Get original-size images instead of thumbnails
+            images = []
+            for img in item.get("images", []):
+                url = img.get("url", "") if isinstance(img, dict) else str(img)
+                if url:
+                    url = url.replace("/s512/", "/original/").replace("/s256/", "/original/")
+                    images.append(url)
+
+            parameters = _parse_parameters(item.get("parameters", []))
+
+            price = ""
+            currency = "PLN"
+            selling_mode = item.get("sellingMode", {})
+            if selling_mode.get("price"):
+                price = str(selling_mode["price"].get("amount", ""))
+                currency = selling_mode["price"].get("currency", "PLN")
+
+            result = {
+                "source_url": f"https://allegro.pl/oferta/{offer_id}",
+                "source_id": offer_id,
+                "title": item.get("name", ""),
+                "description": "",  # WHY: listing endpoint doesn't return description
+                "price": price,
+                "currency": currency,
+                "ean": "",
+                "images": images,
+                "category": item.get("category", {}).get("id", ""),
+                "quantity": "",
+                "condition": "",
+                "parameters": parameters,
+                "brand": parameters.get("Marka", ""),
+                "manufacturer": parameters.get("Producent", ""),
+                "error": None,
+            }
+            logger.info("allegro_listing_offer_fetched", offer_id=offer_id,
+                        title=result["title"][:60], images=len(images), params=len(parameters))
+            return result
+
+    except httpx.TimeoutException:
+        return {"error": f"Allegro API timeout for offer {offer_id}"}
+    except Exception as e:
+        logger.error("allegro_listing_error", offer_id=offer_id, error=str(e))
         return {"error": f"Allegro API error: {str(e)}"}
 
 

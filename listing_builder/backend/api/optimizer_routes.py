@@ -16,7 +16,7 @@ from services.llm_providers import PROVIDERS
 from services.stripe_service import validate_license
 from database import get_db
 from models.optimization import OptimizationRun
-from api.dependencies import require_user_id, get_user_id
+from api.dependencies import require_user_id, require_admin
 from utils.privacy import hash_ip
 
 limiter = Limiter(key_func=get_remote_address)
@@ -223,6 +223,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
             account_type=body.account_type,
             category=body.category or "",
             provider_config=provider_config,
+            user_id=user_id,
         )
 
         logger.info(
@@ -328,6 +329,7 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
                 account_type=product.account_type,
                 category=product.category or "",
                 provider_config=batch_provider_config,
+                user_id=user_id,
             )
 
             results.append(BatchOptimizerResult(
@@ -455,14 +457,14 @@ async def submit_feedback(
     """User rates a listing 1-5. Updates listing_history table."""
     from services.learning_service import submit_feedback as do_feedback
 
-    success = do_feedback(db, listing_id, body.rating)
+    success = do_feedback(db, listing_id, body.rating, user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Listing not found")
     return {"status": "updated", "listing_id": listing_id, "rating": body.rating}
 
 
 @router.get("/health")
-async def optimizer_health():
+async def optimizer_health(_admin: str = Depends(require_admin)):
     """Check if Groq API is reachable"""
     try:
         from groq import Groq
@@ -559,7 +561,7 @@ class GreyMarketRequest(BaseModel):
 
 @router.post("/grey-market-score")
 @limiter.limit("10/minute")
-async def grey_market_score(request: Request, body: GreyMarketRequest):
+async def grey_market_score(request: Request, body: GreyMarketRequest, _user_id: str = Depends(require_user_id)):
     """
     Calculate grey market risk score 0-100.
     WHY: Standalone endpoint — doesn't need optimization data, just SP-API signals.

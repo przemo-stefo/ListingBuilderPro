@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchOAuthConnections, getAuthorizeUrl, disconnectMarketplace } from '../api/oauth'
 import { useToast } from './useToast'
+import { safeRedirect } from '../utils/redirect'
 
 export function useOAuthConnections() {
   return useQuery({
@@ -21,7 +22,7 @@ export function useOAuthAuthorize() {
     mutationFn: (marketplace: string) => getAuthorizeUrl(marketplace),
     onSuccess: (data) => {
       // WHY: Redirect user to marketplace OAuth page
-      window.location.href = data.authorize_url
+      safeRedirect(data.authorize_url)
     },
     onError: (error: Error) => {
       toast({ title: 'Blad OAuth', description: error.message, variant: 'destructive' })

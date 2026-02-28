@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   // WHY: Prevent open redirect — "//evil.com" becomes "https://origin//evil.com"
   // which browsers resolve to evil.com. Only allow paths starting with single "/".
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard'
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.startsWith('/\\') ? rawNext : '/dashboard'
 
   // WHY: Default redirect — if code exchange fails, send to login
   const fallback = `${origin}/login`

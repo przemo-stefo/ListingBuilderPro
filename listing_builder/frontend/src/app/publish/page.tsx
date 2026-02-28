@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useProducts } from '@/lib/hooks/useProducts'
+import { useProducts, useDashboardStats } from '@/lib/hooks/useProducts'
 import { listMarketplaces, bulkPublish } from '@/lib/api/export'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { useToast } from '@/lib/hooks/useToast'
 import { cn, getStatusColor, truncate } from '@/lib/utils'
 import { Send, CheckCircle2, Globe } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
+import { FlowIndicator } from '@/components/ui/FlowIndicator'
 import { PremiumGate } from '@/components/tier/PremiumGate'
 
 const PUBLISH_FAQ = [
@@ -26,6 +27,7 @@ const PUBLISH_FAQ = [
 export default function PublishPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { data: dashStats } = useDashboardStats()
   // WHY: product.id is number from backend, but bulkPublish expects string[] — convert on publish
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('')
@@ -119,6 +121,9 @@ export default function PublishPage() {
   return (
     <PremiumGate feature="Eksport do pliku">
       <div className="space-y-6">
+      {/* WHY: Flow indicator — user sees where they are in the 3-step workflow */}
+      <FlowIndicator stats={dashStats ?? null} currentStep="export" />
+
       <div>
         <h1 className="text-3xl font-bold text-white">Publikacja na marketplace&apos;y</h1>
         <p className="text-gray-400 mt-2">

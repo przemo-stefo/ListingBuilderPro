@@ -6,6 +6,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useToast } from '@/lib/hooks/useToast'
 import { cn } from '@/lib/utils'
 import { FileUp, Clipboard, Loader2, CheckCircle2, XCircle } from 'lucide-react'
@@ -211,10 +212,16 @@ export default function BatchImport() {
               </p>
             )}
           </div>
-          <button onClick={() => router.push('/products')}
-            className="ml-auto rounded-lg bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-200 transition-colors">
-            Zobacz produkty
-          </button>
+          <div className="ml-auto flex gap-2">
+            <Link href="/optimize"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+              Optymalizuj teraz
+            </Link>
+            <Link href="/products"
+              className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors">
+              Zobacz produkty
+            </Link>
+          </div>
         </div>
       )}
 

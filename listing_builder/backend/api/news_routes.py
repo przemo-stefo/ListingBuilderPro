@@ -140,6 +140,23 @@ async def _fetch_all_feeds() -> List[dict]:
 async def _fetch_og_image(client: httpx.AsyncClient, url: str) -> Optional[str]:
     """Fetch og:image from article URL — reads only first 50KB of HTML."""
     try:
+        # SECURITY: SSRF protection — reject private/internal URLs
+        from urllib.parse import urlparse
+        import ipaddress
+        import socket
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return None
+        if parsed.hostname:
+            h = parsed.hostname.lower()
+            if h in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+                return None
+            addr_info = socket.getaddrinfo(h, None)
+            for info in addr_info:
+                ip = ipaddress.ip_address(info[4][0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                    return None
+
         resp = await client.get(
             url,
             headers={"User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)", "Accept": "text/html"},

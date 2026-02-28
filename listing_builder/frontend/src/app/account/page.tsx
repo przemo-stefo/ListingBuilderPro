@@ -10,6 +10,7 @@ import { useTier } from '@/lib/hooks/useTier'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { User, CreditCard, LogOut, Building2, Check } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
+import { safeRedirect } from '@/lib/utils/redirect'
 
 interface SubscriptionInfo {
   plan: string
@@ -60,7 +61,7 @@ export default function AccountPage() {
     setPortalLoading(true)
     try {
       const { data } = await apiClient.post('/stripe/portal-session')
-      if (data.portal_url) window.location.href = data.portal_url
+      if (data.portal_url) safeRedirect(data.portal_url)
     } finally {
       setPortalLoading(false)
     }
@@ -72,7 +73,7 @@ export default function AccountPage() {
       const { data } = await apiClient.post('/stripe/create-checkout', {
         plan_type: 'monthly', email: user.email,
       })
-      if (data.checkout_url) window.location.href = data.checkout_url
+      if (data.checkout_url) safeRedirect(data.checkout_url)
     } catch {}
   }
 

@@ -120,6 +120,14 @@ async def download_report(document_id: str) -> str:
     if not download_url:
         raise RuntimeError(f"No download URL in document: {data}")
 
+    # SECURITY: Validate download URL before fetching — SP-API should only return S3 URLs
+    from urllib.parse import urlparse
+    parsed = urlparse(download_url)
+    if parsed.scheme != "https" or not parsed.hostname or not (
+        parsed.hostname.endswith(".amazonaws.com") or parsed.hostname.endswith(".amazon.com")
+    ):
+        raise RuntimeError(f"Invalid SP-API download URL domain: {parsed.hostname}")
+
     # WHY separate download: SP-API returns a pre-signed S3 URL
     async with httpx.AsyncClient(timeout=60) as client:
         dl_resp = await client.get(download_url)

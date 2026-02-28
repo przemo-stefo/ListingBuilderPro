@@ -42,10 +42,12 @@ async def get_competitors(
         conditions.append("marketplace = :mp")
         params["mp"] = marketplace
     if search:
+        # WHY: Escape SQL LIKE wildcards to prevent wildcard injection (% and _ are special in LIKE)
+        safe_search = search.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         conditions.append(
-            "(LOWER(competitor_name) LIKE :q OR LOWER(product_title) LIKE :q)"
+            "(LOWER(competitor_name) LIKE :q ESCAPE '\\' OR LOWER(product_title) LIKE :q ESCAPE '\\')"
         )
-        params["q"] = f"%{search.lower()}%"
+        params["q"] = f"%{safe_search}%"
 
     clauses.append("WHERE " + " AND ".join(conditions))
     clauses.append("ORDER BY marketplace, competitor_name")

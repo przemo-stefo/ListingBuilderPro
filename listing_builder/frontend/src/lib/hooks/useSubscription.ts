@@ -5,6 +5,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { createCheckoutSession, type CheckoutRequest } from '../api/stripe'
 import { useToast } from './useToast'
+import { safeRedirect } from '../utils/redirect'
 
 export function useCheckout() {
   const { toast } = useToast()
@@ -12,7 +13,7 @@ export function useCheckout() {
   return useMutation({
     mutationFn: (req: CheckoutRequest) => createCheckoutSession(req),
     onSuccess: (data) => {
-      window.location.href = data.checkout_url
+      safeRedirect(data.checkout_url)
     },
     onError: (error: Error) => {
       toast({
