@@ -121,7 +121,7 @@ async def receive_webhook(
         _handle_import_error(e, "webhook")
 
 
-VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "manual"}
+VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "rozetka", "aliexpress", "temu", "manual"}
 
 # WHY: Max 100 offers per import from connected account — balances speed vs API rate limits
 MAX_ALLEGRO_IMPORT = 100
@@ -204,7 +204,8 @@ async def import_from_allegro_account(
 
 class ScrapeRequest(BaseModel):
     """WHY: Typed request for URL scraping — validates URL format before processing."""
-    url: str
+    # SECURITY: Max 2048 chars prevents ReDoS on regex-heavy parsers + memory abuse
+    url: str = Field(..., max_length=2048)
     marketplace: Optional[str] = None
 
 
@@ -235,12 +236,41 @@ async def scrape_product_url(
             marketplace = "ebay"
         elif "kaufland" in hostname:
             marketplace = "kaufland"
+        elif "rozetka" in hostname:
+            marketplace = "rozetka"
+        elif "aliexpress" in hostname:
+            marketplace = "aliexpress"
+        elif "temu" in hostname:
+            marketplace = "temu"
 
     # SECURITY: Validate URL domain
     try:
         validate_marketplace_url(body.url, marketplace)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # WHY: Rozetka, AliExpress, Temu use the same scrape→parse→return pattern
+    scraper_map = {
+        "rozetka": ("services.scraper.rozetka_scraper", "scrape_rozetka_product", "Rozetka"),
+        "aliexpress": ("services.scraper.aliexpress_scraper", "scrape_aliexpress_product", "AliExpress"),
+        "temu": ("services.scraper.temu_scraper", "scrape_temu_product", "Temu (beta)"),
+    }
+    if marketplace in scraper_map:
+        from dataclasses import asdict
+        from importlib import import_module
+
+        module_path, func_name, label = scraper_map[marketplace]
+        scraper_fn = getattr(import_module(module_path), func_name)
+        product = await scraper_fn(body.url)
+        if not product.error:
+            data = asdict(product)
+            data["price"] = _parse_price(data.get("price"))
+            logger.info(f"scrape_url_{marketplace}_success", source_id=product.source_id)
+            return {"status": "success", "product": data, "source": f"{marketplace}_scraper"}
+        raise HTTPException(
+            status_code=503,
+            detail=product.error or f"Nie udało się pobrać oferty z {label}"
+        )
 
     if marketplace != "allegro":
         raise HTTPException(status_code=400, detail=f"Import po URL nie jest jeszcze wspierany dla {marketplace}")
@@ -337,7 +367,7 @@ async def import_single_product(
 async def import_batch(
     request: Request,
     products: List[ProductImport],
-    source: Literal["allegro", "amazon", "ebay", "kaufland", "manual"] = "allegro",
+    source: Literal["allegro", "amazon", "ebay", "kaufland", "rozetka", "aliexpress", "temu", "manual"] = "allegro",
     db: Session = Depends(get_db),
     user_id: str = Depends(require_user_id),
 ):

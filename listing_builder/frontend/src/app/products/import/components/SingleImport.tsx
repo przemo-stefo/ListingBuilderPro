@@ -34,12 +34,26 @@ function detectMarketplace(url: string): string | null {
     if (hostname.includes('amazon')) return 'amazon'
     if (hostname.includes('ebay')) return 'ebay'
     if (hostname.includes('kaufland')) return 'kaufland'
+    if (hostname.includes('rozetka')) return 'rozetka'
+    if (hostname.includes('aliexpress')) return 'aliexpress'
+    if (hostname.includes('temu')) return 'temu'
   } catch { /* not a valid URL */ }
   return null
 }
 
-// WHY: Only Allegro scraping is implemented — others need different scrapers
-const SCRAPEABLE = new Set(['allegro'])
+// WHY: Marketplaces with backend scraping support
+const SCRAPEABLE = new Set(['allegro', 'rozetka', 'aliexpress', 'temu'])
+
+// WHY: Show relevant example URL when marketplace is selected
+const URL_PLACEHOLDERS: Record<string, string> = {
+  amazon: 'https://amazon.de/dp/B0XXXXXXXX',
+  allegro: 'https://allegro.pl/oferta/...',
+  ebay: 'https://ebay.com/itm/...',
+  kaufland: 'https://kaufland.de/product/...',
+  rozetka: 'https://rozetka.com.ua/ua/.../p123456/',
+  aliexpress: 'https://aliexpress.com/item/1005XXXXXXXXX.html',
+  temu: 'https://temu.com/goods-detail-g-XXXXXXXXX.html',
+}
 
 // WHY: ASIN format = 10 chars starting with B0 or digit. Outside component to avoid re-creation.
 const ASIN_PATTERN = /^[B0-9][A-Z0-9]{9}$/i
@@ -218,7 +232,7 @@ export default function SingleImport() {
           </label>
           <div className="flex gap-2 mt-2">
             <input type="url" value={productUrl} onChange={(e) => handleUrlChange(e.target.value)}
-              placeholder="https://allegro.pl/oferta/..." className={cn(inputCls, 'flex-1 px-4 py-3')} />
+              placeholder={URL_PLACEHOLDERS[marketplace] || 'https://...'} className={cn(inputCls, 'flex-1 px-4 py-3')} />
             {canScrape && (
               <button type="button" onClick={() => scrapeMutation.mutate()}
                 disabled={scrapeMutation.isPending}
@@ -235,7 +249,7 @@ export default function SingleImport() {
           </div>
           {SCRAPEABLE.has(marketplace) && productUrl.trim() && (
             <p className="text-xs text-gray-500 mt-1">
-              Wklej link z Allegro — pobierzemy tytuł, cenę, markę i opis automatycznie
+              Wklej link z {MARKETPLACES.find(m => m.value === marketplace)?.label} — pobierzemy dane automatycznie
             </p>
           )}
         </div>
@@ -253,7 +267,7 @@ export default function SingleImport() {
         {/* WHY: User needs to know why scrape button is missing for non-Allegro */}
         {productUrl.trim() && !SCRAPEABLE.has(marketplace) && (
           <p className="text-xs text-gray-500">
-            Automatyczne pobieranie dostępne tylko dla Allegro. Dla {MARKETPLACES.find(m => m.value === marketplace)?.label || marketplace} — wpisz dane ręcznie.
+            Automatyczne pobieranie dostępne dla {MARKETPLACES.filter(m => SCRAPEABLE.has(m.value)).map(m => m.label).join(' i ')}. Dla {MARKETPLACES.find(m => m.value === marketplace)?.label || marketplace} — wpisz dane ręcznie.
           </p>
         )}
         <p className="text-xs text-gray-600">Podaj link, ASIN lub oba.</p>
@@ -263,7 +277,7 @@ export default function SingleImport() {
       <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] overflow-hidden">
         <button type="button" onClick={() => setShowDetails(!showDetails)}
           className="flex w-full items-center justify-between px-5 py-4 text-sm font-medium text-gray-400 hover:text-white transition-colors">
-          <span>{scraped ? 'Dane produktu (pobrane z Allegro)' : 'Dane produktu (opcjonalne)'}</span>
+          <span>{scraped ? `Dane produktu (pobrane z ${MARKETPLACES.find(m => m.value === marketplace)?.label || 'marketplace'})` : 'Dane produktu (opcjonalne)'}</span>
           {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
         {showDetails && (

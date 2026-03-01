@@ -33,6 +33,21 @@ ALLOWED_MARKETPLACE_DOMAINS: dict[str, Set[str]] = {
         "ebay.pl", "www.ebay.pl",
     },
     "kaufland": {"www.kaufland.de", "kaufland.de"},
+    # WHY subdomains: Rozetka uses category subdomains (hard., bt., ek., etc.)
+    "rozetka": {
+        "rozetka.com.ua", "www.rozetka.com.ua",
+        "hard.rozetka.com.ua", "bt.rozetka.com.ua", "ek.rozetka.com.ua",
+        "tabletki.rozetka.com.ua", "fashion.rozetka.com.ua",
+    },
+    # WHY regional subdomains: pl., de., fr. etc. + separate .us TLD
+    "aliexpress": {
+        "aliexpress.com", "www.aliexpress.com",
+        "pl.aliexpress.com", "de.aliexpress.com", "fr.aliexpress.com",
+        "es.aliexpress.com", "it.aliexpress.com", "ko.aliexpress.com",
+        "aliexpress.us", "www.aliexpress.us",
+    },
+    # WHY share.temu.com: mobile app share links use this subdomain
+    "temu": {"temu.com", "www.temu.com", "share.temu.com"},
 }
 
 # WHY: Flat set of all allowed domains for quick lookup when marketplace is unknown
