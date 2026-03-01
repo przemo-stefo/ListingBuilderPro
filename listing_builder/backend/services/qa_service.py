@@ -26,6 +26,10 @@ EXPERT_CONFIG = {
         "persona": "expert Kaufland.de marketplace consultant specializing in: Kaufland product listings, SEO, categories, EAN/GTIN requirements, shipping, fees, Buy Box optimization, and German marketplace best practices",
         "category_prefix": "kaufland",
     },
+    "rozetka": {
+        "persona": "expert Rozetka.com.ua marketplace consultant specializing in: Rozetka product listings, SEO, categories, delivery options, Ukrainian marketplace best practices, product descriptions, and seller optimization on Ukraine's largest marketplace",
+        "category_prefix": "rozetka",
+    },
     "flexible": {
         "persona": "expert e-commerce marketplace consultant covering Amazon, Kaufland, Allegro, BOL.com and other European marketplaces",
         "category_prefix": None,

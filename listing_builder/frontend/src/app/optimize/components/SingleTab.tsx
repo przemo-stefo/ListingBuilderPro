@@ -68,6 +68,8 @@ interface SingleTabProps {
 export default function SingleTab({ loadedResult, initialTitle, productId }: SingleTabProps) {
   // WHY: Track whether form was filled from product picker (vs manual input)
   const [pickedProductTitle, setPickedProductTitle] = useState<string | undefined>()
+  // WHY: Track product ID from picker so "Zapisz" button works even without productId prop
+  const [pickedProductId, setPickedProductId] = useState<number | undefined>()
 
   // Form state — WHY initialTitle: prefill from Allegro Manager's "Optymalizuj z AI" button
   const [productTitle, setProductTitle] = useState(initialTitle ?? '')
@@ -158,13 +160,16 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setTimeout(() => handleGenerate(), 50)
   }
 
+  // WHY: Prop productId (from product detail page) OR pickedProductId (from ProductPicker)
+  const effectiveProductId = productId ?? (pickedProductId ? String(pickedProductId) : undefined)
+
   // WHY: Bridge between Optimizer and Product Database — saves optimized listing back to the product
   const handleSaveToProduct = () => {
-    if (!productId || !displayResults?.listing) return
+    if (!effectiveProductId || !displayResults?.listing) return
     const { title, bullet_points, description, backend_keywords } = displayResults.listing
     saveToProductMutation.mutate(
       {
-        id: productId,
+        id: effectiveProductId,
         data: {
           title_optimized: title,
           description_optimized: description,
@@ -210,6 +215,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setAsin(product.source_id ?? '')
     setCategory(product.category ?? '')
     setPickedProductTitle(product.title_original)
+    setPickedProductId(product.id)
   }
 
   const handleProductClear = () => {
@@ -218,6 +224,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setAsin('')
     setCategory('')
     setPickedProductTitle(undefined)
+    setPickedProductId(undefined)
   }
 
   const handleGenerate = () => {
@@ -609,7 +616,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
           )}
           <FeedbackWidget listingHistoryId={displayResults.listing_history_id} />
           {/* WHY: Bridge — saves optimized listing back to the product in DB */}
-          {productId && (
+          {effectiveProductId && (
             <Card>
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-2">

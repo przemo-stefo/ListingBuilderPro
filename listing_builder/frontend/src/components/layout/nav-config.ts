@@ -59,6 +59,7 @@ export const navSections: NavSection[] = [
       { title: 'Eksport do pliku', href: '/publish', icon: FileDown, desc: 'Pobierz zoptymalizowane listingi jako plik CSV/TSV do uploadu na marketplace', premiumOnly: true },
       { title: 'Ekspert Amazon', href: '/expert-qa?mode=strict', icon: ShoppingCart, desc: 'Pytania o Amazon — odpowiedzi tylko z bazy wiedzy kursów', premiumOnly: true },
       { title: 'Ekspert Kaufland', href: '/expert-qa?mode=kaufland', icon: Store, desc: 'Pytania o Kaufland — listingi, SEO, kategorie, EAN, wysyłka', premiumOnly: true },
+      { title: 'Ekspert Rozetka', href: '/expert-qa?mode=rozetka', icon: Store, desc: 'Pytania o Rozetka — ukraiński marketplace, listingi, SEO, kategorie', premiumOnly: true },
       { title: 'Reklamy AI', href: '/ad-copy', icon: Megaphone, desc: '3 warianty reklam (hook, story, benefit) z wiedzy ekspertów', premiumOnly: true, beta: true },
       { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo', premiumOnly: true, beta: true },
     ],

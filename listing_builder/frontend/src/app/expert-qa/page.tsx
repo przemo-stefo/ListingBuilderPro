@@ -46,6 +46,15 @@ const KAUFLAND_QUESTIONS = [
   'Jakie są najczęstsze błędy sprzedawców na Kaufland.de?',
 ]
 
+const ROZETKA_QUESTIONS = [
+  'Jak zbudować skuteczny tytuł produktu na Rozetka?',
+  'Jakie są wymagania Rozetka dotyczące zdjęć produktów?',
+  'Jak działa system kategorii na Rozetka i jak wybrać właściwą?',
+  'Jakie są opcje dostawy i fulfillment na Rozetka?',
+  'Jak optymalizować opisy produktów pod SEO Rozetka?',
+  'Jakie są najczęstsze błędy sprzedawców na Rozetka.com.ua?',
+]
+
 // WHY: Per-expert config avoids ternary chains — one place to add new experts
 // WHY: Full Tailwind class names — dynamic `bg-${color}` doesn't work with JIT
 const EXPERT_CONFIG = {
@@ -76,6 +85,20 @@ const EXPERT_CONFIG = {
     ragDefault: 'balanced' as const,
     questions: KAUFLAND_QUESTIONS,
     gate: 'Ekspert Kaufland',
+  },
+  rozetka: {
+    title: 'Ekspert Rozetka',
+    subtitle: 'Listingi, SEO, kategorie i sprzedaż na Rozetka.com.ua',
+    heroTitle: 'Ekspert Rozetka — wszystko o sprzedaży na ukraińskim marketplace',
+    heroDesc: 'AI doradca specjalizujący się w Rozetka marketplace. Pytaj o listingi, kategorie, zdjęcia, dostawę i optymalizację SEO na największym ukraińskim marketplace.',
+    placeholder: 'Zapytaj o tytuły, kategorie, zdjęcia, dostawę na Rozetka...',
+    iconBg: 'bg-blue-500/20',
+    iconText: 'text-blue-400',
+    hoverBorder: 'hover:border-blue-800 hover:text-blue-300',
+    icon: Store,
+    ragDefault: 'balanced' as const,
+    questions: ROZETKA_QUESTIONS,
+    gate: 'Ekspert Rozetka',
   },
   flexible: {
     title: 'Ekspert AI',

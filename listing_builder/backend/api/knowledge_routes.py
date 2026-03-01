@@ -48,7 +48,7 @@ class ChatRequest(BaseModel):
     # WHY: RAG behavior modes — controls how strictly the LLM sticks to transcript knowledge
     mode: str = Field(default="balanced", pattern="^(strict|balanced|flexible|bypass)$")
     # WHY: Expert type tells QA service which persona + knowledge categories to use
-    expert: str = Field(default="strict", pattern="^(strict|kaufland|flexible)$")
+    expert: str = Field(default="strict", pattern="^(strict|kaufland|rozetka|flexible)$")
 
 
 class ChatResponse(BaseModel):
