@@ -34,15 +34,14 @@ function detectMarketplace(url: string): string | null {
     if (hostname.includes('amazon')) return 'amazon'
     if (hostname.includes('ebay')) return 'ebay'
     if (hostname.includes('kaufland')) return 'kaufland'
-    if (hostname.includes('rozetka')) return 'rozetka'
-    if (hostname.includes('aliexpress')) return 'aliexpress'
-    if (hostname.includes('temu')) return 'temu'
+    if (hostname.includes('bol.com')) return 'bol'
   } catch { /* not a valid URL */ }
   return null
 }
 
 // WHY: Marketplaces with backend scraping support
-const SCRAPEABLE = new Set(['allegro', 'rozetka', 'aliexpress', 'temu'])
+// WHY: Only Allegro has scraping support — AliExpress/Temu/Rozetka moved to OAuth API
+const SCRAPEABLE = new Set(['allegro'])
 
 // WHY: Show relevant example URL when marketplace is selected
 const URL_PLACEHOLDERS: Record<string, string> = {
@@ -50,9 +49,7 @@ const URL_PLACEHOLDERS: Record<string, string> = {
   allegro: 'https://allegro.pl/oferta/...',
   ebay: 'https://ebay.com/itm/...',
   kaufland: 'https://kaufland.de/product/...',
-  rozetka: 'https://rozetka.com.ua/ua/.../p123456/',
-  aliexpress: 'https://aliexpress.com/item/1005XXXXXXXXX.html',
-  temu: 'https://temu.com/goods-detail-g-XXXXXXXXX.html',
+  bol: 'https://bol.com/nl/p/...',
 }
 
 // WHY: ASIN format = 10 chars starting with B0 or digit. Outside component to avoid re-creation.

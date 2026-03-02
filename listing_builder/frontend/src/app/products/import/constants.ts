@@ -7,9 +7,7 @@ export const MARKETPLACES = [
   { value: 'allegro', label: 'Allegro', flag: '🇵🇱' },
   { value: 'ebay', label: 'eBay', flag: '🏷️' },
   { value: 'kaufland', label: 'Kaufland', flag: '🇩🇪' },
-  { value: 'rozetka', label: 'Rozetka', flag: '🇺🇦' },
-  { value: 'aliexpress', label: 'AliExpress', flag: '🌐' },
-  { value: 'temu', label: 'Temu', flag: '🛍️' },
+  { value: 'bol', label: 'Bol.com', flag: '🇳🇱' },
 ] as const
 
 // WHY: Allegro exports CSVs with Polish headers — we map them to our internal fields

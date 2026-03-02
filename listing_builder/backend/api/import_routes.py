@@ -121,7 +121,7 @@ async def receive_webhook(
         _handle_import_error(e, "webhook")
 
 
-VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "rozetka", "aliexpress", "temu", "manual"}
+VALID_SOURCES = {"allegro", "amazon", "ebay", "kaufland", "rozetka", "aliexpress", "temu", "manual", "bol"}
 
 # WHY: Max 100 offers per import from connected account — balances speed vs API rate limits
 MAX_ALLEGRO_IMPORT = 100
@@ -249,27 +249,11 @@ async def scrape_product_url(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # WHY: Rozetka, AliExpress, Temu use the same scrape→parse→return pattern
-    scraper_map = {
-        "rozetka": ("services.scraper.rozetka_scraper", "scrape_rozetka_product", "Rozetka"),
-        "aliexpress": ("services.scraper.aliexpress_scraper", "scrape_aliexpress_product", "AliExpress"),
-        "temu": ("services.scraper.temu_scraper", "scrape_temu_product", "Temu (beta)"),
-    }
-    if marketplace in scraper_map:
-        from dataclasses import asdict
-        from importlib import import_module
-
-        module_path, func_name, label = scraper_map[marketplace]
-        scraper_fn = getattr(import_module(module_path), func_name)
-        product = await scraper_fn(body.url)
-        if not product.error:
-            data = asdict(product)
-            data["price"] = _parse_price(data.get("price"))
-            logger.info(f"scrape_url_{marketplace}_success", source_id=product.source_id)
-            return {"status": "success", "product": data, "source": f"{marketplace}_scraper"}
+    # WHY: AliExpress/Temu/Rozetka scrapers removed — use OAuth API import instead
+    if marketplace in ("rozetka", "aliexpress", "temu"):
         raise HTTPException(
-            status_code=503,
-            detail=product.error or f"Nie udało się pobrać oferty z {label}"
+            status_code=400,
+            detail=f"Import po URL nie jest wspierany dla {marketplace}. Podłącz konto w Integracje → {marketplace} OAuth."
         )
 
     if marketplace != "allegro":
@@ -367,7 +351,7 @@ async def import_single_product(
 async def import_batch(
     request: Request,
     products: List[ProductImport],
-    source: Literal["allegro", "amazon", "ebay", "kaufland", "rozetka", "aliexpress", "temu", "manual"] = "allegro",
+    source: Literal["allegro", "amazon", "ebay", "kaufland", "rozetka", "aliexpress", "temu", "bol", "manual"] = "allegro",
     db: Session = Depends(get_db),
     user_id: str = Depends(require_user_id),
 ):

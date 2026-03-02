@@ -36,6 +36,15 @@ export async function connectAmazon(clientId: string, clientSecret: string, refr
   return response.data!
 }
 
+export async function connectRozetka(username: string, password: string): Promise<{ status: string; marketplace: string }> {
+  const response = await apiRequest<{ status: string; marketplace: string }>('post', '/oauth/rozetka/connect', {
+    username,
+    password,
+  })
+  if (response.error) throw new Error(response.error)
+  return response.data!
+}
+
 export async function disconnectMarketplace(marketplace: string): Promise<void> {
   const response = await apiRequest<void>('delete', `/oauth/${marketplace}`)
   if (response.error) throw new Error(response.error)

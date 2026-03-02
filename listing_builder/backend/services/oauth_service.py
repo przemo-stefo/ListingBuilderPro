@@ -433,6 +433,196 @@ async def connect_bol(client_id: str, client_secret: str, db: Session, user_id: 
     return {"status": "connected", "marketplace": "bol"}
 
 
+# ── AliExpress OAuth ────────────────────────────────────────────────────────
+
+ALIEXPRESS_AUTH_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/auth/token/create"
+
+
+def get_aliexpress_authorize_url(user_id: str = "default") -> Dict:
+    """Generate AliExpress Open Platform OAuth URL with CSRF state."""
+    if not settings.aliexpress_app_key:
+        return {"error": "AliExpress app_key not configured"}
+
+    state = _sign_state("aliexpress", user_id)
+    redirect_uri = f"{_backend_url()}/api/oauth/aliexpress/callback"
+
+    params = {
+        "response_type": "code",
+        "client_id": settings.aliexpress_app_key,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "sp": "ae",  # WHY: AliExpress requires sp=ae for seller authorization
+    }
+
+    url = f"{ALIEXPRESS_AUTH_URL}?{urlencode(params)}"
+    return {"authorize_url": url, "state": state}
+
+
+async def handle_aliexpress_callback(
+    code: str,
+    state: str,
+    db: Session,
+) -> Dict:
+    """Exchange AliExpress authorization code for tokens (TTL ~30 days)."""
+    payload = _verify_state(state)
+    if not payload or payload.get("m") != "aliexpress":
+        return {"error": "Invalid or expired state parameter"}
+
+    user_id = payload.get("u", "default")
+
+    if not settings.aliexpress_app_key or not settings.aliexpress_app_secret:
+        return {"error": "AliExpress credentials not configured"}
+
+    # WHY: AliExpress uses POST form data for token exchange (not Basic auth)
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            ALIEXPRESS_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "client_id": settings.aliexpress_app_key,
+                "client_secret": settings.aliexpress_app_secret,
+            },
+        )
+
+    if resp.status_code != 200:
+        logger.error("aliexpress_oauth_token_failed", status=resp.status_code)
+        return {"error": f"Token exchange failed: {resp.status_code}"}
+
+    data = resp.json()
+    # WHY: AliExpress returns expire_time as Unix timestamp (milliseconds)
+    expire_time = data.get("expire_time", 0)
+    if expire_time > 0:
+        expires_at = datetime.fromtimestamp(expire_time / 1000, tz=timezone.utc)
+    else:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+
+    _save_connection(
+        db, user_id, "aliexpress",
+        access_token=data.get("access_token", ""),
+        refresh_token=data.get("refresh_token"),
+        expires_at=expires_at,
+        seller_id=data.get("user_id") or data.get("seller_id"),
+        raw_data={"locale": data.get("locale"), "sp": data.get("sp")},
+    )
+    logger.info("aliexpress_oauth_connected", user_id=user_id)
+
+    return {"status": "connected", "marketplace": "aliexpress"}
+
+
+# ── Temu OAuth ──────────────────────────────────────────────────────────────
+
+TEMU_AUTH_URL = "https://partner.temu.com/openapi/auth/authorize"
+TEMU_TOKEN_URL = "https://partner.temu.com/openapi/auth/token/create"
+
+
+def get_temu_authorize_url(user_id: str = "default") -> Dict:
+    """Generate Temu Partner Platform OAuth URL with CSRF state."""
+    if not settings.temu_app_key:
+        return {"error": "Temu app_key not configured"}
+
+    state = _sign_state("temu", user_id)
+    redirect_uri = f"{_backend_url()}/api/oauth/temu/callback"
+
+    params = {
+        "response_type": "code",
+        "app_key": settings.temu_app_key,
+        "redirect_uri": redirect_uri,
+        "state": state,
+    }
+
+    url = f"{TEMU_AUTH_URL}?{urlencode(params)}"
+    return {"authorize_url": url, "state": state}
+
+
+async def handle_temu_callback(
+    code: str,
+    state: str,
+    db: Session,
+) -> Dict:
+    """Exchange Temu authorization code for tokens (TTL ~3 months)."""
+    payload = _verify_state(state)
+    if not payload or payload.get("m") != "temu":
+        return {"error": "Invalid or expired state parameter"}
+
+    user_id = payload.get("u", "default")
+
+    if not settings.temu_app_key or not settings.temu_app_secret:
+        return {"error": "Temu credentials not configured"}
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            TEMU_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "app_key": settings.temu_app_key,
+                "app_secret": settings.temu_app_secret,
+            },
+        )
+
+    if resp.status_code != 200:
+        logger.error("temu_oauth_token_failed", status=resp.status_code)
+        return {"error": f"Token exchange failed: {resp.status_code}"}
+
+    data = resp.json()
+    # WHY: Temu returns expires_in in seconds (~90 days)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 7776000))
+
+    _save_connection(
+        db, user_id, "temu",
+        access_token=data.get("access_token", ""),
+        refresh_token=data.get("refresh_token"),
+        expires_at=expires_at,
+        seller_id=data.get("seller_id"),
+        raw_data={"token_type": data.get("token_type")},
+    )
+    logger.info("temu_oauth_connected", user_id=user_id)
+
+    return {"status": "connected", "marketplace": "temu"}
+
+
+# ── Rozetka (credentials-based, like BOL) ──────────────────────────────────
+
+ROZETKA_TOKEN_URL = "https://api-seller.rozetka.com.ua/sites"
+
+
+async def connect_rozetka(username: str, password: str, db: Session, user_id: str = "default") -> Dict:
+    """Validate Rozetka seller credentials and save connection.
+
+    WHY no OAuth redirect: Rozetka Seller API uses login+password → Bearer token.
+    Seller provides credentials in UI form, we exchange for a 24h token.
+    """
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.put(
+            ROZETKA_TOKEN_URL,
+            json={"username": username, "password": password},
+        )
+
+    if resp.status_code != 200:
+        logger.error("rozetka_auth_failed", status=resp.status_code)
+        return {"error": f"Nieprawidłowe dane Rozetka (HTTP {resp.status_code})"}
+
+    data = resp.json()
+    # WHY `or {}`: if API returns {"content": null}, .get() returns None (key exists),
+    # not the default {}. Without `or {}`, None.get() would raise AttributeError.
+    token = (data.get("content") or {}).get("access_token", "")
+    if not token:
+        return {"error": "Rozetka nie zwróciła tokenu — sprawdź dane logowania"}
+
+    # WHY raw_data: Store username/password for token refresh (Rozetka tokens last 24h)
+    _save_connection(
+        db, user_id, "rozetka",
+        access_token=token,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        raw_data={"username": username, "password": password},
+    )
+    logger.info("rozetka_connected", user_id=user_id)
+
+    return {"status": "connected", "marketplace": "rozetka"}
+
+
 # ── Connection status ────────────────────────────────────────────────────────
 
 def get_connections(db: Session, user_id: str = "default") -> list:

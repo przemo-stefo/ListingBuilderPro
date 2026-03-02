@@ -21,10 +21,11 @@ import { useToast } from '@/lib/hooks/useToast'
 import { apiClient } from '@/lib/api/client'
 import AmazonConnectForm from './AmazonConnectForm'
 import BolConnectForm from './BolConnectForm'
+import RozetkaConnectForm from './RozetkaConnectForm'
 
 // WHY: Marketplaces with OAuth flow ready — others show "Wkrótce"
-// WHY bol: Uses Client Credentials (form-based), not browser redirect
-const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro', 'ebay', 'bol'])
+// WHY bol/rozetka: Uses credentials form, not browser redirect
+const OAUTH_MARKETPLACES = new Set(['amazon', 'allegro', 'ebay', 'bol', 'aliexpress', 'temu', 'rozetka'])
 
 const MARKETPLACES = [
   { id: 'amazon', name: 'Amazon Seller Central', desc: 'Europejskie rynki Amazon (DE, FR, IT, ES, PL)', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-orange-500/20' },
@@ -35,6 +36,9 @@ const MARKETPLACES = [
   { id: 'otto', name: 'Otto.de', desc: 'Drugi co do wielkości marketplace w Niemczech', flag: '\u{1F1E9}\u{1F1EA}', color: 'border-gray-500/20' },
   { id: 'etsy', name: 'Etsy', desc: 'Platforma dla produktów handmade i vintage', flag: '\u{1F1FA}\u{1F1F8}', color: 'border-orange-500/20' },
   { id: 'bol', name: 'Bol.com', desc: 'Największy marketplace w Holandii i Belgii', flag: '\u{1F1F3}\u{1F1F1}', color: 'border-blue-500/20' },
+  { id: 'aliexpress', name: 'AliExpress', desc: 'Globalna platforma B2C (import z konta sprzedawcy)', flag: '\u{1F30D}', color: 'border-orange-500/20' },
+  { id: 'temu', name: 'Temu', desc: 'Import produktów via Partner API', flag: '\u{1F6CD}\u{FE0F}', color: 'border-orange-500/20' },
+  { id: 'rozetka', name: 'Rozetka', desc: 'Największy marketplace na Ukrainie', flag: '\u{1F1FA}\u{1F1E6}', color: 'border-yellow-500/20' },
 ]
 
 export default function IntegrationsTab() {
@@ -45,9 +49,10 @@ export default function IntegrationsTab() {
   const authorizeMutation = useOAuthAuthorize()
   const disconnectMutation = useOAuthDisconnect()
   const [scanning, setScanning] = useState(false)
-  // WHY: Amazon/BOL use form-based connect, not browser redirect
+  // WHY: Amazon/BOL/Rozetka use form-based connect, not browser redirect
   const [amazonFormOpen, setAmazonFormOpen] = useState(false)
   const [bolFormOpen, setBolFormOpen] = useState(false)
+  const [rozetkaFormOpen, setRozetkaFormOpen] = useState(false)
 
   const tracked = trackedQuery.data?.items ?? []
   const oauthConns = oauthQuery.data?.connections ?? []
@@ -175,11 +180,13 @@ export default function IntegrationsTab() {
                   <button
                     onClick={() => {
                       if (!hasOAuth || isOAuthActive) return
-                      // WHY: Amazon/BOL use form-based connect, others use browser redirect
+                      // WHY: Amazon/BOL/Rozetka use form-based connect, others use browser redirect
                       if (mp.id === 'amazon') {
                         setAmazonFormOpen(true)
                       } else if (mp.id === 'bol') {
                         setBolFormOpen(true)
+                      } else if (mp.id === 'rozetka') {
+                        setRozetkaFormOpen(true)
                       } else {
                         authorizeMutation.mutate(mp.id)
                       }
@@ -209,7 +216,7 @@ export default function IntegrationsTab() {
         })}
       </div>
 
-      {/* WHY: Amazon/BOL — form-based connect, extracted to own components */}
+      {/* WHY: Amazon/BOL/Rozetka — form-based connect, extracted to own components */}
       {amazonFormOpen && (
         <AmazonConnectForm
           onSuccess={() => { setAmazonFormOpen(false); oauthQuery.refetch() }}
@@ -220,6 +227,12 @@ export default function IntegrationsTab() {
         <BolConnectForm
           onSuccess={() => { setBolFormOpen(false); oauthQuery.refetch() }}
           onCancel={() => setBolFormOpen(false)}
+        />
+      )}
+      {rozetkaFormOpen && (
+        <RozetkaConnectForm
+          onSuccess={() => { setRozetkaFormOpen(false); oauthQuery.refetch() }}
+          onCancel={() => setRozetkaFormOpen(false)}
         />
       )}
     </div>

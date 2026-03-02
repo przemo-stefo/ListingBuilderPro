@@ -24,6 +24,11 @@ from services.oauth_service import (
     get_ebay_authorize_url,
     handle_ebay_callback,
     connect_bol,
+    get_aliexpress_authorize_url,
+    handle_aliexpress_callback,
+    get_temu_authorize_url,
+    handle_temu_callback,
+    connect_rozetka,
     get_connections,
     disconnect,
     _frontend_url,
@@ -204,6 +209,106 @@ async def ebay_callback(
         return RedirectResponse(f"{frontend}/settings?oauth=error&msg={quote(result['error'])}")
 
     return RedirectResponse(f"{frontend}/settings?oauth=success&marketplace=ebay")
+
+
+# ── AliExpress OAuth ─────────────────────────────────────────────────────────
+
+@router.get("/aliexpress/authorize")
+@limiter.limit("10/minute")
+async def aliexpress_authorize(request: Request, user_id: str = Depends(require_user_id)):
+    """Generate AliExpress Open Platform OAuth URL."""
+    result = get_aliexpress_authorize_url(user_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.get("/aliexpress/callback")
+@limiter.limit("5/minute")
+async def aliexpress_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    db: Session = Depends(get_db),
+):
+    """AliExpress OAuth callback — exchanges authorization code for tokens."""
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing code or state")
+
+    result = await handle_aliexpress_callback(code, state, db)
+
+    frontend = _frontend_url()
+    if "error" in result:
+        logger.error("aliexpress_oauth_callback_error", error=result["error"])
+        return RedirectResponse(f"{frontend}/settings?oauth=error&msg={quote(result['error'])}")
+
+    return RedirectResponse(f"{frontend}/settings?oauth=success&marketplace=aliexpress")
+
+
+# ── Temu OAuth ───────────────────────────────────────────────────────────────
+
+@router.get("/temu/authorize")
+@limiter.limit("10/minute")
+async def temu_authorize(request: Request, user_id: str = Depends(require_user_id)):
+    """Generate Temu Partner Platform OAuth URL."""
+    result = get_temu_authorize_url(user_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.get("/temu/callback")
+@limiter.limit("5/minute")
+async def temu_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    db: Session = Depends(get_db),
+):
+    """Temu OAuth callback — exchanges authorization code for tokens."""
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing code or state")
+
+    result = await handle_temu_callback(code, state, db)
+
+    frontend = _frontend_url()
+    if "error" in result:
+        logger.error("temu_oauth_callback_error", error=result["error"])
+        return RedirectResponse(f"{frontend}/settings?oauth=error&msg={quote(result['error'])}")
+
+    return RedirectResponse(f"{frontend}/settings?oauth=success&marketplace=temu")
+
+
+# ── Rozetka (credentials-based — no browser redirect) ───────────────────────
+
+class RozetkaConnectRequest(BaseModel):
+    """WHY POST body: Rozetka uses login+password, seller provides in UI form."""
+    username: str
+    password: str
+
+    @field_validator("username", "password")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        return _not_empty(v)
+
+
+@router.post("/rozetka/connect")
+@limiter.limit("10/minute")
+async def rozetka_connect(
+    request: Request,
+    body: RozetkaConnectRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
+    """Validate Rozetka seller credentials and save connection.
+
+    WHY POST not GET/authorize: Rozetka uses login+password (no browser redirect).
+    Seller enters credentials in form, we test and save.
+    """
+    result = await connect_rozetka(body.username, body.password, db, user_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # ── BOL.com (Client Credentials — no browser redirect) ───────────────────

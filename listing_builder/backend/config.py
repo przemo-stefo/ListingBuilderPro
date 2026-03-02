@@ -57,6 +57,15 @@ class Settings(BaseSettings):
     bol_client_id: str = ""  # WHY: BOL.com Retailer API credentials (Client Credentials grant)
     bol_client_secret: str = ""
 
+    # WHY: AliExpress Open Platform ISV app — OAuth redirect flow, token TTL 30 days
+    aliexpress_app_key: str = ""
+    aliexpress_app_secret: str = ""
+
+    # WHY: Temu Partner Platform ISV/ERP app — OAuth code flow, token TTL 3 months
+    temu_app_key: str = ""
+    temu_app_secret: str = ""
+    # WHY: Rozetka doesn't need app keys — seller provides login/password directly
+
     baselinker_api_token: str = ""  # WHY: Empty = BaseLinker sync disabled
 
     kaufland_client_key: str = ""

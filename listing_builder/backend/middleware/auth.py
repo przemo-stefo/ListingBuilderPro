@@ -81,6 +81,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/api/oauth/amazon/callback",  # WHY: Amazon redirects user here without our API key
         "/api/oauth/allegro/callback",  # WHY: Allegro redirects user here without our API key
         "/api/oauth/ebay/callback",  # WHY: eBay redirects user here without our API key
+        "/api/oauth/aliexpress/callback",  # WHY: AliExpress redirects user here without our API key
+        "/api/oauth/temu/callback",  # WHY: Temu redirects user here without our API key
         "/api/import/webhook",  # WHY: n8n calls with X-Webhook-Secret, not X-API-Key
         "/api/auth/me",  # WHY: Uses JWT directly, no API key needed
     }
