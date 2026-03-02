@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -25,9 +25,13 @@ export function Sidebar({ onClose }: SidebarProps) {
   const { tier, isPremium, isLoading } = useTier()
   const { isAdmin } = useAdmin()
 
-  // WHY: Auto-expand when user is on /compliance, collapse otherwise
   const isOnCompliance = pathname === '/compliance'
   const [complianceOpen, setComplianceOpen] = useState(isOnCompliance)
+
+  // WHY: Auto-expand when navigating TO /compliance (useState only sets initial value)
+  useEffect(() => {
+    if (isOnCompliance) setComplianceOpen(true)
+  }, [isOnCompliance])
   const activeComplianceTab = searchParams.get('tab') || 'dashboard'
 
   // WHY: Close sidebar on mobile after navigating
@@ -162,34 +166,40 @@ export function Sidebar({ onClose }: SidebarProps) {
                 <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', complianceOpen && 'rotate-180')} />
               </button>
 
-              {complianceOpen && (
-                <div className="ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
-                  {complianceSubItems.map(({ key, label, icon: SubIcon, desc }) => {
-                    const isSubActive = isOnCompliance && activeComplianceTab === key
-                    return (
-                      <div key={key} className="group/sub relative">
-                        <Link
-                          href={`/compliance?tab=${key}`}
-                          onClick={handleNav}
-                          className={cn(
-                            'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
-                            isSubActive ? 'bg-white/10 text-white' : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300'
+              {/* WHY: CSS grid animation (0fr→1fr) — smooth expand/collapse, no layout jump */}
+              <div
+                className="grid transition-[grid-template-rows] duration-200 ease-out"
+                style={{ gridTemplateRows: complianceOpen ? '1fr' : '0fr' }}
+              >
+                <div className="overflow-hidden">
+                  <div className="ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
+                    {complianceSubItems.map(({ key, label, icon: SubIcon, desc }) => {
+                      const isSubActive = isOnCompliance && activeComplianceTab === key
+                      return (
+                        <div key={key} className="group/sub relative">
+                          <Link
+                            href={`/compliance?tab=${key}`}
+                            onClick={handleNav}
+                            className={cn(
+                              'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                              isSubActive ? 'bg-white/10 text-white' : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300'
+                            )}
+                          >
+                            <SubIcon className="h-3.5 w-3.5" />
+                            {label}
+                          </Link>
+                          {desc && (
+                            <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-52 rounded-lg border border-gray-700 bg-[#1A1A1A] p-3 text-xs text-gray-300 shadow-xl group-hover/sub:block">
+                              <p className="font-medium text-white mb-1">{label}</p>
+                              {desc}
+                            </div>
                           )}
-                        >
-                          <SubIcon className="h-3.5 w-3.5" />
-                          {label}
-                        </Link>
-                        {desc && (
-                          <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-52 rounded-lg border border-gray-700 bg-[#1A1A1A] p-3 text-xs text-gray-300 shadow-xl group-hover/sub:block">
-                            <p className="font-medium text-white mb-1">{label}</p>
-                            {desc}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              )}
+              </div>
             </>
           )}
 
