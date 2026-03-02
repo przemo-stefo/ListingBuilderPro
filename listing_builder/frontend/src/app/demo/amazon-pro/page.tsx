@@ -13,6 +13,7 @@ import StepOptimize from './components/StepOptimize'
 import StepCompliance from './components/StepCompliance'
 import StepPublish from './components/StepPublish'
 import StepPromote from './components/StepPromote'
+import type { DemoProduct, OptimizedListing, CoverageResult, ComplianceResult, PublishResult, CouponResult } from './types'
 
 export default function AmazonProDemoPage() {
   const router = useRouter()
@@ -20,12 +21,12 @@ export default function AmazonProDemoPage() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
 
   // WHY separate state per step: each step's data feeds into the next
-  const [product, setProduct] = useState<any>(null)
-  const [optimized, setOptimized] = useState<any>(null)
-  const [coverage, setCoverage] = useState<any>(null)
-  const [complianceResult, setComplianceResult] = useState<any>(null)
-  const [publishResult, setPublishResult] = useState<any>(null)
-  const [couponResult, setCouponResult] = useState<any>(null)
+  const [product, setProduct] = useState<DemoProduct | null>(null)
+  const [optimized, setOptimized] = useState<OptimizedListing | null>(null)
+  const [coverage, setCoverage] = useState<CoverageResult | null>(null)
+  const [complianceResult, setComplianceResult] = useState<ComplianceResult | null>(null)
+  const [publishResult, setPublishResult] = useState<PublishResult | null>(null)
+  const [couponResult, setCouponResult] = useState<CouponResult | null>(null)
 
   const completeStep = (step: number) => {
     setCompletedSteps((prev) => [...new Set([...prev, step])])
@@ -99,7 +100,7 @@ export default function AmazonProDemoPage() {
           />
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 3 && product && (
           <StepCompliance
             optimized={optimized}
             product={product}
@@ -110,7 +111,7 @@ export default function AmazonProDemoPage() {
           />
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 4 && product && (
           <StepPublish
             product={product}
             optimized={optimized}

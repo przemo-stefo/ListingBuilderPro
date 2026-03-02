@@ -4,14 +4,15 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
 import { Tag, CheckCircle, Lock } from 'lucide-react'
+import type { DemoProduct, CouponResult } from '../types'
 
 interface StepPromoteProps {
-  product: any
-  onComplete: (couponResult: any) => void
+  product: DemoProduct
+  onComplete: (couponResult: CouponResult) => void
 }
 
 const inputCls = 'w-full rounded-lg border border-gray-700 bg-[#121212] px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-white/20'
@@ -36,12 +37,16 @@ export default function StepPromote({ product, onComplete }: StepPromoteProps) {
       })
       return data
     },
-    onSuccess: (data) => {
-      onComplete(data)
-    },
+    // WHY no onSuccess→onComplete: User must see coupon results (it's the last step).
   })
 
   const result = mutation.data
+
+  // WHY useEffect: Step 5 is the last step — no "Dalej" button. Mark as completed
+  // when the coupon result appears so the stepper shows all 5 steps done.
+  useEffect(() => {
+    if (result) onComplete(result)
+  }, [result]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">

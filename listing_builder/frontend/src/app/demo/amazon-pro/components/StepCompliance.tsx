@@ -7,11 +7,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
 import { Shield, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import type { DemoProduct, OptimizedListing, ComplianceResult, ComplianceIssue } from '../types'
 
 interface StepComplianceProps {
-  optimized: any
-  product: any
-  onComplete: (complianceResult: any) => void
+  optimized: OptimizedListing | null
+  product: DemoProduct
+  onComplete: (complianceResult: ComplianceResult) => void
 }
 
 export default function StepCompliance({ optimized, product, onComplete }: StepComplianceProps) {
@@ -26,9 +27,7 @@ export default function StepCompliance({ optimized, product, onComplete }: StepC
       })
       return data
     },
-    onSuccess: (data) => {
-      onComplete(data)
-    },
+    // WHY no onSuccess→onComplete: User must see compliance results before proceeding.
   })
 
   const result = mutation.data
@@ -79,7 +78,7 @@ export default function StepCompliance({ optimized, product, onComplete }: StepC
           {/* Issues List */}
           {result.issues?.length > 0 && (
             <div className="space-y-2">
-              {result.issues.map((issue: any, i: number) => (
+              {result.issues.map((issue: ComplianceIssue, i: number) => (
                 <div
                   key={i}
                   className={`border rounded-lg p-3 ${

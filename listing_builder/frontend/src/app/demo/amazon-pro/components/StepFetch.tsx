@@ -1,5 +1,5 @@
 // frontend/src/app/demo/amazon-pro/components/StepFetch.tsx
-// Purpose: Step 1 — ASIN input + "Use sample" button → product card
+// Purpose: Step 1 — ASIN input + "Use sample" button → product card + instant TOS scan
 // NOT for: Optimization or compliance logic
 
 'use client'
@@ -7,10 +7,11 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
-import { Package, Search, Sparkles } from 'lucide-react'
+import { Package, Search, Sparkles, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react'
+import type { DemoProduct, TOSScan, TOSViolation } from '../types'
 
 interface StepFetchProps {
-  onComplete: (product: any) => void
+  onComplete: (product: DemoProduct) => void
 }
 
 const inputCls = 'w-full rounded-lg border border-gray-700 bg-[#121212] px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-white/20'
@@ -23,13 +24,11 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
       const { data } = await apiClient.post('/demo/fetch', params)
       return data
     },
-    onSuccess: (data) => {
-      if (data.product) onComplete(data.product)
-    },
+    // WHY no onSuccess→onComplete: Let user review the product card before proceeding.
   })
 
   const handleFetchSample = () => {
-    fetchMutation.mutate({ asin: 'B09EXAMPLE1', use_sample: true })
+    fetchMutation.mutate({ asin: 'B09EXAMPL1', use_sample: true })
   }
 
   const handleFetchLive = () => {
@@ -37,7 +36,8 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
     fetchMutation.mutate({ asin, use_sample: false })
   }
 
-  const product = fetchMutation.data?.product
+  const product = fetchMutation.data?.product as DemoProduct | undefined
+  const tosScan = fetchMutation.data?.tos_scan as TOSScan | undefined
 
   return (
     <div className="space-y-6">
@@ -51,7 +51,7 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
           type="text"
           value={asin}
           onChange={(e) => setAsin(e.target.value.toUpperCase())}
-          placeholder="Wpisz ASIN (np. B09EXAMPLE1)"
+          placeholder="Wpisz ASIN (np. B09EXAMPL1)"
           className={inputCls}
           maxLength={10}
         />
@@ -81,7 +81,7 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
       </button>
 
       {fetchMutation.error && (
-        <p className="text-sm text-red-400">{(fetchMutation.error as any)?.message || 'Błąd pobierania'}</p>
+        <p className="text-sm text-red-400">{(fetchMutation.error as Error)?.message || 'Błąd pobierania'}</p>
       )}
 
       {/* Product Card */}
@@ -119,6 +119,9 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
             </div>
           )}
 
+          {/* Instant TOS Scan — WOW: shows risks before optimization */}
+          {tosScan && <TOSScanPanel scan={tosScan} />}
+
           <button
             onClick={() => onComplete(product)}
             className="w-full mt-2 px-4 py-2 bg-white text-black rounded-lg text-sm font-semibold hover:bg-gray-200"
@@ -126,6 +129,44 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
             Dalej — Optymalizuj
           </button>
         </div>
+      )}
+    </div>
+  )
+}
+
+function TOSScanPanel({ scan }: { scan: TOSScan }) {
+  if (scan.severity === 'PASS') {
+    return (
+      <div className="flex items-center gap-2 border border-green-900/40 bg-green-950/20 rounded-lg px-3 py-2">
+        <ShieldCheck className="w-4 h-4 text-green-400 shrink-0" />
+        <span className="text-xs text-green-400">Amazon TOS — Brak naruszeń wykrytych</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border border-red-900/40 bg-red-950/10 rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+        <span className="text-xs font-medium text-red-400">
+          Amazon TOS Scan — {scan.violation_count} {scan.violation_count === 1 ? 'ryzyko' : 'ryzyk'} wykryte
+        </span>
+        {scan.suppression_risk && (
+          <span className="text-[10px] bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded font-medium">
+            SUPPRESSION RISK
+          </span>
+        )}
+      </div>
+      {scan.violations.slice(0, 3).map((v: TOSViolation, i: number) => (
+        <div key={i} className="flex items-start gap-2 text-xs">
+          <AlertTriangle className={`w-3 h-3 shrink-0 mt-0.5 ${
+            v.severity === 'SUPPRESSION' ? 'text-red-400' : 'text-yellow-400'
+          }`} />
+          <span className="text-gray-400">{v.message}</span>
+        </div>
+      ))}
+      {scan.violations.length > 3 && (
+        <p className="text-[10px] text-gray-600 pl-5">+ {scan.violations.length - 3} więcej...</p>
       )}
     </div>
   )

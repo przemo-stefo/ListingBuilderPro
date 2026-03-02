@@ -7,11 +7,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
 import { Upload, CheckCircle, Lock } from 'lucide-react'
+import type { DemoProduct, OptimizedListing, PublishResult } from '../types'
 
 interface StepPublishProps {
-  product: any
-  optimized: any
-  onComplete: (publishResult: any) => void
+  product: DemoProduct
+  optimized: OptimizedListing | null
+  onComplete: (publishResult: PublishResult) => void
 }
 
 export default function StepPublish({ product, optimized, onComplete }: StepPublishProps) {
@@ -31,9 +32,7 @@ export default function StepPublish({ product, optimized, onComplete }: StepPubl
       })
       return data
     },
-    onSuccess: (data) => {
-      onComplete(data)
-    },
+    // WHY no onSuccess→onComplete: User must see publish results before proceeding.
   })
 
   const result = mutation.data
