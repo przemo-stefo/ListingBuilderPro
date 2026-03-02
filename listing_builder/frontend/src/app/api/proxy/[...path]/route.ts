@@ -41,6 +41,7 @@ const ALLOWED_PATH_PREFIXES = [
   'alert-settings',
   'ads',
   'score',
+  'demo',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints — defense in depth

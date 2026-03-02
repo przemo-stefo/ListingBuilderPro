@@ -20,6 +20,7 @@ import {
   Database,
   DollarSign,
   Megaphone,
+  Rocket,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -62,6 +63,12 @@ export const navSections: NavSection[] = [
       { title: 'Ekspert Rozetka', href: '/expert-qa?mode=rozetka', icon: Store, desc: 'Pytania o Rozetka — ukraiński marketplace, listingi, SEO, kategorie', premiumOnly: true },
       { title: 'Reklamy AI', href: '/ad-copy', icon: Megaphone, desc: '3 warianty reklam (hook, story, benefit) z wiedzy ekspertów', premiumOnly: true, beta: true },
       { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo', premiumOnly: true, beta: true },
+    ],
+  },
+  {
+    label: 'Demo',
+    items: [
+      { title: 'Amazon Pro', href: '/demo/amazon-pro', icon: Rocket, desc: 'Pełny pipeline: ASIN → AI → Compliance → Publish → Coupon', highlight: true },
     ],
   },
   {
