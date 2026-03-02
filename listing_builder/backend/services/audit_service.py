@@ -14,6 +14,7 @@ from services.scraper.amazon_scraper import parse_input as parse_amazon_input, f
 from services.sp_api_catalog import fetch_catalog_item
 from services.sp_api_auth import credentials_configured as sp_api_configured, has_refresh_token
 from services.ebay_service import fetch_ebay_product
+from services.allegro_api import fetch_offer_via_listing, get_access_token as get_allegro_token
 
 logger = structlog.get_logger()
 
@@ -256,12 +257,11 @@ def audit_product_from_data(data: Dict) -> Dict:
 
 async def audit_product(url: str, marketplace: str, db: Optional[Session] = None) -> Dict:
     """
-    Full audit pipeline: scrape → base rules → parameter rules → AI suggestions.
-    WHY db: Pass to SP-API for oauth_connections token lookup.
+    Full audit pipeline: API/scrape → base rules → parameter rules → AI suggestions.
+    WHY db: Pass to Allegro/SP-API for oauth_connections token lookup.
     """
-    # Step 1: Scrape based on marketplace
     if marketplace == "allegro":
-        return await _audit_allegro(url, marketplace)
+        return await _audit_allegro(url, marketplace, db=db)
     elif marketplace == "amazon":
         return await _audit_amazon(url, marketplace, db=db)
     elif marketplace == "ebay":
@@ -307,11 +307,54 @@ def _score_response(url: str, source_id: str, marketplace: str, title: str,
     }
 
 
-async def _audit_allegro(url: str, marketplace: str) -> Dict:
-    """Allegro audit: scrape → base rules → parameter rules → AI suggestions."""
-    product = await scrape_allegro_product(url)
-    if product.error:
-        return _error_response(url, marketplace, f"Błąd scrapowania: {product.error}")
+async def _audit_allegro(url: str, marketplace: str, db: Optional[Session] = None) -> Dict:
+    """Allegro audit: API (primary) → scrape (fallback) → base rules → parameter rules → AI.
+
+    WHY API first: Scrape.do has 1000 req/month shared limit — exceeded in production.
+    Allegro REST API via OAuth token is free, reliable, and long-term.
+    WHY fallback: If no OAuth connection exists yet, try scraping as last resort.
+    """
+    # WHY: Extract offer_id from Allegro URL (number at end of slug)
+    offer_match = re.search(r"-(\d{8,14})(?:\?|$)", url)
+    offer_id = offer_match.group(1) if offer_match else None
+
+    product = None
+
+    # WHY: Try Allegro API first — no Scrape.do dependency, no rate limits
+    if offer_id and db is not None:
+        token = await _get_any_allegro_token(db)
+        if token:
+            try:
+                api_data = await fetch_offer_via_listing(offer_id, token)
+                if not api_data.get("error"):
+                    product = AllegroProduct(
+                        source_url=url,
+                        source_id=offer_id,
+                        title=api_data.get("title", ""),
+                        description=api_data.get("description", ""),
+                        price=api_data.get("price", ""),
+                        currency=api_data.get("currency", "PLN"),
+                        ean=api_data.get("ean", ""),
+                        images=api_data.get("images", []),
+                        category=api_data.get("category", ""),
+                        quantity="",
+                        condition="",
+                        parameters=api_data.get("parameters", {}),
+                        brand=api_data.get("brand", ""),
+                        manufacturer=api_data.get("manufacturer", ""),
+                    )
+                    logger.info("audit_allegro_api_ok", offer_id=offer_id)
+                else:
+                    logger.warning("audit_allegro_api_error", error=api_data["error"][:100])
+            except Exception as e:
+                logger.warning("audit_allegro_api_exception", error=str(e)[:100])
+
+    # WHY: Fallback to scraping only if API didn't work
+    if product is None:
+        product = await scrape_allegro_product(url)
+        if product.error:
+            return _error_response(url, marketplace, f"Błąd pobierania danych: {product.error}")
+        logger.info("audit_allegro_scrape_fallback", url=url[:60])
 
     fields = _extract_audit_fields(product)
     issues = _run_base_rules(fields, ALLEGRO_BASE_RULES)
@@ -349,6 +392,27 @@ async def _audit_allegro(url: str, marketplace: str) -> Dict:
         url, product.source_id, marketplace, product.title, issues,
         product_data, total_checks=len(ALLEGRO_BASE_RULES) + 8,
     )
+
+
+async def _get_any_allegro_token(db: Session) -> Optional[str]:
+    """Get ANY valid Allegro OAuth token from oauth_connections.
+
+    WHY: Audit doesn't have user_id — it checks any public offer.
+    We just need a valid token from any connected Allegro account.
+    WHY get_allegro_token: Handles refresh logic internally, no private imports.
+    """
+    from models.oauth_connection import OAuthConnection
+
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.marketplace == "allegro",
+        OAuthConnection.status == "active",
+    ).first()
+
+    if not conn:
+        return None
+
+    # WHY: Reuse get_access_token which handles refresh + error handling
+    return await get_allegro_token(db, conn.user_id)
 
 
 async def _audit_amazon(url: str, marketplace: str, db: Optional[Session] = None) -> Dict:
