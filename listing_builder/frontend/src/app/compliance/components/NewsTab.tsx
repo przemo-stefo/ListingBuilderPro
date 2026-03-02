@@ -14,6 +14,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { apiClient } from '@/lib/api/client'
 
 interface NewsItem {
   title: string
@@ -195,11 +196,9 @@ export default function NewsTab() {
     setLoading(true)
     setError(null)
     try {
-      const url = force ? '/api/proxy/news/feed?force=true' : '/api/proxy/news/feed'
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setNews(data.articles || [])
+      const params = force ? { force: 'true' } : undefined
+      const res = await apiClient.get('/news/feed', { params })
+      setNews(res.data.articles || [])
     } catch {
       setError('Nie udało się załadować wiadomości')
     } finally {

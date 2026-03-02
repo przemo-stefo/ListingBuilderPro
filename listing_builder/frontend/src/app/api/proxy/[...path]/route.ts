@@ -42,6 +42,7 @@ const ALLOWED_PATH_PREFIXES = [
   'ads',
   'score',
   'demo',
+  'admin',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints — defense in depth
@@ -50,6 +51,7 @@ const BLOCKED_METHODS: Record<string, string[]> = {
   'settings': ['DELETE'],
   'oauth': ['PUT', 'PATCH'],
   'stripe/webhook': ['DELETE', 'PUT', 'PATCH'],
+  'admin': ['DELETE'],
 }
 
 async function proxyRequest(request: NextRequest, params: { path: string[] }) {
