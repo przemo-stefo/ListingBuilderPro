@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from typing import List, Dict, Any
+from services.category_prompts import get_category_rules
 
 # WHY: Rules from Amazon FBA Revolution Module 7 "Złota Formuła Listingu"
 # Injected ONLY for amazon marketplaces — other platforms have different best practices
@@ -52,6 +53,7 @@ def build_title_prompt(
     tier1_phrases: List[str], lang: str, max_chars: int,
     expert_context: str = "",
     marketplace: str = "",
+    category: str = "",
 ) -> str:
     kw_list = ", ".join(tier1_phrases[:10])
     # WHY: Expert context from knowledge base teaches proven title strategies
@@ -83,6 +85,7 @@ Rules:
 - No special characters (!, €, ™, etc.)
 - The ENTIRE title must be in {lang} — no words in other languages
 {AMAZON_TITLE_RULES if marketplace.startswith("amazon") else ""}
+{get_category_rules(category, "title")}
 Return ONLY the optimized title, nothing else."""
 
 
@@ -92,6 +95,7 @@ def build_bullets_prompt(
     expert_context: str = "",
     bullet_count: int = 5,
     marketplace: str = "",
+    category: str = "",
 ) -> str:
     kw_list = ", ".join(tier2_phrases[:15])
     context_block = ""
@@ -130,6 +134,7 @@ Rules:
 - The ENTIRE text must be in {lang} — no words in other languages
 - No promotional words{vendor_guidance}
 {AMAZON_BULLETS_RULES if marketplace.startswith("amazon") else ""}
+{get_category_rules(category, "bullets")}
 Return ONLY {bullet_count} bullet points, one per line, no numbering or bullet symbols."""
 
 
@@ -138,6 +143,7 @@ def build_description_prompt(
     lang: str,
     expert_context: str = "",
     marketplace: str = "amazon_de",
+    category: str = "",
 ) -> str:
     kw_list = ", ".join(remaining_phrases[:10])
     context_block = ""
@@ -150,7 +156,8 @@ EXPERT KNOWLEDGE (use these best practices):
     # WHY: Allegro buyers scan descriptions — bold keywords are a game changer
     is_allegro = "allegro" in marketplace
     platform_name = "Allegro" if is_allegro else "Amazon"
-    paragraph_rule = "Write 3-4 detailed paragraphs" if is_allegro else "Write 2-3 short paragraphs"
+    # WHY: Bartek (16.02) — Allegro opisy powinny mieć ~1000 znaków, 3 akapity
+    paragraph_rule = "Write exactly 3 detailed paragraphs, target 800-1200 characters of text (excluding HTML tags)" if is_allegro else "Write 2-3 short paragraphs"
     bold_rule = ""
     if is_allegro:
         bold_rule = (
@@ -176,6 +183,7 @@ Rules:
 - Format as simple HTML: use <p> for paragraphs, <ul><li> for feature lists, <b> for emphasis{bold_rule}
 - Keep HTML clean and minimal — no classes, no inline styles, no <div> or <span>
 {AMAZON_DESC_RULES if "amazon" in marketplace else ""}
+{get_category_rules(category, "description")}
 Return ONLY the HTML description, nothing else."""
 
 
@@ -183,6 +191,7 @@ def build_backend_prompt(
     product_title: str, brand: str, title_text: str,
     keywords: List[Dict[str, Any]], lang: str, max_bytes: int,
     marketplace: str = "",
+    category: str = "",
 ) -> str:
     """Prompt for LLM to suggest additional backend search terms.
 
@@ -216,4 +225,5 @@ Rules:
 - No brand names, no promotional words, no special characters
 - Every word must be UNIQUE (no repetition)
 {AMAZON_BACKEND_RULES if marketplace.startswith("amazon") else ""}
+{get_category_rules(category, "backend")}
 Return ONLY space-separated search terms in {lang}, nothing else."""

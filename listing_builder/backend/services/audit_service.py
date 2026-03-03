@@ -14,7 +14,7 @@ from services.scraper.amazon_scraper import parse_input as parse_amazon_input, f
 from services.sp_api_catalog import fetch_catalog_item
 from services.sp_api_auth import credentials_configured as sp_api_configured, has_refresh_token
 from services.ebay_service import fetch_ebay_product
-from services.allegro_api import fetch_offer_via_listing, get_access_token as get_allegro_token
+from services.allegro_api import fetch_offer_details, fetch_offer_via_listing, get_access_token as get_allegro_token
 
 logger = structlog.get_logger()
 
@@ -270,6 +270,18 @@ async def audit_product(url: str, marketplace: str, db: Optional[Session] = None
         return _error_response(url, marketplace, f"Marketplace '{marketplace}' nie jest obsługiwany")
 
 
+def _friendly_scrape_error(raw_error: str) -> str:
+    """Translate raw scraper errors to user-friendly Polish messages."""
+    low = raw_error.lower()
+    if "monthly request limit" in low or "limit exceeded" in low:
+        return "Tymczasowy limit zapytań został wyczerpany. Spróbuj ponownie jutro lub użyj własnej oferty Allegro (połącz konto w Ustawieniach → Integracje)."
+    if "timed out" in low or "timeout" in low:
+        return "Serwer Allegro nie odpowiada. Spróbuj ponownie za kilka minut."
+    if "playwright not installed" in low:
+        return "Usługa scrapowania tymczasowo niedostępna. Spróbuj ponownie później."
+    return f"Błąd pobierania danych: {raw_error}"
+
+
 def _error_response(url: str, marketplace: str, message: str) -> Dict:
     """Standard error response for audit failures."""
     return {
@@ -324,36 +336,45 @@ async def _audit_allegro(url: str, marketplace: str, db: Optional[Session] = Non
     if offer_id and db is not None:
         token = await _get_any_allegro_token(db)
         if token:
-            try:
-                api_data = await fetch_offer_via_listing(offer_id, token)
-                if not api_data.get("error"):
-                    product = AllegroProduct(
-                        source_url=url,
-                        source_id=offer_id,
-                        title=api_data.get("title", ""),
-                        description=api_data.get("description", ""),
-                        price=api_data.get("price", ""),
-                        currency=api_data.get("currency", "PLN"),
-                        ean=api_data.get("ean", ""),
-                        images=api_data.get("images", []),
-                        category=api_data.get("category", ""),
-                        quantity="",
-                        condition="",
-                        parameters=api_data.get("parameters", {}),
-                        brand=api_data.get("brand", ""),
-                        manufacturer=api_data.get("manufacturer", ""),
-                    )
-                    logger.info("audit_allegro_api_ok", offer_id=offer_id)
-                else:
-                    logger.warning("audit_allegro_api_error", error=api_data["error"][:100])
-            except Exception as e:
-                logger.warning("audit_allegro_api_exception", error=str(e)[:100])
+            # WHY: Try own-offer endpoint first (full data incl. description),
+            # then public listing endpoint (works for any offer but less data)
+            for api_fn, label in [
+                (fetch_offer_details, "sale_api"),
+                (fetch_offer_via_listing, "listing_api"),
+            ]:
+                try:
+                    api_data = await api_fn(offer_id, token)
+                    if not api_data.get("error"):
+                        product = AllegroProduct(
+                            source_url=url,
+                            source_id=offer_id,
+                            title=api_data.get("title", ""),
+                            description=api_data.get("description", ""),
+                            price=api_data.get("price", ""),
+                            currency=api_data.get("currency", "PLN"),
+                            ean=api_data.get("ean", ""),
+                            images=api_data.get("images", []),
+                            category=api_data.get("category", ""),
+                            quantity="",
+                            condition="",
+                            parameters=api_data.get("parameters", {}),
+                            brand=api_data.get("brand", ""),
+                            manufacturer=api_data.get("manufacturer", ""),
+                        )
+                        logger.info("audit_allegro_api_ok", offer_id=offer_id, via=label)
+                        break
+                    else:
+                        logger.warning("audit_allegro_api_error", via=label, error=api_data["error"][:100])
+                except Exception as e:
+                    logger.warning("audit_allegro_api_exception", via=label, error=str(e)[:100])
 
     # WHY: Fallback to scraping only if API didn't work
     if product is None:
         product = await scrape_allegro_product(url)
         if product.error:
-            return _error_response(url, marketplace, f"Błąd pobierania danych: {product.error}")
+            # WHY: Translate raw Scrape.do English errors to user-friendly Polish
+            friendly = _friendly_scrape_error(product.error)
+            return _error_response(url, marketplace, friendly)
         logger.info("audit_allegro_scrape_fallback", url=url[:60])
 
     fields = _extract_audit_fields(product)

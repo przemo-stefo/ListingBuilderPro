@@ -4,22 +4,36 @@
 
 import structlog
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, UploadFile, File
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 
 from database import get_db
+# WHY: Demo uses get_user_id (not require_user_id) — must work without login
 from api.dependencies import get_user_id
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 logger = structlog.get_logger()
+# WHY: Per-module limiter (same pattern as news_routes, research_routes)
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/demo", tags=["demo"])
+
+# WHY: Lazy imports at module level cause circular deps with optimizer_service.
+# Import inside handlers instead (consistent with other route files that do this).
+from data.demo_samples import get_demo_product, DEMO_KEYWORDS
+from services.supplement_compliance import check_supplement_compliance
+from services.ranking_juice_service import calculate_ranking_juice
+from services.amazon_tos_checker import check_amazon_tos
+from services.keyword_csv_parser import parse_keyword_csv
 
 
 # --- Request/Response Models ---
 
 class FetchRequest(BaseModel):
-    asin: str = Field(..., min_length=10, max_length=10, pattern=r"^B[0-9A-Z]{9}$")
+    # WHY: ASIN can start with B or 0 (books) — relaxed from B-only to [B0]
+    asin: str = Field(default="B09EXAMPL1", min_length=10, max_length=10, pattern=r"^[B0][0-9A-Z]{9}$")
     marketplace: str = Field(default="DE", max_length=5)
     use_sample: bool = Field(default=False)
 
@@ -73,10 +87,16 @@ async def demo_fetch(
 ):
     """Step 1: ASIN → product data. Sample data or real SP-API."""
     if req.use_sample:
-        from data.demo_samples import get_demo_product
         product = get_demo_product()
         logger.info("demo_fetch_sample", asin=product["asin"])
-        return {"source": "sample", "product": product}
+        # WHY: Instant TOS scan creates urgency — shows risks BEFORE optimization
+        tos = check_amazon_tos(
+            title=product["title"],
+            bullets=product.get("bullets", []),
+            description=product.get("description", ""),
+            marketplace=f"amazon_{req.marketplace.lower()}",
+        )
+        return {"source": "sample", "product": product, "tos_scan": tos}
 
     # Real SP-API fetch
     from services.sp_api_catalog import fetch_catalog_item
@@ -86,17 +106,25 @@ async def demo_fetch(
         return {"source": "sp_api", "product": None, "error": product["error"]}
 
     # WHY: Attach demo keywords to real product so optimize step has data
-    from data.demo_samples import DEMO_KEYWORDS
     product["keywords"] = DEMO_KEYWORDS
 
+    tos = check_amazon_tos(
+        title=product.get("title", ""),
+        bullets=product.get("bullets", []),
+        description=product.get("description", ""),
+        marketplace=f"amazon_{req.marketplace.lower()}",
+    )
+
     logger.info("demo_fetch_live", asin=req.asin, marketplace=req.marketplace)
-    return {"source": "sp_api", "product": product}
+    return {"source": "sp_api", "product": product, "tos_scan": tos}
 
 
 # --- Step 2: AI Optimize ---
 
 @router.post("/optimize")
+@limiter.limit("5/minute")
 async def demo_optimize(
+    request: Request,
     req: OptimizeRequest,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_user_id),
@@ -107,10 +135,16 @@ async def demo_optimize(
     """
     from services.optimizer_service import optimize_listing
 
+    # WHY: optimizer_service expects "phrase" key, demo frontend sends "keyword" key
+    kw_for_optimizer = [
+        {"phrase": k["keyword"], "search_volume": k.get("search_volume", 0)}
+        for k in req.keywords[:50]
+    ]
+
     result = await optimize_listing(
         product_title=req.title,
         brand=req.brand,
-        keywords=req.keywords,
+        keywords=kw_for_optimizer,
         marketplace=req.marketplace,
         mode="aggressive",
         account_type="seller",
@@ -122,13 +156,21 @@ async def demo_optimize(
     if result.get("error"):
         return {"error": result["error"]}
 
+    # WHY: optimizer_service nests listing data under "listing" key.
+    # Frontend expects flat {title, bullet_points, description, backend_keywords}.
+    listing = result.get("listing", {})
+
     # WHY: Calculate DataDive keyword coverage for before/after comparison
-    coverage = _calculate_coverage(req.keywords, result)
+    coverage = _calculate_coverage(req.keywords, listing)
+
+    # WHY: "Listing DNA" — before/after scoring with RJ + TOS (pure Python, instant)
+    listing_dna = _calculate_listing_dna(req, listing)
 
     logger.info("demo_optimize_ok", user_id=user_id[:8] if user_id else "anon")
     return {
-        "optimized": result,
+        "optimized": listing,
         "coverage": coverage,
+        "listing_dna": listing_dna,
     }
 
 
@@ -137,8 +179,6 @@ async def demo_optimize(
 @router.post("/compliance-check")
 async def demo_compliance_check(req: ComplianceRequest):
     """Step 3: EU supplement compliance (HCPR, GPSR, allergens)."""
-    from services.supplement_compliance import check_supplement_compliance
-
     result = check_supplement_compliance(
         title=req.title,
         bullets=req.bullets,
@@ -236,7 +276,126 @@ async def demo_create_coupon(
     return result
 
 
+# --- Step 0: Upload Keywords CSV (Helium10 / DataDive) ---
+
+class KeywordUploadTextRequest(BaseModel):
+    """WHY: Alternative to file upload — paste CSV text directly."""
+    csv_text: str = Field(..., min_length=10, max_length=500_000)
+
+
+@router.post("/upload-keywords")
+@limiter.limit("10/minute")
+async def demo_upload_keywords(
+    request: Request,
+    file: UploadFile = File(...),
+):
+    """Upload Helium10 or DataDive CSV → parsed keywords with search volume + RJ.
+
+    WHY: Michał's client uses Helium10 — they export Cerebro/Magnet CSVs.
+    This parses any H10/DataDive CSV and returns keywords ready for optimizer.
+    Supports: DataDive, Cerebro, Magnet, BlackBox, Jungle Scout, generic CSV.
+    """
+    # WHY: 5MB limit — CSVs rarely exceed 1MB
+    content = await file.read()
+    if len(content) > 5_000_000:
+        return {"error": "File too large (max 5MB)"}
+
+    # WHY: Try UTF-8 first, fall back to latin-1 (common in EU exports)
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    result = parse_keyword_csv(text)
+    logger.info("demo_upload_keywords", source=result["source"], total=len(result["keywords"]))
+    return result
+
+
+@router.post("/parse-keywords")
+@limiter.limit("10/minute")
+async def demo_parse_keywords(
+    request: Request,
+    req: KeywordUploadTextRequest,
+):
+    """Parse pasted CSV text → keywords. Alternative to file upload.
+
+    WHY: Sometimes easier to paste CSV content than upload a file (mobile, demo).
+    """
+    result = parse_keyword_csv(req.csv_text)
+    logger.info("demo_parse_keywords", source=result["source"], total=len(result["keywords"]))
+    return result
+
+
 # --- Helpers ---
+
+def _calculate_listing_dna(
+    req: OptimizeRequest,
+    optimized: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Calculate Listing DNA — before/after Ranking Juice + TOS scores.
+
+    WHY: This is the WOW feature. Shows multi-dimensional scoring improvement
+    with letter grades. Pure Python, instant, zero LLM cost. No competitor has this.
+    """
+    # Adapt keywords: demo uses "keyword" key, RJ service uses "phrase"
+    kw_for_rj = [{"phrase": k["keyword"], "search_volume": k.get("search_volume", 0)}
+                 for k in req.keywords[:50]]
+
+    # Before: original listing data
+    before_rj = calculate_ranking_juice(
+        keywords=kw_for_rj,
+        title=req.title,
+        bullets=req.bullets,
+        backend="",
+        description=req.description,
+    )
+    before_tos = check_amazon_tos(
+        title=req.title,
+        bullets=req.bullets,
+        description=req.description,
+        backend_keywords="",
+        marketplace=req.marketplace,
+    )
+
+    # After: optimized listing data
+    after_rj = calculate_ranking_juice(
+        keywords=kw_for_rj,
+        title=optimized.get("title", ""),
+        bullets=optimized.get("bullet_points", []),
+        backend=optimized.get("backend_keywords", ""),
+        description=optimized.get("description", ""),
+    )
+    after_tos = check_amazon_tos(
+        title=optimized.get("title", ""),
+        bullets=optimized.get("bullet_points", []),
+        description=optimized.get("description", ""),
+        backend_keywords=optimized.get("backend_keywords", ""),
+        marketplace=req.marketplace,
+    )
+
+    return {
+        "before": {
+            "score": before_rj["score"],
+            "grade": before_rj["grade"],
+            "verdict": before_rj["verdict"],
+            "components": before_rj["components"],
+            "tos_violations": before_tos["violation_count"],
+            "tos_severity": before_tos["severity"],
+            "suppression_risk": before_tos["suppression_risk"],
+        },
+        "after": {
+            "score": after_rj["score"],
+            "grade": after_rj["grade"],
+            "verdict": after_rj["verdict"],
+            "components": after_rj["components"],
+            "tos_violations": after_tos["violation_count"],
+            "tos_severity": after_tos["severity"],
+            "suppression_risk": after_tos["suppression_risk"],
+        },
+        "improvement": round(after_rj["score"] - before_rj["score"], 1),
+        "tos_issues_fixed": max(0, before_tos["violation_count"] - after_tos["violation_count"]),
+    }
+
 
 def _calculate_coverage(
     keywords: List[Dict[str, Any]],

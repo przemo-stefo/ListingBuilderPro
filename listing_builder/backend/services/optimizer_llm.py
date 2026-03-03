@@ -28,6 +28,7 @@ async def run_direct_groq(
     title_context: str, bullets_context: str, desc_context: str,
     marketplace: str,
     provider_config: dict | None = None,
+    category: str = "",
 ) -> tuple:
     """Run 4 parallel LLM calls (title, bullets, description, backend suggestions).
 
@@ -45,7 +46,7 @@ async def run_direct_groq(
 
     title_prompt = build_title_prompt(
         product_title, brand, product_line, tier1_phrases, lang, limits["title"],
-        expert_context=title_context, marketplace=marketplace,
+        expert_context=title_context, marketplace=marketplace, category=category,
     )
 
     with span(trace, "llm_title") as s:
@@ -57,21 +58,24 @@ async def run_direct_groq(
     bullets_prompt = build_bullets_prompt(
         product_title, brand, tier2_phrases, lang, bullet_char_limit,
         expert_context=bullets_context, bullet_count=bullet_count, marketplace=marketplace,
+        category=category,
     )
     desc_prompt = build_description_prompt(
         product_title, brand, tier3_phrases + tier2_phrases[-5:], lang,
-        expert_context=desc_context, marketplace=marketplace,
+        expert_context=desc_context, marketplace=marketplace, category=category,
     )
+    # WHY: Allegro descriptions need ~1000 chars (Bartek 16.02) — 600 tokens too low, bump to 900
+    desc_max_tokens = 900 if "allegro" in marketplace else 600
     backend_prompt = build_backend_prompt(
         product_title, brand, title_text, all_kw, lang, limits["backend"],
-        marketplace=marketplace,
+        marketplace=marketplace, category=category,
     )
 
     # WHY: return_exceptions so optional backend call can fail without killing essential calls
     with span(trace, "llm_bullets_desc") as s:
         results = await asyncio.gather(
             asyncio.to_thread(call_fn, bullets_prompt, 0.5, 800),
-            asyncio.to_thread(call_fn, desc_prompt, 0.5, 600),
+            asyncio.to_thread(call_fn, desc_prompt, 0.5, desc_max_tokens),
             asyncio.to_thread(call_fn, backend_prompt, 0.3, 200),
             return_exceptions=True,
         )

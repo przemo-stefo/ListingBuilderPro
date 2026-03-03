@@ -59,9 +59,9 @@ Generate exactly 3 ad variations in JSON format. Each variation has a different 
 
 Each variation MUST contain:
 - "type": one of "hook", "story", "benefit"
-- "headline": max 40 characters
-- "primary_text": max 125 characters
-- "description": max 30 characters
+- "headline": short attention-grabbing headline, max 40 characters
+- "primary_text": the MAIN ad body text, 2-4 compelling sentences, 150-300 characters. Include product benefits, pain points, or a story. This is the most important part of the ad.
+- "description": a persuasive call-to-action or key benefit summary, 40-80 characters. NEVER just one word — write a complete phrase like "Zamów teraz i oszczędź 20%" or "Sprawdź ofertę dla profesjonalistów".
 
 {lang_rule}
 
@@ -125,7 +125,7 @@ async def generate_ad_copy(
                     model=MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.7,
-                    max_tokens=800,
+                    max_tokens=1200,
                 )
             except Exception as e:
                 last_error = e

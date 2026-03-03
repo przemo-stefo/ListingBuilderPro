@@ -61,10 +61,11 @@ def check_supplement_compliance(
 
     # --- Check 1: EC 1924/2006 — Forbidden health claims ---
     for claim in FORBIDDEN_HEALTH_CLAIMS:
-        if claim in full_text:
-            # WHY: Determine which field contains the claim for actionable feedback
-            field = "title" if claim in title.lower() else (
-                "bullets" if any(claim in b.lower() for b in bullets) else "description"
+        # WHY: Word-boundary regex prevents false positives (e.g., "heilt" in "aufentheilt")
+        pattern = r"\b" + re.escape(claim) + r"\b"
+        if re.search(pattern, full_text):
+            field = "title" if re.search(pattern, title.lower()) else (
+                "bullets" if any(re.search(pattern, b.lower()) for b in bullets) else "description"
             )
             issues.append({
                 "field": field,

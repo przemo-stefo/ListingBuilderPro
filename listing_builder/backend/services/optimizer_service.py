@@ -150,7 +150,7 @@ async def optimize_listing(
                 tier1_phrases, tier2_phrases, tier3_phrases, all_kw,
                 lang, limits, bullet_count, bullet_char_limit,
                 title_ctx, bullets_ctx, desc_ctx, marketplace,
-                provider_config=provider_config,
+                provider_config=provider_config, category=category,
             )
         except Exception as provider_err:
             if used_provider != "groq":
@@ -161,6 +161,7 @@ async def optimize_listing(
                     tier1_phrases, tier2_phrases, tier3_phrases, all_kw,
                     lang, limits, bullet_count, bullet_char_limit,
                     title_ctx, bullets_ctx, desc_ctx, marketplace,
+                    category=category,
                 )
                 used_provider = "groq"
             else:

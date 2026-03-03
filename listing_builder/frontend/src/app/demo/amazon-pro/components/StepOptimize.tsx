@@ -39,8 +39,8 @@ export default function StepOptimize({ product, onComplete }: StepOptimizeProps)
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-white mb-1">Optymalizacja AI + DataDive</h2>
-        <p className="text-sm text-gray-400">AI optymalizuje listing z Ranking Juice keyword priority</p>
+        <h2 className="text-lg font-semibold text-white mb-1">Krok 2: Optymalizacja AI</h2>
+        <p className="text-sm text-gray-400">Kliknij przycisk — AI przepisze tytuł, bullet points i opis pod najlepsze keywords. Trwa ok. 15 sekund.</p>
       </div>
 
       {!optimized && (
@@ -127,7 +127,7 @@ export default function StepOptimize({ product, onComplete }: StepOptimizeProps)
             onClick={() => onComplete(optimized, coverage!)}
             className="w-full px-4 py-2 bg-white text-black rounded-lg text-sm font-semibold hover:bg-gray-200"
           >
-            Dalej — Sprawdź Compliance
+            Przejdź do kroku 3: Compliance EU
           </button>
         </>
       )}

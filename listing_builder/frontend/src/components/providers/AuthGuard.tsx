@@ -10,7 +10,8 @@ import { useAuth } from './AuthProvider'
 
 // WHY: These pages don't require login
 const PUBLIC_PATHS = ['/login', '/', '/landing', '/privacy', '/terms']
-const PUBLIC_PREFIXES = ['/payment/', '/auth/']
+// WHY: /demo/ is public — demo must work without login (for prospects like Michał)
+const PUBLIC_PREFIXES = ['/payment/', '/auth/', '/demo/']
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true

@@ -48,19 +48,13 @@ export default function AmazonProDemoPage() {
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="p-2 rounded-lg hover:bg-white/10 text-gray-400"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
         <div>
           <div className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-blue-400" />
-            <h1 className="text-xl font-bold text-white">Amazon Pro Demo</h1>
+            <h1 className="text-xl font-bold text-white">Amazon Listing Optimizer — Demo</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            Pełny pipeline: ASIN → AI Optymalizacja → Compliance → Publish → Coupon
+            5 kroków od produktu do promocji. Kliknij przycisk poniżej aby zacząć.
           </p>
         </div>
         {completedSteps.length > 0 && (
@@ -68,10 +62,25 @@ export default function AmazonProDemoPage() {
             onClick={handleReset}
             className="ml-auto text-xs text-gray-500 hover:text-white px-3 py-1 rounded border border-gray-800 hover:border-gray-600"
           >
-            Reset demo
+            Zacznij od nowa
           </button>
         )}
       </div>
+
+      {/* Info box — only on first step, before any action */}
+      {currentStep === 1 && completedSteps.length === 0 && (
+        <div className="border border-blue-900/40 bg-blue-950/20 rounded-xl p-4 text-sm text-gray-300 space-y-2">
+          <p className="font-medium text-white">Jak to działa?</p>
+          <ol className="list-decimal list-inside space-y-1 text-gray-400">
+            <li><span className="text-white">Pobierz produkt</span> — wczytaj dane z Amazon (lub użyj przykładu)</li>
+            <li><span className="text-white">AI Optymalizacja</span> — sztuczna inteligencja przepisze listing pod SEO</li>
+            <li><span className="text-white">Compliance</span> — sprawdź zgodność z regulacjami EU</li>
+            <li><span className="text-white">Publikuj</span> — wyślij listing na Amazon (symulacja)</li>
+            <li><span className="text-white">Promocja</span> — utwórz kupon rabatowy (symulacja)</li>
+          </ol>
+          <p className="text-xs text-gray-500 pt-1">Tryb demo — żadne dane nie są wysyłane na Amazon. Podłącz konto SP-API aby działać na żywo.</p>
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="border border-gray-800 rounded-xl p-4 bg-[#1A1A1A]">

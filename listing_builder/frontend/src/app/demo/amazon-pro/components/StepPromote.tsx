@@ -51,8 +51,8 @@ export default function StepPromote({ product, onComplete }: StepPromoteProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-white mb-1">Kupon promocyjny</h2>
-        <p className="text-sm text-gray-400">Utwórz kupon rabatowy przez Amazon Coupons API</p>
+        <h2 className="text-lg font-semibold text-white mb-1">Krok 5: Kupon promocyjny</h2>
+        <p className="text-sm text-gray-400">Ustaw rabat, budżet i czas trwania — system utworzy kupon przez Amazon Coupons API. W trybie demo to symulacja.</p>
       </div>
 
       {!result && (

@@ -40,8 +40,8 @@ export default function StepPublish({ product, optimized, onComplete }: StepPubl
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-white mb-1">Opublikuj na Amazon</h2>
-        <p className="text-sm text-gray-400">Dry-run mode — symulacja bez rzeczywistego push na Amazon</p>
+        <h2 className="text-lg font-semibold text-white mb-1">Krok 4: Publikacja na Amazon</h2>
+        <p className="text-sm text-gray-400">Symulacja wysyłki listingu na Amazon przez SP-API. W trybie demo nic nie jest publikowane — po podłączeniu konta, listing trafi na Amazon jednym klikiem.</p>
       </div>
 
       {!result && (
@@ -96,7 +96,7 @@ export default function StepPublish({ product, optimized, onComplete }: StepPubl
             onClick={() => onComplete(result)}
             className="w-full px-4 py-2 bg-white text-black rounded-lg text-sm font-semibold hover:bg-gray-200"
           >
-            Dalej — Utwórz kupon promocyjny
+            Przejdź do kroku 5: Kupon promocyjny
           </button>
         </>
       )}

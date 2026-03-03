@@ -1,0 +1,58 @@
+# deploy/izabela166/docker-compose.yml
+# Purpose: LBP Demo deployment on izabela166 (2.2GB RAM) — for Michał Lasocki demo
+# NOT for: Compliance Guard or production LBP (that's grzegorz152)
+
+services:
+  lbp-backend:
+    build:
+      context: ./lbp-backend
+      dockerfile: Dockerfile
+    container_name: lbp-demo-backend
+    restart: unless-stopped
+    env_file: .env-lbp
+    environment:
+      - PORT=8001
+      - APP_ENV=production
+    ports:
+      - "127.0.0.1:8003:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  lbp-frontend:
+    build:
+      context: ./lbp-frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    container_name: lbp-demo-frontend
+    restart: unless-stopped
+    # WHY network_mode: host: Docker 29.x ICC rules block inter-container traffic
+    # on custom networks. Host mode lets frontend reach backend on localhost:8003.
+    network_mode: host
+    environment:
+      - PORT=3004
+      - BACKEND_URL=http://localhost:8003
+      - API_KEY=${API_SECRET_KEY}
+      - NODE_ENV=production
+    depends_on:
+      lbp-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3004').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 384M

@@ -13,11 +13,11 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { number: 1, label: 'Pobierz produkt', shortLabel: 'Fetch' },
-  { number: 2, label: 'Optymalizuj AI', shortLabel: 'Optimize' },
-  { number: 3, label: 'Compliance', shortLabel: 'Check' },
-  { number: 4, label: 'Publikuj', shortLabel: 'Publish' },
-  { number: 5, label: 'Promocja', shortLabel: 'Coupon' },
+  { number: 1, label: '1. Produkt', shortLabel: 'Fetch' },
+  { number: 2, label: '2. AI Listing', shortLabel: 'Optimize' },
+  { number: 3, label: '3. Compliance', shortLabel: 'Check' },
+  { number: 4, label: '4. Publikacja', shortLabel: 'Publish' },
+  { number: 5, label: '5. Kupon', shortLabel: 'Coupon' },
 ]
 
 interface DemoStepperProps {

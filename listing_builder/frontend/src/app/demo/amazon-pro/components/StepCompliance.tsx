@@ -35,8 +35,8 @@ export default function StepCompliance({ optimized, product, onComplete }: StepC
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-white mb-1">EU Compliance Check</h2>
-        <p className="text-sm text-gray-400">Regulacje: HCPR (EC 1924/2006), GPSR, FIC 1169/2011, Amazon Policy</p>
+        <h2 className="text-lg font-semibold text-white mb-1">Krok 3: Sprawdzenie zgodności z EU</h2>
+        <p className="text-sm text-gray-400">Automatycznie sprawdzamy Twój listing pod kątem regulacji EU dla suplementów — niedozwolone health claims, GPSR, alergeny.</p>
       </div>
 
       {!result && (
@@ -119,7 +119,7 @@ export default function StepCompliance({ optimized, product, onComplete }: StepC
             onClick={() => onComplete(result)}
             className="w-full px-4 py-2 bg-white text-black rounded-lg text-sm font-semibold hover:bg-gray-200"
           >
-            Dalej — Opublikuj na Amazon
+            Przejdź do kroku 4: Publikacja na Amazon
           </button>
         </>
       )}

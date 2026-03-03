@@ -54,16 +54,18 @@ DEMO_KEYWORDS: List[Dict[str, Any]] = [
 
 
 DEMO_PRODUCT: Dict[str, Any] = {
-    "asin": "B09EXAMPLE1",
+    "asin": "B09EXAMPL1",
     "marketplace": "DE",
-    "title": "BIO Spirulina Tabletten 500mg - 600 Presslinge - Hochdosiert - Vegan",
+    # WHY realistic TOS issues: Title too short for optimal indexing, but no violations.
+    # Bullets contain real violations that Amazon's 2025 scanner WOULD catch.
+    "title": "BIO Spirulina Tabletten 500mg - 600 Presslinge - Hochdosiert - Premium Qualität - Vegan",
     "brand": "NaturPlus",
     "manufacturer": "NaturPlus GmbH, Musterstr. 12, 10115 Berlin, DE",
     "bullets": [
-        "BIO-QUALITÄT: 100% reine Bio-Spirulina aus kontrolliertem Anbau, DE-ÖKO-001 zertifiziert",
-        "HOCHDOSIERT: 500mg pro Tablette, 600 Presslinge für 4 Monate Vorrat",
-        "NÄHRSTOFFREICH: Natürliche Quelle von Eisen, Protein und Vitamin B12",
-        "VEGAN & REIN: Ohne Zusatzstoffe, ohne Füllstoffe, ohne Magnesiumstearat",
+        "BIO-QUALITÄT: 100% reine Bio-Spirulina aus kontrolliertem Anbau, DE-ÖKO-001 zertifiziert, premium quality guaranteed",
+        "HOCHDOSIERT: 500mg pro Tablette, 600 Presslinge für 4 Monate Vorrat, best price",
+        "IMMUNE BOOSTER: Natürliche Quelle von Eisen, Protein und Vitamin B12 für Ihr Immunsystem",
+        "DETOX & VEGAN: Spirulina detox Wirkung, ohne Zusatzstoffe, ohne Magnesiumstearat",
         "MADE IN GERMANY: Hergestellt und laborgeprüft in Deutschland",
     ],
     "description": (

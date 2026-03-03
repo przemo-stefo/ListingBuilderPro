@@ -82,6 +82,32 @@ export interface TOSScan {
   violation_count: number
 }
 
+// WHY: Parsed keyword from Helium10/DataDive CSV upload
+export interface ParsedKeyword {
+  phrase: string
+  search_volume: number
+  relevancy: number
+  ranking_juice: number
+  competition: number
+  smart_score: number
+  indexed: boolean
+  word_count: number
+}
+
+export interface KeywordUploadResult {
+  source: 'datadive' | 'cerebro' | 'magnet' | 'blackbox' | 'generic'
+  keywords: ParsedKeyword[]
+  products?: Array<{ asin: string; title: string; monthly_revenue: number }>
+  stats: {
+    total: number
+    with_volume: number
+    avg_volume: number
+    top_keyword: string
+    top_rj?: number
+  }
+  error?: string | null
+}
+
 export interface ComplianceIssue {
   field: string
   severity: 'FAIL' | 'WARNING'

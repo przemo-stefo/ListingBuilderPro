@@ -2,7 +2,7 @@
 # Purpose: CRUD endpoints for tracked keyword rankings and search volumes
 # NOT for: Keyword extraction from optimizer (that's in optimizer_service.py)
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sa_func
 from slowapi import Limiter
@@ -14,6 +14,7 @@ from api.dependencies import require_user_id
 from models.listing import TrackedKeyword
 from schemas import KeywordCreate, KeywordItem, KeywordsResponse
 from utils.validators import validate_uuid
+from services.keyword_csv_parser import parse_keyword_csv
 
 router = APIRouter(prefix="/api/keywords", tags=["Keywords"])
 limiter = Limiter(key_func=get_remote_address)
@@ -127,6 +128,35 @@ async def create_keyword(
         relevance_score=kw.relevance_score,
         last_updated=kw.last_updated.isoformat() if kw.last_updated else None,
     )
+
+
+@router.post("/upload-csv")
+@limiter.limit("10/minute")
+async def upload_keywords_csv(
+    request: Request,
+    file: UploadFile = File(...),
+    user_id: str = Depends(require_user_id),
+):
+    """Upload Helium10/DataDive CSV → parsed keywords with search volume + Ranking Juice.
+
+    WHY: Users export CSV from Helium10 Cerebro/Magnet or DataDive.
+    This parses any format and returns structured keywords ready for the optimizer.
+    Supports: DataDive, Cerebro, Magnet, BlackBox, Jungle Scout, generic CSV.
+    """
+    content = await file.read()
+    if len(content) > 5_000_000:
+        raise HTTPException(status_code=413, detail="File too large (max 5MB)")
+
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    result = parse_keyword_csv(text)
+    if result.get("error"):
+        raise HTTPException(status_code=422, detail=result["error"])
+
+    return result
 
 
 @router.delete("/{keyword_id}")
