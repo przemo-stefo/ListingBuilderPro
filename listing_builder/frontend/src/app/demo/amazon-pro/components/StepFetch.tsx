@@ -7,7 +7,7 @@
 import { useState, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
-import { Package, Search, Sparkles, ShieldAlert, ShieldCheck, AlertTriangle, Upload, FileText, X } from 'lucide-react'
+import { Package, Search, Sparkles, ShieldAlert, ShieldCheck, AlertTriangle, Upload, FileText, X, Link, CheckCircle } from 'lucide-react'
 import type { DemoProduct, TOSScan, TOSViolation, KeywordUploadResult, ParsedKeyword } from '../types'
 
 interface StepFetchProps {
@@ -25,10 +25,36 @@ const SOURCE_LABELS: Record<string, string> = {
   generic: 'CSV',
 }
 
+// WHY: Extract ASIN from Amazon product URL (supports all marketplaces)
+function extractAsinFromInput(input: string): string {
+  const trimmed = input.trim()
+  // Already a valid ASIN (10 chars, starts with B or 0)
+  if (/^[B0][0-9A-Z]{9}$/.test(trimmed)) return trimmed
+  // Try to extract from URL: /dp/ASIN or /gp/product/ASIN
+  const match = trimmed.match(/(?:\/dp\/|\/gp\/product\/|\/product\/)([B0][0-9A-Z]{9})/)
+  if (match) return match[1]
+  return trimmed.toUpperCase()
+}
+
+// WHY: Supported CSV format descriptions for user guidance
+const SUPPORTED_FORMATS = [
+  { name: 'Helium10 Cerebro', desc: 'Keyword, Search Volume, Cerebro IQ Score' },
+  { name: 'Helium10 Magnet', desc: 'Keyword, Search Volume, Smart Score' },
+  { name: 'Helium10 BlackBox', desc: 'ASIN, Title, Monthly Revenue, BSR' },
+  { name: 'DataDive', desc: 'Phrase, Relevancy, Ranking Juice, Search Volume' },
+  { name: 'Dowolny CSV', desc: 'keyword + search_volume (min. 2 kolumny)' },
+]
+
 export default function StepFetch({ onComplete }: StepFetchProps) {
-  const [asin, setAsin] = useState('')
+  const [rawInput, setRawInput] = useState('')
   const [uploadedKeywords, setUploadedKeywords] = useState<KeywordUploadResult | null>(null)
+  const [showFormats, setShowFormats] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // WHY: Derive ASIN from raw input (typed ASIN or pasted URL)
+  const asin = extractAsinFromInput(rawInput)
+  const isValidAsin = /^[B0][0-9A-Z]{9}$/.test(asin)
+  const isUrlInput = rawInput.includes('amazon') || rawInput.includes('/dp/')
 
   const fetchMutation = useMutation({
     mutationFn: async (params: { asin: string; use_sample: boolean }) => {
@@ -58,7 +84,7 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
   }
 
   const handleFetchLive = () => {
-    if (asin.length !== 10) return
+    if (!isValidAsin) return
     fetchMutation.mutate({ asin, use_sample: false })
   }
 
@@ -100,26 +126,38 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-white mb-1">Krok 1: Pobierz dane produktu</h2>
-        <p className="text-sm text-gray-400">Wpisz ASIN lub użyj przykładu. Opcjonalnie zaimportuj keywords z Helium10/DataDive.</p>
+        <p className="text-sm text-gray-400">Wklej link Amazon lub ASIN. Opcjonalnie zaimportuj keywords z Helium10/DataDive.</p>
       </div>
 
-      <div className="flex gap-3">
-        <input
-          type="text"
-          value={asin}
-          onChange={(e) => setAsin(e.target.value.toUpperCase())}
-          placeholder="Wpisz ASIN (np. B09EXAMPL1)"
-          className={inputCls}
-          maxLength={10}
-        />
-        <button
-          onClick={handleFetchLive}
-          disabled={asin.length !== 10 || fetchMutation.isPending}
-          className="px-4 py-2 bg-white/10 text-white rounded-lg text-sm font-medium hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-        >
-          <Search className="w-4 h-4" />
-          Szukaj
-        </button>
+      <div className="space-y-2">
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={rawInput}
+              onChange={(e) => setRawInput(e.target.value)}
+              placeholder="Wklej link Amazon lub wpisz ASIN (np. B09EXAMPL1)"
+              className={inputCls}
+            />
+            {isUrlInput && isValidAsin && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                <span className="text-[10px] text-green-400 font-medium">{asin}</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleFetchLive}
+            disabled={!isValidAsin || fetchMutation.isPending}
+            className="px-4 py-2 bg-white/10 text-white rounded-lg text-sm font-medium hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+          >
+            {isUrlInput ? <Link className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+            Szukaj
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-600">
+          Obsługiwane: amazon.de, amazon.com, amazon.co.uk, amazon.fr, amazon.it, amazon.es
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -139,17 +177,43 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
 
       {/* CSV Upload Section */}
       <div className="border border-gray-800 rounded-xl p-4 bg-[#121212] space-y-3">
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-300">Import keywords z Helium10 / DataDive</span>
-          <span className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">opcjonalnie</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-300">Import keywords z Helium10 / DataDive</span>
+            <span className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">opcjonalnie</span>
+          </div>
+          <button
+            onClick={() => setShowFormats(!showFormats)}
+            className="text-[10px] text-gray-500 hover:text-gray-300 underline"
+          >
+            {showFormats ? 'ukryj formaty' : 'obsługiwane formaty'}
+          </button>
         </div>
 
         {!uploadedKeywords ? (
           <div className="space-y-2">
             <p className="text-xs text-gray-500">
-              Eksportuj CSV z Cerebro, Magnet lub DataDive → upload tutaj. System automatycznie rozpozna format i wyciągnie keywords z search volume + Ranking Juice.
+              Eksportuj CSV z dowolnego narzędzia Helium10 lub DataDive i wrzuć tutaj. System automatycznie rozpozna format i wyciągnie keywords z search volume + Ranking Juice.
             </p>
+
+            {/* Supported formats dropdown */}
+            {showFormats && (
+              <div className="bg-[#0a0a0a] border border-gray-800 rounded-lg p-3 space-y-1.5">
+                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Auto-wykrywane formaty:</p>
+                {SUPPORTED_FORMATS.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                    <span className="text-gray-300">{f.name}</span>
+                    <span className="text-gray-600">— {f.desc}</span>
+                  </div>
+                ))}
+                <p className="text-[10px] text-gray-600 mt-1 pt-1 border-t border-gray-800">
+                  Pliki: .csv, .tsv, .txt (max 5MB) — kodowanie UTF-8 lub Latin-1 (EU)
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <label className="flex-1 cursor-pointer">
                 <input
@@ -161,10 +225,13 @@ export default function StepFetch({ onComplete }: StepFetchProps) {
                 />
                 <div className="flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-gray-700 rounded-lg text-sm text-gray-400 hover:border-gray-500 hover:text-white transition-colors">
                   <Upload className="w-4 h-4" />
-                  {uploadMutation.isPending ? 'Parsowanie...' : 'Upload CSV'}
+                  {uploadMutation.isPending ? 'Parsowanie...' : 'Upload CSV / TSV'}
                 </div>
               </label>
             </div>
+            <p className="text-[10px] text-gray-600">
+              Helium10: Cerebro/Magnet → Export → CSV. DataDive: Export → Download CSV.
+            </p>
             {uploadMutation.error && (
               <p className="text-xs text-red-400">{(uploadMutation.error as Error)?.message || 'Błąd parsowania CSV'}</p>
             )}
