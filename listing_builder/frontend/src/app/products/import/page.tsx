@@ -1,27 +1,25 @@
 // frontend/src/app/products/import/page.tsx
-// Purpose: Product import page — single or batch import with tab switching
+// Purpose: Product import page — batch CSV or Allegro account import
 // NOT for: Product editing, optimization, or publishing
 
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, ArrowLeft, Package, Layers, Store } from 'lucide-react'
+import { Upload, ArrowLeft, Layers, Store } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import SingleImport from './components/SingleImport'
 import BatchImport from './components/BatchImport'
 import AllegroImport from './components/AllegroImport'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const TABS = [
-  { id: 'single', label: 'Pojedynczy', icon: Package, desc: 'ASIN, link lub dane ręcznie' },
   { id: 'batch', label: 'Import zbiorczy', icon: Layers, desc: 'CSV z Allegro lub wklej dane' },
   { id: 'allegro', label: 'Z konta Allegro', icon: Store, desc: 'Wybierz oferty z połączonego konta' },
 ] as const
 
 export default function ImportPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'allegro'>('batch')
+  const [activeTab, setActiveTab] = useState<'batch' | 'allegro'>('batch')
 
   return (
     <div className="space-y-6">
@@ -39,7 +37,7 @@ export default function ImportPage() {
           Importuj Produkty
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          Dodaj produkty z Allegro, eBay lub ręcznie — potem optymalizuj dla Amazon
+          Dodaj produkty z CSV lub konta Allegro — potem optymalizuj dla Amazon
         </p>
       </div>
 
@@ -66,7 +64,7 @@ export default function ImportPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'single' ? <SingleImport /> : activeTab === 'allegro' ? <AllegroImport /> : <BatchImport />}
+      {activeTab === 'allegro' ? <AllegroImport /> : <BatchImport />}
 
       {/* FAQ */}
       <FaqSection
