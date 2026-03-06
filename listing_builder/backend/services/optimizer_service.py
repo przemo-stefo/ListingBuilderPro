@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from services.knowledge_service import search_knowledge_batch
@@ -92,6 +93,12 @@ async def optimize_listing(
     limits = get_limits(marketplace)
     lang = detect_language(marketplace, language)
 
+    # WHY: Original listing from import — AI improves it instead of generating from scratch
+    # WHY: strip_tags before sanitize — Allegro descriptions are HTML, LLM needs plain text
+    raw_desc = kwargs.get("original_description", "") or ""
+    original_description = sanitize_llm_input(re.sub(r'<[^>]+>', ' ', raw_desc).strip())
+    original_bullets = [sanitize_llm_input(b) for b in (kwargs.get("original_bullets") or [])]
+
     # WHY: Sanitize user inputs before they enter LLM prompts (injection prevention)
     product_title = sanitize_llm_input(product_title)
     brand = sanitize_llm_input(brand)
@@ -115,6 +122,17 @@ async def optimize_listing(
         title_ctx, bullets_ctx, desc_ctx, past_successes = await _fetch_knowledge(
             db, product_title, tier1_phrases, marketplace, audience_context, user_id=user_id,
         )
+
+    # WHY: If original listing provided, inject as reference context — AI improves rather than invents
+    if original_bullets or original_description:
+        ref_parts = []
+        if original_bullets:
+            ref_parts.append("Original bullets:\n" + "\n".join(f"- {b}" for b in original_bullets))
+        if original_description:
+            ref_parts.append(f"Original description:\n{original_description[:2000]}")
+        ref_block = "ORIGINAL LISTING (improve upon this, keep key facts):\n" + "\n\n".join(ref_parts) + "\n\n"
+        bullets_ctx = ref_block + bullets_ctx
+        desc_ctx = ref_block + desc_ctx
 
     logger.info(
         "optimizer_start", product=product_title[:50],

@@ -375,6 +375,127 @@ async def import_batch(
         _handle_import_error(e, "batch_import")
 
 
+class EnrichImagesRequest(BaseModel):
+    """WHY: Typed request for image enrichment — limits batch size to prevent scraper abuse."""
+    product_ids: List[int] = Field(default=[], max_length=50)
+    # WHY: If True, auto-find user's products without images (ignores product_ids)
+    auto_recent: bool = False
+
+
+@router.post("/enrich-images")
+@limiter.limit("3/minute")
+async def enrich_images(
+    request: Request,
+    body: EnrichImagesRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
+    """
+    Fetch images from source URLs for products that lack them.
+    WHY: Allegro CSV exports don't include image URLs — this fills the gap.
+    """
+    import asyncio
+    from models.product import Product
+    from services.scraper.allegro_scraper import scrape_allegro_product
+    from utils.url_validator import validate_marketplace_url
+    from sqlalchemy import or_, cast, String
+
+    if body.auto_recent:
+        # WHY: Find up to 50 products without images that have source_url
+        # WHY cast(images, String): PostgreSQL JSON == [] doesn't work — compare as text instead
+        # WHY source_platform filter: only Allegro URLs can be scraped by allegro_scraper
+        products = (
+            db.query(Product)
+            .filter(
+                Product.user_id == user_id,
+                Product.source_url.isnot(None),
+                Product.source_url != "",
+                Product.source_platform == "allegro",
+                or_(
+                    Product.images.is_(None),
+                    cast(Product.images, String).in_(["[]", "null"]),
+                ),
+            )
+            .order_by(Product.created_at.desc())
+            .limit(50)
+            .all()
+        )
+    else:
+        if not body.product_ids:
+            raise HTTPException(status_code=400, detail="product_ids lub auto_recent wymagane")
+        # WHY: user_id filter prevents IDOR — user can only enrich their own products
+        products = (
+            db.query(Product)
+            .filter(Product.id.in_(body.product_ids), Product.user_id == user_id)
+            .all()
+        )
+
+    if not products:
+        return {"enriched": 0, "failed": 0, "total": 0, "errors": ["Brak produktów do wzbogacenia"]}
+
+    enriched = 0
+    skipped = 0
+    failed = 0
+    errors = []
+
+    for i, product in enumerate(products):
+        if not product.source_url:
+            errors.append(f"ID {product.id}: brak source_url — pominięto")
+            failed += 1
+            continue
+
+        # WHY: Skip products that already have images — don't count as "enriched"
+        if product.images and len(product.images) > 0:
+            skipped += 1
+            continue
+
+        # SECURITY: Validate URL before scraping — prevents SSRF via tampered DB data
+        try:
+            validate_marketplace_url(product.source_url, "allegro")
+        except ValueError:
+            errors.append(f"ID {product.id}: nieprawidłowy URL — pominięto")
+            failed += 1
+            continue
+
+        try:
+            scraped = await scrape_allegro_product(product.source_url)
+            if scraped.error:
+                errors.append(f"ID {product.id}: {scraped.error}")
+                failed += 1
+                continue
+
+            if scraped.images:
+                product.images = scraped.images
+                enriched += 1
+                logger.info("image_enriched", product_id=product.id, images=len(scraped.images))
+            else:
+                errors.append(f"ID {product.id}: brak zdjęć na stronie")
+                failed += 1
+        except Exception as e:
+            errors.append(f"ID {product.id}: {str(e)[:100]}")
+            failed += 1
+            logger.error("image_enrich_failed", product_id=product.id, error=str(e))
+
+        # WHY: 2s delay between scrapes — prevents scrape.do rate limit (5/s)
+        if i < len(products) - 1:
+            await asyncio.sleep(2)
+
+    # WHY: Single commit after all updates — more efficient than per-product commit
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error("image_enrich_commit_failed", error=str(e))
+
+    return {
+        "enriched": enriched,
+        "skipped": skipped,
+        "failed": failed,
+        "total": len(products),
+        "errors": errors[:20],
+    }
+
+
 @router.get("/job/{job_id}", response_model=ImportJobResponse)
 async def get_import_job(
     job_id: int,

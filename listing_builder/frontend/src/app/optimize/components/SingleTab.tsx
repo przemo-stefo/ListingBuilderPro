@@ -102,6 +102,10 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   // WHY: Ref avoids stale closure in handleImprove → setTimeout → handleGenerate chain
   const audienceContextRef = useRef(audienceContext)
 
+  // WHY: Original listing from import — shown as read-only reference, sent to AI
+  const [originalDescription, setOriginalDescription] = useState('')
+  const [originalBullets, setOriginalBullets] = useState<string[]>([])
+
   // Collapsible sections
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [asin, setAsin] = useState('')
@@ -216,6 +220,11 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setCategory(product.category ?? '')
     setPickedProductTitle(product.title_original)
     setPickedProductId(product.id)
+    // WHY: Show original listing data so AI can improve it rather than generate from scratch
+    // WHY: Strip HTML — Allegro descriptions come as HTML, display and AI need plain text
+    setOriginalDescription(stripHtml(product.description_original ?? ''))
+    const bp = product.attributes?.bullet_points
+    setOriginalBullets(Array.isArray(bp) ? bp as string[] : [])
   }
 
   const handleProductClear = () => {
@@ -225,6 +234,8 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setCategory('')
     setPickedProductTitle(undefined)
     setPickedProductId(undefined)
+    setOriginalDescription('')
+    setOriginalBullets([])
   }
 
   const handleGenerate = () => {
@@ -254,6 +265,9 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
         llm_provider: llmProvider,
         llm_api_key: inlineLlmKey || undefined,
       }),
+      // WHY: Original listing from import — AI improves it instead of generating from scratch
+      ...(originalDescription && { original_description: originalDescription }),
+      ...(originalBullets.length > 0 && { original_bullets: originalBullets }),
     }
 
     generateMutation.mutate(payload, {
@@ -292,6 +306,37 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
         onClear={handleProductClear}
         selectedTitle={pickedProductTitle}
       />
+
+      {/* WHY: Show imported bullets + description so user sees what AI will improve */}
+      {(originalBullets.length > 0 || originalDescription) && (
+        <Card className="border-gray-800 bg-[#121212]">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-gray-500" />
+              <span className="text-xs font-medium text-gray-400">Oryginalne dane z importu</span>
+              <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">z bazy</span>
+            </div>
+            {originalBullets.length > 0 && (
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-600">Bullet points</p>
+                <ul className="space-y-1">
+                  {originalBullets.map((b, i) => (
+                    <li key={i} className="text-xs text-gray-400 leading-relaxed">
+                      <span className="text-gray-600 mr-1">{i + 1}.</span>{b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {originalDescription && (
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-600">Opis</p>
+                <p className="text-xs text-gray-400 leading-relaxed line-clamp-4">{originalDescription}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Section 1: Product Info */}
       <Card>
@@ -574,8 +619,17 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
           </span>
         )}
         {isLoading && (
-          <span className="text-xs text-gray-500">
-            AI pisze tytul, bullety i opis...
+          <span className="text-xs text-gray-500 animate-pulse">
+            AI generuje listing (tytuł → bullety → opis)...
+          </span>
+        )}
+        {generateMutation.isError && !isLoading && (
+          <span className="text-xs text-red-400">
+            {(generateMutation.error as Error & { code?: string })?.code === '402'
+              ? 'Dzienny limit wyczerpany — wykup Premium'
+              : (generateMutation.error as Error & { code?: string })?.code === '503'
+                ? 'Serwer AI przeciążony — spróbuj za minutę'
+                : 'Błąd — kliknij ponownie lub zmniejsz liczbę słów kluczowych'}
           </span>
         )}
       </div>
@@ -653,9 +707,14 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
       {displayResults && displayResults.status === 'error' && (
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center gap-2 text-red-400">
-              <XCircle className="h-5 w-5" />
-              <span>Optymalizacja nie powiodla sie. Sprawdz logi workflow.</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-400">
+                <XCircle className="h-5 w-5" />
+                <span>Optymalizacja nie powiodla sie. Sprawdz logi workflow.</span>
+              </div>
+              <Button onClick={handleGenerate} disabled={!canSubmit || isLoading} size="sm" variant="outline">
+                Spróbuj ponownie
+              </Button>
             </div>
           </CardContent>
         </Card>

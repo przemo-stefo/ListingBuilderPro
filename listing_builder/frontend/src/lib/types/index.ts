@@ -526,6 +526,9 @@ export interface OptimizerRequest {
   // WHY: Multi-LLM — client picks provider and sends their API key
   llm_provider?: LLMProvider
   llm_api_key?: string
+  // WHY: Imported product data — AI uses as reference to improve, not generate from scratch
+  original_description?: string
+  original_bullets?: string[]
 }
 
 export interface OptimizerListing {

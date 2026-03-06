@@ -3,7 +3,7 @@
 // NOT for: App footer or navigation
 
 import Link from 'next/link'
-import { Sparkles } from 'lucide-react'
+import Image from 'next/image'
 
 export function FooterSection() {
   return (
@@ -11,11 +11,8 @@ export function FooterSection() {
       <div className="mx-auto max-w-5xl grid grid-cols-2 md:grid-cols-5 gap-8">
         {/* Brand — full width on mobile */}
         <div className="col-span-2 md:col-span-1">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-            </div>
-            <span className="text-sm font-semibold text-white">OctoHelper</span>
+          <div className="mb-4">
+            <Image src="/logo-octohelper.png" alt="OctoHelper" width={140} height={23} />
           </div>
           <p className="text-xs text-gray-500 leading-relaxed">
             AI-powered marketplace assistant dla sprzedawców online.

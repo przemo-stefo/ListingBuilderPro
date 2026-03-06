@@ -6,7 +6,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, Menu, X } from 'lucide-react'
+import Image from 'next/image'
+import { Menu, X } from 'lucide-react'
 
 const NAV_LINKS = [
   { label: 'Funkcje', href: '#features' },
@@ -32,11 +33,8 @@ export function LandingNav() {
     }`}>
       <div className="mx-auto max-w-6xl flex items-center justify-between px-6 py-4">
         {/* Logo */}
-        <Link href="/landing" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <Sparkles className="h-4 w-4 text-emerald-400" />
-          </div>
-          <span className="text-lg font-semibold text-white">OctoHelper</span>
+        <Link href="/landing" className="flex items-center">
+          <Image src="/logo-octohelper.png" alt="OctoHelper" width={160} height={26} />
         </Link>
 
         {/* Desktop links */}

@@ -5,11 +5,12 @@
 'use client'
 
 import { Suspense, useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { LoginMarketingPanel } from '@/components/login/LoginMarketingPanel'
 import { ResetPasswordForm } from '@/components/login/ResetPasswordForm'
-import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
+import { Mail, Lock, ArrowRight } from 'lucide-react'
 
 type Tab = 'login' | 'register'
 
@@ -104,10 +105,7 @@ function LoginContent() {
         <div className="w-full max-w-md space-y-8">
           {/* WHY: Mobile-only logo — desktop shows it in left panel */}
           <div className="lg:hidden flex items-center gap-3 mb-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <Sparkles className="h-4 w-4 text-emerald-400" />
-            </div>
-            <span className="text-lg font-semibold text-white">OctoHelper</span>
+            <Image src="/logo-octohelper.png" alt="OctoHelper" width={160} height={26} />
           </div>
 
           <div>

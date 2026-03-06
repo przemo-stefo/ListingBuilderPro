@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Check, Link2, Upload, Sparkles, Send, X } from 'lucide-react'
+import { Check, Link2, Upload, Sparkles, ArrowRightLeft, X } from 'lucide-react'
 import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
 
 interface OnboardingChecklistProps {
@@ -26,7 +26,7 @@ export function OnboardingChecklist({ totalProducts, optimizedCount, publishedCo
     { label: 'Połącz Allegro', done: hasOAuth, href: '/integrations', icon: Link2 },
     { label: 'Importuj produkt', done: totalProducts > 0, href: '/products/import', icon: Upload },
     { label: 'Zoptymalizuj listing', done: optimizedCount > 0, href: '/optimize', icon: Sparkles },
-    { label: 'Eksportuj na marketplace', done: publishedCount > 0, href: '/publish', icon: Send },
+    { label: 'Konwertuj listing', done: publishedCount > 0, href: '/converter', icon: ArrowRightLeft },
   ]
 
   const completedCount = steps.filter(s => s.done).length

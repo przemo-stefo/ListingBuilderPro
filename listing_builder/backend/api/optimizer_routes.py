@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import asyncio
+from datetime import date
 import structlog
 
 from services.optimizer_service import optimize_listing
@@ -44,7 +46,6 @@ def _check_tier_limit(request: Request, db: Session, requested_count: int = 1):
         return  # unlimited
 
     # WHY: Per-IP limit prevents abuse — hashed IP for GDPR, same hash = same person
-    from datetime import date
     ip_hash = _hashed_ip(request)
     today_count = (
         db.query(OptimizationRun)
@@ -89,6 +90,9 @@ class OptimizerRequest(BaseModel):
     # WHY: Multi-LLM support — client picks provider, sends their own API key
     llm_provider: Optional[str] = Field(default=None, max_length=20)
     llm_api_key: Optional[str] = Field(default=None, max_length=200)
+    # WHY: Imported product data — AI uses as reference to improve listing
+    original_description: Optional[str] = Field(default="", max_length=5000)
+    original_bullets: Optional[List[str]] = Field(default_factory=list)
 
 
 class OptimizerScores(BaseModel):
@@ -207,23 +211,29 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
         }
 
     try:
-        result = await optimize_listing(
-            product_title=body.product_title,
-            brand=body.brand,
-            keywords=[
-                {"phrase": k.phrase, "search_volume": k.search_volume}
-                for k in body.keywords
-            ],
-            marketplace=body.marketplace,
-            mode=body.mode,
-            product_line=body.product_line or "",
-            language=body.language,
-            db=db,
-            audience_context=body.audience_context or "",
-            account_type=body.account_type,
-            category=body.category or "",
-            provider_config=provider_config,
-            user_id=user_id,
+        # WHY: 60s timeout prevents infinite spinner — Groq can hang on large products
+        result = await asyncio.wait_for(
+            optimize_listing(
+                product_title=body.product_title,
+                brand=body.brand,
+                keywords=[
+                    {"phrase": k.phrase, "search_volume": k.search_volume}
+                    for k in body.keywords
+                ],
+                marketplace=body.marketplace,
+                mode=body.mode,
+                product_line=body.product_line or "",
+                language=body.language,
+                db=db,
+                audience_context=body.audience_context or "",
+                account_type=body.account_type,
+                category=body.category or "",
+                provider_config=provider_config,
+                user_id=user_id,
+                original_description=body.original_description or "",
+                original_bullets=body.original_bullets or [],
+            ),
+            timeout=60.0,
         )
 
         logger.info(
@@ -255,9 +265,24 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
 
         return result
 
+    except asyncio.TimeoutError:
+        logger.error("optimizer_timeout", product=body.product_title[:50])
+        raise HTTPException(
+            status_code=504,
+            detail="Optymalizacja przekroczyła limit czasu (60s). Spróbuj ponownie za chwilę.",
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("optimizer_error", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail="Optimization failed")
+        error_msg = str(e).lower()
+        logger.error("optimizer_error", error=str(e), product=body.product_title[:50], exc_info=True)
+        # WHY: Differentiate between rate limit (all keys exhausted) and other errors
+        if "rate_limit" in error_msg or "429" in error_msg or "too many" in error_msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Serwer AI jest chwilowo przeciążony. Spróbuj ponownie za minutę.",
+            )
+        raise HTTPException(status_code=500, detail="Optymalizacja nie powiodła się. Spróbuj ponownie.")
 
 
 # WHY: Batch endpoint processes multiple products sequentially
@@ -314,22 +339,27 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
                         "api_key": product.llm_api_key,
                     }
 
-            data = await optimize_listing(
-                product_title=product.product_title,
-                brand=product.brand,
-                keywords=[
-                    {"phrase": k.phrase, "search_volume": k.search_volume}
-                    for k in product.keywords
-                ],
-                marketplace=product.marketplace,
-                mode=product.mode,
-                product_line=product.product_line or "",
-                language=product.language,
-                db=db,
-                account_type=product.account_type,
-                category=product.category or "",
-                provider_config=batch_provider_config,
-                user_id=user_id,
+            # WHY: 60s timeout per product — prevents one hung call from blocking entire batch
+            data = await asyncio.wait_for(
+                optimize_listing(
+                    product_title=product.product_title,
+                    brand=product.brand,
+                    keywords=[
+                        {"phrase": k.phrase, "search_volume": k.search_volume}
+                        for k in product.keywords
+                    ],
+                    marketplace=product.marketplace,
+                    mode=product.mode,
+                    product_line=product.product_line or "",
+                    language=product.language,
+                    db=db,
+                    audience_context=product.audience_context or "",
+                    account_type=product.account_type,
+                    category=product.category or "",
+                    provider_config=batch_provider_config,
+                    user_id=user_id,
+                ),
+                timeout=60.0,
             )
 
             results.append(BatchOptimizerResult(
@@ -346,12 +376,41 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
                 coverage=data.get("scores", {}).get("coverage_pct", 0),
             )
 
-        except Exception as e:
-            logger.error("batch_item_error", index=i, error=str(e))
+        except asyncio.TimeoutError:
+            logger.error("batch_item_timeout", index=i, product=product.product_title[:50])
             results.append(BatchOptimizerResult(
                 product_title=product.product_title,
                 status="error",
-                error="Optimization failed for this product",
+                error="Timeout — produkt zbyt duży lub serwer AI przeciążony",
+            ))
+            failed += 1
+            continue
+
+        except Exception as e:
+            error_msg = str(e).lower()
+            logger.error("batch_item_error", index=i, error=str(e))
+            # WHY: Rate limit = all keys exhausted — remaining products will also fail
+            if "rate_limit" in error_msg or "429" in error_msg:
+                results.append(BatchOptimizerResult(
+                    product_title=product.product_title,
+                    status="error",
+                    error="Serwer AI przeciążony — spróbuj za minutę",
+                ))
+                failed += 1
+                # WHY: Skip remaining products — they'll all hit the same rate limit
+                for remaining in body.products[i + 1:]:
+                    results.append(BatchOptimizerResult(
+                        product_title=remaining.product_title,
+                        status="error",
+                        error="Pominięto — serwer AI przeciążony",
+                    ))
+                    failed += 1
+                break
+
+            results.append(BatchOptimizerResult(
+                product_title=product.product_title,
+                status="error",
+                error="Optymalizacja nie powiodła się",
             ))
             failed += 1
 

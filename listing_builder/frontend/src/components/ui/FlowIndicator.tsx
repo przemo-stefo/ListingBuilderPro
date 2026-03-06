@@ -1,5 +1,5 @@
 // frontend/src/components/ui/FlowIndicator.tsx
-// Purpose: Reusable 3-step flow stepper (Import → Optymalizacja → Eksport)
+// Purpose: Reusable 3-step flow stepper (Import → Optymalizacja → Konwersja)
 // NOT for: Navigation logic or data fetching
 
 'use client'
@@ -41,9 +41,9 @@ export function FlowIndicator({ stats, currentStep }: FlowIndicatorProps) {
     },
     {
       key: 'export' as const,
-      href: '/publish',
-      label: 'Eksport',
-      sublabel: optimizedCount > 0 ? `${optimizedCount} do eksportu` : 'Brak gotowych',
+      href: '/converter',
+      label: 'Konwersja',
+      sublabel: optimizedCount > 0 ? `${optimizedCount} do konwersji` : 'Brak gotowych',
       done: false,
       active: false,
     },

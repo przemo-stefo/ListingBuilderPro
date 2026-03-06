@@ -5,6 +5,7 @@
 'use client'
 
 import { Suspense, useState, useEffect, type ReactNode } from 'react'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { TierProvider } from '@/components/providers/TierProvider'
@@ -58,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <span className="ml-3 text-sm font-bold text-white">OctoHelper</span>
+            <Image src="/logo-octohelper.png" alt="OctoHelper" width={120} height={20} className="ml-3" />
           </div>
 
           {/* WHY: overflow-y-scroll (not auto) prevents scrollbar appearing/disappearing = no layout jump */}

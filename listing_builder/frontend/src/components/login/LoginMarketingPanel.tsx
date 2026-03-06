@@ -2,7 +2,8 @@
 // Purpose: Left marketing panel for login page — explains what OctoHelper does
 // NOT for: Form logic or authentication (that's login/page.tsx)
 
-import { Sparkles, PenTool, Globe, Upload, Brain, Search, Check } from 'lucide-react'
+import Image from 'next/image'
+import { PenTool, Globe, Upload, Brain, Search, Check } from 'lucide-react'
 
 // WHY: Static feature list — clear "what does this tool do" before login
 const features = [
@@ -42,12 +43,7 @@ export function LoginMarketingPanel() {
 
       {/* Logo */}
       <div className="relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <Sparkles className="h-5 w-5 text-emerald-400" />
-          </div>
-          <span className="text-lg font-semibold text-white">OctoHelper</span>
-        </div>
+        <Image src="/logo-octohelper.png" alt="OctoHelper" width={180} height={29} />
       </div>
 
       {/* WHY: Static feature list — user sees exactly what the tool does before signing up */}

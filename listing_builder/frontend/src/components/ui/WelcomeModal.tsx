@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Upload, Sparkles, Send, X, ArrowRight } from 'lucide-react'
+import { Upload, Sparkles, ArrowRightLeft, X, ArrowRight } from 'lucide-react'
 import { useLocalStorage } from '@/lib/hooks/useLocalStorage'
 
 interface WelcomeModalProps {
@@ -36,7 +36,7 @@ export function WelcomeModal({ totalProducts }: WelcomeModalProps) {
   const steps = [
     { icon: Upload, label: 'Import', desc: 'Zaimportuj produkty z Allegro, CSV lub ręcznie' },
     { icon: Sparkles, label: 'Optymalizacja', desc: 'AI generuje tytuł, bullety, opis i keywords' },
-    { icon: Send, label: 'Eksport', desc: 'Wyeksportuj na Amazon, eBay, Kaufland' },
+    { icon: ArrowRightLeft, label: 'Konwersja', desc: 'Konwertuj na Amazon, eBay, Kaufland' },
   ]
 
   return (

@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
@@ -40,7 +41,14 @@ export function Sidebar({ onClose }: SidebarProps) {
   return (
     <div className="w-64 h-full border-r border-gray-800 bg-[#121212] p-6 flex flex-col">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-white">OctoHelper</h1>
+        <Image
+          src="/logo-octohelper.png"
+          alt="OctoHelper"
+          width={180}
+          height={29}
+          className="mb-1"
+          priority
+        />
         <p className="text-sm text-gray-400">Asystent sprzedawcy marketplace</p>
       </div>
 

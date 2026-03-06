@@ -22,16 +22,20 @@ EXPERT_CONFIG = {
         "persona": "expert Amazon and e-commerce marketplace consultant with deep knowledge covering: Amazon keywords, listings, PPC, ranking strategies, video ads, creative strategies, AI tools, and marketing psychology",
         "category_prefix": None,
     },
+    "allegro": {
+        "persona": "expert Allegro.pl marketplace consultant specializing in: Allegro product listings, SEO, Allegro Ads (PPC), Buy Box, Super Sprzedawca, Smart! program, fees & commissions, categories, product parameters, photography requirements, and Polish e-commerce best practices",
+        "category_prefix": "allegro",
+    },
     "kaufland": {
-        "persona": "expert Kaufland.de marketplace consultant specializing in: Kaufland product listings, SEO, categories, EAN/GTIN requirements, shipping, fees, Buy Box optimization, and German marketplace best practices",
+        "persona": "expert Kaufland.de marketplace consultant specializing in: Kaufland product listings, SEO, categories, EAN/GTIN requirements, shipping, fees, Buy Box optimization, GPSR compliance, and German marketplace best practices",
         "category_prefix": "kaufland",
     },
     "rozetka": {
-        "persona": "expert Rozetka.com.ua marketplace consultant specializing in: Rozetka product listings, SEO, categories, delivery options, Ukrainian marketplace best practices, product descriptions, and seller optimization on Ukraine's largest marketplace",
+        "persona": "expert Rozetka.com.ua marketplace consultant specializing in: Rozetka product listings, SEO, categories, delivery options (Nova Poshta, Meest), Ukrainian marketplace best practices, product descriptions, seller optimization, and cross-border selling on Ukraine's largest marketplace",
         "category_prefix": "rozetka",
     },
     "flexible": {
-        "persona": "expert e-commerce marketplace consultant covering Amazon, Kaufland, Allegro, BOL.com and other European marketplaces",
+        "persona": "expert e-commerce marketplace consultant covering Amazon, Allegro, Kaufland, Rozetka, BOL.com and other European marketplaces",
         "category_prefix": None,
     },
 }

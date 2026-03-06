@@ -427,6 +427,104 @@ async def list_marketplaces(_user_id: str = Depends(require_user_id)):
     }
 
 
+# ── Convert from DB ──────────────────────────────────────────────────────
+
+
+class ConvertFromDbRequest(BaseModel):
+    """Request to convert products already in the database."""
+    product_ids: List[int] = Field(..., min_length=1, max_length=50)
+    marketplace: str
+    gpsr_data: GPSRData = GPSRData()
+    eur_rate: float = 0.23
+
+    @field_validator("marketplace")
+    @classmethod
+    def validate_marketplace(cls, v):
+        allowed = ["amazon", "ebay", "kaufland", "bol"]
+        if v not in allowed:
+            raise ValueError(f"marketplace must be one of: {allowed}")
+        return v
+
+
+@router.post("/convert-from-db", response_model=ConvertResponse)
+@limiter.limit("5/minute")
+async def convert_from_db(
+    request: Request,
+    body: ConvertFromDbRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
+    """Convert products from the database (no scraping needed).
+
+    WHY: User already has products imported — reuse them for conversion
+    instead of re-scraping from URLs.
+    """
+    from models.product import Product
+    from services.converter.product_adapter import products_to_allegro
+
+    # WHY: user_id filter prevents cross-tenant data access
+    products = (
+        db.query(Product)
+        .filter(Product.id.in_(body.product_ids), Product.user_id == user_id)
+        .all()
+    )
+
+    if not products:
+        raise HTTPException(status_code=404, detail="Nie znaleziono produktów")
+
+    logger.info(
+        "convert_from_db",
+        product_count=len(products),
+        marketplace=body.marketplace,
+    )
+
+    # WHY: Adapter converts DB Product → AllegroProduct format expected by convert_batch
+    allegro_products = products_to_allegro(products)
+
+    translator = AITranslator(groq_api_key=settings.groq_api_key)
+    converted = convert_batch(
+        products=allegro_products,
+        marketplace=body.marketplace,
+        translator=translator,
+        gpsr_data=body.gpsr_data.model_dump(),
+        eur_rate=body.eur_rate,
+    )
+
+    succeeded = sum(1 for c in converted if not c.error)
+    all_warnings = []
+    for c in converted:
+        all_warnings.extend(c.warnings)
+
+    # WHY: Warn about missing fields that CSV imports typically lack
+    missing_fields_warning = []
+    for p in products:
+        attrs = p.attributes or {}
+        if not attrs.get("ean"):
+            missing_fields_warning.append(f"{(p.title_original or '')[:40]}: brak EAN")
+        if not attrs.get("manufacturer"):
+            missing_fields_warning.append(f"{(p.title_original or '')[:40]}: brak producenta")
+    if missing_fields_warning:
+        all_warnings.insert(0, "Niektóre pola mogą być puste (EAN, producent) — uzupełnij ręcznie w pliku wynikowym")
+
+    return ConvertResponse(
+        total=len(converted),
+        succeeded=succeeded,
+        failed=len(converted) - succeeded,
+        marketplace=body.marketplace,
+        products=[
+            {
+                "source_url": c.source_url,
+                "source_id": c.source_id,
+                "fields": c.fields,
+                "warnings": c.warnings,
+                "error": c.error,
+            }
+            for c in converted
+        ],
+        warnings=all_warnings,
+    )
+
+
 # ── Store endpoints ──────────────────────────────────────────────────────
 
 @router.post("/store-urls", response_model=StoreUrlsResponse)

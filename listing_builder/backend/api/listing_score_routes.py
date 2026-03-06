@@ -70,6 +70,7 @@ class FetchResponse(BaseModel):
     title: str = ""
     bullets: list[str] = []
     description: str = ""
+    a_plus_content: str = ""
     url: str = ""
     error: str = ""
 
@@ -110,7 +111,9 @@ async def fetch_listing_endpoint(request: Request, body: FetchRequest, db: Sessi
             return FetchResponse(
                 asin=parsed.asin, marketplace=marketplace,
                 title=parsed.title, bullets=parsed.bullets,
-                description=parsed.description, url=url,
+                description=parsed.description,
+                a_plus_content=parsed.a_plus_content,
+                url=url,
             )
 
     return FetchResponse(

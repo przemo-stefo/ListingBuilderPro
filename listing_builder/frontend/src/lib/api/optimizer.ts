@@ -2,49 +2,56 @@
 // Purpose: API calls for the n8n Listing Optimizer workflow
 // NOT for: React hooks or UI logic (those are in hooks/useOptimizer.ts)
 
-import { apiRequest } from './client'
+import { apiClient, apiRequest } from './client'
 import type {
   OptimizerRequest,
   OptimizerResponse,
   BatchOptimizerRequest,
   BatchOptimizerResponse,
   ScrapeResponse,
+  ApiError,
 } from '../types'
 
-// WHY: n8n runs 3 sequential LLM calls — can take 10-20s total
-const OPTIMIZER_TIMEOUT = 60_000
+// WHY: Custom error preserves HTTP status code from backend
+class OptimizerError extends Error {
+  code: string
+  constructor(message: string, code: string) {
+    super(message)
+    this.code = code
+    this.name = 'OptimizerError'
+  }
+}
+
+// WHY: Shared helper — throws OptimizerError with HTTP code for hook differentiation
+function throwApiError(error: unknown): never {
+  const apiErr = error as ApiError
+  throw new OptimizerError(
+    apiErr.message || 'Nieoczekiwany błąd',
+    apiErr.code || '500',
+  )
+}
 
 export async function generateListing(
   payload: OptimizerRequest
 ): Promise<OptimizerResponse> {
-  const response = await apiRequest<OptimizerResponse>(
-    'post',
-    '/optimizer/generate',
-    payload
-  )
-
-  if (response.error) {
-    throw new Error(response.error)
+  try {
+    const { data } = await apiClient.post<OptimizerResponse>('/optimizer/generate', payload)
+    return data
+  } catch (error) {
+    throwApiError(error)
   }
-
-  return response.data!
 }
 
 // WHY: Batch can take 5s per product × up to 50 products
 export async function generateBatch(
   payload: BatchOptimizerRequest
 ): Promise<BatchOptimizerResponse> {
-  const response = await apiRequest<BatchOptimizerResponse>(
-    'post',
-    '/optimizer/generate-batch',
-    payload
-  )
-
-  if (response.error) {
-    throw new Error(response.error)
+  try {
+    const { data } = await apiClient.post<BatchOptimizerResponse>('/optimizer/generate-batch', payload)
+    return data
+  } catch (error) {
+    throwApiError(error)
   }
-
-  return response.data!
 }
 
 // WHY: Reuse existing scrape endpoint to pull product data from Allegro URLs

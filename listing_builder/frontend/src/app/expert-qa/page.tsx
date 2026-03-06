@@ -46,6 +46,15 @@ const KAUFLAND_QUESTIONS = [
   'Jakie są najczęstsze błędy sprzedawców na Kaufland.de?',
 ]
 
+const ALLEGRO_QUESTIONS = [
+  'Jak zbudować skuteczny tytuł oferty na Allegro?',
+  'Jak działają Allegro Ads i jak ustawić kampanię CPC?',
+  'Jakie są wymagania programu Smart! i darmowej dostawy?',
+  'Jak wygrać Buy Box na Allegro i co na to wpływa?',
+  'Jakie są prowizje i opłaty na Allegro w 2026?',
+  'Jak zostać Super Sprzedawcą na Allegro?',
+]
+
 const ROZETKA_QUESTIONS = [
   'Jak zbudować skuteczny tytuł produktu na Rozetka?',
   'Jakie są wymagania Rozetka dotyczące zdjęć produktów?',
@@ -71,6 +80,20 @@ const EXPERT_CONFIG = {
     ragDefault: 'strict' as const,
     questions: AMAZON_QUESTIONS,
     gate: 'Ekspert Amazon',
+  },
+  allegro: {
+    title: 'Ekspert Allegro',
+    subtitle: 'Listingi, SEO, Allegro Ads, Smart!, Buy Box i prowizje',
+    heroTitle: 'Ekspert Allegro — wszystko o sprzedaży na Allegro.pl',
+    heroDesc: 'AI doradca specjalizujący się w Allegro marketplace. Pytaj o listingi, Allegro Ads, program Smart!, Buy Box, prowizje, Super Sprzedawcę i optymalizację ofert.',
+    placeholder: 'Zapytaj o tytuły, Allegro Ads, Smart!, Buy Box, prowizje...',
+    iconBg: 'bg-orange-500/20',
+    iconText: 'text-orange-400',
+    hoverBorder: 'hover:border-orange-800 hover:text-orange-300',
+    icon: ShoppingCart,
+    ragDefault: 'balanced' as const,
+    questions: ALLEGRO_QUESTIONS,
+    gate: 'Ekspert Allegro',
   },
   kaufland: {
     title: 'Ekspert Kaufland',
@@ -359,16 +382,26 @@ function ExpertQAContent() {
         <FaqSection
           title={`FAQ — ${expert.title}`}
           subtitle={`Jak korzystać z: ${expert.title}`}
-          items={expertKey === 'kaufland' ? [
+          items={expertKey === 'allegro' ? [
+            { question: 'Co to jest Ekspert Allegro?', answer: 'Chatbot AI specjalizujący się w sprzedaży na Allegro.pl. Odpowiada na pytania o listingach, Allegro Ads, programie Smart!, Buy Box, prowizjach i optymalizacji ofert.' },
+            { question: 'Jakie pytania mogę zadawać?', answer: 'Jak pisać tytuły na Allegro, jak ustawić Allegro Ads, jakie są prowizje, jak zostać Super Sprzedawcą, jak wygrać Buy Box, jak działa Smart!, jak optymalizować zdjęcia i opisy.' },
+            { question: 'Skąd pochodzi wiedza?', answer: 'Dedykowana baza wiedzy o Allegro marketplace — oficjalne wymagania, prowizje, zasady programu Smart!, Allegro Ads, Super Sprzedawca i sprawdzone praktyki polskich sellerów.' },
+            { question: 'Czy odpowiedzi dotyczą Allegro.pl?', answer: 'Tak — ekspert jest skonfigurowany pod Allegro.pl. Odpowiedzi uwzględniają specyfikę polskiego marketplace, wymagania i aktualne prowizje.' },
+          ] : expertKey === 'kaufland' ? [
             { question: 'Co to jest Ekspert Kaufland?', answer: 'Chatbot AI specjalizujący się w sprzedaży na Kaufland.de. Odpowiada na pytania o listingach, kategoriach, EAN, SEO, wysyłce i wymaganiach marketplace.' },
             { question: 'Jakie pytania mogę zadawać?', answer: 'Jak pisać tytuły na Kaufland, jak wybrać kategorię, jakie są wymagania EAN/GTIN, jak działa fulfillment, jak optymalizować opisy pod SEO Kaufland, jakie są prowizje i opłaty.' },
             { question: 'Czy odpowiedzi dotyczą Kaufland.de?', answer: 'Tak — ekspert jest skonfigurowany pod Kaufland.de (rynek niemiecki). Odpowiedzi uwzględniają specyfikę tego marketplace, wymagania i best practices.' },
-            { question: 'Skąd pochodzi wiedza?', answer: 'Baza wiedzy e-commerce + wiedza AI o Kaufland marketplace. Używa trybu zbalansowanego — łączy sprawdzone źródła z ogólną wiedzą o e-commerce.' },
+            { question: 'Skąd pochodzi wiedza?', answer: 'Dedykowana baza wiedzy o Kaufland marketplace — wymagania, prowizje, EAN/GTIN, GPSR, Buy Box, kategorie i sprawdzone praktyki sprzedawców na rynku niemieckim.' },
+          ] : expertKey === 'rozetka' ? [
+            { question: 'Co to jest Ekspert Rozetka?', answer: 'Chatbot AI specjalizujący się w sprzedaży na Rozetka.com.ua — największym ukraińskim marketplace. Odpowiada na pytania o listingach, kategoriach, dostawie i optymalizacji ofert.' },
+            { question: 'Jakie pytania mogę zadawać?', answer: 'Jak pisać tytuły na Rozetka, jak wybrać kategorię, jakie są wymagania zdjęć, jak działa Nova Poshta, jak optymalizować opisy, jakie są prowizje i popularne metody płatności.' },
+            { question: 'Czy odpowiedzi dotyczą rynku ukraińskiego?', answer: 'Tak — ekspert jest skonfigurowany pod Rozetka.com.ua. Odpowiedzi uwzględniają specyfikę ukraińskiego rynku, dostawę przez Nova Poshta/Meest, płatności i preferencje kupujących.' },
+            { question: 'Skąd pochodzi wiedza?', answer: 'Dedykowana baza wiedzy o Rozetka marketplace — wymagania platformy, kategorie, opcje dostawy, prowizje i sprawdzone praktyki sprzedawców na rynku ukraińskim.' },
           ] : [
-            { question: 'Co to jest Ekspert AI?', answer: 'Chatbot AI z dostępem do bazy wiedzy o sprzedaży na marketplace. Odpowiada na pytania o Amazon, eBay, Kaufland — słowa kluczowe, listingi, PPC, strategie cenowe, backend keywords i wiele więcej.' },
+            { question: 'Co to jest Ekspert AI?', answer: 'Chatbot AI z dostępem do bazy wiedzy o sprzedaży na marketplace. Odpowiada na pytania o Amazon, Allegro, Kaufland, Rozetka — słowa kluczowe, listingi, PPC, strategie cenowe i wiele więcej.' },
             { question: 'Skąd pochodzi wiedza?', answer: 'Baza wiedzy zawiera ponad 10 000 fragmentów z kursów ekspertów marketplace, poradników e-commerce i sprawdzonych strategii sprzedażowych. Wiedza jest regularnie aktualizowana.' },
             { question: 'Co oznaczają tryby RAG?', answer: 'Ścisły = odpowiedzi tylko z bazy wiedzy. Zbalansowany = baza + ogólna wiedza AI. Elastyczny = łączy wszystkie źródła. Bez RAG = czysty LLM bez bazy wiedzy. Domyślnie: Zbalansowany.' },
-            { question: 'Jakie pytania mogę zadawać?', answer: 'Wszystko o sprzedaży online: jak pisać tytuły, jak dobierać słowa kluczowe, jak optymalizować PPC, jak tworzyć reklamy wideo, jak budować markę na Amazon, jakie są najlepsze praktyki dla backend keywords, itp.' },
+            { question: 'Jakie pytania mogę zadawać?', answer: 'Wszystko o sprzedaży online: jak pisać tytuły, jak dobierać słowa kluczowe, jak optymalizować PPC, jak tworzyć reklamy wideo, jak budować markę na Amazon/Allegro, jakie są najlepsze praktyki dla każdego marketplace.' },
           ]}
         />
       )}

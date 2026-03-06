@@ -49,6 +49,7 @@ class AmazonListing:
     title: str = ""
     bullets: list[str] = field(default_factory=list)
     description: str = ""
+    a_plus_content: str = ""
     url: str = ""
     error: Optional[str] = None
 
@@ -155,15 +156,19 @@ class _AmazonHTMLParser(HTMLParser):
         self.title = ""
         self.bullets: list[str] = []
         self.description = ""
+        self.a_plus_content = ""
 
         # Internal state tracking
         self._in_title = False
         self._in_feature_bullets = False
         self._in_bullet_span = False
         self._in_description = False
+        self._in_aplus = False
         self._current_bullet = ""
         self._desc_parts: list[str] = []
+        self._aplus_parts: list[str] = []
         self._depth = 0
+        self._aplus_depth = 0
 
     def handle_starttag(self, tag, attrs):
         attr_dict = dict(attrs)
@@ -181,6 +186,12 @@ class _AmazonHTMLParser(HTMLParser):
             self._depth = 0
         elif self._in_description:
             self._depth += 1
+        # WHY: A+ content lives in separate div — extract text for listing score
+        elif tag_id in ("aplus", "aplus_feature_div", "aplusBrandStory_feature_div") and not self._in_aplus:
+            self._in_aplus = True
+            self._aplus_depth = 0
+        elif self._in_aplus:
+            self._aplus_depth += 1
 
     def handle_endtag(self, tag):
         if self._in_title and tag == "span":
@@ -199,6 +210,13 @@ class _AmazonHTMLParser(HTMLParser):
                     self._in_description = False
                 else:
                     self._depth -= 1
+        if self._in_aplus:
+            if tag == "div":
+                if self._aplus_depth <= 0:
+                    self.a_plus_content = " ".join(self._aplus_parts).strip()
+                    self._in_aplus = False
+                else:
+                    self._aplus_depth -= 1
 
     def handle_data(self, data):
         text = data.strip()
@@ -210,6 +228,8 @@ class _AmazonHTMLParser(HTMLParser):
             self._current_bullet += " " + text
         elif self._in_description:
             self._desc_parts.append(text)
+        elif self._in_aplus:
+            self._aplus_parts.append(text)
 
 
 async def fetch_listing(listing: AmazonListing) -> AmazonListing:
@@ -227,14 +247,17 @@ async def fetch_listing(listing: AmazonListing) -> AmazonListing:
 
     try:
         html = ""
-        # WHY: Try scrape.do first (handles anti-bot), fall back to direct on failure
-        if scrape_do_token:
+        # WHY: curl_cffi first (Chrome TLS impersonation, free, fast),
+        # then Scrape.do fallback (paid proxy), then plain httpx (last resort)
+        try:
+            html = await _fetch_direct(url)
+        except Exception as e:
+            logger.warning("curl_cffi_failed", error=str(e)[:80])
+        if not html and scrape_do_token:
             try:
                 html = await _fetch_via_scrape_do(url, scrape_do_token)
             except Exception as e:
-                logger.warning("scrape_do_failed_fallback_direct", error=str(e)[:80])
-        if not html:
-            html = await _fetch_direct(url)
+                logger.warning("scrape_do_failed", error=str(e)[:80])
 
         if not html:
             listing.error = "Nie udało się pobrać strony — spróbuj ponownie"
@@ -246,6 +269,7 @@ async def fetch_listing(listing: AmazonListing) -> AmazonListing:
         listing.title = parser.title.strip()
         listing.bullets = parser.bullets
         listing.description = parser.description
+        listing.a_plus_content = parser.a_plus_content
 
         if not listing.title:
             listing.error = "Nie znaleziono tytułu — Amazon mógł zablokować zapytanie"
@@ -275,7 +299,28 @@ async def _fetch_via_scrape_do(url: str, token: str) -> str:
 
 
 async def _fetch_direct(url: str) -> str:
-    """Direct fetch with browser-like headers. Works for some marketplaces."""
+    """Direct fetch using curl_cffi with Chrome TLS impersonation.
+
+    WHY curl_cffi: Amazon blocks httpx/requests via TLS fingerprint detection.
+    curl_cffi impersonates real Chrome TLS handshake → gets past anti-bot.
+    Falls back to plain httpx if curl_cffi not installed.
+    """
+    try:
+        from curl_cffi import requests as cffi_requests
+        # WHY: Detect marketplace from URL for Accept-Language header
+        lang = "de-DE,de;q=0.9,en;q=0.7" if "amazon.de" in url else "en-US,en;q=0.9"
+        resp = cffi_requests.get(
+            url,
+            impersonate="chrome",
+            headers={"Accept-Language": lang},
+            allow_redirects=True,
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.text
+    except ImportError:
+        logger.warning("curl_cffi_not_installed_fallback_httpx")
+    # Fallback: plain httpx (likely blocked by Amazon but worth trying)
     import random
     headers = {
         "User-Agent": random.choice(_USER_AGENTS),

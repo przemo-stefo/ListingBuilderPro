@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '@/lib/hooks/useToast'
 import { cn } from '@/lib/utils'
-import { FileUp, Clipboard, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { FileUp, Clipboard, Loader2, CheckCircle2, XCircle, ImagePlus } from 'lucide-react'
 import Papa from 'papaparse'
 import { apiRequest } from '@/lib/api/client'
 import { MARKETPLACES, COLUMN_MAP, MAX_BATCH_SIZE } from '../constants'
@@ -26,6 +26,8 @@ export default function BatchImport() {
   const [pasteText, setPasteText] = useState('')
   const [isImporting, setIsImporting] = useState(false)
   const [result, setResult] = useState<{ success: number; failed: number } | null>(null)
+  const [isEnrichingImages, setIsEnrichingImages] = useState(false)
+  const [imageResult, setImageResult] = useState<{ enriched: number; failed: number } | null>(null)
 
   // WHY: Auto-detect CSV columns using the COLUMN_MAP lookup table
   const parseCSVData = useCallback((text: string) => {
@@ -107,6 +109,25 @@ export default function BatchImport() {
     e.target.value = ''
   }
 
+  const handleEnrichImages = async () => {
+    setIsEnrichingImages(true)
+    try {
+      const res = await apiRequest<{ enriched: number; failed: number; total: number; errors: string[] }>(
+        'post', '/import/enrich-images', { auto_recent: true }
+      )
+      if (res.error) throw new Error(res.error)
+      setImageResult({ enriched: res.data!.enriched, failed: res.data!.failed })
+      toast({
+        title: 'Zdjęcia pobrane',
+        description: `Wzbogacono ${res.data!.enriched} produktów${res.data!.failed > 0 ? `, ${res.data!.failed} błędów` : ''}`,
+      })
+    } catch (err) {
+      toast({ title: 'Błąd pobierania zdjęć', description: (err as Error).message, variant: 'destructive' })
+    } finally {
+      setIsEnrichingImages(false)
+    }
+  }
+
   const handleImport = async () => {
     if (products.length === 0) return
     setIsImporting(true)
@@ -131,9 +152,11 @@ export default function BatchImport() {
       if (res.error) throw new Error(res.error)
 
       setResult({ success: res.data!.success_count, failed: res.data!.failed_count })
+      // WHY: Check if imported products had source_url — if yes, images can be enriched
+      const hasSourceUrls = products.some(p => p.source_url)
       toast({
         title: 'Import zakończony',
-        description: `${res.data!.success_count} produktów zaimportowano${res.data!.failed_count > 0 ? `, ${res.data!.failed_count} błędów` : ''}`,
+        description: `${res.data!.success_count} produktów zaimportowano${res.data!.failed_count > 0 ? `, ${res.data!.failed_count} błędów` : ''}${hasSourceUrls ? '. Możesz teraz pobrać zdjęcia.' : ''}`,
       })
     } catch (err) {
       toast({ title: 'Błąd importu', description: (err as Error).message, variant: 'destructive' })
@@ -202,26 +225,62 @@ export default function BatchImport() {
 
       {/* Result */}
       {result && (
-        <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] p-5 flex items-center gap-4">
-          <CheckCircle2 className="h-6 w-6 text-green-400 shrink-0" />
-          <div>
-            <p className="text-sm text-white font-medium">Zaimportowano {result.success} produktów</p>
-            {result.failed > 0 && (
-              <p className="text-xs text-red-400 flex items-center gap-1 mt-1">
-                <XCircle className="h-3.5 w-3.5" /> {result.failed} błędów
+        <div className="space-y-3">
+          <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] p-5 flex items-center gap-4">
+            <CheckCircle2 className="h-6 w-6 text-green-400 shrink-0" />
+            <div>
+              <p className="text-sm text-white font-medium">Zaimportowano {result.success} produktów</p>
+              {result.failed > 0 && (
+                <p className="text-xs text-red-400 flex items-center gap-1 mt-1">
+                  <XCircle className="h-3.5 w-3.5" /> {result.failed} błędów
+                </p>
+              )}
+            </div>
+            <div className="ml-auto flex gap-2">
+              <Link href="/optimize"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                Optymalizuj teraz
+              </Link>
+              <Link href="/products"
+                className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors">
+                Zobacz produkty
+              </Link>
+            </div>
+          </div>
+
+          {/* WHY: CSV z Allegro nie zawiera zdjęć — oferujemy pobranie z oryginalnych URL-i */}
+          {products.some(p => p.source_url) && !imageResult && (
+            <div className="rounded-xl border border-amber-800/50 bg-amber-900/10 p-5 flex items-center gap-4">
+              <ImagePlus className="h-6 w-6 text-amber-400 shrink-0" />
+              <div>
+                <p className="text-sm text-white font-medium">Pliki CSV nie zawierają zdjęć</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Pobierz zdjęcia z Allegro dla zaimportowanych produktów (do 50 na raz)
+                </p>
+              </div>
+              <button
+                onClick={handleEnrichImages}
+                disabled={isEnrichingImages}
+                className="ml-auto flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {isEnrichingImages ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Pobieranie...</>
+                ) : (
+                  <><ImagePlus className="h-4 w-4" /> Pobierz zdjęcia</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {imageResult && (
+            <div className="rounded-xl border border-gray-800 bg-[#1A1A1A] p-5 flex items-center gap-4">
+              <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0" />
+              <p className="text-sm text-white">
+                Pobrano zdjęcia dla {imageResult.enriched} produktów
+                {imageResult.failed > 0 && <span className="text-red-400 ml-1">({imageResult.failed} błędów)</span>}
               </p>
-            )}
-          </div>
-          <div className="ml-auto flex gap-2">
-            <Link href="/optimize"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-              Optymalizuj teraz
-            </Link>
-            <Link href="/products"
-              className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors">
-              Zobacz produkty
-            </Link>
-          </div>
+            </div>
+          )}
         </div>
       )}
 
