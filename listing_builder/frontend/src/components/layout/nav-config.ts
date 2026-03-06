@@ -50,6 +50,7 @@ export const navSections: NavSection[] = [
       { title: 'Konwerter', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty Allegro na Amazon/eBay/Kaufland' },
       // WHY: Mateusz (spotkanie 24.02) — Listing Score tuż pod konwersją
       { title: 'Listing Score', href: '/listing-score', icon: BarChart3, desc: 'Oceń listing 1-10 w 5 wymiarach copywriterskich' },
+      // WHY: Integracje NIE w sidebar (Mateusz 24.02) — dostępne przez /settings lub /integrations URL
     ],
   },
   {

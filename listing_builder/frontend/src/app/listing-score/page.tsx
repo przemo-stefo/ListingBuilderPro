@@ -112,6 +112,7 @@ export default function ListingScorePage() {
   const [title, setTitle] = useState('')
   const [bullets, setBullets] = useState<string[]>(['', '', '', '', ''])
   const [description, setDescription] = useState('')
+  const [backendKeywords, setBackendKeywords] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<ScoreResult | null>(null)
   const [error, setError] = useState('')
@@ -189,6 +190,7 @@ export default function ListingScorePage() {
         title,
         bullets: validBullets,
         description: description || undefined,
+        backend_keywords: backendKeywords || undefined,
       })
       setResult(data)
     } catch (e) {
@@ -330,6 +332,16 @@ export default function ListingScorePage() {
               rows={4}
               className="w-full rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-600"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm text-gray-400">Backend Keywords (opcjonalnie)</label>
+            <Input
+              value={backendKeywords}
+              onChange={(e) => setBackendKeywords(e.target.value)}
+              placeholder="np. silicone utensils heat resistant BPA free kitchen tools cooking set"
+            />
+            <p className="mt-1 text-[10px] text-gray-600">Słowa kluczowe backend (Search Terms z Seller Central) — wpływają na ocenę pokrycia SEO</p>
           </div>
         </CardContent>
       </Card>
