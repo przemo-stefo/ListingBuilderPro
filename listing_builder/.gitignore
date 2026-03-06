@@ -145,3 +145,22 @@ test_data/
 
 # Internal docs / notes (not code)
 docs/
+
+# Test screenshots (temporary, not code)
+test-*.png
+demo-*.png
+formspree-*.png
+test*.png
+
+# Playwright MCP cache
+.playwright-mcp/
+
+# LinkedIn data (private, not for repo)
+linkedin-*.json
+linkedin-*.md
+
+# Optimizer debug notes
+optimizer-*.md
+
+# Misc temporary docs
+README_remote-control.md
