@@ -161,6 +161,13 @@ function ExpertQAContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const initialQuestionSent = useRef(false)
 
+  // WHY: Clear conversation when switching between experts — each expert starts fresh
+  useEffect(() => {
+    setMessages([])
+    setInput('')
+    initialQuestionSent.current = false
+  }, [expertKey])
+
   // WHY: Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
