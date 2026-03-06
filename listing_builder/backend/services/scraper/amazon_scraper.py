@@ -287,7 +287,7 @@ async def fetch_listing(listing: AmazonListing) -> AmazonListing:
 
     except Exception as e:
         logger.error("amazon_fetch_error", asin=listing.asin, error=str(e))
-        listing.error = f"Błąd pobierania: {str(e)[:100]}"
+        listing.error = f"Błąd pobierania: {str(e)[:200]}"
 
     return listing
 

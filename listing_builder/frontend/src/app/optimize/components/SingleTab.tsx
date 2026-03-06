@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import {
   Sparkles,
   Loader2,
@@ -142,8 +142,9 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
         description: stripHtml(listing.description),
       })
       setScoreResult(data)
-    } catch {
-      // WHY: Score is non-critical — don't break the flow if it fails
+    } catch (err) {
+      // WHY: Score is non-critical — don't break the flow, just log for debugging
+      console.warn('Auto-score failed:', err)
     } finally {
       setScoreLoading(false)
     }
@@ -189,7 +190,8 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   }
 
   // WHY: Parse keywords from textarea — supports CSV (phrase,volume) and plain text (one per line)
-  const parseKeywords = (): OptimizerKeyword[] => {
+  // WHY: useMemo prevents re-parsing on every render (was called 2x per keystroke before)
+  const parsedKeywords = useMemo((): OptimizerKeyword[] => {
     return keywordsText
       .split('\n')
       .map((line) => line.trim())
@@ -207,9 +209,9 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
         // Plain text — no volume
         return { phrase: line.replace(/^["']|["']$/g, ''), search_volume: 0 }
       })
-  }
+  }, [keywordsText])
 
-  const keywordCount = parseKeywords().length
+  const keywordCount = parsedKeywords.length
   const canSubmit = productTitle.length >= 3 && brand.length >= 1 && keywordCount >= 1
 
   // WHY: Auto-fill form fields when user picks a product from the database
@@ -253,7 +255,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
       product_title: productTitle,
       brand,
       product_line: productLine || undefined,
-      keywords: parseKeywords(),
+      keywords: parsedKeywords,
       marketplace,
       mode,
       asin: asin || undefined,
@@ -291,7 +293,9 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   }
 
   const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text)
+    navigator.clipboard.writeText(text).catch(() => {
+      // WHY: Clipboard API can fail in non-secure contexts — silent fallback
+    })
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
   }

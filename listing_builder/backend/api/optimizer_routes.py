@@ -96,7 +96,7 @@ class OptimizerRequest(BaseModel):
 
     @field_validator("original_bullets")
     @classmethod
-    def truncate_bullets(cls, v: list[str] | None) -> list[str]:
+    def truncate_bullets(cls, v: Optional[List[str]]) -> List[str]:
         """WHY: Each bullet max 500 chars — prevents oversized payloads from reaching LLM."""
         if not v:
             return []
@@ -320,7 +320,7 @@ class BatchOptimizerResponse(BaseModel):
 
 @router.post("/generate-batch", response_model=BatchOptimizerResponse)
 @limiter.limit("3/minute")
-async def generate_batch(request: Request, body: BatchOptimizerRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
+async def generate_batch(request: Request, body: BatchOptimizerRequest, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
     """
     Generate optimized listings for multiple products.
 
@@ -549,11 +549,13 @@ async def optimizer_health(_admin: str = Depends(require_admin)):
             "model": "llama-3.3-70b-versatile",
         }
     except Exception as e:
-        return {
+        # WHY: 503 so monitoring systems detect unhealthy state via HTTP status
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content={
             "status": "unhealthy",
             "provider": "groq",
             "error": "Connection failed",
-        }
+        })
 
 
 # --- Trace / observability endpoints ---

@@ -2,8 +2,10 @@
 # Purpose: Listing Score endpoint — rate listing quality 1-10 with copywriting frameworks
 # NOT for: Listing generation (optimizer_routes) or ad copy (ad_copy_routes)
 
+from typing import List
+
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -28,6 +30,12 @@ class ScoreRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=500)
     bullets: list[str] = Field(..., min_length=1, max_length=10)
     description: str = Field(default="", max_length=5000)
+
+    @field_validator("bullets")
+    @classmethod
+    def truncate_bullets(cls, v: List[str]) -> List[str]:
+        """WHY: Per-bullet max 1000 chars — prevents oversized payloads reaching LLM."""
+        return [b[:1000] for b in v]
     backend_keywords: str = Field(default="", max_length=500)
     marketplace: str = Field(default="amazon", max_length=50)
 

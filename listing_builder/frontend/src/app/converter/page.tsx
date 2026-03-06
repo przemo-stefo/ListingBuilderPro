@@ -64,6 +64,8 @@ export default function ConverterPage() {
 
   // Product picker
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([])
+  // WHY: Set for O(1) lookup instead of Array.includes() O(n) in render loop
+  const selectedIdsSet = useMemo(() => new Set(selectedProductIds), [selectedProductIds])
   const [dbConvertLoading, setDbConvertLoading] = useState(false)
 
   // Results
@@ -230,7 +232,7 @@ export default function ConverterPage() {
                 {/* Product list */}
                 <div className="max-h-80 overflow-y-auto space-y-1">
                   {importedProducts.map((product) => {
-                    const isSelected = selectedProductIds.includes(product.id)
+                    const isSelected = selectedIdsSet.has(product.id)
                     return (
                       <button
                         key={product.id}
@@ -380,7 +382,10 @@ export default function ConverterPage() {
                   disabled={updateSettingsMutation.isPending}
                   onClick={(e) => {
                     e.stopPropagation()
-                    updateSettingsMutation.mutate({ gpsr: gpsr as GPSRData })
+                    updateSettingsMutation.mutate({ gpsr: gpsr as GPSRData }, {
+                      onSuccess: () => toast({ title: 'GPSR zapisano' }),
+                      onError: () => toast({ title: 'Błąd zapisu GPSR', variant: 'destructive' }),
+                    })
                   }}
                 >
                   {updateSettingsMutation.isPending ? (
