@@ -13,6 +13,7 @@ import StepOptimize from './components/StepOptimize'
 import StepCompliance from './components/StepCompliance'
 import StepPublish from './components/StepPublish'
 import StepPromote from './components/StepPromote'
+import ExpertChat from './components/ExpertChat'
 import type { DemoProduct, OptimizedListing, CoverageResult, ComplianceResult, PublishResult, CouponResult } from './types'
 
 export default function AmazonProDemoPage() {
@@ -141,6 +142,9 @@ export default function AmazonProDemoPage() {
           />
         )}
       </div>
+
+      {/* WHY: Floating chatbot — always accessible regardless of wizard step */}
+      <ExpertChat />
     </div>
   )
 }

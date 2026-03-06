@@ -90,3 +90,84 @@ DEMO_PRODUCT: Dict[str, Any] = {
 def get_demo_product() -> Dict[str, Any]:
     """Return demo product with pre-calculated DataDive keyword data."""
     return {**DEMO_PRODUCT, "keywords": DEMO_KEYWORDS}
+
+
+# WHY: Competitor listing with INTENTIONAL TOS + EU compliance violations.
+# Used in Competitor Compliance Radar demo — shows what Amazon would flag.
+DEMO_COMPETITOR: Dict[str, Any] = {
+    "asin": "B09COMPET1",
+    "marketplace": "DE",
+    "title": "Spirulina Tabletten 500mg - DETOX & IMMUNE BOOSTER - Natürliche Entgiftung - Gewichtsverlust - 300 Stück!!!",
+    "brand": "VitaBoost24",
+    "manufacturer": "",  # WHY: Missing = GPSR FAIL
+    "bullets": [
+        "IMMUNE BOOSTER: Stärkt das Immunsystem und beugt Krankheiten vor — best price guaranteed!!!",
+        "DETOX WIRKUNG: Entgiftet den Körper von Schwermetallen und Toxinen, natürliche Reinigung",
+        "GEWICHTSVERLUST: Spirulina hilft beim Abnehmen, garantierter Gewichtsverlust in 30 Tagen",
+        "HEILT MÜDIGKEIT: Spirulina heilt chronische Müdigkeit und steigert die Energie um 300%",
+        "ANTI-AGING: Verjüngt die Haut, stoppt Haarausfall, cures all skin problems",
+    ],
+    "description": (
+        "VitaBoost24 Spirulina — das BESTE Supplement auf dem Markt! "
+        "Unser Produkt HEILT Müdigkeit, STÄRKT das Immunsystem und ENTGIFTET Ihren Körper. "
+        "Klinisch getestete Formel für garantierten Gewichtsverlust. "
+        "Kontaktieren Sie uns: info@vitaboost24.de oder +49 123 456789. "
+        "Besuchen Sie www.vitaboost24.de für mehr Angebote!"
+    ),
+    "images": [],
+    "category": "Health & Household",
+    "price": "14.99",
+    "currency": "EUR",
+}
+
+
+def get_demo_competitor() -> Dict[str, Any]:
+    """Return competitor listing with intentional violations for demo scanning."""
+    return DEMO_COMPETITOR
+
+
+# WHY: Sample competitors for Competitor-Inspired Generator demo mode.
+# Realistic Spirulina supplement listings from Amazon DE.
+DEMO_INSPIRE_COMPETITORS: List[Dict[str, Any]] = [
+    {
+        "asin": "B0DBZF2DK4",
+        "title": "Spirulina Bio Tabletten 500mg - 600 Stück (10 Monate) - Spirulina Presslinge Hochdosiert mit Phycocyanin",
+        "bullets": [
+            "BIO SPIRULINA TABLETTEN - 600 Tabletten reines Bio Spirulina für volle 10 Monate Versorgung",
+            "HOCHDOSIERT - Jede Tablette enthält 500mg Bio Spirulina platensis Pulver",
+            "REICH AN PHYCOCYANIN - Natürliches blaues Pigment mit hoher Bioverfügbarkeit",
+            "BIO ZERTIFIZIERT - DE-ÖKO-006 kontrolliert, ohne Zusatzstoffe, vegan, glutenfrei",
+            "LABORGEPRÜFT - Auf Schwermetalle, Pestizide und Mikrobiologie in Deutschland getestet",
+        ],
+        "description": "Premium Bio Spirulina in Tablettenform. 600 Tabletten für eine 10-monatige Versorgung.",
+    },
+    {
+        "asin": "B0CTZ2FSVK",
+        "title": "Spirulina Pulver Bio 500g - Rohkostqualität - Spirulina Platensis - Vegan Superfood",
+        "bullets": [
+            "BIO SPIRULINA PULVER - 500g feinstes Spirulina platensis in Rohkostqualität",
+            "NÄHRSTOFFREICH - Natürliche Quelle von Eisen, Vitamin B12, Protein und Chlorophyll",
+            "VIELSEITIG - Perfekt für Smoothies, Bowls, Säfte und als Nahrungsergänzung",
+            "OHNE ZUSÄTZE - 100% reines Bio Spirulina, keine Füllstoffe, vegan und glutenfrei",
+            "NACHHALTIG ANGEBAUT - Aus kontrolliert biologischem Anbau, schonend getrocknet",
+        ],
+        "description": "Reines Bio Spirulina Pulver aus kontrolliert biologischem Anbau für den täglichen Nährstoff-Boost.",
+    },
+    {
+        "asin": "B01M30G72K",
+        "title": "Sevenhills Wholefoods Spirulina Pulver Bio 500g - Soil Association zertifiziert",
+        "bullets": [
+            "BIOLOGISCH ZERTIFIZIERT - Von der Soil Association als biologisch zertifiziert",
+            "HOHER PROTEINGEHALT - Bis zu 65% pflanzliches Protein pro Portion",
+            "100% REIN - Ohne Zusatzstoffe, Konservierungsmittel oder Füllstoffe",
+            "REICH AN EISEN - Natürliche Eisenquelle für die tägliche Versorgung",
+            "WIEDERVERSCHLIESSBAR - Frischhaltebeutel für optimale Lagerung",
+        ],
+        "description": "Bio Spirulina Pulver von Sevenhills Wholefoods. Premium Qualität mit Soil Association Zertifizierung.",
+    },
+]
+
+
+def get_demo_inspire_competitors() -> List[Dict[str, Any]]:
+    """Return sample competitors for Competitor-Inspired Generator demo."""
+    return DEMO_INSPIRE_COMPETITORS

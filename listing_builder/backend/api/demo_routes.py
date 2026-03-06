@@ -77,6 +77,20 @@ class CouponRequest(BaseModel):
     dry_run: bool = Field(default=True)
 
 
+class ChatRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=1000)
+    mode: str = Field(default="balanced")
+    expert: str = Field(default="strict")
+
+
+# WHY: Shared across demo_routes and demo_wow_routes — single source of truth
+MARKETPLACE_DOMAINS = {
+    "DE": "amazon.de", "US": "amazon.com", "UK": "amazon.co.uk",
+    "FR": "amazon.fr", "IT": "amazon.it", "ES": "amazon.es",
+    "PL": "amazon.pl", "NL": "amazon.nl", "SE": "amazon.se",
+}
+
+
 # --- Step 1: Fetch Product ---
 
 @router.post("/fetch")
@@ -98,25 +112,41 @@ async def demo_fetch(
         )
         return {"source": "sample", "product": product, "tos_scan": tos}
 
-    # Real SP-API fetch
-    from services.sp_api_catalog import fetch_catalog_item
-    product = await fetch_catalog_item(asin=req.asin, marketplace=req.marketplace, db=db)
+    # WHY: Scraper instead of SP-API — no production credentials yet.
+    # Scrape.do (if token set) → fallback direct httpx → real Amazon product page.
+    from services.scraper.amazon_scraper import AmazonListing, fetch_listing
 
-    if product.get("error"):
-        return {"source": "sp_api", "product": None, "error": product["error"]}
+    listing = AmazonListing(asin=req.asin, marketplace=req.marketplace)
+    # WHY: Build domain from marketplace code so scraper knows which Amazon to hit
+    listing.domain = MARKETPLACE_DOMAINS.get(req.marketplace.upper(), "amazon.de")
+    listing = await fetch_listing(listing)
 
-    # WHY: Attach demo keywords to real product so optimize step has data
-    product["keywords"] = DEMO_KEYWORDS
+    if listing.error:
+        return {"source": "scraper", "product": None, "error": listing.error}
+
+    product = {
+        "asin": listing.asin,
+        "marketplace": f"Amazon {listing.marketplace or req.marketplace}",
+        "title": listing.title,
+        "brand": "",  # WHY: Scraper doesn't extract brand — user can edit
+        "manufacturer": "",
+        "bullets": listing.bullets,
+        "description": listing.description,
+        "images": [],
+        "category": "",
+        "keywords": DEMO_KEYWORDS,
+    }
 
     tos = check_amazon_tos(
-        title=product.get("title", ""),
-        bullets=product.get("bullets", []),
-        description=product.get("description", ""),
+        title=product["title"],
+        bullets=product["bullets"],
+        description=product["description"],
         marketplace=f"amazon_{req.marketplace.lower()}",
     )
 
-    logger.info("demo_fetch_live", asin=req.asin, marketplace=req.marketplace)
-    return {"source": "sp_api", "product": product, "tos_scan": tos}
+    logger.info("demo_fetch_live", asin=req.asin, marketplace=req.marketplace,
+                title_len=len(listing.title), bullets=len(listing.bullets))
+    return {"source": "scraper", "product": product, "tos_scan": tos}
 
 
 # --- Step 2: AI Optimize ---
@@ -276,6 +306,46 @@ async def demo_create_coupon(
     return result
 
 
+# --- Amazon Expert Chat (RAG-powered) ---
+
+@router.post("/chat")
+@limiter.limit("10/minute")
+async def demo_chat(
+    request: Request,
+    req: ChatRequest,
+    db: Session = Depends(get_db),
+):
+    """Amazon Expert AI Chat — RAG-powered answers from Inner Circle transcripts.
+
+    WHY: Fully working chatbot that answers real Amazon FBA questions using
+    228 expert transcripts (10K+ knowledge chunks). No auth required for demo.
+    Reuses existing qa_service pipeline: search → embed → Groq LLM → answer.
+    """
+    from services.qa_service import ask_expert
+
+    try:
+        result = await ask_expert(
+            question=req.question,
+            db=db,
+            mode=req.mode,
+            expert=req.expert,
+        )
+        logger.info("demo_chat_ok", question=req.question[:50],
+                     sources=result["sources_used"], mode=req.mode)
+        return result
+    except Exception as e:
+        logger.error("demo_chat_error", error=str(e)[:100])
+        return {
+            "answer": "Przepraszam, wystąpił błąd. Spróbuj ponownie za chwilę.",
+            "sources_used": 0,
+            "has_context": False,
+            "mode": req.mode,
+            "sources": [],
+            "error": str(e)[:100],
+        }
+
+
+
 # --- Step 0: Upload Keywords CSV (Helium10 / DataDive) ---
 
 class KeywordUploadTextRequest(BaseModel):
@@ -428,3 +498,5 @@ def _calculate_coverage(
         "keywords_covered": covered,
         "keywords_total": min(len(keywords), 20),
     }
+
+

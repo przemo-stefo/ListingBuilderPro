@@ -152,3 +152,135 @@ export interface CouponResult {
   }
   would_call?: string
 }
+
+// --- Competitor-Inspired Listing Generator ---
+
+export interface ScrapedCompetitor {
+  asin: string
+  title: string
+  bullets: string[]
+  description: string
+  error?: string | null
+}
+
+export interface ListingVersion {
+  name: string
+  title: string
+  bullets: string[]
+  description: string
+  backend_keywords: string
+}
+
+export interface CompetitorInspireResult {
+  competitors: ScrapedCompetitor[]
+  failed: Array<{ asin: string; error: string }>
+  common_keywords: string[]
+  versions: ListingVersion[]
+  error?: string
+}
+
+// --- Amazon Expert Chat ---
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  sources?: string[]
+  sources_used?: number
+  timestamp: number
+}
+
+export interface ChatResponse {
+  answer: string
+  sources_used: number
+  has_context: boolean
+  mode: string
+  sources: string[]
+  error?: string
+}
+
+// --- WOW Feature 1: Competitor Compliance Radar ---
+
+export interface CompetitorScanResult {
+  competitor: {
+    title: string
+    brand: string
+    asin: string
+    bullets: string[]
+  }
+  tos_scan: TOSScan
+  compliance: ComplianceResult
+  risk_summary: {
+    level: 'HIGH' | 'MEDIUM' | 'LOW'
+    message: string
+    total_issues: number
+    tos_violations: number
+    compliance_fails: number
+    compliance_warnings: number
+    suppression_risk: boolean
+  }
+}
+
+// --- WOW Feature 2: EFSA Ingredient-to-Claims Mapper ---
+
+export interface EFSAIngredientResult {
+  name: string
+  found: boolean
+  approved_claims: {
+    de: string[]
+    en: string[]
+  }
+  forbidden_in_listing: Array<{
+    pattern: string
+    matched_text: string
+  }>
+  suggestion: string
+}
+
+export interface EFSAClaimsResult {
+  ingredients: EFSAIngredientResult[]
+  auto_detected: boolean
+  summary: {
+    total_ingredients: number
+    with_efsa_data: number
+    forbidden_claims_found: number
+    approved_claims_available: number
+  }
+  error?: string
+}
+
+// --- WOW Feature 3: Listing Change Guard ---
+
+export interface ListingGuardChange {
+  type: 'TRUNCATION' | 'PROMO_REMOVAL' | 'BRAND_REMOVAL' | 'SEPARATOR_REMOVAL'
+  description: string
+  impact: 'HIGH' | 'MEDIUM' | 'LOW'
+}
+
+export interface ListingGuardResult {
+  original: {
+    title: string
+    bullets: string[]
+  }
+  amazon_modified: {
+    title: string
+    bullets: string[]
+  }
+  changes: ListingGuardChange[]
+  rj_impact: {
+    before: number
+    after: number
+    drop: number
+    before_grade: string
+    after_grade: string
+  }
+  lost_keywords: Array<{
+    keyword: string
+    search_volume: number
+    ranking_juice: number
+  }>
+  alert: {
+    type: string
+    detected_ago: string
+    severity: 'HIGH' | 'MEDIUM' | 'LOW'
+  }
+}
