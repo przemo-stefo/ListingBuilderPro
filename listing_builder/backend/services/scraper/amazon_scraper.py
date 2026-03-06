@@ -213,7 +213,10 @@ class _AmazonHTMLParser(HTMLParser):
         if self._in_aplus:
             if tag == "div":
                 if self._aplus_depth <= 0:
-                    self.a_plus_content = " ".join(self._aplus_parts).strip()
+                    chunk = " ".join(self._aplus_parts).strip()
+                    # WHY: Page may have multiple A+ divs — append, don't overwrite
+                    self.a_plus_content = (self.a_plus_content + " " + chunk).strip() if self.a_plus_content else chunk
+                    self._aplus_parts = []
                     self._in_aplus = False
                 else:
                     self._aplus_depth -= 1

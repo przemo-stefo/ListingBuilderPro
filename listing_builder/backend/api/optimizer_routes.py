@@ -3,7 +3,7 @@
 # NOT for: LLM prompts or keyword logic (that's in services/optimizer_service.py)
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -92,7 +92,15 @@ class OptimizerRequest(BaseModel):
     llm_api_key: Optional[str] = Field(default=None, max_length=200)
     # WHY: Imported product data — AI uses as reference to improve listing
     original_description: Optional[str] = Field(default="", max_length=5000)
-    original_bullets: Optional[List[str]] = Field(default_factory=list)
+    original_bullets: Optional[List[str]] = Field(default_factory=list, max_length=10)
+
+    @field_validator("original_bullets")
+    @classmethod
+    def truncate_bullets(cls, v: list[str] | None) -> list[str]:
+        """WHY: Each bullet max 500 chars — prevents oversized payloads from reaching LLM."""
+        if not v:
+            return []
+        return [b[:500] for b in v]
 
 
 class OptimizerScores(BaseModel):
@@ -358,6 +366,8 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest = None, d
                     category=product.category or "",
                     provider_config=batch_provider_config,
                     user_id=user_id,
+                    original_description=product.original_description or "",
+                    original_bullets=product.original_bullets or [],
                 ),
                 timeout=60.0,
             )

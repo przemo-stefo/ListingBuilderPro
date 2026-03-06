@@ -151,8 +151,8 @@ export default function ListingScorePage() {
       if (data.bullets.length > 0) {
         setBullets(data.bullets.length >= 5 ? data.bullets : [...data.bullets, ...Array(5 - data.bullets.length).fill('')])
       }
-      // WHY: Merge description + A+ content — A+ is separate HTML section with brand story
-      const desc = [data.description, data.a_plus_content].filter(Boolean).join('\n\n--- A+ Content ---\n\n')
+      // WHY: Merge description + A+ content — both feed into scoring dimensions
+      const desc = [data.description, data.a_plus_content].filter(Boolean).join('\n\n')
       if (desc) setDescription(desc)
 
       // WHY: Show warning if fetch partially failed

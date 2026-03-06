@@ -95,8 +95,12 @@ async def optimize_listing(
 
     # WHY: Original listing from import — AI improves it instead of generating from scratch
     # WHY: strip_tags before sanitize — Allegro descriptions are HTML, LLM needs plain text
+    # WHY: sanitize_llm_input truncates to 1000 chars — but descriptions can be 3000+
+    #       so we strip HTML first, then sanitize, then allow up to 3000 chars
     raw_desc = kwargs.get("original_description", "") or ""
-    original_description = sanitize_llm_input(re.sub(r'<[^>]+>', ' ', raw_desc).strip())
+    clean_desc = re.sub(r'<[^>]+>', ' ', raw_desc)
+    clean_desc = re.sub(r'\s+', ' ', clean_desc).strip()
+    original_description = sanitize_llm_input(clean_desc)[:3000]
     original_bullets = [sanitize_llm_input(b) for b in (kwargs.get("original_bullets") or [])]
 
     # WHY: Sanitize user inputs before they enter LLM prompts (injection prevention)

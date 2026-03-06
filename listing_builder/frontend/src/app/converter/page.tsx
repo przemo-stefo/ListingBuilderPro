@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  ArrowRightLeft,
   ChevronDown,
   ChevronRight,
   Download,
@@ -30,6 +29,7 @@ import { listProducts } from '@/lib/api/products'
 import { useMarketplaces, useDownloadTemplate } from '@/lib/hooks/useConverter'
 import { apiRequest } from '@/lib/api/client'
 import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
+import { useToast } from '@/lib/hooks/useToast'
 import type { ConvertResponse, ConvertedProductResult, GPSRData } from '@/lib/types'
 import { FaqItem } from '@/components/ui/FaqSection'
 import { ConverterStepper } from './components/ConverterStepper'
@@ -79,6 +79,7 @@ export default function ConverterPage() {
   const downloadMutation = useDownloadTemplate()
   const { data: settings } = useSettings()
   const updateSettingsMutation = useUpdateSettings()
+  const { toast } = useToast()
 
   // WHY: Always fetch products — step 1 is the default visible step
   const { data: importedData, isLoading: importedLoading } = useQuery({
@@ -99,6 +100,11 @@ export default function ConverterPage() {
     setGpsrLoaded(true)
   }, [settings, gpsrLoaded])
 
+  const completeStep = useCallback((step: number) => {
+    setCompletedSteps((prev) => new Set([...prev, step]))
+    if (step < 3) setCurrentStep(step + 1)
+  }, [])
+
   // WHY: Convert products from DB — no scraping, uses data already imported
   const handleConvertFromDb = useCallback(async () => {
     if (selectedProductIds.length === 0 || !marketplace) return
@@ -115,12 +121,15 @@ export default function ConverterPage() {
       setExpandedProducts(new Set())
       completeStep(3)
     } catch (err) {
-      // WHY: Show error inline — don't reset wizard state
-      alert(err instanceof Error ? err.message : 'Błąd konwersji')
+      toast({
+        title: 'Błąd konwersji',
+        description: err instanceof Error ? err.message : 'Spróbuj ponownie',
+        variant: 'destructive',
+      })
     } finally {
       setDbConvertLoading(false)
     }
-  }, [selectedProductIds, marketplace, gpsr, eurRate])
+  }, [selectedProductIds, marketplace, gpsr, eurRate, completeStep, toast])
 
   const handleDownloadFile = useCallback(() => {
     if (selectedProductIds.length === 0 || !marketplace) return
@@ -141,11 +150,6 @@ export default function ConverterPage() {
       handleConvertFromDb()
     }
   }, [selectedProductIds, marketplace, gpsr, eurRate, importedProducts, downloadMutation, handleConvertFromDb])
-
-  const completeStep = (step: number) => {
-    setCompletedSteps((prev) => new Set([...prev, step]))
-    if (step < 3) setCurrentStep(step + 1)
-  }
 
   const toggleProduct = (idx: number) => {
     setExpandedProducts((prev) => {
