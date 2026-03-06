@@ -181,7 +181,8 @@ export function Sidebar({ onClose }: SidebarProps) {
                 style={{ gridTemplateRows: complianceOpen ? '1fr' : '0fr' }}
               >
                 <div className="overflow-hidden">
-                  <div className="ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
+                  {/* WHY: relative z-20 ensures sub-items are above Compliance Guard button and Wiadomości link */}
+                  <div className="relative z-20 ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
                     {complianceSubItems.map(({ key, label, icon: SubIcon, desc }) => {
                       const isSubActive = isOnCompliance && activeComplianceTab === key
                       return (
