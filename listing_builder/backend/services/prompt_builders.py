@@ -7,35 +7,38 @@ from __future__ import annotations
 from typing import List, Dict, Any
 from services.category_prompts import get_category_rules
 
-# WHY: Rules from Amazon FBA Revolution Module 7 "Złota Formuła Listingu"
+# WHY: Rules from Inner Circle knowledge + Amazon algorithm research (4-layer search model)
 # Injected ONLY for amazon marketplaces — other platforms have different best practices
 AMAZON_TITLE_RULES = """
 AMAZON-SPECIFIC TITLE RULES:
-- Start with brand name, then front-load the most important keywords
+- Start with brand name, then front-load the HIGHEST VOLUME exact-match keyword
 - Mobile shows only 70-90 characters — put critical keywords FIRST
-- Use " - " dash separators between keyword groups
-- Never repeat the same word more than twice in the title
+- Use " - " dash separators between keyword groups for better indexing
+- Never repeat the same word — Amazon treats singular/plural as the same root
 - Title must be readable for the customer, not a keyword dump
 - Capitalize all words except prepositions and conjunctions
+- Every ROOT WORD must appear somewhere in the listing — missing roots = indexing holes
 """
 
 AMAZON_BULLETS_RULES = """
 AMAZON-SPECIFIC BULLET RULES:
-- Structure each bullet: [CAPS BENEFIT HEADER] – [proof/explanation with keywords]
-- Apply CZAKO rule: Feature → Advantage → Benefit (most important!)
-- Strongest bullet on top, weakest at bottom — shoppers read top 2-3 only
-- Weave 2-3 keyword phrases per bullet NATURALLY into sentences
+- Structure: [CAPS BENEFIT HEADER] - [Feature -> Advantage -> Benefit with keywords]
+- Strongest bullet on top — shoppers read top 2-3 only on mobile (first ~150 chars visible)
+- Weave 2-3 keyword phrases per bullet NATURALLY — each bullet targets different root word routes
 - Use concrete benefits: "saves 2h/week" NOT "highest quality"
-- Each bullet should answer: "Why should I care about this feature?"
+- Target different customer avatars per bullet (eco-conscious, busy parent, gift shopper, etc.)
+- Include SECONDARY root words not in the title — bullets are the #2 SEO tool after title
+- Optimal length: 200-250 chars per bullet
 """
 
 AMAZON_DESC_RULES = """
 AMAZON-SPECIFIC DESCRIPTION RULES:
-- Structure: Intro → Summarize bullet benefits → Brand message → Subtle CTA
+- Structure: Intro -> Summarize bullet benefits -> Brand message -> Subtle CTA
 - Each keyword should appear ONCE only — repetition degrades ranking!
-- Use synonyms for words already in title/bullets
+- Use synonyms for words already in title/bullets — this feeds Amazon's semantic matching layer
 - Max 2000 characters, natural conversational language
-- Focus on use cases and lifestyle benefits, not specs
+- Focus on use cases and lifestyle benefits — Amazon's BERT layer understands context and buyer intent
+- Write comprehensive, natural text — it helps Amazon's contextual matching beyond exact keywords
 """
 
 AMAZON_BACKEND_RULES = """
@@ -45,6 +48,9 @@ AMAZON-SPECIFIC BACKEND KEYWORD RULES:
 - Include common misspellings shoppers actually type
 - Only words NOT ALREADY in visible listing (title, bullets, description)
 - No commas, no punctuation, no repeated words
+- Include foreign-language synonyms and alternate spellings (feeds semantic matching)
+- Include complementary use-case terms — Amazon's behavioral layer links related products
+- Fill ALL remaining root words not covered by title/bullets — no indexing holes
 """
 
 
@@ -64,7 +70,14 @@ EXPERT KNOWLEDGE (use these best practices):
 {expert_context}
 
 """
+    # WHY: Algorithm insight only relevant for Amazon — Allegro/eBay have different ranking models
+    algo_insight = ""
+    if marketplace.startswith("amazon"):
+        algo_insight = """
+AMAZON SEARCH ALGORITHM INSIGHT: Amazon matches titles through 4 layers — exact text match (most weight in first 150 chars), semantic meaning, contextual understanding (BERT), and buyer behavior patterns. Front-loading exact-match keywords maximizes the strongest signal.
+"""
     return f"""You are an expert Amazon listing optimizer. Your goal is MAXIMUM unique keyword coverage in the title.
+{algo_insight}
 {context_block}Product: {product_title}
 Brand: {brand}
 Product line: {product_line}
@@ -166,6 +179,8 @@ EXPERT KNOWLEDGE (use these best practices):
             "8-12 bolded phrases total. Buyer must scan description and see key info at a glance."
         )
 
+    # WHY: Description feeds Amazon's BERT contextual layer — natural, comprehensive text
+    # helps Amazon understand product intent even beyond exact keyword matches
     return f"""You are an expert {platform_name} listing optimizer.
 {context_block}Product: {product_title}
 Brand: {brand}
@@ -201,8 +216,14 @@ def build_backend_prompt(
     that shoppers actually search for but aren't in the keyword research.
     """
     kw_sample = ", ".join(k["phrase"] for k in keywords[:20])
+    # WHY: Indexing insight only useful for Amazon — other platforms handle backend differently
+    indexing_insight = ""
+    if marketplace.startswith("amazon"):
+        indexing_insight = """
+INDEXING INSIGHT: Backend keywords are the last chance to cover root words missing from visible listing. Amazon uses 4 matching layers — backend feeds the lexical and semantic layers. Every uncovered root word = a keyword family you CANNOT rank for.
+"""
     return f"""You are an Amazon backend keyword specialist.
-
+{indexing_insight}
 Product: {product_title}
 Brand: {brand}
 Current title: {title_text}
@@ -218,6 +239,7 @@ Include:
 - Related product category terms
 - Common abbreviations and alternate spellings
 - Complementary use-case terms (e.g. "camping hiking outdoor" for a water bottle)
+- Foreign-language terms buyers might search in (feeds semantic matching)
 
 Rules:
 - IMPORTANT: All terms must be in {lang} — translate if needed
