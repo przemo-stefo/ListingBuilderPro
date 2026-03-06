@@ -1,0 +1,234 @@
+{
+  "name": "Content Archiver - Archiwum Postow FB",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 23,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Codziennie 23:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.FB_PAGE_ID || 'CONFIGURE_ME' }}/feed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "fields", "value": "id,message,created_time,permalink_url,type,likes.summary(true),comments.summary(true),shares,attachments{media_type,url,title}" },
+            { "name": "since", "value": "={{ Math.floor((Date.now() - 25*60*60*1000) / 1000) }}" },
+            { "name": "limit", "value": "50" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb-get-posts",
+      "name": "FB - Posty z Dzisiaj",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Meta Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Przetworz posty do archiwizacji\nconst posts = $json.data || [];\nconst today = new Date().toLocaleDateString('pl-PL');\n\nif (posts.length === 0) {\n  return [{ json: { no_posts: true, date: today, count: 0 } }];\n}\n\nconst archived = posts.map(post => ({\n  post_id: post.id,\n  data_publikacji: new Date(post.created_time).toLocaleString('pl-PL'),\n  tresc: post.message || '(bez tekstu)',\n  typ: post.type || 'unknown',\n  link: post.permalink_url || '',\n  polubienia: post.likes?.summary?.total_count || 0,\n  komentarze: post.comments?.summary?.total_count || 0,\n  udostepnienia: post.shares?.count || 0,\n  engagement: (post.likes?.summary?.total_count || 0) + (post.comments?.summary?.total_count || 0) + (post.shares?.count || 0),\n  zalacznik_typ: post.attachments?.data?.[0]?.media_type || '',\n  zalacznik_url: post.attachments?.data?.[0]?.url || '',\n  data_archiwizacji: new Date().toISOString()\n}));\n\nreturn archived.map(a => ({ json: a }));"
+      },
+      "id": "code-process",
+      "name": "Przetworz do Archiwum",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.no_posts }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notTrue" }
+            }
+          ]
+        }
+      },
+      "id": "if-has-posts",
+      "name": "Są Posty?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Archiwum Postow"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "post_id": "={{ $json.post_id }}",
+            "data_publikacji": "={{ $json.data_publikacji }}",
+            "tresc": "={{ $json.tresc }}",
+            "typ": "={{ $json.typ }}",
+            "link": "={{ $json.link }}",
+            "polubienia": "={{ $json.polubienia }}",
+            "komentarze": "={{ $json.komentarze }}",
+            "udostepnienia": "={{ $json.udostepnienia }}",
+            "engagement": "={{ $json.engagement }}",
+            "zalacznik_typ": "={{ $json.zalacznik_typ }}",
+            "zalacznik_url": "={{ $json.zalacznik_url }}",
+            "data_archiwizacji": "={{ $json.data_archiwizacji }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-archive",
+      "name": "Zapisz w Archiwum",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1000, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Podsumowanie dnia\nconst items = $input.all();\nconst count = items.length;\nconst totalEng = items.reduce((sum, i) => sum + (i.json.engagement || 0), 0);\nconst topPost = items.sort((a, b) => (b.json.engagement || 0) - (a.json.engagement || 0))[0];\n\nreturn [{\n  json: {\n    count,\n    total_engagement: totalEng,\n    avg_engagement: count > 0 ? Math.round(totalEng / count) : 0,\n    top_post: topPost?.json?.tresc?.substring(0, 80) || 'brak',\n    top_engagement: topPost?.json?.engagement || 0,\n    date: new Date().toLocaleDateString('pl-PL')\n  }\n}];"
+      },
+      "id": "code-summary",
+      "name": "Podsumowanie Dnia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Dzienne Statystyki"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data": "={{ $json.date }}",
+            "liczba_postow": "={{ $json.count }}",
+            "laczny_engagement": "={{ $json.total_engagement }}",
+            "sredni_engagement": "={{ $json.avg_engagement }}",
+            "top_post": "={{ $json.top_post }}",
+            "top_engagement": "={{ $json.top_engagement }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-daily",
+      "name": "Dzienne Statystyki",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1520, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📦 Content Archiver\n\n**Co robi:**\n1. Codziennie o 23:30 pobiera posty z FB\n   opublikowane w ciągu ostatnich 24h\n2. Archiwizuje: treść, link, typ, załączniki,\n   polubienia, komentarze, udostępnienia\n3. Zapisuje dzienne statystyki:\n   - Liczba postów\n   - Łączny i średni engagement\n   - Top post dnia\n\n**Google Sheets — 2 arkusze:**\n\n**\"Archiwum Postow\":**\n| post_id | data_publikacji | tresc | typ |\n| link | polubienia | komentarze | udostepnienia |\n| engagement | zalacznik_typ | zalacznik_url |\n| data_archiwizacji |\n\n**\"Dzienne Statystyki\":**\n| data | liczba_postow | laczny_engagement |\n| sredni_engagement | top_post | top_engagement |\n\n**Dlaczego to ważne:**\n- Obowiązek archiwalny (ustawa o narodowym\n  zasobie archiwalnym)\n- Dane do raportów miesięcznych (#3)\n- Trend engagement w czasie\n- Dowód aktywności na wypadek kontroli\n\n**Do skonfigurowania:**\n- Meta Access Token (Query Auth)\n- Google Sheets OAuth2\n- Zmienne: FB_PAGE_ID",
+        "width": 400,
+        "height": 540,
+        "color": 6
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 40]
+    }
+  ],
+  "connections": {
+    "Codziennie 23:30": {
+      "main": [
+        [
+          { "node": "FB - Posty z Dzisiaj", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "FB - Posty z Dzisiaj": {
+      "main": [
+        [
+          { "node": "Przetworz do Archiwum", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Przetworz do Archiwum": {
+      "main": [
+        [
+          { "node": "Są Posty?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Są Posty?": {
+      "main": [
+        [
+          { "node": "Zapisz w Archiwum", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Zapisz w Archiwum": {
+      "main": [
+        [
+          { "node": "Podsumowanie Dnia", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Podsumowanie Dnia": {
+      "main": [
+        [
+          { "node": "Dzienne Statystyki", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "archiver" },
+    { "name": "marcin" },
+    { "name": "compliance" }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

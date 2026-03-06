@@ -1,0 +1,331 @@
+{
+  "name": "Kalkulator Wplywu - Co Zrobilem Dla Powiatu",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtDay": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "1-szy Dnia Miesiaca 8:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.FB_PAGE_ID || 'CONFIGURE_ME' }}/insights",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "metric", "value": "page_impressions,page_engaged_users,page_post_engagements,page_fan_adds,page_fans" },
+            { "name": "period", "value": "days_28" },
+            { "name": "since", "value": "={{ Math.floor((Date.now() - 32*24*60*60*1000) / 1000) }}" },
+            { "name": "until", "value": "={{ Math.floor(Date.now() / 1000) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb-insights",
+      "name": "FB - Statystyki Miesiaca",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 200],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Meta Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Messenger Log"
+        },
+        "options": {}
+      },
+      "id": "sheets-messenger",
+      "name": "Messenger Log (FAQ Bot)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [260, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Archiwum Postow"
+        },
+        "options": {}
+      },
+      "id": "sheets-archive",
+      "name": "Archiwum Postow",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [260, 580],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Kryzysy"
+        },
+        "options": {}
+      },
+      "id": "sheets-crisis",
+      "name": "Log Kryzysow",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [260, 760],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zbierz dane ze wszystkich źródeł\nconst items = $input.all();\n\n// FB Insights\nlet insights = {};\ntry {\n  const fbData = items[0]?.json?.data || [];\n  for (const m of fbData) {\n    const val = m.values?.[m.values.length - 1]?.value || 0;\n    insights[m.name] = val;\n  }\n} catch(e) {}\n\n// Messenger Log — policz wiadomości z ostatniego miesiąca\nconst messengerItems = items.filter(i => i.json.pytanie).map(i => i.json);\nconst monthAgo = new Date(Date.now() - 30*24*60*60*1000);\nconst recentMessages = messengerItems.filter(m => {\n  try { return new Date(m.timestamp) >= monthAgo; } catch(e) { return false; }\n});\nconst autoAnswered = recentMessages.filter(m => m.eskalacja !== 'true' && m.eskalacja !== true);\n\n// Archiwum Postów\nconst archiveItems = items.filter(i => i.json.post_id).map(i => i.json);\nconst recentPosts = archiveItems.filter(p => {\n  try { return new Date(p.data_archiwizacji) >= monthAgo; } catch(e) { return false; }\n});\nconst totalEngagement = recentPosts.reduce((s, p) => s + (p.engagement || 0), 0);\n\n// Kryzysy\nconst crisisItems = items.filter(i => i.json.typ && i.json.lokalizacja).map(i => i.json);\nconst recentCrisis = crisisItems.filter(c => {\n  try { return new Date(c.data) >= monthAgo; } catch(e) { return false; }\n});\n\nconst now = new Date();\nconst monthName = now.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });\n\nreturn [{\n  json: {\n    miesiac: monthName,\n    // Social media\n    zasieg: insights.page_impressions || 0,\n    zaangazowani: insights.page_engaged_users || 0,\n    interakcje: insights.page_post_engagements || 0,\n    nowi_fani: insights.page_fan_adds || 0,\n    fani_lacznie: insights.page_fans || 0,\n    // Content\n    opublikowane_posty: recentPosts.length,\n    laczny_engagement: totalEngagement,\n    sredni_engagement: recentPosts.length > 0 ? Math.round(totalEngagement / recentPosts.length) : 0,\n    // Messenger\n    wiadomosci_messenger: recentMessages.length,\n    auto_odpowiedzi: autoAnswered.length,\n    procent_auto: recentMessages.length > 0 ? Math.round(autoAnswered.length / recentMessages.length * 100) : 0,\n    // Kryzysy\n    komunikaty_kryzysowe: recentCrisis.length,\n    // Obliczone metryki\n    mieszkancy_poinformowani: insights.page_impressions || 0,\n    czas_zaoszczedzony_h: Math.round(\n      (recentPosts.length * 0.5) +      // 30 min/post zaoszczędzone\n      (autoAnswered.length * 0.05) +     // 3 min/wiadomość zaoszczędzone\n      (recentCrisis.length * 0.5) +      // 30 min/kryzys zaoszczędzone\n      2                                    // raport miesięczny\n    )\n  }\n}];"
+      },
+      "id": "code-calculate",
+      "name": "Oblicz Wskazniki",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"systemInstruction\": {\n    \"parts\": [{\n      \"text\": \"Jesteś analitykiem działalności radnego. Na podstawie danych generujesz MIESIĘCZNE PODSUMOWANIE DZIAŁALNOŚCI w formacie gotowym do publikacji na FB. Ton: rzeczowy, ale dumny z wyników. NIGDY nie wymyślaj danych — użyj TYLKO podanych liczb.\"\n    }]\n  },\n  \"contents\": [{\n    \"role\": \"user\",\n    \"parts\": [{\n      \"text\": \"Wygeneruj podsumowanie działalności za {{ $json.miesiac }}:\\n\\n📊 SOCIAL MEDIA:\\n- Zasięg: {{ $json.zasieg }} osób\\n- Zaangażowani: {{ $json.zaangazowani }}\\n- Interakcje: {{ $json.interakcje }}\\n- Nowi obserwujący: +{{ $json.nowi_fani }} (łącznie: {{ $json.fani_lacznie }})\\n- Opublikowane posty: {{ $json.opublikowane_posty }}\\n- Łączny engagement: {{ $json.laczny_engagement }}\\n\\n💬 KOMUNIKACJA Z MIESZKAŃCAMI:\\n- Wiadomości na Messengerze: {{ $json.wiadomosci_messenger }}\\n- Automatycznie obsłużone: {{ $json.auto_odpowiedzi }} ({{ $json.procent_auto }}%)\\n\\n🚨 KOMUNIKACJA KRYZYSOWA:\\n- Opublikowane komunikaty: {{ $json.komunikaty_kryzysowe }}\\n\\n⏱️ ZAOSZCZĘDZONY CZAS:\\n- Szacunkowo: {{ $json.czas_zaoszczedzony_h }}h dzięki automatyzacji\\n\\nNapisz:\\n1. Post na FB (200-300 słów) — podsumowanie miesiąca, konkretne liczby, bez przechwalania się ale z dumą z wyników\\n2. Krótki tweet (max 270 znaków)\\n\\nFormat:\\n---FB---\\n[post]\\n---X---\\n[tweet]\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.5,\n    \"maxOutputTokens\": 1200\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-summary",
+      "name": "Gemini Flash - Podsumowanie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 400],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiText = $json.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst data = $('Oblicz Wskazniki').first().json;\n\nconst fbMatch = aiText.match(/---FB---(.*?)---X---/s);\nconst xMatch = aiText.match(/---X---(.*?)$/s);\n\nconst post_fb = fbMatch ? fbMatch[1].trim() : aiText.substring(0, 600);\nlet tweet_x = xMatch ? xMatch[1].trim() : '';\nif (tweet_x.length > 280) tweet_x = tweet_x.substring(0, 277) + '...';\n\nreturn [{\n  json: {\n    ...data,\n    post_fb,\n    tweet_x,\n    ai_full: aiText\n  }\n}];"
+      },
+      "id": "code-parse",
+      "name": "Parsuj AI Odpowiedz",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.EMAIL_APPROVAL || 'marcin@example.com' }}",
+        "subject": "=📊 Kalkulator Wpływu — {{ $json.miesiac }}",
+        "emailType": "html",
+        "html": "=<div style=\"font-family:Arial;max-width:700px;margin:0 auto;padding:20px;\">\n<div style=\"background:linear-gradient(135deg,#2c5aa0,#1a3d6e);color:white;padding:25px;border-radius:8px;text-align:center;\">\n<h1 style=\"margin:0;\">📊 Kalkulator Wpływu</h1>\n<p style=\"margin:5px 0 0;opacity:0.9;\">{{ $json.miesiac }}</p>\n</div>\n\n<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0;\">\n<div style=\"background:#f0f7ff;padding:15px;border-radius:8px;text-align:center;\"><div style=\"font-size:28px;font-weight:bold;color:#2c5aa0;\">{{ $json.zasieg.toLocaleString('pl-PL') }}</div><div style=\"font-size:12px;color:#666;\">Zasięg</div></div>\n<div style=\"background:#f0fff0;padding:15px;border-radius:8px;text-align:center;\"><div style=\"font-size:28px;font-weight:bold;color:#28a745;\">{{ $json.opublikowane_posty }}</div><div style=\"font-size:12px;color:#666;\">Postów</div></div>\n<div style=\"background:#fff8f0;padding:15px;border-radius:8px;text-align:center;\"><div style=\"font-size:28px;font-weight:bold;color:#e67e22;\">{{ $json.wiadomosci_messenger }}</div><div style=\"font-size:12px;color:#666;\">Wiadomości</div></div>\n<div style=\"background:#f5f0ff;padding:15px;border-radius:8px;text-align:center;\"><div style=\"font-size:28px;font-weight:bold;color:#8e44ad;\">{{ $json.procent_auto }}%</div><div style=\"font-size:12px;color:#666;\">Auto-obsługa</div></div>\n<div style=\"background:#fff0f0;padding:15px;border-radius:8px;text-align:center;\"><div style=\"font-size:28px;font-weight:bold;color:#e74c3c;\">{{ $json.komunikaty_kryzysowe }}</div><div style=\"font-size:12px;color:#666;\">Alerty kryzysowe</div></div>\n<div style=\"background:#f0ffff;padding:15px;border-radius:8px;text-align:center;\"><div style=\"font-size:28px;font-weight:bold;color:#16a085;\">~{{ $json.czas_zaoszczedzony_h }}h</div><div style=\"font-size:12px;color:#666;\">Zaoszczędzono</div></div>\n</div>\n\n<h3>📘 Gotowy post na Facebook:</h3>\n<div style=\"background:#f0f0f0;padding:15px;border-radius:8px;white-space:pre-wrap;\">{{ $json.post_fb }}</div>\n\n<h3>🐦 Tweet:</h3>\n<div style=\"background:#f0f8ff;padding:15px;border-radius:8px;\">{{ $json.tweet_x }}</div>\n\n<p style=\"margin-top:20px;text-align:center;\"><strong>Kliknij Approve aby opublikować podsumowanie na FB.</strong></p>\n</div>",
+        "options": { "appendAttribution": false }
+      },
+      "id": "gmail-preview",
+      "name": "Email - Podglad + Akceptacja",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1360, 400],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_ME",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "if-approved",
+      "name": "Zatwierdzono?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1620, 400]
+    },
+    {
+      "parameters": {
+        "nodeId": "={{ $env.FB_PAGE_ID || 'CONFIGURE_ME' }}",
+        "edge": "feed",
+        "method": "POST",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "message",
+              "value": "={{ $('Parsuj AI Odpowiedz').first().json.post_fb }}"
+            }
+          ]
+        }
+      },
+      "id": "fb-publish",
+      "name": "Facebook - Publikuj Podsumowanie",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [1880, 400],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Facebook Graph API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📊 Kalkulator Wpływu\n\n**\"Co zrobiłem dla powiatu w tym miesiącu\"**\n\nKażdego 1-go dnia miesiąca zbiera dane\nze WSZYSTKICH workflow'ów i generuje:\n\n1. Podsumowanie z twardymi liczbami:\n   - Zasięg, engagement, nowi fani\n   - Ile postów opublikowano\n   - Ile wiadomości obsłużył bot\n   - Ile komunikatów kryzysowych\n   - Ile godzin zaoszczędzono\n\n2. Gotowy post na FB\n   (do zatwierdzenia jednym klikiem)\n\n3. Email z pięknym dashboardem\n\n**Źródła danych:**\n- FB Page Insights (API)\n- Messenger Log (z workflow #4)\n- Archiwum Postów (z workflow #8)\n- Log Kryzysów (z workflow #5)\n\n**Wartość przed wyborami:**\nNie puste obietnice — TWARDE DANE.\n\"W tym roku: X postów, Y mieszkańców\npoinformowanych, Z godzin zaoszczędzonych\ndla urzędu.\"\n\n**Do skonfigurowania:**\n- Meta Access Token\n- Gemini API Key\n- Gmail OAuth2\n- Google Sheets OAuth2\n- Facebook Graph API\n- Zmienne: FB_PAGE_ID, EMAIL_APPROVAL",
+        "width": 400,
+        "height": 600,
+        "color": 1
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 40]
+    }
+  ],
+  "connections": {
+    "1-szy Dnia Miesiaca 8:00": {
+      "main": [
+        [
+          { "node": "FB - Statystyki Miesiaca", "type": "main", "index": 0 },
+          { "node": "Messenger Log (FAQ Bot)", "type": "main", "index": 0 },
+          { "node": "Archiwum Postow", "type": "main", "index": 0 },
+          { "node": "Log Kryzysow", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "FB - Statystyki Miesiaca": {
+      "main": [
+        [
+          { "node": "Oblicz Wskazniki", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Messenger Log (FAQ Bot)": {
+      "main": [
+        [
+          { "node": "Oblicz Wskazniki", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Archiwum Postow": {
+      "main": [
+        [
+          { "node": "Oblicz Wskazniki", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Log Kryzysow": {
+      "main": [
+        [
+          { "node": "Oblicz Wskazniki", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Oblicz Wskazniki": {
+      "main": [
+        [
+          { "node": "Gemini Flash - Podsumowanie", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini Flash - Podsumowanie": {
+      "main": [
+        [
+          { "node": "Parsuj AI Odpowiedz", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parsuj AI Odpowiedz": {
+      "main": [
+        [
+          { "node": "Email - Podglad + Akceptacja", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Email - Podglad + Akceptacja": {
+      "main": [
+        [
+          { "node": "Zatwierdzono?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Zatwierdzono?": {
+      "main": [
+        [
+          { "node": "Facebook - Publikuj Podsumowanie", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "kalkulator" },
+    { "name": "marcin" },
+    { "name": "wplyw" }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

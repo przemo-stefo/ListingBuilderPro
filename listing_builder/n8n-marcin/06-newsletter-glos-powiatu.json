@@ -1,0 +1,549 @@
+{
+  "name": "Newsletter - Glos Powiatu (Tygodniowy)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtDay": 5,
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Co Piatek 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://radio.lublin.pl/feed/",
+        "options": {}
+      },
+      "id": "rss-radio",
+      "name": "RSS Radio Lublin",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [260, 140]
+    },
+    {
+      "parameters": {
+        "url": "https://www.dziennikwschodni.pl/rss/articles/pl",
+        "options": {}
+      },
+      "id": "rss-dw",
+      "name": "RSS Dziennik Wschodni",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [260, 320]
+    },
+    {
+      "parameters": {
+        "url": "https://krasnik.naszemiasto.pl/rss/artykuly/1.xml",
+        "options": {}
+      },
+      "id": "rss-nm",
+      "name": "RSS NaszeMiasto",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [260, 500]
+    },
+    {
+      "parameters": {
+        "url": "https://powiatkrasnik.e-bip.eu/index.php?id=722",
+        "options": {
+          "response": { "response": { "responseFormat": "text" } }
+        }
+      },
+      "id": "http-bip-ogl",
+      "name": "BIP Ogloszenia",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 680]
+    },
+    {
+      "parameters": {
+        "url": "https://powiatkrasnik.e-bip.eu/index.php?id=857",
+        "options": {
+          "response": { "response": { "responseFormat": "text" } }
+        }
+      },
+      "id": "http-bip-uch",
+      "name": "BIP Uchwaly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 860]
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "tytuly",
+              "cssSelector": "table.tableNormal td a, .doc-title a, .lista td a",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "html-ogl",
+      "name": "Wyciagnij Ogloszenia",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [500, 680]
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "tytuly",
+              "cssSelector": "table.tableNormal td a, .doc-title a, .lista td a",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "html-uch",
+      "name": "Wyciagnij Uchwaly",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [500, 860]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zbierz wszystko z RSS i BIP, filtruj po Kraśniku, ostatnie 7 dni\nconst allItems = [];\nconst weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);\n\nfor (const item of $input.all()) {\n  const d = item.json;\n\n  // RSS items\n  if (d.title && d.link) {\n    const pubDate = new Date(d.pubDate || d.isoDate || 0);\n    if (pubDate >= weekAgo) {\n      allItems.push({\n        zrodlo: d.creator || 'Media',\n        tytul: d.title,\n        link: d.link,\n        data: pubDate.toISOString(),\n        opis: (d.contentSnippet || d.content || '').substring(0, 200),\n        typ: 'news'\n      });\n    }\n  }\n\n  // BIP\n  if (d.tytuly && Array.isArray(d.tytuly)) {\n    for (const t of d.tytuly.slice(0, 8)) {\n      allItems.push({\n        zrodlo: 'BIP Powiat',\n        tytul: t,\n        link: 'https://powiatkrasnik.e-bip.eu/',\n        data: new Date().toISOString(),\n        opis: '',\n        typ: 'bip'\n      });\n    }\n  }\n}\n\n// Filtruj po Kraśniku\nconst kw = ['kraśnik','krasnik','kraśnick','krasnick','powiat','starosta','starostwo','rada powiatu','annopol','urzędów','gościeradów','dzierzkowice','szastarka','trzydnik','wilkołaz','zakrzówek'];\n\nconst filtered = allItems.filter(i => {\n  if (i.typ === 'bip') return true;\n  const txt = `${i.tytul} ${i.opis}`.toLowerCase();\n  return kw.some(k => txt.includes(k));\n});\n\nconst sorted = filtered.sort((a, b) => new Date(b.data) - new Date(a.data)).slice(0, 30);\n\nconst news = sorted.filter(i => i.typ === 'news');\nconst bip = sorted.filter(i => i.typ === 'bip');\n\nconst now = new Date();\nconst weekStart = new Date(now - 7 * 24 * 60 * 60 * 1000);\n\nreturn [{\n  json: {\n    news,\n    bip,\n    total: sorted.length,\n    news_count: news.length,\n    bip_count: bip.length,\n    week_start: weekStart.toLocaleDateString('pl-PL'),\n    week_end: now.toLocaleDateString('pl-PL'),\n    issue_number: Math.ceil((now - new Date('2026-01-01')) / (7 * 24 * 60 * 60 * 1000))\n  }\n}];"
+      },
+      "id": "code-aggregate",
+      "name": "Zbierz i Filtruj (7 dni)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"systemInstruction\": {\n    \"parts\": [{\n      \"text\": \"Jesteś redaktorem tygodniowego newslettera 'Głos Powiatu Kraśnickiego'. Piszesz dla mieszkańców — prosto, przyjaźnie, konkretnie. Newsletter ma informować i angażować.\\n\\nFORMAT NEWSLETTERA:\\n\\n1. POWITANIE — 2-3 zdania, co ważnego w tym tygodniu, lekki ton\\n\\n2. 📰 NAJWAŻNIEJSZE WYDARZENIA (max 5)\\n   Dla każdego: tytuł + 2-3 zdania podsumowania + link\\n\\n3. 🏛️ Z BIULETYNU INFORMACJI PUBLICZNEJ\\n   Krótka lista nowych uchwał/ogłoszeń w ludzkim języku (nie urzędniczym!)\\n\\n4. 📅 CO NAS CZEKA?\\n   Jeśli z newsów wynika co będzie w przyszłym tygodniu — wspomnij\\n   Jeśli nie — pomiń tę sekcję\\n\\n5. 💬 SŁOWO OD RADNEGO\\n   Krótki komentarz (2-3 zdania) z perspektywy radnego — co warto śledzić, na co zwrócić uwagę\\n\\n6. ZAKOŃCZENIE — zachęta do kontaktu, pozdrowienia\\n\\nZASADY:\\n- Max 500 słów\\n- Prosty język, zero żargonu urzędniczego\\n- Jeśli BIP ma uchwały — przetłumacz na ludzki język\\n- NIGDY nie wymyślaj newsów! Pisz TYLKO o podanych informacjach\\n- Lekkie emoji dozwolone (1-2 na sekcję)\"\n    }]\n  },\n  \"contents\": [{\n    \"role\": \"user\",\n    \"parts\": [{\n      \"text\": \"Przygotuj newsletter #{{ $json.issue_number }} za okres {{ $json.week_start }} — {{ $json.week_end }}.\\n\\nZEBRANE NEWSY Z MEDIÓW ({{ $json.news_count }}):\\n{{ $json.news.map((n, i) => `${i+1}. [${n.zrodlo}] ${n.tytul}\\n   ${n.opis}\\n   Link: ${n.link}`).join('\\n\\n') }}\\n\\nNOWE DOKUMENTY Z BIP ({{ $json.bip_count }}):\\n{{ $json.bip.map((b, i) => `${i+1}. ${b.tytul}`).join('\\n') }}\\n\\nJeśli newsów jest mało — skróć newsletter, nie rozciągaj.\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.6,\n    \"maxOutputTokens\": 2000\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-newsletter",
+      "name": "Gemini Flash - Newsletter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 400],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiText = $json.candidates?.[0]?.content?.parts?.[0]?.text || 'Brak treści newslettera.';\nconst meta = $('Zbierz i Filtruj (7 dni)').first().json;\n\n// Konwertuj markdown na prosty HTML\nlet htmlContent = aiText\n  .replace(/^### (.*$)/gm, '<h3 style=\"color:#2c5aa0;margin-top:20px;\">$1</h3>')\n  .replace(/^## (.*$)/gm, '<h2 style=\"color:#1a3d6e;border-bottom:2px solid #e8e8e8;padding-bottom:6px;\">$1</h2>')\n  .replace(/^# (.*$)/gm, '<h1 style=\"color:#1a3d6e;\">$1</h1>')\n  .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')\n  .replace(/\\*(.*?)\\*/g, '<em>$1</em>')\n  .replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href=\"$2\" style=\"color:#2c5aa0;\">$1</a>')\n  .replace(/\\n\\n/g, '</p><p style=\"line-height:1.7;color:#333;\">')\n  .replace(/\\n/g, '<br>');\n\nconst fullHtml = `<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif;\">\n<div style=\"max-width:620px;margin:0 auto;background:white;\">\n\n  <!-- Header -->\n  <div style=\"background:linear-gradient(135deg,#1a3d6e,#2c5aa0);padding:30px 25px;text-align:center;\">\n    <h1 style=\"color:white;margin:0;font-size:26px;\">📰 Głos Powiatu Kraśnickiego</h1>\n    <p style=\"color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;\">Tygodniowy przegląd | Nr ${meta.issue_number} | ${meta.week_start} — ${meta.week_end}</p>\n  </div>\n\n  <!-- Content -->\n  <div style=\"padding:25px 30px;\">\n    <p style=\"line-height:1.7;color:#333;\">${htmlContent}</p>\n  </div>\n\n  <!-- Footer -->\n  <div style=\"background:#f8f9fa;padding:20px 30px;border-top:1px solid #e8e8e8;\">\n    <p style=\"font-size:13px;color:#666;text-align:center;line-height:1.5;\">\n      📍 Starostwo Powiatowe w Kraśniku | Al. Niepodległości 20, 23-204 Kraśnik<br>\n      📞 (81) 825 58 99 | 📧 sekretariat@powiatkrasnicki.pl<br>\n      🌐 <a href=\"https://samorzad.gov.pl/web/powiat-krasnicki\" style=\"color:#2c5aa0;\">samorzad.gov.pl/web/powiat-krasnicki</a>\n      | <a href=\"https://www.facebook.com/powiatkrasnicki\" style=\"color:#2c5aa0;\">Facebook</a>\n    </p>\n    <p style=\"font-size:11px;color:#999;text-align:center;margin-top:10px;\">\n      Newsletter generowany automatycznie | Powered by n8n + Gemini AI<br>\n      <a href=\"{{ $env.UNSUBSCRIBE_URL || '#' }}\" style=\"color:#999;\">Wypisz się z newslettera</a>\n    </p>\n  </div>\n\n</div>\n</body>\n</html>`;\n\nreturn [{\n  json: {\n    html: fullHtml,\n    plain_text: aiText,\n    subject: `📰 Głos Powiatu #${meta.issue_number} | ${meta.week_start} — ${meta.week_end}`,\n    issue_number: meta.issue_number,\n    week_start: meta.week_start,\n    week_end: meta.week_end,\n    news_count: meta.news_count,\n    bip_count: meta.bip_count\n  }\n}];"
+      },
+      "id": "code-html",
+      "name": "Generuj HTML Newsletter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 400]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.EMAIL_APPROVAL || 'marcin@example.com' }}",
+        "subject": "=👁️ PODGLĄD: {{ $json.subject }}",
+        "emailType": "html",
+        "html": "=<div style=\"background:#fff3cd;padding:15px;border:1px solid #ffc107;border-radius:6px;margin-bottom:20px;font-family:Arial;\">\n<strong>⚠️ To jest PODGLĄD newslettera.</strong><br>\nKliknij <strong>Approve</strong> aby wysłać do subskrybentów.<br>\nKliknij <strong>Reject</strong> aby odrzucić i nie wysyłać.\n</div>\n{{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "gmail-preview",
+      "name": "Podglad do Akceptacji",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1520, 400],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_ME",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "if-approved",
+      "name": "Zatwierdzono?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Subskrybenci"
+        },
+        "options": {}
+      },
+      "id": "sheets-subscribers",
+      "name": "Pobierz Subskrybentow",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2040, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Przygotuj listę emaili + dane newslettera\nconst subscribers = $input.all().map(i => i.json);\nconst newsletter = $('Generuj HTML Newsletter').first().json;\n\nconst validEmails = subscribers.filter(s => \n  s.email && \n  s.email.includes('@') && \n  (s.status || 'active') === 'active'\n);\n\nreturn validEmails.map(s => ({\n  json: {\n    email: s.email,\n    imie: s.imie || 'Mieszkańcu',\n    html: newsletter.html.replace('Mieszkańcu', s.imie || 'Mieszkańcu'),\n    subject: newsletter.subject,\n    plain_text: newsletter.plain_text\n  }\n}));"
+      },
+      "id": "code-prepare-send",
+      "name": "Przygotuj Wysylke",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "gmail-send",
+      "name": "Wyslij Newsletter",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2560, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_ME",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'CONFIGURE_ME' }}",
+        "text": "=✅ *Newsletter #{{ $('Generuj HTML Newsletter').first().json.issue_number }} wysłany!*\n\n📧 Wysłano do: {{ $input.all().length }} subskrybentów\n📰 Newsów: {{ $('Generuj HTML Newsletter').first().json.news_count }}\n🏛️ BIP: {{ $('Generuj HTML Newsletter').first().json.bip_count }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-confirm",
+      "name": "Telegram - Potwierdzenie",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2820, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Archiwum"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "numer": "={{ $('Generuj HTML Newsletter').first().json.issue_number }}",
+            "data": "={{ new Date().toLocaleString('pl-PL') }}",
+            "temat": "={{ $('Generuj HTML Newsletter').first().json.subject }}",
+            "wyslano_do": "={{ $input.all().length }}",
+            "newsy": "={{ $('Generuj HTML Newsletter').first().json.news_count }}",
+            "bip": "={{ $('Generuj HTML Newsletter').first().json.bip_count }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-archive",
+      "name": "Archiwum Newsletterow",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2820, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "newsletter-subscribe",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-subscribe",
+      "name": "Webhook - Zapisz sie",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 900],
+      "webhookId": "newsletter-subscribe"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\n\nreturn [{\n  json: {\n    email: body.email || '',\n    imie: body.imie || body.name || '',\n    data_zapisu: new Date().toLocaleString('pl-PL'),\n    status: 'active'\n  }\n}];"
+      },
+      "id": "code-subscribe",
+      "name": "Parsuj Zapis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 900]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Subskrybenci"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "imie": "={{ $json.imie }}",
+            "data_zapisu": "={{ $json.data_zapisu }}",
+            "status": "active"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-add-subscriber",
+      "name": "Dodaj Subskrybenta",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [520, 900],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Dziękujemy za zapis do newslettera Głos Powiatu Kraśnickiego! Pierwszy numer otrzymasz w najbliższy piątek.",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-subscribe",
+      "name": "Potwierdzenie Zapisu",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [780, 900]
+    },
+    {
+      "parameters": {
+        "content": "## 📰 Newsletter \"Głos Powiatu Kraśnickiego\"\n\n**Co robi:**\n1. Co piątek o 9:00 zbiera newsy z RSS + BIP (7 dni)\n2. Filtruje po Kraśniku i gminach powiatu\n3. Gemini Flash pisze newsletter:\n   - Powitanie\n   - Top 5 wydarzeń\n   - Nowe z BIP (ludzkim językiem!)\n   - Co nas czeka\n   - Słowo od radnego\n4. Podgląd emailem do Marcina → Approve/Reject\n5. Wysyła do subskrybentów z Google Sheets\n6. Archiwizuje w Sheets + potwierdza na Telegram\n\n**Bonus: Endpoint zapisu**\n`POST /webhook/newsletter-subscribe`\n`{\"email\":\"...\",\"imie\":\"...\"}`\nMożna podpiąć pod formularz na stronie!\n\n**Google Sheets — 2 arkusze:**\n\nArkusz **\"Subskrybenci\":**\n| email | imie | data_zapisu | status |\n\nArkusz **\"Archiwum\":**\n| numer | data | temat | wyslano_do | newsy | bip |\n\n**Do skonfigurowania:**\n- Gemini API Key\n- Gmail OAuth2\n- Google Sheets OAuth2\n- Telegram Bot\n- Zmienne: EMAIL_APPROVAL, TELEGRAM_CHAT_ID,\n  UNSUBSCRIBE_URL\n\n**Wartość polityczna:**\nLista subskrybentów = ZŁOTO przed wyborami.\nMarcin buduje bezpośredni kanał do mieszkańców,\nniezależny od algorytmów Facebooka.",
+        "width": 440,
+        "height": 720,
+        "color": 4
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-440, 40]
+    }
+  ],
+  "connections": {
+    "Co Piatek 9:00": {
+      "main": [
+        [
+          { "node": "RSS Radio Lublin", "type": "main", "index": 0 },
+          { "node": "RSS Dziennik Wschodni", "type": "main", "index": 0 },
+          { "node": "RSS NaszeMiasto", "type": "main", "index": 0 },
+          { "node": "BIP Ogloszenia", "type": "main", "index": 0 },
+          { "node": "BIP Uchwaly", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "RSS Radio Lublin": {
+      "main": [
+        [
+          { "node": "Zbierz i Filtruj (7 dni)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "RSS Dziennik Wschodni": {
+      "main": [
+        [
+          { "node": "Zbierz i Filtruj (7 dni)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "RSS NaszeMiasto": {
+      "main": [
+        [
+          { "node": "Zbierz i Filtruj (7 dni)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "BIP Ogloszenia": {
+      "main": [
+        [
+          { "node": "Wyciagnij Ogloszenia", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "BIP Uchwaly": {
+      "main": [
+        [
+          { "node": "Wyciagnij Uchwaly", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wyciagnij Ogloszenia": {
+      "main": [
+        [
+          { "node": "Zbierz i Filtruj (7 dni)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wyciagnij Uchwaly": {
+      "main": [
+        [
+          { "node": "Zbierz i Filtruj (7 dni)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Zbierz i Filtruj (7 dni)": {
+      "main": [
+        [
+          { "node": "Gemini Flash - Newsletter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini Flash - Newsletter": {
+      "main": [
+        [
+          { "node": "Generuj HTML Newsletter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Generuj HTML Newsletter": {
+      "main": [
+        [
+          { "node": "Podglad do Akceptacji", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Podglad do Akceptacji": {
+      "main": [
+        [
+          { "node": "Zatwierdzono?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Zatwierdzono?": {
+      "main": [
+        [
+          { "node": "Pobierz Subskrybentow", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Pobierz Subskrybentow": {
+      "main": [
+        [
+          { "node": "Przygotuj Wysylke", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Przygotuj Wysylke": {
+      "main": [
+        [
+          { "node": "Wyslij Newsletter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wyslij Newsletter": {
+      "main": [
+        [
+          { "node": "Telegram - Potwierdzenie", "type": "main", "index": 0 },
+          { "node": "Archiwum Newsletterow", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Webhook - Zapisz sie": {
+      "main": [
+        [
+          { "node": "Parsuj Zapis", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parsuj Zapis": {
+      "main": [
+        [
+          { "node": "Dodaj Subskrybenta", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Dodaj Subskrybenta": {
+      "main": [
+        [
+          { "node": "Potwierdzenie Zapisu", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "newsletter" },
+    { "name": "marcin" },
+    { "name": "glos-powiatu" }
+  ],
+  "triggerCount": 2,
+  "pinData": {}
+}

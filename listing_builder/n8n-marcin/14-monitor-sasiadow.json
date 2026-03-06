@@ -1,0 +1,198 @@
+{
+  "name": "Monitor Sąsiadów - Tygodniowy Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtDay": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-sasiedzi",
+      "name": "Poniedziałek 8:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "path": "sasiedzi-test-a015018b",
+        "options": {}
+      },
+      "id": "webhook-test-sas",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        100,
+        400
+      ],
+      "webhookId": "sasiedzi-test-a015018b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n-marcin/14-monitor-sasiadow.json — Zbierz Wiadomości Sąsiadów\n// Purpose: Scrape news from neighboring powiats, AI summary, Telegram digest\n// NOT for: collecting Kraśnik news (that's News Collector)\n\nconst geminiKey = $env.GEMINI_API_KEY || '';\n\n// Sources: neighboring powiats via Dziennik Wschodni + official sites\nconst sources = [\n  { name: 'DW Janów Lubelski', url: 'https://www.dziennikwschodni.pl/janow-lubelski/', powiat: 'Janów Lubelski' },\n  { name: 'DW Opole Lubelskie', url: 'https://www.dziennikwschodni.pl/opole-lubelskie/', powiat: 'Opole Lubelskie' },\n  { name: 'Powiat Janowski', url: 'https://powiatjanowski.pl/category/aktualnosci/', powiat: 'Janów Lubelski' },\n  { name: 'Lublin112 Opole', url: 'https://www.lublin112.pl/category/wiadomosci-z-regionu/opole-lubelskie/', powiat: 'Opole Lubelskie' }\n];\n\n// Fetch all sources in parallel\nconst fetchPage = async (src) => {\n  try {\n    const html = await this.helpers.httpRequest({\n      method: 'GET', url: src.url,\n      options: { redirect: { followRedirects: true }, response: { response: { responseFormat: 'text' } } }\n    });\n    const body = typeof html === 'string' ? html : (html.data || html.body || '');\n    return { ...src, html: body, error: null };\n  } catch (e) {\n    return { ...src, html: '', error: e.message };\n  }\n};\n\nconst results = await Promise.all(sources.map(fetchPage));\n\n// Extract article titles and links from HTML\nconst allArticles = [];\n\nfor (const r of results) {\n  if (!r.html) continue;\n\n  // Generic extraction: find <a> tags with article-like titles\n  // DW pattern: <a href=\"/janow-lubelski/...\">Title</a>\n  // Powiat pattern: <a href=\"https://powiatjanowski.pl/...\">Title</a>\n  const articleRegex = /<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>([^<]{15,200})<\\/a>/gi;\n  let match;\n  const seen = new Set();\n\n  while ((match = articleRegex.exec(r.html)) !== null && allArticles.length < 100) {\n    const href = match[1];\n    const title = match[2].replace(/\\s+/g, ' ').trim();\n\n    // Filter: only article-like links (not navigation, not categories)\n    const isArticle = (\n      (href.includes('/janow-lubelski/') || href.includes('/opole-lubelskie/') ||\n       href.includes('powiatjanowski.pl/') || href.includes('lublin112.pl/')) &&\n      !href.includes('/category/') && !href.includes('/tag/') &&\n      !href.includes('/page/') && !href.includes('#') &&\n      title.length > 20 && title.length < 200 &&\n      !title.includes('Czytaj więcej') && !title.includes('Strona główna')\n    );\n\n    if (isArticle && !seen.has(title)) {\n      seen.add(title);\n      allArticles.push({\n        title,\n        url: href.startsWith('http') ? href : (new URL(href, r.url)).toString(),\n        source: r.name,\n        powiat: r.powiat\n      });\n    }\n  }\n}\n\nif (allArticles.length < 3) {\n  return [{ json: { skip: true, reason: 'Za mało artykułów z sąsiednich powiatów: ' + allArticles.length } }];\n}\n\n// Ask Gemini to create a digest\nconst articleList = allArticles.slice(0, 30).map((a, i) =>\n  `${i + 1}. [${a.powiat}/${a.source}] ${a.title}`\n).join('\\n');\n\nconst prompt = `Jesteś asystentem Marcina Nastarowicza z Biura Starosty Powiatu Kraśnickiego.\nPoniżej lista artykułów z SĄSIEDNICH powiatów (Janów Lubelski, Opole Lubelskie).\n\nPrzygotuj KRÓTKI tygodniowy digest (max 10 pozycji) z najciekawszymi wiadomościami.\nDla każdej pozycji napisz 1 zdanie co się dzieje.\nNa końcu dodaj 1-2 zdania: co z tego Kraśnik może wyciągnąć / co jest inspirujące.\n\nFormat:\n🏘️ CO U SĄSIADÓW — tydzień [data]\n\n📍 Janów Lubelski:\n• [wiadomość 1]\n• [wiadomość 2]\n\n📍 Opole Lubelskie:\n• [wiadomość 1]\n\n💡 Inspiracja dla Kraśnika: [1-2 zdania]\n\nARTYKUŁY:\n${articleList}`;\n\nlet digest = '';\ntry {\n  const aiResult = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=' + geminiKey,\n    body: {\n      contents: [{ role: 'user', parts: [{ text: prompt }] }],\n      generationConfig: { temperature: 0.4, maxOutputTokens: 1000 }\n    },\n    json: true\n  });\n  digest = aiResult.candidates?.[0]?.content?.parts?.[0]?.text || '';\n} catch (e) { console.log('Gemini error:', e.message); }\n\nif (!digest) {\n  return [{ json: { skip: true, reason: 'Gemini nie wygenerował digestu' } }];\n}\n\n// Truncate for Telegram\nif (digest.length > 4000) {\n  digest = digest.substring(0, 3950) + '\\n\\n... ciąg dalszy na portalu';\n}\n\nreturn [{ json: { skip: false, telegram: digest, articleCount: allArticles.length, sources: results.map(r => r.name + ': ' + (r.error || 'OK')).join(', ') } }];"
+      },
+      "id": "collect-sasiedzi",
+      "name": "Zbierz Wiadomości Sąsiadów",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-digest",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-digest",
+      "name": "Ma digest?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.WAHA_URL || \"http://65.21.88.47:40127\") + \"/api/sendText\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: ($env.WHATSAPP_GROUP_JID || \"120363426348074659@g.us\"), text: $json.telegram, session: \"default\" }) }}",
+        "options": {},
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "839a7bb725914e2b88ce225223f019e2"
+            }
+          ]
+        }
+      },
+      "id": "telegram-sasiedzi",
+      "name": "WhatsApp Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "noop-skip-sas",
+      "name": "Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Monitor Sąsiadów\n\n**Schedule:** poniedziałek 8:00\n**Źródła:**\n- Dziennik Wschodni: Janów Lubelski, Opole Lubelskie\n- powiatjanowski.pl aktualności\n- lublin112.pl Opole Lubelskie\n\n**Logika:**\n1. Scrape 4 źródła (parallel)\n2. Extract artykuły z HTML\n3. Gemini → digest max 10 pozycji\n4. Telegram alert\n\n**Webhook test:** GET /webhook/sasiedzi-test",
+        "height": 280,
+        "width": 350
+      },
+      "id": "sticky-sas",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -100
+      ]
+    }
+  ],
+  "connections": {
+    "Poniedziałek 8:00": {
+      "main": [
+        [
+          {
+            "node": "Zbierz Wiadomości Sąsiadów",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Zbierz Wiadomości Sąsiadów",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zbierz Wiadomości Sąsiadów": {
+      "main": [
+        [
+          {
+            "node": "Ma digest?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ma digest?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Digest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

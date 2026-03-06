@@ -1,0 +1,405 @@
+{
+  "name": "Radar Radnego v2 - RAG Briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Codziennie 6:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://qdrant:6333/collections/krasnik_news/points/scroll",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"limit\": 100,\n  \"with_payload\": true,\n  \"with_vector\": false,\n  \"filter\": {\n    \"must\": [\n      {\n        \"key\": \"category\",\n        \"match\": { \"any\": [\"news\", \"bip\", \"social\"] }\n      }\n    ]\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "qdrant-last24h",
+      "name": "Qdrant: Artykuly 24h",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const scrollData = $input.first().json;\nconst qdrantUrl = 'http://qdrant:6333';\nconst geminiKey = $env.GEMINI_API_KEY || '';\n\n// Get all recent articles from scroll result\nconst recentArticles = scrollData.result?.points?.map(p => p.payload) || [];\n\n// Embed search query for similarity search\nlet similarArticles = [];\ntry {\n  const embData = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${geminiKey}`,\n    body: {\n      model: 'models/gemini-embedding-001',\n      content: { parts: [{ text: 'Najważniejsze wydarzenia w powiecie kraśnickim: rada powiatu, BIP, inwestycje, sport, edukacja, bezpieczeństwo, przetargi' }] },\n      outputDimensionality: 768\n    },\n    json: true\n  });\n  const embResult = embData;\n  \n  if (embResult.embedding?.values) {\n    const searchData = await this.helpers.httpRequest({\n      method: 'POST',\n      url: `${qdrantUrl}/collections/krasnik_news/points/search`,\n      body: {\n        vector: embResult.embedding.values,\n        limit: 20,\n        with_payload: true,\n        score_threshold: 0.3\n      },\n      json: true\n    });\n    const searchResult = searchData;\n    similarArticles = searchResult.result?.map(r => ({ ...r.payload, score: r.score })) || [];\n  }\n} catch (e) {\n  console.log('RAG search error:', e.message);\n}\n\n// Get yesterday's briefing for context (avoid repetition)\nlet yesterdayBriefing = '';\ntry {\n  const briefData = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${qdrantUrl}/collections/krasnik_news/points/scroll`,\n    body: {\n      limit: 1,\n      with_payload: true,\n      with_vector: false,\n      filter: {\n        must: [{ key: 'category', match: { value: 'briefing' } }]\n      },\n      order_by: { key: 'date', direction: 'desc' }\n    },\n    json: true\n  });\n  const briefResult = briefData;\n  yesterdayBriefing = briefResult.result?.points?.[0]?.payload?.description || '';\n} catch (e) {\n  console.log('Yesterday briefing fetch error:', e.message);\n}\n\n// Merge and deduplicate by URL\nconst allArticles = new Map();\nfor (const a of [...recentArticles, ...similarArticles]) {\n  const key = a.url || a.title;\n  if (!allArticles.has(key)) {\n    allArticles.set(key, a);\n  }\n}\n\nconst articles = Array.from(allArticles.values())\n  .sort((a, b) => (b.score || 0) - (a.score || 0))\n  .slice(0, 30);\n\nconst today = new Date().toLocaleDateString('pl-PL', { \n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' \n});\n\n// 4+5. Fetch preferences + style feedback (parallel)\nlet prefSummary = '';\nlet styleFeedback = '';\nconst qdrantScroll = (cat, lim) => this.helpers.httpRequest({\n  method: 'POST', url: qdrantUrl + '/collections/krasnik_news/points/scroll',\n  body: { limit: lim, with_payload: true, with_vector: false,\n    filter: { must: [{ key: 'category', match: { value: cat } }] } },\n  json: true\n}).catch(e => { console.log('Qdrant scroll error (' + cat + '):', e.message); return { result: { points: [] } }; });\n\ntry {\n  const [prefData, fbData] = await Promise.all([\n    qdrantScroll('marcin-preference', 50),\n    qdrantScroll('marcin-style-feedback', 10)\n  ]);\n\n  const prefs = (prefData.result?.points || []).map(p => p.payload);\n  if (prefs.length > 0) {\n    const topicCounts = {};\n    for (const pref of prefs) {\n      for (const t of (pref.topics || [])) topicCounts[t] = (topicCounts[t] || 0) + 1;\n    }\n    const sorted = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);\n    if (sorted.length > 0) {\n      prefSummary = 'Marcin najczesciej wybiera: ' + sorted.slice(0, 5).map(([t, c]) => t + ' (' + c + 'x)').join(', ');\n    }\n  }\n\n  const feedbacks = (fbData.result?.points || []).map(p => p.payload?.feedback || p.payload?.feedback_text).filter(Boolean);\n  if (feedbacks.length > 0) {\n    styleFeedback = 'Feedback Marcina na temat stylu: ' + feedbacks.slice(0, 5).join('; ');\n  }\n} catch (e) { console.log('Pref/style fetch error:', e.message); }\n\nreturn [{\n  json: {\n    articles,\n    article_count: articles.length,\n    preferences: prefSummary,\n    style_feedback: styleFeedback,\n    date: today,\n    date_iso: new Date().toISOString(),\n    yesterday_briefing: yesterdayBriefing.substring(0, 1000),\n    sources: [...new Set(articles.map(a => a.source))].join(', ')\n  }\n}];"
+      },
+      "id": "code-similarity",
+      "name": "RAG: Wyszukaj Istotne",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {
+          "maxTokensToSample": 3000,
+          "temperature": 0.3
+        }
+      },
+      "id": "ai-groq",
+      "name": "Groq AI - Briefing",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        780,
+        500
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "XNZLc55hW0XsCpHv",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Jesteś asystentem Marcina Nastarowicza, pracownika Biura Starosty w Starostwie Powiatowym w Kraśniku.\n\nKIM JEST MARCIN:\n- Pracuje w Biurze Starosty Powiatu Kraśnickiego\n- Digital creator — prowadzi social media powiatu (FB: Starostwo Powiatowe w Kraśniku)\n- Interesuje go: decyzje rady powiatu, BIP, inwestycje, sport lokalny, wydarzenia kulturalne, edukacja, bezpieczeństwo\n- Starosta: Zbigniew Dżugaj | Wicestarosta: Paweł Marek Kudrel\n\n{% if $json.preferences %}\nPREFERENCJE MARCINA (ucz się z nich — priorytetyzuj te tematy):\n{{ $json.preferences }}\n{% endif %}\n\n{% if $json.style_feedback %}\nFEEDBACK MARCINA O STYLU (stosuj te uwagi):\n{{ $json.style_feedback }}\n{% endif %}\n\nTWOJE ZADANIE:\nZ podanych {{ $json.article_count }} artykułów wybierz max 15 najważniejszych.\nPogrupuj w sekcje i numeruj CIĄGŁĄ numeracją (1, 2, 3... przez cały briefing, NIE resetuj w sekcjach).\n\nWAŻNE: Pomiń reklamy, spam (rowery, meble, makijaż, laminowanie, sprężarki).\nZostaw TYLKO: polityka, samorząd, sport Kraśnik, infrastruktura, bezpieczeństwo, edukacja, kultura, inwestycje.\n\nARTYKUŁY DO ANALIZY:\n{{ $json.articles.map(a => `- [${a.source}] ${a.title}\n  ${a.url}`).join('\\n') }}\n\n{% if $json.yesterday_briefing %}\nWCZORAJSZY BRIEFING (NIE POWTARZAJ):\n{{ $json.yesterday_briefing }}\n{% endif %}\n\nFORMAT (krótki, z emoji, max 1 ekran telefonu):\n\n🏛️ *BRIEFING — {{ $json.date }}*\n\n📌 *POWIAT KRAŚNICKI*\n1. emoji *Tytuł* — 1 zdanie streszczenia\n\n📰 *REGION*\n(kontynuuj numerację)\n\n⚽ *SPORT*\n(kontynuuj)\n\n💡 *TOP 3 NA FB:*\nArt. X — dlaczego (1 zdanie)\nArt. Y — dlaczego\nArt. Z — dlaczego\n\nOdpisz numerami, np. *1, 4* 👍",
+        "options": {}
+      },
+      "id": "ai-chain",
+      "name": "AI Briefing Radnego",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ragData = $('RAG: Wyszukaj Istotne').first().json;\nconst aiResponse = $input.first().json.response || $input.first().json.text || '';\nconst articles = ragData.articles || [];\nconst dateIso = new Date().toISOString();\nconst qdrantUrl = 'http://qdrant:6333';\nconst geminiKey = $env.GEMINI_API_KEY || '';\n\n// SHARED: simpleHash+makeUUID — keep identical across all Code nodes that use it\nfunction simpleHash(str) {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < str.length; i++) {\n    const ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);\n  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);\n  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0') + '0000000000000000';\n}\nfunction makeUUID(input) {\n  const h = simpleHash(input);\n  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);\n}\n\n// Create numbered article list for interactive selection\nlet numberedList = '';\nconst indexArticles = [];\nlet num = 1;\n\nfor (const a of articles) {\n  if (a.title && a.url) {\n    numberedList += num + '. ' + a.title + '\\n   ' + a.url + '\\n';\n    indexArticles.push({\n      num: num,\n      title: a.title,\n      url: a.url,\n      source: a.source || '',\n      description: a.description || ''\n    });\n    num++;\n  }\n}\n\n// Store briefing-index in Qdrant for FB Post Generator\n// Use simple hash for UUID\n\ntry {\n  // Embed a simple text to get vector for the index entry\n  const embData = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=' + geminiKey,\n    body: {\n      model: 'models/gemini-embedding-001',\n      content: { parts: [{ text: 'briefing index ' + dateIso }] },\n      outputDimensionality: 768\n    },\n    json: true\n  });\n  const embResult = embData;\n  \n  if (embResult.embedding?.values) {\n    const uuid = makeUUID('briefing-index-' + dateIso.substring(0, 10));\n    \n    // Delete previous briefing-index entries first\n    try {\n      await this.helpers.httpRequest({\n        method: 'POST',\n        url: qdrantUrl + '/collections/krasnik_news/points/delete',\n            body: {\n          filter: { must: [{ key: 'category', match: { value: 'briefing-index' } }] }\n        },\n        json: true\n      });\n    } catch (e) { console.log('Delete briefing-index error:', e.message); }\n    \n    // Store new index\n    await this.helpers.httpRequest({\n      method: 'PUT',\n      url: qdrantUrl + '/collections/krasnik_news/points',\n        body: {\n        points: [{\n          id: uuid,\n          vector: embResult.embedding.values,\n          payload: {\n            title: 'Briefing Index ' + new Date().toLocaleDateString('pl-PL'),\n            url: '',\n            description: 'Index of numbered articles for FB Post Generator',\n            source: 'Radar Radnego',\n            date: dateIso,\n            category: 'briefing-index',\n            articles_json: JSON.stringify(indexArticles)\n          }\n        }]\n      }),\n      json: true\n    });\n  }\n} catch (e) {\n  // Index storage failed - non-critical\n}\n\n// Build WhatsApp message with AI briefing + numbered list\nconst interactiveMsg = aiResponse;\n\n// Truncate for Telegram (4096 char limit)\nlet telegramText = aiResponse;\nif (telegramText.length > 4000) {\n  telegramText = telegramText.substring(0, 3950) + '\\n\\n... Briefing skrocony (pelna wersja na WhatsApp)';\n}\n\nconst smsText = 'Briefing Radnego gotowy! Sprawdz WhatsApp. ' + aiResponse.substring(0, 80) + '...';\n\nreturn [{\n  json: {\n    briefing_full: aiResponse,\n    briefing_telegram: telegramText,\n    briefing_whatsapp: interactiveMsg,\n    briefing_sms: smsText,\n    date_iso: dateIso,\n    date_pl: new Date().toLocaleDateString('pl-PL'),\n    article_count: indexArticles.length\n  }\n}];"
+      },
+      "id": "code-prepare",
+      "name": "Przygotuj Wysylke",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7002371113",
+        "text": "={{ $json.briefing_telegram }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "telegram-send",
+      "name": "Telegram Briefing",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1300,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "V4Dj22sqdNKu30vC",
+          "name": "Telegram Bot (RadnyKrasnikBot)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const briefing = $input.first().json.briefing_full;\nconst dateIso = $input.first().json.date_iso;\nconst qdrantUrl = 'http://qdrant:6333';\nconst geminiKey = $env.GEMINI_API_KEY || '';\n\n// SHARED: simpleHash+makeUUID — keep identical across all Code nodes that use it\nfunction simpleHash(str) {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < str.length; i++) {\n    const ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);\n  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);\n  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0') + '0000000000000000';\n}\nfunction makeUUID(input) {\n  const h = simpleHash(input);\n  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);\n}\n\ntry {\n  const embData = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${geminiKey}`,\n    body: {\n      model: 'models/gemini-embedding-001',\n      content: { parts: [{ text: briefing.substring(0, 2000) }] },\n      outputDimensionality: 768\n    },\n    json: true\n  });\n  const embResult = embData;\n  \n  if (embResult.embedding?.values) {\n    const uuid = makeUUID('briefing-' + dateIso);\n    \n    await this.helpers.httpRequest({\n      method: 'PUT',\n      url: `${qdrantUrl}/collections/krasnik_news/points`,\n        body: {\n        points: [{\n          id: uuid,\n          vector: embResult.embedding.values,\n          payload: {\n            title: `Briefing Radnego ${new Date().toLocaleDateString('pl-PL')}`,\n            url: '',\n            description: briefing,\n            source: 'Radar Radnego',\n            date: dateIso,\n            category: 'briefing'\n          }\n        }]\n      }),\n      json: true\n    });\n  }\n  \n  return [{ json: { status: 'archived', date: dateIso } }];\n} catch (e) {\n  return [{ json: { status: 'archive_failed', error: e.message } }];\n}"
+      },
+      "id": "code-archive",
+      "name": "Archiwizuj Briefing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.WAHA_URL || \"http://65.21.88.47:40127\") + \"/api/sendText\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: $env.MARCIN_WHATSAPP_JID, text: $json.briefing_whatsapp, session: \"default\" }) }}",
+        "options": {
+          "headers": {
+            "values": [
+              {
+                "name": "X-Api-Key",
+                "value": "={{ $env.WAHA_API_KEY || '839a7bb725914e2b88ce225223f019e2' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "whatsapp-send",
+      "name": "WhatsApp Briefing (WAHA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        560
+      ],
+      "notesInFlow": true,
+      "notes": "WAHA na izabela166:40127 — API key w header X-Api-Key"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://messenger-bot:3111/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipientId\": \"100003569876334\",\n  \"text\": \"{{ $json.briefing_telegram }}\"\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "messenger-send",
+      "name": "Messenger Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        720
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Disabled — uzywamy WhatsApp via WAHA"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.smsapi.pl/sms.do",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "+48722149435"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.briefing_sms }}"
+            },
+            {
+              "name": "from",
+              "value": "RadarRadnego"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SMSAPI_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sms-send",
+      "name": "SMS Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        900
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Wymaga konta SMSAPI.pl (~0.07 PLN/SMS)"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.EMAIL_RADNY || 'marcin@example.com' }}",
+        "subject": "=📋 Briefing Radnego - {{ new Date().toLocaleDateString('pl-PL') }}",
+        "emailType": "html",
+        "html": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; color: #e0e0e0; padding: 20px; border-radius: 8px;\">\n<h1 style=\"color: #4A9EFF; border-bottom: 2px solid #333; padding-bottom: 10px;\">📋 Briefing Radnego</h1>\n<p style=\"color: #888;\">{{ new Date().toLocaleDateString('pl-PL', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'}) }}</p>\n<div style=\"white-space: pre-wrap; line-height: 1.6;\">{{ ($json.briefing_full || '').replace(/\\n/g, '<br>') }}</div>\n<hr style=\"border-color: #333; margin-top: 20px;\">\n<p style=\"color: #666; font-size: 12px;\">Wygenerowano automatycznie przez Radar Radnego v2 | n8n + Qdrant RAG</p>\n</div>",
+        "options": {}
+      },
+      "id": "email-send",
+      "name": "Email Briefing",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1300,
+        1060
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "CONFIGURE_ME",
+          "name": "SMTP"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## 📡 Radar Radnego v2 — RAG Briefing\n\n**Co robi:** Codziennie o 6:30 generuje briefing z kontekstem RAG\n**Źródło danych:** Qdrant `krasnik_news` (News Collector zbiera co 4h)\n**AI:** Groq llama-3.3-70b-versatile + system prompt o Marcinie\n**Pamięć:** Archiwizuje briefing w Qdrant (nie powtarza wczorajszych info)\n\n**Kanały dostarczenia:**\n✅ Telegram — aktywny\n✅ WhatsApp — via WAHA na anna130:30130\n✅ Messenger — via Puppeteer bot (cookies Shawna)\n⏸️ SMS — wymaga konta SMSAPI.pl\n⏸️ Email — wymaga SMTP credentials\n\n**Wymagane:**\n- News Collector (workflow #10) musi działać\n- Qdrant dostępny via qdrant:6333\n- GEMINI_API_KEY w zmiennych n8n\n- Groq API credential\n\n**Autor:** PYROX AI | shawnstefaniak@pyroxai.com",
+        "width": 420,
+        "height": 460,
+        "color": 4
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔧 KANAŁY DOSTARCZENIA\n\n**Telegram:** ✅ Działa od razu\n**WhatsApp:** ✅ Via WAHA (anna130:30130) — ustaw MARCIN_WHATSAPP_JID\n**Messenger:** ✅ Puppeteer bot (messenger-bot:3111)\n**SMS:** Załóż konto smsapi.pl → ustaw SMSAPI_TOKEN → włącz node\n**Email:** Skonfiguruj SMTP credential → włącz node",
+        "width": 320,
+        "height": 200,
+        "color": 6
+      },
+      "id": "sticky-config",
+      "name": "Sticky Note Config",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        560
+      ]
+    }
+  ],
+  "connections": {
+    "Codziennie 6:30": {
+      "main": [
+        [
+          {
+            "node": "Qdrant: Artykuly 24h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant: Artykuly 24h": {
+      "main": [
+        [
+          {
+            "node": "RAG: Wyszukaj Istotne",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG: Wyszukaj Istotne": {
+      "main": [
+        [
+          {
+            "node": "AI Briefing Radnego",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq AI - Briefing": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Briefing Radnego",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Briefing Radnego": {
+      "main": [
+        [
+          {
+            "node": "Przygotuj Wysylke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Przygotuj Wysylke": {
+      "main": [
+        [
+          {
+            "node": "Telegram Briefing",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Archiwizuj Briefing",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp Briefing (WAHA)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Messenger Briefing",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SMS Briefing",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

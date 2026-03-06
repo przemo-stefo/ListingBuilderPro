@@ -1,0 +1,326 @@
+{
+  "name": "Messenger FAQ Bot - Powiat Krasnicki",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "={{$request.method}}",
+        "path": "messenger-bot",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook Messenger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "messenger-bot"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obsługa weryfikacji webhook (GET) i wiadomości (POST)\nconst req = $input.first().json;\n\n// Facebook wysyła GET z hub.challenge przy weryfikacji\nif (req.query && req.query['hub.verify_token']) {\n  const VERIFY_TOKEN = $env.FB_VERIFY_TOKEN || 'marcin_bot_2026';\n  if (req.query['hub.verify_token'] === VERIFY_TOKEN) {\n    return [{ json: { type: 'verification', challenge: req.query['hub.challenge'] } }];\n  }\n  return [{ json: { type: 'error', message: 'Invalid verify token' } }];\n}\n\n// POST - nowa wiadomość\nconst body = req.body || req;\nconst entries = body.entry || [];\nconst messages = [];\n\nfor (const entry of entries) {\n  const messaging = entry.messaging || [];\n  for (const event of messaging) {\n    if (event.message && event.message.text) {\n      messages.push({\n        type: 'message',\n        sender_id: event.sender.id,\n        recipient_id: event.recipient.id,\n        message_text: event.message.text,\n        message_id: event.message.mid,\n        timestamp: event.timestamp || Date.now()\n      });\n    }\n  }\n}\n\nif (messages.length === 0) {\n  return [{ json: { type: 'no_message' } }];\n}\n\nreturn messages.map(m => ({ json: m }));"
+      },
+      "id": "code-parse",
+      "name": "Parsuj Wiadomosc",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "verification",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-verification",
+      "name": "Weryfikacja?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {}
+      },
+      "id": "respond-verify",
+      "name": "Odpowiedz Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [740, 140]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\"}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-ok",
+      "name": "Odpowiedz 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [740, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "message",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-message",
+      "name": "To Wiadomosc?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [740, 380]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"systemInstruction\": {\n    \"parts\": [{\n      \"text\": \"Jesteś przyjaznym asystentem Starostwa Powiatowego w Kraśniku. Odpowiadasz na pytania mieszkańców przez Messenger.\\n\\nZASADY:\\n- Odpowiadaj KRÓTKO (max 3-4 zdania), konkretnie, po polsku\\n- Podawaj NUMERY TELEFONÓW i POKOJE gdy to możliwe\\n- Jeśli NIE ZNASZ odpowiedzi — napisz: 'Niestety nie mam tej informacji. Proszę zadzwonić na sekretariat: (81) 825 58 99'\\n- NIGDY nie wymyślaj informacji!\\n- Bądź uprzejmy ale zwięzły\\n- Używaj emoji oszczędnie (max 1-2)\\n\\nBAZA WIEDZY STAROSTWA POWIATOWEGO W KRAŚNIKU:\\n\\n📍 ADRES: Al. Niepodległości 20, 23-204 Kraśnik\\n📞 CENTRALA: (81) 825 58 99\\n📧 EMAIL: sekretariat@powiatkrasnicki.pl\\n🌐 WWW: samorzad.gov.pl/web/powiat-krasnicki\\n🏛️ BIP: powiatkrasnik.e-bip.eu\\n📮 ePUAP: /SPKrasnik/SkrytkaESP\\n\\n⏰ GODZINY URZĘDOWANIA:\\nPoniedziałek: 7:30-15:30\\nWtorek: 7:30-16:00\\nŚroda: 7:30-15:30\\nCzwartek: 7:30-15:30\\nPiątek: 7:30-15:00\\n\\n👥 KIEROWNICTWO (kadencja 2024-2029):\\nStarosta: Zbigniew Dżugaj\\nWicestarosta: Paweł Marek Kudrel\\nSekretarz: Agnieszka Beata Lenart\\nSkarbnik: Iwona Szymańska\\n\\n🚗 WYDZIAŁ KOMUNIKACJI I TRANSPORTU:\\nRejestracja pojazdów: pok. 114, tel. (81) 826 17 74\\nDowody rejestracyjne, wyrejestrowania: pok. 115, tel. (81) 826 17 75\\nPrawa jazdy: pok. 113, tel. (81) 826 17 73, email: prawojazdy@powiatkrasnicki.pl\\nOrzeczenia sądowe: pok. 112, tel. (81) 826 17 72\\nZezwolenia transportowe, OSK: pok. 116, tel. (81) 826 18 56\\nNaczelnik: pok. 111, tel. (81) 826 17 69\\nEmail: komunikacja@powiatkrasnicki.pl\\n\\n📐 WYDZIAŁ GEODEZJI (INNY BUDYNEK!):\\nAdres: ul. Szpitalna 2A, 23-204 Kraśnik\\nObsługa klienta: pok. 108, tel. (81) 826 41 55\\nGłówny: tel. (81) 826 41 09\\nNaczelnik: pok. 215, tel. (81) 458 10 96\\nEmail: geodezja@powiatkrasnicki.pl\\nGminy Kraśnik miasto, Dzierzkowice, Trzydnik, Szastarka: tel. (81) 826 41 18\\nGminy Kraśnik wiejska, Wilkołaz, Zakrzówek: tel. (81) 826 41 15\\nGminy Annopol, Gościeradów, Urzędów: tel. (81) 825 55 60\\n\\n🏗️ WYDZIAŁ BUDOWNICTWA (II piętro):\\nNaczelnik: pok. 215, tel. (81) 826 17 77\\nKraśnik miasto + Annopol: pok. 216, tel. (81) 826 17 80\\nDzierzkowice, Kraśnik gm., Zakrzówek, Trzydnik: pok. 214, tel. (81) 826 17 78\\nUrzędów, Gościeradów, Szastarka, Wilkołaz: pok. 212, tel. (81) 826 17 79\\n\\n💰 KASA: pok. 108 (parter), tel. (81) 825 43 80\\n\\n📚 EDUKACJA I SPORT:\\nNaczelnik: pok. 206, tel. (81) 826 17 89\\nEmail: edukacja@powiatkrasnicki.pl / sport@powiatkrasnicki.pl\\n\\n🌍 GEOLOG POWIATOWY: pok. 410, tel. (81) 825 54 86, email: geolog@powiatkrasnicki.pl\\n\\n🌡️ DORADZTWO KLIMATYCZNE: ul. Szpitalna 2A, pok. 115, tel. 663 920 720\\n\\n📋 JEDNOSTKI ORGANIZACYJNE:\\nPUP (praca): Al. Niepodległości 20, tel. (81) 826 18 11, email: sekretariat@pup.krasnik.pl\\nPCPR (pomoc rodzinie, niepełnosprawność): ul. Grunwaldzka 6, tel. (81) 826 18 64\\nPoradnia Psychologiczno-Pedagogiczna: ul. Słowackiego 7, tel. (81) 825 87 88\\nSzpital (SPZOZ): ul. Chopina 13, tel. (81) 825 13 66\\n\\n⚠️ CZEGO STAROSTWO NIE ZAŁATWIA (kompetencje GMIN):\\n- Odpady / wywóz śmieci → Urząd Gminy\\n- Meldunek / wymeldowanie → Urząd Gminy\\n- Dowody osobiste → Urząd Gminy\\n- Akty urodzenia/małżeństwa/zgonu → USC w gminie\\n- Podatek od nieruchomości → Urząd Gminy\\n- Wodociągi / kanalizacja → Urząd Gminy\\n\\n🏘️ GMINY W POWIECIE (10): Kraśnik miasto, Kraśnik gm., Annopol, Urzędów, Gościeradów, Dzierzkowice, Szastarka, Trzydnik Duży, Wilkołaz, Zakrzówek\"\n    }]\n  },\n  \"contents\": [{\n    \"role\": \"user\",\n    \"parts\": [{ \"text\": {{ JSON.stringify($json.message_text) }} }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.3,\n    \"maxOutputTokens\": 300\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-faq",
+      "name": "Gemini Flash - Odpowiedz",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 380],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wyciągnij odpowiedź Gemini i sprawdź czy wymaga eskalacji\nconst geminiResponse = $json.candidates?.[0]?.content?.parts?.[0]?.text || 'Przepraszam, wystąpił błąd. Proszę zadzwonić na sekretariat: (81) 825 58 99';\nconst originalMessage = $('To Wiadomosc?').first().json;\n\n// Sprawdź czy AI nie było w stanie odpowiedzieć (eskalacja do człowieka)\nconst escalationPhrases = ['nie mam tej informacji', 'nie jestem w stanie', 'proszę zadzwonić', 'nie wiem', 'skontaktować się'];\nconst needsEscalation = escalationPhrases.some(p => geminiResponse.toLowerCase().includes(p));\n\n// Skróć odpowiedź do limitu Messenger (2000 znaków)\nconst response = geminiResponse.length > 1900 \n  ? geminiResponse.substring(0, 1900) + '...' \n  : geminiResponse;\n\nreturn [{\n  json: {\n    sender_id: originalMessage.sender_id,\n    message_text: originalMessage.message_text,\n    response: response,\n    needs_escalation: needsEscalation,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-response",
+      "name": "Przygotuj Odpowiedz",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 380]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/me/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": { \"id\": \"{{ $json.sender_id }}\" },\n  \"message\": { \"text\": {{ JSON.stringify($json.response) }} },\n  \"messaging_type\": \"RESPONSE\"\n}",
+        "options": {
+          "queryParametersUi": {
+            "parameter": [
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_PAGE_TOKEN || 'CONFIGURE_ME' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fb-send-reply",
+      "name": "Wyslij Odpowiedz Messenger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Messenger Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "sender_id": "={{ $json.sender_id }}",
+            "pytanie": "={{ $json.message_text }}",
+            "odpowiedz": "={{ $json.response }}",
+            "eskalacja": "={{ $json.needs_escalation }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log",
+      "name": "Loguj w Sheets (RODO)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1520, 520],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needs_escalation }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "if-escalation",
+      "name": "Wymaga Eskalacji?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1780, 520]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'CONFIGURE_ME' }}",
+        "text": "=⚠️ *ESKALACJA MESSENGER*\n\n👤 Nadawca: `{{ $json.sender_id }}`\n💬 Pytanie: _{{ $json.message_text }}_\n🤖 Bot odpowiedział: {{ $json.response }}\n\n🕐 {{ $json.timestamp }}\n\n👉 Bot nie był pewny odpowiedzi — sprawdź i odpowiedz ręcznie jeśli trzeba.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-alert",
+      "name": "Alert Telegram - Eskalacja",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2040, 520],
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 💬 Messenger FAQ Bot\n\n**Co robi:**\n1. Mieszkaniec pisze na Messenger strony FB Powiatu\n2. Gemini Flash klasyfikuje pytanie i odpowiada\n3. Baza wiedzy: godziny, adresy, telefony, wydziały\n4. Jeśli AI nie zna odpowiedzi → eskalacja na Telegram\n5. Wszystkie rozmowy logowane w Google Sheets (RODO)\n\n**Baza wiedzy zawiera:**\n- Godziny urzędowania (pon-pt)\n- Dane kontaktowe wszystkich wydziałów\n- Wydział Komunikacji (rejestracja, prawa jazdy)\n- Wydział Geodezji (ul. Szpitalna 2A!)\n- Wydział Budownictwa (pozwolenia)\n- Jednostki: PUP, PCPR, szpital, poradnia\n- Kierownictwo: Starosta Zbigniew Dżugaj\n- Czego starostwo NIE załatwia (→ gmina)\n\n**Do skonfigurowania:**\n1. Facebook App z Messenger Platform\n2. Webhook URL: `https://twoj-n8n/webhook/messenger-bot`\n3. Verify Token: `marcin_bot_2026` (lub zmień w zmiennych)\n4. Gemini API Key (Query Auth)\n5. Meta Page Token\n6. Telegram Bot (do eskalacji)\n7. Google Sheets (log rozmów)\n\n**Zmienne:**\n- `FB_VERIFY_TOKEN` — token weryfikacji webhook\n- `META_PAGE_TOKEN` — Page Access Token\n- `TELEGRAM_CHAT_ID` — chat ID do alertów\n\n**Facebook App Setup:**\n1. developers.facebook.com → Your App\n2. Add Product → Messenger\n3. Generate Token → wybierz stronę powiatu\n4. Webhooks → Subscribe: `messages`\n5. Callback URL: twój webhook URL\n6. Verify Token: `marcin_bot_2026`",
+        "width": 440,
+        "height": 680,
+        "color": 2
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 40]
+    },
+    {
+      "parameters": {
+        "content": "## 📊 Google Sheets Log\n\nUtwórz arkusz **\"Messenger Log\"**\nz kolumnami:\n\n| timestamp | sender_id | pytanie | odpowiedz | eskalacja |\n\nDane przechowuj max 30 dni\n(RODO — retencja danych).\n\nCo miesiąc archiwizuj i usuwaj.",
+        "width": 300,
+        "height": 220,
+        "color": 6
+      },
+      "id": "sticky-rodo",
+      "name": "Sticky RODO",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 760]
+    }
+  ],
+  "connections": {
+    "Webhook Messenger": {
+      "main": [
+        [
+          { "node": "Parsuj Wiadomosc", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parsuj Wiadomosc": {
+      "main": [
+        [
+          { "node": "Weryfikacja?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Weryfikacja?": {
+      "main": [
+        [
+          { "node": "Odpowiedz Challenge", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "To Wiadomosc?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "To Wiadomosc?": {
+      "main": [
+        [
+          { "node": "Gemini Flash - Odpowiedz", "type": "main", "index": 0 },
+          { "node": "Odpowiedz 200 OK", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Gemini Flash - Odpowiedz": {
+      "main": [
+        [
+          { "node": "Przygotuj Odpowiedz", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Przygotuj Odpowiedz": {
+      "main": [
+        [
+          { "node": "Wyslij Odpowiedz Messenger", "type": "main", "index": 0 },
+          { "node": "Loguj w Sheets (RODO)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loguj w Sheets (RODO)": {
+      "main": [
+        [
+          { "node": "Wymaga Eskalacji?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wymaga Eskalacji?": {
+      "main": [
+        [
+          { "node": "Alert Telegram - Eskalacja", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "messenger" },
+    { "name": "faq-bot" },
+    { "name": "marcin" }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

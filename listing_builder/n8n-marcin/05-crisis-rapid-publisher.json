@@ -1,0 +1,489 @@
+{
+  "name": "Crisis Rapid Publisher - Powiat Krasnicki",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crisis",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-crisis",
+      "name": "Webhook - Kryzys",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "crisis-publisher"
+    },
+    {
+      "parameters": {
+        "formTitle": "🚨 Publikacja Kryzysowa",
+        "formDescription": "Szybka publikacja na wszystkie platformy. Wypełnij formularz — AI wygeneruje posty, Ty zatwierdzisz jednym klikiem.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Typ kryzysu",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "🚰 Awaria wody" },
+                  { "option": "⚡ Awaria prądu" },
+                  { "option": "🚧 Zamknięcie drogi" },
+                  { "option": "🌊 Zagrożenie powodziowe" },
+                  { "option": "🌪️ Ostrzeżenie pogodowe" },
+                  { "option": "🔥 Pożar / zadymienie" },
+                  { "option": "🚑 Zagrożenie zdrowotne" },
+                  { "option": "📢 Pilne ogłoszenie" },
+                  { "option": "🏛️ Zmiana godzin urzędu" },
+                  { "option": "❄️ Zimowe utrzymanie dróg" },
+                  { "option": "🔧 Inne" }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Lokalizacja",
+              "placeholder": "np. ul. Lubelska, Kraśnik / cały powiat / gmina Annopol",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Co się dzieje? (szczegóły)",
+              "fieldType": "textarea",
+              "placeholder": "Opisz sytuację krótko — AI rozwinie to w pełny post",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Czas trwania / prognoza",
+              "placeholder": "np. do godz. 18:00 / do odwołania / szacunkowo 2-3 godziny",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Numer kontaktowy",
+              "placeholder": "np. (81) 825 58 99 lub 112",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Platformy",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "Wszystkie (FB + IG + X)" },
+                  { "option": "Tylko Facebook" },
+                  { "option": "Facebook + Instagram" }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithData": true
+        }
+      },
+      "id": "form-trigger",
+      "name": "Formularz Kryzysowy",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 600],
+      "webhookId": "crisis-form"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Przyjmij dane z formularza lub webhook POST\nconst data = $input.first().json;\n\n// Mapuj pola z formularza\nconst crisis = {\n  typ: data['Typ kryzysu'] || data.typ || '📢 Pilne ogłoszenie',\n  lokalizacja: data['Lokalizacja'] || data.lokalizacja || 'Powiat Kraśnicki',\n  szczegoly: data['Co się dzieje? (szczegóły)'] || data.szczegoly || '',\n  czas_trwania: data['Czas trwania / prognoza'] || data.czas_trwania || 'do odwołania',\n  telefon: data['Numer kontaktowy'] || data.telefon || '(81) 825 58 99',\n  platformy_wybor: data['Platformy'] || data.platformy || 'Wszystkie (FB + IG + X)',\n  timestamp: new Date().toLocaleString('pl-PL'),\n  date_short: new Date().toLocaleDateString('pl-PL')\n};\n\n// Ustal platformy\nlet platformy = 'fb,ig,x';\nif (crisis.platformy_wybor.includes('Tylko Facebook')) platformy = 'fb';\nelse if (crisis.platformy_wybor.includes('Facebook + Instagram')) platformy = 'fb,ig';\n\ncrisis.platformy = platformy;\n\nreturn [{ json: crisis }];"
+      },
+      "id": "code-normalize",
+      "name": "Normalizuj Dane",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, 440]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"systemInstruction\": {\n    \"parts\": [{\n      \"text\": \"Jesteś specjalistą ds. komunikacji kryzysowej Starostwa Powiatowego w Kraśniku. Generujesz PILNE komunikaty dla mieszkańców.\\n\\nZASADY KOMUNIKACJI KRYZYSOWEJ:\\n- PROSTYM JĘZYKIEM — zrozumiałym dla każdego\\n- KONKRETNIE — co, gdzie, kiedy, jak długo, co robić\\n- BEZ PANIKI — spokojny, rzeczowy ton\\n- DOSTĘPNOŚĆ — krótkie zdania, zero żargonu\\n- Na końcu ZAWSZE podaj numer kontaktowy\\n- NIGDY nie wymyślaj szczegółów — pisz tylko to co podano\\n\\nGeneruj TRZY WERSJE jednocześnie w formacie:\\n---FB---\\n[post Facebook: 100-200 słów, bez hashtagów]\\n---IG---\\n[caption Instagram: 60-100 słów, 5-8 hashtagów kryzysowych na końcu]\\n---X---\\n[tweet: max 260 znaków, 1 hashtag]\"\n    }]\n  },\n  \"contents\": [{\n    \"role\": \"user\",\n    \"parts\": [{\n      \"text\": \"Wygeneruj komunikat kryzysowy:\\n\\nTyp: {{ $json.typ }}\\nLokalizacja: {{ $json.lokalizacja }}\\nSzczegóły: {{ $json.szczegoly }}\\nCzas trwania: {{ $json.czas_trwania }}\\nTelefon kontaktowy: {{ $json.telefon }}\\nData: {{ $json.date_short }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.2,\n    \"maxOutputTokens\": 1200\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-crisis",
+      "name": "Gemini Flash - Komunikat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, 440],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsuj odpowiedź Gemini — wyciągnij 3 wersje\nconst aiText = $json.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst crisis = $('Normalizuj Dane').first().json;\n\n// Wyciągnij sekcje\nlet fb = '', ig = '', x = '';\n\nconst fbMatch = aiText.match(/---FB---(.*?)---IG---/s);\nconst igMatch = aiText.match(/---IG---(.*?)---X---/s);\nconst xMatch = aiText.match(/---X---(.*?)$/s);\n\nfb = fbMatch ? fbMatch[1].trim() : aiText.substring(0, 500);\nig = igMatch ? igMatch[1].trim() : fb.substring(0, 300);\nx = xMatch ? xMatch[1].trim() : fb.substring(0, 260);\n\n// Upewnij się że tweet nie przekracza 280 znaków\nif (x.length > 280) x = x.substring(0, 277) + '...';\n\nreturn [{\n  json: {\n    ...crisis,\n    post_fb: fb,\n    caption_ig: ig,\n    tweet_x: x,\n    ai_full: aiText\n  }\n}];"
+      },
+      "id": "code-parse-ai",
+      "name": "Parsuj 3 Wersje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [820, 440]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.EMAIL_APPROVAL || 'marcin@example.com' }}",
+        "subject": "=🚨 KRYZYS: {{ $json.typ }} - {{ $json.lokalizacja }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial;max-width:700px;margin:0 auto;padding:20px;border:3px solid #e74c3c;border-radius:8px;\">\n<div style=\"background:#e74c3c;color:white;padding:15px;border-radius:4px;text-align:center;\">\n<h1 style=\"margin:0;\">🚨 KOMUNIKAT KRYZYSOWY</h1>\n<p style=\"margin:5px 0 0;\">{{ $json.typ }} | {{ $json.lokalizacja }} | {{ $json.timestamp }}</p>\n</div>\n\n<div style=\"padding:15px;\">\n<h3>📘 Facebook:</h3>\n<div style=\"background:#f0f0f0;padding:12px;border-radius:6px;white-space:pre-wrap;\">{{ $json.post_fb }}</div>\n\n<h3>📸 Instagram:</h3>\n<div style=\"background:#fff0f5;padding:12px;border-radius:6px;white-space:pre-wrap;\">{{ $json.caption_ig }}</div>\n\n<h3>🐦 X (Twitter):</h3>\n<div style=\"background:#f0f8ff;padding:12px;border-radius:6px;\">{{ $json.tweet_x }}</div>\n</div>\n\n<p style=\"text-align:center;padding:10px;\"><strong>Kliknij Approve aby opublikować NATYCHMIAST na: {{ $json.platformy_wybor }}</strong></p>\n</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "gmail-approval",
+      "name": "Email - Szybka Akceptacja",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1100, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_ME",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'CONFIGURE_ME' }}",
+        "text": "=🚨 *KRYZYS — CZEKA NA AKCEPTACJĘ*\n\n📌 *{{ $json.typ }}*\n📍 {{ $json.lokalizacja }}\n📝 {{ $json.szczegoly }}\n⏱ {{ $json.czas_trwania }}\n\n_Sprawdź email i zatwierdź publikację!_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-alert",
+      "name": "Telegram - Alert Kryzys",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1100, 580],
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "if-approved",
+      "name": "Zatwierdzono?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1360, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Router — publikuj na wybranych platformach\nconst data = $('Parsuj 3 Wersje').first().json;\nconst platformy = data.platformy || 'fb,ig,x';\n\nreturn [{\n  json: {\n    ...data,\n    pub_fb: platformy.includes('fb'),\n    pub_ig: platformy.includes('ig'),\n    pub_x: platformy.includes('x')\n  }\n}];"
+      },
+      "id": "code-router",
+      "name": "Router Platform",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.pub_fb }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "if-fb",
+      "name": "FB?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1840, 140]
+    },
+    {
+      "parameters": {
+        "nodeId": "={{ $env.FB_PAGE_ID || 'CONFIGURE_ME' }}",
+        "edge": "feed",
+        "method": "POST",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "message",
+              "value": "={{ $json.post_fb }}"
+            }
+          ]
+        }
+      },
+      "id": "fb-publish",
+      "name": "Facebook - PUBLIKUJ",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [2080, 140],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Facebook Graph API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.pub_ig }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "if-ig",
+      "name": "IG?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1840, 340]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.IG_USER_ID || 'CONFIGURE_ME' }}/media",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"image_url\": \"{{ $json.image_url || $env.CRISIS_DEFAULT_IMAGE || '' }}\",\n  \"caption\": {{ JSON.stringify($json.caption_ig) }}\n}",
+        "options": {
+          "queryParametersUi": {
+            "parameter": [
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_PAGE_TOKEN || 'CONFIGURE_ME' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ig-container",
+      "name": "IG - Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2080, 340]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.IG_USER_ID || 'CONFIGURE_ME' }}/media_publish",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"creation_id\": \"{{ $json.id }}\"\n}",
+        "options": {
+          "queryParametersUi": {
+            "parameter": [
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_PAGE_TOKEN || 'CONFIGURE_ME' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ig-publish",
+      "name": "IG - PUBLIKUJ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2320, 340]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'CONFIGURE_ME' }}",
+        "text": "=✅ *KOMUNIKAT KRYZYSOWY OPUBLIKOWANY*\n\n{{ $json.typ }} | {{ $json.lokalizacja }}\n\nPlatformy: {{ $json.platformy_wybor }}\nCzas: {{ new Date().toLocaleString('pl-PL') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-confirm",
+      "name": "Telegram - Potwierdzenie",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2320, 140],
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Kryzysy"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data": "={{ new Date().toLocaleString('pl-PL') }}",
+            "typ": "={{ $json.typ }}",
+            "lokalizacja": "={{ $json.lokalizacja }}",
+            "szczegoly": "={{ $json.szczegoly }}",
+            "czas_trwania": "={{ $json.czas_trwania }}",
+            "platformy": "={{ $json.platformy_wybor }}",
+            "status": "Opublikowano"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log",
+      "name": "Log w Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2320, 540],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🚨 Crisis Rapid Publisher\n\n**Problem:** Awaria wody, zamknięcie drogi, ostrzeżenie\npogodowe — dziś zajmuje 30+ minut żeby napisać,\nzatwierdzić i opublikować na 3 platformach.\n\n**Rozwiązanie:** Formularz z 5 polami → AI generuje\n3 wersje (FB/IG/X) → email + Telegram do akceptacji\n→ jednym klikiem publikacja na wszystkich platformach.\n\n**Czas:** Z 30 min → 2-3 minuty.\n\n**Dwa triggery:**\n1. **Formularz n8n** — otwierasz URL, wypełniasz,\n   gotowe. Najłatwiejszy sposób.\n2. **Webhook POST** — dla zaawansowanych,\n   np. z Telegram bota lub innego systemu.\n\n**Typy kryzysów (predefiniowane):**\n- Awaria wody / prądu\n- Zamknięcie drogi\n- Zagrożenie powodziowe\n- Ostrzeżenie pogodowe\n- Pożar / zadymienie\n- Zmiana godzin urzędu\n- Zimowe utrzymanie dróg\n- Inne (dowolne)\n\n**AI (Gemini Flash):**\n- Temperatura 0.2 (ultra-precyzyjne)\n- Ton: spokojny, rzeczowy, bez paniki\n- Prosty język (WCAG dostępność!)\n- NIGDY nie wymyśla szczegółów\n\n**Do skonfigurowania:**\n- Gemini API Key\n- Facebook Graph API\n- Meta Page Token\n- Gmail OAuth2\n- Telegram Bot\n- Google Sheets (log kryzysów)\n- Zmienne: FB_PAGE_ID, IG_USER_ID,\n  META_PAGE_TOKEN, TELEGRAM_CHAT_ID,\n  EMAIL_APPROVAL, CRISIS_DEFAULT_IMAGE",
+        "width": 400,
+        "height": 760,
+        "color": 7
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-420, 20]
+    }
+  ],
+  "connections": {
+    "Webhook - Kryzys": {
+      "main": [
+        [
+          { "node": "Normalizuj Dane", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Formularz Kryzysowy": {
+      "main": [
+        [
+          { "node": "Normalizuj Dane", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Normalizuj Dane": {
+      "main": [
+        [
+          { "node": "Gemini Flash - Komunikat", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini Flash - Komunikat": {
+      "main": [
+        [
+          { "node": "Parsuj 3 Wersje", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parsuj 3 Wersje": {
+      "main": [
+        [
+          { "node": "Email - Szybka Akceptacja", "type": "main", "index": 0 },
+          { "node": "Telegram - Alert Kryzys", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Email - Szybka Akceptacja": {
+      "main": [
+        [
+          { "node": "Zatwierdzono?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Zatwierdzono?": {
+      "main": [
+        [
+          { "node": "Router Platform", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Router Platform": {
+      "main": [
+        [
+          { "node": "FB?", "type": "main", "index": 0 },
+          { "node": "IG?", "type": "main", "index": 0 },
+          { "node": "Log w Sheets", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "FB?": {
+      "main": [
+        [
+          { "node": "Facebook - PUBLIKUJ", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Facebook - PUBLIKUJ": {
+      "main": [
+        [
+          { "node": "Telegram - Potwierdzenie", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IG?": {
+      "main": [
+        [
+          { "node": "IG - Container", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "IG - Container": {
+      "main": [
+        [
+          { "node": "IG - PUBLIKUJ", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "crisis" },
+    { "name": "marcin" },
+    { "name": "rapid-publish" }
+  ],
+  "triggerCount": 2,
+  "pinData": {}
+}

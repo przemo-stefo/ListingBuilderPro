@@ -1,0 +1,254 @@
+{
+  "name": "Raport Kliencki - One Click Report",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "raport",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Generuj Raport",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "raport-kliencki"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pobierz parametry z webhook query string\nconst query = $input.first().json.query || {};\nconst clientId = query.client || 'default';\n\n// Konfiguracja klientów - DOSTOSUJ DO SWOICH KLIENTÓW\nconst clients = {\n  'powiat': {\n    name: 'Powiat Kraśnicki',\n    fb_page_id: 'CONFIGURE_FB_PAGE_ID',\n    ig_user_id: 'CONFIGURE_IG_USER_ID',\n    email: 'kontakt@powiatkrasnik.pl',\n    logo_url: ''\n  },\n  'klient1': {\n    name: 'Klient 1',\n    fb_page_id: 'CONFIGURE_FB_PAGE_ID',\n    ig_user_id: 'CONFIGURE_IG_USER_ID',\n    email: 'klient1@example.com',\n    logo_url: ''\n  },\n  'klient2': {\n    name: 'Klient 2',\n    fb_page_id: 'CONFIGURE_FB_PAGE_ID',\n    ig_user_id: 'CONFIGURE_IG_USER_ID',\n    email: 'klient2@example.com',\n    logo_url: ''\n  }\n};\n\nconst client = clients[clientId] || clients['powiat'];\n\n// Okres raportu: ostatnie 28 dni\nconst now = new Date();\nconst since = new Date(now - 28 * 24 * 60 * 60 * 1000);\n\nreturn [{\n  json: {\n    ...client,\n    client_id: clientId,\n    since: Math.floor(since.getTime() / 1000),\n    until: Math.floor(now.getTime() / 1000),\n    since_date: since.toLocaleDateString('pl-PL'),\n    until_date: now.toLocaleDateString('pl-PL'),\n    period: '28 dni'\n  }\n}];"
+      },
+      "id": "code-client-config",
+      "name": "Konfiguracja Klienta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $json.fb_page_id }}/insights",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "metric", "value": "page_impressions,page_engaged_users,page_post_engagements,page_fan_adds,page_views_total,page_fans" },
+            { "name": "period", "value": "days_28" },
+            { "name": "since", "value": "={{ $json.since }}" },
+            { "name": "until", "value": "={{ $json.until }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb-page-insights",
+      "name": "FB - Statystyki Strony",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 180],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Meta Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $json.fb_page_id }}/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "fields", "value": "message,created_time,likes.summary(true),comments.summary(true),shares" },
+            { "name": "since", "value": "={{ $json.since }}" },
+            { "name": "limit", "value": "50" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb-posts",
+      "name": "FB - Posty (28 dni)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 420],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Meta Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zbierz dane z insights i postów\nconst items = $input.all();\nconst clientData = $('Konfiguracja Klienta').first().json;\n\n// Parse insights\nlet insights = {};\ntry {\n  const insightsData = items[0]?.json?.data || [];\n  for (const metric of insightsData) {\n    const values = metric.values || [];\n    const lastValue = values[values.length - 1]?.value || 0;\n    insights[metric.name] = lastValue;\n  }\n} catch(e) {\n  insights = { error: e.message };\n}\n\n// Parse posts\nlet posts = [];\nlet totalLikes = 0, totalComments = 0, totalShares = 0;\ntry {\n  const postsData = items[1]?.json?.data || [];\n  for (const post of postsData) {\n    const likes = post.likes?.summary?.total_count || 0;\n    const comments = post.comments?.summary?.total_count || 0;\n    const shares = post.shares?.count || 0;\n    totalLikes += likes;\n    totalComments += comments;\n    totalShares += shares;\n    posts.push({\n      message: (post.message || '').substring(0, 100),\n      date: new Date(post.created_time).toLocaleDateString('pl-PL'),\n      likes, comments, shares,\n      engagement: likes + comments + shares\n    });\n  }\n} catch(e) {\n  posts = [];\n}\n\n// Top 5 postów\nconst topPosts = posts.sort((a, b) => b.engagement - a.engagement).slice(0, 5);\n\nconst report = {\n  client_name: clientData.name,\n  client_email: clientData.email,\n  period: `${clientData.since_date} - ${clientData.until_date}`,\n  // Page metrics\n  impressions: insights.page_impressions || 0,\n  engaged_users: insights.page_engaged_users || 0,\n  post_engagements: insights.page_post_engagements || 0,\n  new_fans: insights.page_fan_adds || 0,\n  page_views: insights.page_views_total || 0,\n  total_fans: insights.page_fans || 0,\n  // Post metrics\n  total_posts: posts.length,\n  total_likes: totalLikes,\n  total_comments: totalComments,\n  total_shares: totalShares,\n  avg_engagement: posts.length > 0 ? Math.round((totalLikes + totalComments + totalShares) / posts.length) : 0,\n  // Top posts\n  top_posts: topPosts\n};\n\nreturn [{ json: report }];"
+      },
+      "id": "code-process",
+      "name": "Przetwórz Dane",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"Jesteś analitykiem social media. Piszesz zwięzłe, konkretne komentarze do raportów. Po polsku.\"},\n    {\"role\": \"user\", \"content\": \"Przeanalizuj statystyki Facebook za okres {{ $json.period }} dla {{ $json.client_name }}:\\n\\nZasięg: {{ $json.impressions }}\\nZaangażowani użytkownicy: {{ $json.engaged_users }}\\nInterakcje z postami: {{ $json.post_engagements }}\\nNowi fani: {{ $json.new_fans }}\\nWyświetlenia strony: {{ $json.page_views }}\\nŁączna liczba fanów: {{ $json.total_fans }}\\nLiczba postów: {{ $json.total_posts }}\\nŁączne polubienia: {{ $json.total_likes }}\\nŁączne komentarze: {{ $json.total_comments }}\\nŁączne udostępnienia: {{ $json.total_shares }}\\nŚrednie zaangażowanie/post: {{ $json.avg_engagement }}\\n\\nTop 5 postów:\\n{{ $json.top_posts.map((p, i) => `${i+1}. \\\"${p.message}\\\" (${p.date}) - ${p.likes} lajków, ${p.comments} komentarzy, ${p.shares} udostępnień`).join('\\n') }}\\n\\nNapisz 3-4 zdania podsumowania + 3 konkretne rekomendacje na następny miesiąc.\"}\n  ],\n  \"temperature\": 0.4,\n  \"max_tokens\": 800\n}",
+        "options": {}
+      },
+      "id": "groq-analysis",
+      "name": "Groq - Analiza AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const report = $('Przetwórz Dane').first().json;\nconst aiAnalysis = $json.choices?.[0]?.message?.content || 'Analiza AI niedostępna';\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"><style>\n  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }\n  .container { max-width: 700px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }\n  .header { background: linear-gradient(135deg, #1877F2, #42B72A); color: white; padding: 30px; text-align: center; }\n  .header h1 { margin: 0; font-size: 24px; }\n  .header p { margin: 5px 0 0; opacity: 0.9; }\n  .section { padding: 20px 30px; }\n  .metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 15px 0; }\n  .metric { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }\n  .metric .number { font-size: 28px; font-weight: bold; color: #1877F2; }\n  .metric .label { font-size: 12px; color: #666; margin-top: 4px; }\n  .top-post { background: #f8f9fa; border-radius: 8px; padding: 12px; margin: 8px 0; border-left: 3px solid #1877F2; }\n  .top-post .text { font-size: 14px; color: #333; }\n  .top-post .stats { font-size: 12px; color: #888; margin-top: 4px; }\n  .ai-box { background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 15px 0; border: 1px solid #d0e3ff; }\n  .ai-box h3 { margin-top: 0; color: #1877F2; }\n  .footer { background: #f8f9fa; padding: 15px 30px; text-align: center; font-size: 12px; color: #999; }\n  h2 { color: #333; border-bottom: 2px solid #1877F2; padding-bottom: 8px; }\n</style></head>\n<body>\n<div class=\"container\">\n  <div class=\"header\">\n    <h1>📊 Raport Social Media</h1>\n    <p>${report.client_name} | ${report.period}</p>\n  </div>\n  \n  <div class=\"section\">\n    <h2>📈 Podsumowanie</h2>\n    <div class=\"metrics\">\n      <div class=\"metric\"><div class=\"number\">${report.impressions.toLocaleString('pl-PL')}</div><div class=\"label\">Zasięg</div></div>\n      <div class=\"metric\"><div class=\"number\">${report.engaged_users.toLocaleString('pl-PL')}</div><div class=\"label\">Zaangażowani</div></div>\n      <div class=\"metric\"><div class=\"number\">${report.post_engagements.toLocaleString('pl-PL')}</div><div class=\"label\">Interakcje</div></div>\n      <div class=\"metric\"><div class=\"number\">+${report.new_fans}</div><div class=\"label\">Nowi fani</div></div>\n      <div class=\"metric\"><div class=\"number\">${report.total_fans.toLocaleString('pl-PL')}</div><div class=\"label\">Łącznie fanów</div></div>\n      <div class=\"metric\"><div class=\"number\">${report.page_views.toLocaleString('pl-PL')}</div><div class=\"label\">Wyświetlenia</div></div>\n    </div>\n  </div>\n\n  <div class=\"section\">\n    <h2>📝 Aktywność (${report.total_posts} postów)</h2>\n    <div class=\"metrics\">\n      <div class=\"metric\"><div class=\"number\">${report.total_likes}</div><div class=\"label\">👍 Polubienia</div></div>\n      <div class=\"metric\"><div class=\"number\">${report.total_comments}</div><div class=\"label\">💬 Komentarze</div></div>\n      <div class=\"metric\"><div class=\"number\">${report.total_shares}</div><div class=\"label\">🔄 Udostępnienia</div></div>\n    </div>\n    <p style=\"text-align:center;color:#666;\">Średnie zaangażowanie na post: <strong>${report.avg_engagement}</strong></p>\n  </div>\n\n  <div class=\"section\">\n    <h2>🏆 Top 5 Postów</h2>\n    ${report.top_posts.map((p, i) => `\n    <div class=\"top-post\">\n      <div class=\"text\"><strong>#${i+1}</strong> ${p.message}...</div>\n      <div class=\"stats\">${p.date} | 👍 ${p.likes} | 💬 ${p.comments} | 🔄 ${p.shares}</div>\n    </div>`).join('')}\n  </div>\n\n  <div class=\"section\">\n    <div class=\"ai-box\">\n      <h3>🤖 Analiza AI + Rekomendacje</h3>\n      <p style=\"white-space:pre-wrap;line-height:1.6;\">${aiAnalysis}</p>\n    </div>\n  </div>\n\n  <div class=\"footer\">\n    Raport wygenerowany automatycznie | ${new Date().toLocaleString('pl-PL')}<br>\n    Powered by n8n + Groq AI | Marcin Nastarowicz Social Media\n  </div>\n</div>\n</body>\n</html>`;\n\nreturn [{ json: { html, ...report, ai_analysis: aiAnalysis } }];"
+      },
+      "id": "code-html-report",
+      "name": "Generuj Raport HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.client_email }}",
+        "subject": "=📊 Raport Social Media - {{ $json.client_name }} ({{ $json.period }})",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "email-report",
+      "name": "Wyslij Raport Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1560, 200],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_ME",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=Raport dla {{ $json.client_name }} wygenerowany i wysłany na {{ $json.client_email }}!",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "text/html; charset=utf-8" }
+            ]
+          }
+        }
+      },
+      "id": "webhook-response",
+      "name": "Odpowiedz OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1560, 420]
+    },
+    {
+      "parameters": {
+        "content": "## 📊 Raport Kliencki - One Click\n\n**Jak używać:**\nOtwórz w przeglądarce:\n`https://twoj-n8n.com/webhook/raport?client=powiat`\n\n**Parametry:**\n- `?client=powiat` → Powiat Kraśnicki\n- `?client=klient1` → Klient 1\n- `?client=klient2` → Klient 2\n\n**Co robi:**\n1. Pobiera statystyki FB (28 dni): zasięg, interakcje, fani\n2. Pobiera wszystkie posty i liczy engagement\n3. AI analizuje dane + daje rekomendacje\n4. Generuje piękny raport HTML\n5. Wysyła emailem do klienta\n\n**Do skonfigurowania:**\n- Meta Access Token (query auth: access_token=...)\n- Groq API Key (Header Auth)\n- Gmail OAuth2\n- FB Page ID i IG User ID per klient\n\n**Pro tip:** Dodaj te linki do zakładek!\nMożna też podpiąć pod Schedule Trigger\n(1-szy dzień miesiąca) dla auto-raportów.",
+        "width": 400,
+        "height": 500,
+        "color": 5
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 60]
+    },
+    {
+      "parameters": {
+        "content": "## 💡 BOOKMARK LINKS\n\nPo aktywacji workflow,\nstwórz zakładki w przeglądarce:\n\n🔗 Powiat: /webhook/raport?client=powiat\n🔗 Klient 1: /webhook/raport?client=klient1\n🔗 Klient 2: /webhook/raport?client=klient2\n\nJeden klik = raport gotowy!",
+        "width": 300,
+        "height": 220,
+        "color": 1
+      },
+      "id": "sticky-bookmarks",
+      "name": "Sticky Bookmarks",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 600]
+    }
+  ],
+  "connections": {
+    "Webhook - Generuj Raport": {
+      "main": [
+        [
+          { "node": "Konfiguracja Klienta", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Konfiguracja Klienta": {
+      "main": [
+        [
+          { "node": "FB - Statystyki Strony", "type": "main", "index": 0 },
+          { "node": "FB - Posty (28 dni)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "FB - Statystyki Strony": {
+      "main": [
+        [
+          { "node": "Przetwórz Dane", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "FB - Posty (28 dni)": {
+      "main": [
+        [
+          { "node": "Przetwórz Dane", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Przetwórz Dane": {
+      "main": [
+        [
+          { "node": "Groq - Analiza AI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Groq - Analiza AI": {
+      "main": [
+        [
+          { "node": "Generuj Raport HTML", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Generuj Raport HTML": {
+      "main": [
+        [
+          { "node": "Wyslij Raport Email", "type": "main", "index": 0 },
+          { "node": "Odpowiedz OK", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "raport" },
+    { "name": "marcin" },
+    { "name": "analytics" }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

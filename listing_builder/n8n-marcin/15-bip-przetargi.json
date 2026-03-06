@@ -1,0 +1,208 @@
+{
+  "name": "BIP Przetargi Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            },
+            {
+              "triggerAtHour": 14
+            }
+          ]
+        }
+      },
+      "id": "schedule-1",
+      "name": "Schedule (8:00, 14:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bip-przetargi-test-a015018b",
+        "options": {}
+      },
+      "id": "webhook-test",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        500
+      ],
+      "webhookId": "bip-przetargi-test-a015018b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n-marcin/15-bip-przetargi.json — Fetch BIP Przetargi\n// Purpose: Query BIP e-bip.eu AJAX API for recent przetargi, check Qdrant for new ones\n// NOT for: generating content\n\nconst qdrantUrl = 'http://qdrant:6333';\nconst bipUrl = 'https://powiatkrasnik.e-bip.eu/index.php?id=724&ajax=pobierz_przetargi';\n\n// Step 1: Get total count with minimal data\nlet total = 0;\nlet rows = [];\ntry {\n  // First get just 1 row to learn total count\n  const countData = await this.helpers.httpRequest({\n    method: 'GET',\n    url: bipUrl + '&sEcho=1&iDisplayStart=0&iDisplayLength=1',\n    json: true\n  });\n  total = countData.iTotalRecords || 0;\n\n  // Then fetch only the last 30 rows (most recent)\n  const startFrom = Math.max(0, total - 30);\n  const bipData = await this.helpers.httpRequest({\n    method: 'GET',\n    url: bipUrl + '&sEcho=2&iDisplayStart=' + startFrom + '&iDisplayLength=30',\n    json: true\n  });\n  rows = bipData.aaData || [];\n} catch (e) {\n  console.log('BIP fetch error:', e.message);\n  // Return empty so workflow doesn't crash\n  return [{ json: { newPrzetargi: [], totalInBIP: 0, checkedCount: 0, error: e.message } }];\n}\n\n// Parse rows: Col 1=ID, 4=date, 6=title, 8=deadline\nconst przetargi = rows.map(row => {\n  const id = String(row[1]);\n  const date = String(row[4] || '');\n  const title = String(row[6] || '').replace(/<[^>]+>/g, '').trim();\n  const deadline = String(row[8] || '');\n  const bipLink = 'https://powiatkrasnik.e-bip.eu/index.php?id=' + id;\n  return { id, date, title, deadline, bipLink };\n}).filter(p => p.title.length > 10);\n\n// Check Qdrant for already-notified przetargi\nconst notifiedResult = await this.helpers.httpRequest({\n  method: 'POST',\n  url: qdrantUrl + '/collections/krasnik_news/points/scroll',\n  body: {\n    limit: 200,\n    with_payload: true,\n    with_vector: false,\n    filter: { must: [{ key: 'category', match: { value: 'bip-przetarg-notified' } }] }\n  },\n  json: true\n}).catch(e => ({ result: { points: [] } }));\n\nconst notifiedIds = new Set(\n  (notifiedResult.result?.points || []).map(p => p.payload?.bip_id || '')\n);\n\n// Filter new przetargi\nconst newPrzetargi = przetargi.filter(p => !notifiedIds.has(p.id));\n\n// Only keep przetargi from last 30 days\nconst cutoff = new Date();\ncutoff.setDate(cutoff.getDate() - 30);\nconst cutoffStr = cutoff.toISOString().slice(0, 10);\n\nconst freshNew = newPrzetargi.filter(p => p.date >= cutoffStr);\n\nreturn [{ json: { newPrzetargi: freshNew, totalInBIP: total, checkedCount: przetargi.length } }];",
+        "nodeVersion": 2
+      },
+      "id": "fetch-bip",
+      "name": "Fetch BIP Przetargi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-new",
+              "leftValue": "={{ $json.newPrzetargi.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-new",
+      "name": "New Przetargi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const GROUP_JID = $env.WHATSAPP_GROUP_JID || '120363426348074659@g.us';\n// n8n-marcin/15-bip-przetargi.json — Format & Store\n// Purpose: Format WhatsApp message + store notified IDs in Qdrant\n// NOT for: fetching data\n\nconst data = $input.first().json;\nconst newPrzetargi = data.newPrzetargi || [];\nconst qdrantUrl = 'http://qdrant:6333';\nconst geminiKey = $env.GEMINI_API_KEY || '';\n\nif (newPrzetargi.length === 0) {\n  return [{ json: { skip: true } }];\n}\n\n// Format WhatsApp message\nlet msg = '📋 *Nowe przetargi BIP*\\n\\n';\n\nfor (const p of newPrzetargi) {\n  msg += '🔹 *' + p.title.substring(0, 200) + '*\\n';\n  const dd = p.date.slice(8,10) + '.' + p.date.slice(5,7);\n  msg += '📅 ' + dd;\n  if (p.deadline && p.deadline !== 'None') {\n    const dl = p.deadline.length >= 10 ? p.deadline.slice(8,10) + '.' + p.deadline.slice(5,7) : p.deadline;\n    msg += ' → termin ' + dl + '\\n';\n  }\n  if (!p.deadline || p.deadline === 'None') msg += '\\n';\n  msg += '🔗 ' + p.bipLink + '\\n\\n';\n}\n\n// footer removed — clean ending\n\n// Store notified IDs in Qdrant\nfunction simpleHash(str) {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < str.length; i++) {\n    const ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);\n  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);\n  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0') + '0000000000000000';\n}\nfunction makeUUID(input) {\n  const h = simpleHash(input);\n  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);\n}\n\n// Store each przetarg as notified\nconst points = [];\nfor (const p of newPrzetargi) {\n  // Generate a simple embedding (dummy 768-dim zero vector — we only use payload filter, not search)\n  const vector = new Array(768).fill(0);\n  vector[0] = 0.1; // non-zero to satisfy Qdrant\n  \n  points.push({\n    id: makeUUID('bip-przetarg-' + p.id),\n    vector,\n    payload: {\n      category: 'bip-przetarg-notified',\n      bip_id: p.id,\n      title: p.title,\n      date: p.date,\n      deadline: p.deadline,\n      notified_at: new Date().toISOString()\n    }\n  });\n}\n\nif (points.length > 0) {\n  await this.helpers.httpRequest({\n    method: 'PUT',\n    url: qdrantUrl + '/collections/krasnik_news/points',\n    body: { points },\n    json: true\n  }).catch(e => console.log('Store przetargi error:', e.message));\n}\n\nreturn [{ json: { response: msg, chatId: GROUP_JID, count: newPrzetargi.length } }];",
+        "nodeVersion": 2
+      },
+      "id": "format-store",
+      "name": "Format & Store",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.WAHA_URL || \"http://65.21.88.47:40127\") + \"/api/sendText\" }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $env.WAHA_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: ($env.WHATSAPP_GROUP_JID || \"120363426348074659@g.us\"), text: $json.response, session: \"default\" }) }}",
+        "options": {}
+      },
+      "id": "send-wa",
+      "name": "Send WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## BIP Przetargi Monitor\n\n**Schedule:** 8:00 + 14:00 daily\n**Source:** powiatkrasnik.e-bip.eu AJAX API\n**Dedup:** Qdrant category 'bip-przetarg-notified'\n**Output:** WhatsApp group alert",
+        "width": 300,
+        "height": 200
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -50
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule (8:00, 14:00)": {
+      "main": [
+        [
+          {
+            "node": "Fetch BIP Przetargi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Fetch BIP Przetargi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BIP Przetargi": {
+      "main": [
+        [
+          {
+            "node": "New Przetargi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Przetargi?": {
+      "main": [
+        [
+          {
+            "node": "Format & Store",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Format & Store": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

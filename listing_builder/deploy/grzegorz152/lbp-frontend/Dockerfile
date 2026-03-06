@@ -32,10 +32,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# WHY: sharp required for Next.js image optimization in standalone mode
+RUN npm i sharp@0.33
+
 # WHY: standalone output includes only what's needed (~50MB vs ~500MB)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+
+# WHY: Next.js needs writable cache dir for image optimization + ISR
+RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next/cache
 
 USER nextjs
 

@@ -1,0 +1,19 @@
+# deploy/anna130/env-template.txt
+# Purpose: Template for n8n-marcin environment variables
+# Copy to .env on server: scp env-template.txt anna130:/root/n8n-marcin/.env
+
+POSTGRES_PASSWORD=CHANGE_ME
+N8N_BASIC_AUTH_PASSWORD=CHANGE_ME
+N8N_ENCRYPTION_KEY=CHANGE_ME
+CLOUDFLARE_TUNNEL_TOKEN=CHANGE_ME
+
+# RAG: Gemini Embeddings (text-embedding-004, 768 dim)
+# Get key: https://aistudio.google.com → Get API Key
+GEMINI_API_KEY=CHANGE_ME
+
+# WhatsApp: WAHA on izabela166 (65.21.88.47:40127)
+MARCIN_WHATSAPP_JID=48722149435@c.us
+WAHA_API_KEY=839a7bb725914e2b88ce225223f019e2
+
+# Optional: SMS via smsapi.pl (~0.07 PLN/SMS)
+# SMSAPI_TOKEN=CHANGE_ME

@@ -1,0 +1,187 @@
+{
+  "name": "Auto-sugestie Postów FB",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-sugestie",
+      "name": "Codziennie 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "path": "sugestie-test-a015018b",
+        "options": {}
+      },
+      "id": "webhook-test-sug",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        100,
+        400
+      ],
+      "webhookId": "sugestie-test-a015018b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n-marcin/13-auto-sugestie.json — Znajdz Tematy\n// Purpose: Query Qdrant for recent articles, find 'postable' topics via AI\n// NOT for: generating actual FB posts (that's FB Post Generator)\n\nconst qdrantUrl = 'http://qdrant:6333';\nconst geminiKey = $env.GEMINI_API_KEY || '';\n\n// 1. Get articles from last 48h (wider window for weekends)\nconst now = new Date();\nconst cutoff = new Date(now.getTime() - 48 * 3600000).toISOString();\n\nlet articles = [];\ntry {\n  const scrollResult = await this.helpers.httpRequest({\n    method: 'POST',\n    url: qdrantUrl + '/collections/krasnik_news/points/scroll',\n    body: {\n      limit: 50, with_payload: true, with_vector: false,\n      filter: {\n        must_not: [\n          { key: 'category', match: { value: 'briefing' } },\n          { key: 'category', match: { value: 'briefing-index' } },\n          { key: 'category', match: { value: 'marcin-preference' } },\n          { key: 'category', match: { value: 'marcin-style-feedback' } },\n          { key: 'category', match: { value: 'marcin-last-post' } },\n          { key: 'category', match: { value: 'sesja-rady-notified' } },\n          { key: 'category', match: { value: 'bip-przetarg-notified' } }\n        ]\n      }\n    },\n    json: true\n  });\n  articles = (scrollResult.result?.points || []).map(p => p.payload);\n} catch (e) { console.log('Qdrant scroll error:', e.message); }\n\n// Sort by date descending, take most recent\narticles.sort((a, b) => (b.date || '').localeCompare(a.date || ''));\nconst recent = articles.slice(0, 30);\n\nif (recent.length < 3) {\n  return [{ json: { skip: true, reason: 'Za mało artykułów: ' + recent.length } }];\n}\n\n// 2. Get last post (avoid suggesting same topic)\nlet lastPostTopic = '';\ntry {\n  const lastResult = await this.helpers.httpRequest({\n    method: 'POST',\n    url: qdrantUrl + '/collections/krasnik_news/points/scroll',\n    body: {\n      limit: 1, with_payload: true, with_vector: false,\n      filter: { must: [{ key: 'category', match: { value: 'marcin-last-post' } }] }\n    },\n    json: true\n  });\n  lastPostTopic = lastResult.result?.points?.[0]?.payload?.generated_post?.substring(0, 200) || '';\n} catch (e) {}\n\n// 3. Ask Gemini to pick top 3 postable topics\nconst articleList = recent.map((a, i) => `${i + 1}. [${a.source || '?'}] ${a.title || a.description?.substring(0, 100) || '?'} (${a.date || '?'})`).join('\\n');\n\nconst prompt = `Jesteś social media managerem powiatu kraśnickiego. Z poniższych artykułów wybierz DOKŁADNIE 3 najlepsze do posta na Facebook.\n\nKRYTERIA:\n- Temat interesujący dla mieszkańców powiatu kraśnickiego\n- Pozytywne lub ważne informacje (inwestycje, wydarzenia, sukcesy, sport)\n- Unikaj powtarzania tematu ostatniego posta: \"${lastPostTopic.substring(0, 100)}\"\n- Preferuj: lokalne wydarzenia, decyzje rady, sport, edukacja, kultura\n\nARTYKUŁY:\n${articleList}\n\nODPOWIEDZ DOKŁADNIE W FORMACIE (3 linie, każda: numer | tytuł | dlaczego):\n1|Tytuł artykułu|Dlaczego warto (1 zdanie)\n2|Tytuł artykułu|Dlaczego warto (1 zdanie)\n3|Tytuł artykułu|Dlaczego warto (1 zdanie)`;\n\nlet suggestions = '';\ntry {\n  const aiResult = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=' + geminiKey,\n    body: {\n      contents: [{ role: 'user', parts: [{ text: prompt }] }],\n      generationConfig: { temperature: 0.3, maxOutputTokens: 500 }\n    },\n    json: true\n  });\n  suggestions = aiResult.candidates?.[0]?.content?.parts?.[0]?.text || '';\n} catch (e) { console.log('Gemini error:', e.message); }\n\nif (!suggestions) {\n  return [{ json: { skip: true, reason: 'Gemini nie zwrócił sugestii' } }];\n}\n\n// 4. Format WhatsApp message\nconst lines = suggestions.trim().split('\\n').filter(l => l.includes('|'));\nlet msg = '💡 *Sugestie postów FB na dziś:*\\n\\n';\nfor (const line of lines) {\n  const parts = line.split('|').map(s => s.trim());\n  if (parts.length >= 3) {\n    msg += `*${parts[0]}.* ${parts[1]}\\n   → ${parts[2]}\\n\\n`;\n  }\n}\nmsg += 'Odpisz numerem, np. *1* lub *1, 3* 👍';\n\nreturn [{ json: { skip: false, message: msg, articleCount: recent.length, suggestionsRaw: suggestions } }];"
+      },
+      "id": "find-topics",
+      "name": "Znajdz Tematy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-suggestions",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-suggestions",
+      "name": "Ma sugestie?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.WAHA_URL || \"http://65.21.88.47:40127\") + \"/api/sendText\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: ($env.WHATSAPP_GROUP_JID || \"120363426348074659@g.us\"), text: $json.message, session: \"default\" }) }}",
+        "options": {},
+        "authentication": "none"
+      },
+      "id": "send-whatsapp-sug",
+      "name": "Send WhatsApp Sugestie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "noop-skip",
+      "name": "Skip - za mało danych",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Auto-sugestie Postów FB\n\n**Schedule:** codziennie 9:00 (po briefingu)\n**Logika:**\n1. Query Qdrant → artykuły z ostatnich 48h\n2. Gemini Flash Lite → top 3 'postowalne' tematy\n3. WhatsApp do Marcina z numerowaną listą\n4. Marcin odpowiada numerem → FB Post Generator generuje post\n\n**Webhook test:** GET /webhook/sugestie-test",
+        "height": 280,
+        "width": 350
+      },
+      "id": "sticky-sug",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -100
+      ]
+    }
+  ],
+  "connections": {
+    "Codziennie 9:00": {
+      "main": [
+        [
+          {
+            "node": "Znajdz Tematy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Znajdz Tematy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Znajdz Tematy": {
+      "main": [
+        [
+          {
+            "node": "Ma sugestie?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ma sugestie?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Sugestie",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip - za mało danych",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,456 @@
+{
+  "name": "Social Media Machine - Cross-Platform Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            { "mode": "everyMinute", "minute": 5 }
+          ]
+        },
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Posty"
+        },
+        "event": "newRow",
+        "options": {}
+      },
+      "id": "sheets-trigger",
+      "name": "Nowy Post w Arkuszu",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [0, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "do publikacji",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-ready",
+      "name": "Status = Do Publikacji?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Przygotuj dane do AI - rozdziel na platformy\nconst item = $input.first().json;\n\nconst prompt_fb = `Napisz post na Facebook dla strony samorządowej/firmowej.\n\nTemat: ${item.temat || item.tresc}\nTon: ${item.ton || 'profesjonalny, przyjazny'}\nKlient: ${item.klient || 'Powiat Kraśnicki'}\n\nZasady:\n- Długość: 150-300 słów\n- Zacznij od chwytliwego pierwszego zdania\n- Dodaj call-to-action na końcu\n- NIE używaj hashtagów (to Facebook)\n- Pisz naturalnie, jak człowiek, ZERO keyword stuffingu\n- Jeśli dotyczy wydarzenia, podaj datę, miejsce, godzinę\n\nZwróć TYLKO tekst posta, bez cudzysłowów ani oznaczeń.`;\n\nconst prompt_ig = `Napisz caption na Instagram.\n\nTemat: ${item.temat || item.tresc}\nTon: ${item.ton || 'profesjonalny, przyjazny'}\nKlient: ${item.klient || 'Powiat Kraśnicki'}\n\nZasady:\n- Długość: 80-150 słów\n- Zacznij od emoji i mocnego zdania\n- Na końcu dodaj 15-20 hashtagów (polskie + angielskie)\n- Hashtagi lokalne: #kraśnik #powiatkraśnicki #lubelskie #polska\n- Dodaj CTA: \"Daj znać w komentarzu\" / \"Zapisz na później\"\n\nZwróć TYLKO tekst caption, bez cudzysłowów.`;\n\nconst prompt_x = `Napisz tweet (max 270 znaków).\n\nTemat: ${item.temat || item.tresc}\nTon: ${item.ton || 'informacyjny'}\nKlient: ${item.klient || 'Powiat Kraśnicki'}\n\nZasady:\n- Max 270 znaków (zostaw miejsce na link)\n- 1-2 hashtagi max\n- Konkretnie, zwięźle, informacyjnie\n\nZwróć TYLKO tekst tweeta.`;\n\nreturn [\n  {\n    json: {\n      ...item,\n      prompt_fb,\n      prompt_ig,\n      prompt_x,\n      row_number: item.row_number || $input.first().json.row_number\n    }\n  }\n];"
+      },
+      "id": "code-prompts",
+      "name": "Przygotuj Prompty",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Jesteś ekspertem od social media dla polskich samorządów i firm. Piszesz naturalnie, bez keyword stuffingu.\\n\\n\" + {{ JSON.stringify($json.prompt_fb) }}\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"maxOutputTokens\": 1000\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-fb",
+      "name": "Gemini Flash - Post FB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 140],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Jesteś ekspertem od Instagrama dla polskich samorządów i firm.\\n\\n\" + {{ JSON.stringify($json.prompt_ig) }}\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"maxOutputTokens\": 500\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-ig",
+      "name": "Gemini Flash - Caption IG",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 340],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Jesteś ekspertem od Twittera/X. Pisz ultra zwięźle.\\n\\n\" + {{ JSON.stringify($json.prompt_x) }}\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"maxOutputTokens\": 150\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-x",
+      "name": "Gemini Flash - Tweet X",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 540],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zbierz wygenerowane treści z 3 Gemini Flash calls\nconst items = $input.all();\nconst original = $('Przygotuj Prompty').first().json;\n\n// Gemini response format: candidates[0].content.parts[0].text\nfunction extractGemini(item, label) {\n  try {\n    return item?.json?.candidates?.[0]?.content?.parts?.[0]?.text || `BŁĄD: brak odpowiedzi Gemini (${label})`;\n  } catch(e) { return `BŁĄD ${label}: ` + e.message; }\n}\n\nlet fb_text = extractGemini(items[0], 'FB');\nlet ig_text = extractGemini(items[1], 'IG');\nlet x_text = extractGemini(items[2], 'X');\n\nreturn [{\n  json: {\n    klient: original.klient || 'Powiat Kraśnicki',\n    temat: original.temat || original.tresc,\n    post_fb: fb_text,\n    caption_ig: ig_text,\n    tweet_x: x_text,\n    image_url: original.image_url || '',\n    platformy: original.platformy || 'fb,ig,x',\n    row_number: original.row_number,\n    email_approval: original.email_approval || ''\n  }\n}];"
+      },
+      "id": "code-merge",
+      "name": "Zlacz Odpowiedzi AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email_approval || $env.EMAIL_APPROVAL || 'supervisor@example.com' }}",
+        "subject": "=✅ Do akceptacji: {{ $json.klient }} - {{ $json.temat }}",
+        "emailType": "html",
+        "html": "=<div style=\"font-family: Arial; max-width: 700px; margin: 0 auto; padding: 20px;\">\n<h2>📱 Nowe posty do akceptacji</h2>\n<p><strong>Klient:</strong> {{ $json.klient }}<br>\n<strong>Temat:</strong> {{ $json.temat }}</p>\n\n<div style=\"background: #f0f0f0; padding: 15px; border-radius: 8px; margin: 10px 0;\">\n<h3>📘 Facebook</h3>\n<p style=\"white-space: pre-wrap;\">{{ $json.post_fb }}</p>\n</div>\n\n<div style=\"background: #fff0f5; padding: 15px; border-radius: 8px; margin: 10px 0;\">\n<h3>📸 Instagram</h3>\n<p style=\"white-space: pre-wrap;\">{{ $json.caption_ig }}</p>\n</div>\n\n<div style=\"background: #f0f8ff; padding: 15px; border-radius: 8px; margin: 10px 0;\">\n<h3>🐦 X (Twitter)</h3>\n<p>{{ $json.tweet_x }}</p>\n</div>\n\n<p style=\"margin-top: 20px;\">Kliknij przycisk aby zatwierdzić lub odrzucić:</p>\n</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "email-approval",
+      "name": "Email - Akceptacja",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1280, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_ME",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "if-approved",
+      "name": "Zatwierdzono?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.platformy }}",
+              "rightValue": "fb",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "if-fb",
+      "name": "Publikuj FB?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "nodeId": "={{ $env.FB_PAGE_ID || 'CONFIGURE_ME' }}",
+        "edge": "feed",
+        "method": "POST",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "message",
+              "value": "={{ $json.post_fb }}"
+            },
+            {
+              "name": "link",
+              "value": "={{ $json.image_url }}"
+            }
+          ]
+        }
+      },
+      "id": "fb-publish",
+      "name": "Facebook - Publikuj",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [2020, 100],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Facebook Graph API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.platformy }}",
+              "rightValue": "ig",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "if-ig",
+      "name": "Publikuj IG?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.IG_USER_ID || 'CONFIGURE_ME' }}/media",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"image_url\": \"{{ $json.image_url }}\",\n  \"caption\": {{ JSON.stringify($json.caption_ig) }}\n}",
+        "options": {
+          "queryParametersUi": {
+            "parameter": [
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_PAGE_TOKEN || 'CONFIGURE_ME' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ig-container",
+      "name": "IG - Utwórz Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2020, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.IG_USER_ID || 'CONFIGURE_ME' }}/media_publish",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"creation_id\": \"{{ $json.id }}\"\n}",
+        "options": {
+          "queryParametersUi": {
+            "parameter": [
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_PAGE_TOKEN || 'CONFIGURE_ME' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ig-publish",
+      "name": "IG - Publikuj",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2280, 300]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Posty"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Opublikowano ✅",
+            "data_publikacji": "={{ new Date().toLocaleString('pl-PL') }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-update",
+      "name": "Oznacz jako Opublikowane",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2540, 300]
+    },
+    {
+      "parameters": {
+        "content": "## 📱 Social Media Machine\n\n**Jak działa:**\n1. Wpisujesz post w Google Sheets (temat + ton + klient)\n2. AI generuje 3 wersje: FB (długi), IG (hashtagi), X (krótki)\n3. Email z podglądem do akceptacji\n4. Po kliknięciu \"Approve\" → publikuje na wybranych platformach\n5. Oznacza jako opublikowane w arkuszu\n\n**Kolumny w Google Sheets:**\n| Kolumna | Opis |\n|---------|------|\n| temat | O czym post |\n| tresc | Szczegóły (opcjonalnie) |\n| ton | profesjonalny/luźny/oficjalny |\n| klient | Nazwa klienta |\n| platformy | fb,ig,x (rozdzielone przecinkami) |\n| image_url | Link do grafiki (publiczny URL!) |\n| status | \"do publikacji\" → trigger |\n| email_approval | Email osoby zatwierdzającej |\n| data_publikacji | Auto-wypełniane po publikacji |\n\n**Do skonfigurowania:**\n- Google Sheets OAuth2\n- Gemini API Key (Query Auth: key=AIza...)\n- Facebook Graph API credentials\n- Meta Page Token (long-lived!)\n- Gmail OAuth2 (do approval flow)\n- Zmienne: FB_PAGE_ID, IG_USER_ID, META_PAGE_TOKEN, EMAIL_APPROVAL",
+        "width": 480,
+        "height": 560,
+        "color": 3
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 40]
+    }
+  ],
+  "connections": {
+    "Nowy Post w Arkuszu": {
+      "main": [
+        [
+          { "node": "Status = Do Publikacji?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Status = Do Publikacji?": {
+      "main": [
+        [
+          { "node": "Przygotuj Prompty", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Przygotuj Prompty": {
+      "main": [
+        [
+          { "node": "Gemini Flash - Post FB", "type": "main", "index": 0 },
+          { "node": "Gemini Flash - Caption IG", "type": "main", "index": 0 },
+          { "node": "Gemini Flash - Tweet X", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini Flash - Post FB": {
+      "main": [
+        [
+          { "node": "Zlacz Odpowiedzi AI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini Flash - Caption IG": {
+      "main": [
+        [
+          { "node": "Zlacz Odpowiedzi AI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini Flash - Tweet X": {
+      "main": [
+        [
+          { "node": "Zlacz Odpowiedzi AI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Zlacz Odpowiedzi AI": {
+      "main": [
+        [
+          { "node": "Email - Akceptacja", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Email - Akceptacja": {
+      "main": [
+        [
+          { "node": "Zatwierdzono?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Zatwierdzono?": {
+      "main": [
+        [
+          { "node": "Publikuj FB?", "type": "main", "index": 0 },
+          { "node": "Publikuj IG?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Publikuj FB?": {
+      "main": [
+        [
+          { "node": "Facebook - Publikuj", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Publikuj IG?": {
+      "main": [
+        [
+          { "node": "IG - Utwórz Container", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IG - Utwórz Container": {
+      "main": [
+        [
+          { "node": "IG - Publikuj", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Facebook - Publikuj": {
+      "main": [
+        [
+          { "node": "Oznacz jako Opublikowane", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IG - Publikuj": {
+      "main": [
+        [
+          { "node": "Oznacz jako Opublikowane", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "social-media" },
+    { "name": "marcin" },
+    { "name": "publisher" }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

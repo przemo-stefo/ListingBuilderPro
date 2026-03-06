@@ -1,0 +1,163 @@
+{
+  "name": "Weekly Summary - Piątek 17:00",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 17,
+              "triggerAtDay": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-1",
+      "name": "Piątek 17:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "weekly-summary-test-a015018b",
+        "options": {}
+      },
+      "id": "webhook-test",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        500
+      ],
+      "webhookId": "weekly-summary-test-a015018b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n-marcin/16-weekly-summary.json — Gather Weekly Data\n// Purpose: Collect stats from Qdrant for weekly summary\n// NOT for: sending messages\n\nconst qdrantUrl = 'http://qdrant:6333';\n\n// Date range: last 7 days\nconst now = new Date();\nconst weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\nconst weekAgoStr = weekAgo.toISOString();\n\nconst qdrantScroll = async (filter, limit) => {\n  try {\n    const r = await this.helpers.httpRequest({\n      method: 'POST',\n      url: qdrantUrl + '/collections/krasnik_news/points/scroll',\n      body: { limit, with_payload: true, with_vector: false, filter },\n      json: true\n    });\n    return r.result?.points || [];\n  } catch (e) { return []; }\n};\n\nconst qdrantCount = async (filter) => {\n  try {\n    const r = await this.helpers.httpRequest({\n      method: 'POST',\n      url: qdrantUrl + '/collections/krasnik_news/points/count',\n      body: { filter, exact: true },\n      json: true\n    });\n    return r.result?.count || 0;\n  } catch (e) { return 0; }\n};\n\n// Parallel queries\nconst [totalArticles, recentArticles, briefings, preferences, feedbacks, przetargi, sessions] = await Promise.all([\n  // Total articles in DB\n  qdrantCount({}),\n  // Articles from last 7 days (no system categories)\n  qdrantScroll({\n    must: [{ key: 'date', range: { gte: weekAgoStr } }],\n    must_not: [\n      { key: 'category', match: { value: 'briefing' } },\n      { key: 'category', match: { value: 'briefing-index' } },\n      { key: 'category', match: { value: 'marcin-preference' } },\n      { key: 'category', match: { value: 'marcin-last-post' } },\n      { key: 'category', match: { value: 'marcin-style-feedback' } },\n      { key: 'category', match: { value: 'sesja-rady-notified' } },\n      { key: 'category', match: { value: 'bip-przetarg-notified' } }\n    ]\n  }, 200),\n  // Briefings from last 7 days\n  qdrantScroll({\n    must: [\n      { key: 'category', match: { value: 'briefing' } },\n      { key: 'date', range: { gte: weekAgoStr } }\n    ]\n  }, 10),\n  // All preferences\n  qdrantScroll({ must: [{ key: 'category', match: { value: 'marcin-preference' } }] }, 100),\n  // All feedbacks\n  qdrantScroll({ must: [{ key: 'category', match: { value: 'marcin-style-feedback' } }] }, 20),\n  // Przetargi notified\n  qdrantScroll({\n    must: [\n      { key: 'category', match: { value: 'bip-przetarg-notified' } },\n      { key: 'notified_at', range: { gte: weekAgoStr } }\n    ]\n  }, 50),\n  // Sessions notified\n  qdrantScroll({ must: [{ key: 'category', match: { value: 'sesja-rady-notified' } }] }, 20)\n]);\n\n// Analyze sources\nconst sourceCounts = {};\nfor (const a of recentArticles) {\n  const src = a.payload?.source || 'unknown';\n  sourceCounts[src] = (sourceCounts[src] || 0) + 1;\n}\nconst topSources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);\n\n// Analyze topics from preferences\nconst topicCounts = {};\nfor (const p of preferences) {\n  for (const t of (p.payload?.topics || [])) {\n    topicCounts[t] = (topicCounts[t] || 0) + 1;\n  }\n}\nconst topTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);\n\n// Count posts generated (from preferences = each preference = 1 post generated)\nconst weekPrefs = preferences.filter(p => (p.payload?.date || '') >= weekAgoStr);\n\nreturn [{ json: {\n  totalArticles,\n  weekArticles: recentArticles.length,\n  briefingCount: briefings.length,\n  postsGenerated: weekPrefs.length,\n  feedbackCount: feedbacks.length,\n  przetargiCount: przetargi.length,\n  sessionsCount: sessions.length,\n  topSources,\n  topTopics,\n  weekAgoStr: weekAgoStr.slice(0, 10),\n  nowStr: now.toISOString().slice(0, 10)\n} }];",
+        "nodeVersion": 2
+      },
+      "id": "gather-data",
+      "name": "Gather Weekly Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const GROUP_JID = $env.WHATSAPP_GROUP_JID || '120363426348074659@g.us';\n// n8n-marcin/16-weekly-summary.json — Format Weekly Summary\n// Purpose: Format WhatsApp weekly summary message\n// NOT for: data gathering\n\nconst d = $input.first().json;\n\n// Format dates nicely: \"21.02 → 28.02\"\nconst from = d.weekAgoStr.slice(8,10) + '.' + d.weekAgoStr.slice(5,7);\nconst to = d.nowStr.slice(8,10) + '.' + d.nowStr.slice(5,7);\n\nlet msg = '📊 *Tydzień ' + from + ' → ' + to + '*\\n\\n';\n\n// Compact stats in 2 lines\nmsg += '📰 ' + d.weekArticles + ' artykułów · 📋 ' + d.briefingCount + ' briefingów · ✍️ ' + d.postsGenerated + ' postów FB\\n';\nmsg += '📋 ' + d.przetargiCount + ' przetargów · 🗳️ ' + d.sessionsCount + ' sesji · ❤️ ' + d.feedbackCount + ' feedbacków\\n\\n';\n\n// Top sources — compact\nif (d.topSources && d.topSources.length > 0) {\n  msg += '🏆 *Źródła:* ';\n  msg += d.topSources.map(([src, count]) => src + ' (' + count + ')').join(', ');\n  msg += '\\n\\n';\n}\n\n// Top topics — compact\nif (d.topTopics && d.topTopics.length > 0) {\n  msg += '❤️ *Twoje tematy:* ';\n  msg += d.topTopics.map(([topic, count]) => topic + ' (' + count + 'x)').join(', ');\n  msg += '\\n\\n';\n}\n\n// Tips — friendlier\nif (d.postsGenerated === 0) {\n  msg += '💡 W tym tygodniu żadnego posta — po briefingu odpisz numerami!\\n\\n';\n} else if (d.feedbackCount === 0) {\n  msg += '💡 Daj feedback do postów (np. _krócej_, _więcej emoji_) — system się uczy!\\n\\n';\n}\n\nmsg += 'Dobrego weekendu! 🎉';\n\nreturn [{ json: { response: msg, chatId: GROUP_JID } }];",
+        "nodeVersion": 2
+      },
+      "id": "format-msg",
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.WAHA_URL || \"http://65.21.88.47:40127\") + \"/api/sendText\" }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $env.WAHA_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: ($env.WHATSAPP_GROUP_JID || \"120363426348074659@g.us\"), text: $json.response, session: \"default\" }) }}",
+        "options": {}
+      },
+      "id": "send-wa",
+      "name": "Send WhatsApp Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Weekly Summary\n\n**Schedule:** Friday 17:00\n**Data:** Qdrant stats for last 7 days\n**Output:** WhatsApp group summary",
+        "width": 260,
+        "height": 150
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -50
+      ]
+    }
+  ],
+  "connections": {
+    "Piątek 17:00": {
+      "main": [
+        [
+          {
+            "node": "Gather Weekly Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Gather Weekly Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather Weekly Data": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

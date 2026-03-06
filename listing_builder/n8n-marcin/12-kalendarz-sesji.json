@@ -1,0 +1,255 @@
+{
+  "name": "Kalendarz Sesji Rady Powiatu",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            },
+            {
+              "triggerAtHour": 19
+            }
+          ]
+        }
+      },
+      "id": "schedule-sesje",
+      "name": "Co 12h (7:00 i 19:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://powiatkrasnicki.esesja.pl/posiedzenia",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "http-esesja",
+      "name": "Fetch eSesja",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n-marcin/12-kalendarz-sesji.json — Parsuj Sesje\n// Purpose: Extract sessions from eSesja HTML, check Qdrant for already-notified\n// NOT for: fetching agenda (that's the next node)\n\nconst html = $input.first().json.data || $input.first().json.body || '';\nconst qdrantUrl = 'http://qdrant:6333';\n\n// Parse sessions from HTML\n// Pattern: /posiedzenie/UUID with date text nearby\nconst sessionRegex = /\\/posiedzenie\\/([a-f0-9-]+)/g;\nconst dateRegex = /(\\d{1,2})\\s+(stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|wrze[sś]nia|pa[zź]dziernika|listopada|grudnia)\\s+(\\d{4})[^\\d]*(\\d{2}:\\d{2})?/gi;\n\nconst months = {\n  'stycznia': '01', 'lutego': '02', 'marca': '03', 'kwietnia': '04',\n  'maja': '05', 'czerwca': '06', 'lipca': '07', 'sierpnia': '08',\n  'września': '09', 'wrzesnia': '09', 'października': '10', 'pazdziernika': '10',\n  'listopada': '11', 'grudnia': '12'\n};\n\n// Extract all session links\nconst sessions = [];\nconst seen = new Set();\n\n// Split HTML into chunks around session links for context\nconst chunks = html.split(/\\/posiedzenie\\//);\nfor (let i = 1; i < chunks.length; i++) {\n  const uuid = chunks[i].match(/^([a-f0-9-]+)/)?.[1];\n  if (!uuid || seen.has(uuid)) continue;\n  seen.add(uuid);\n\n  // Look for date in surrounding context (before and after the link)\n  const context = (chunks[i - 1]?.slice(-500) || '') + chunks[i].slice(0, 500);\n  const dateMatch = context.match(/(\\d{1,2})\\s+(stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|wrze[sś]nia|pa[zź]dziernika|listopada|grudnia)\\s+(\\d{4})/i);\n  const timeMatch = context.match(/godz\\.?\\s*(\\d{2}:\\d{2})/i);\n\n  // Extract title (text before/around the link)\n  const titleMatch = context.match(/(Sesja|Posiedzenie)\\s+nr\\s+[IVXLC]+/i);\n  // Extract body name: look for text inside <a> tags or plain text\n  let bodyName = '';\n  const bodyAnchor = context.match(/>\\s*(Rada Powiatu[^<]*|Komisja[^<]{3,60})</i);\n  if (bodyAnchor) {\n    bodyName = bodyAnchor[1].trim();\n  } else {\n    const bodyPlain = context.match(/(Rada Powiatu|Komisja\\s+\\w[^<,]{3,60})/i);\n    if (bodyPlain) bodyName = bodyPlain[1].trim();\n  }\n\n  if (dateMatch) {\n    const day = dateMatch[1].padStart(2, '0');\n    const monthName = dateMatch[2].toLowerCase();\n    const month = months[monthName] || '01';\n    const year = dateMatch[3];\n    const dateIso = `${year}-${month}-${day}`;\n    const time = timeMatch?.[1] || '09:00';\n\n    sessions.push({\n      uuid,\n      url: `https://powiatkrasnicki.esesja.pl/posiedzenie/${uuid}`,\n      date: dateIso,\n      time,\n      title: titleMatch?.[0] || 'Posiedzenie',\n      body: bodyName || 'Rada Powiatu',\n      dateObj: new Date(`${dateIso}T${time}:00`)\n    });\n  }\n}\n\n// Filter: last 14 days + future (catch newly added sessions)\nconst now = new Date();\nconst cutoff = new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 10);\nconst upcoming = sessions.filter(s => s.date >= cutoff).sort((a, b) => a.dateObj - b.dateObj);\n\nif (upcoming.length === 0) {\n  return [{ json: { sessions: [], newSessions: [], message: 'Brak nadchodzących sesji' } }];\n}\n\n// Check Qdrant for already-notified sessions\nlet notified = [];\ntry {\n  const result = await this.helpers.httpRequest({\n    method: 'POST',\n    url: qdrantUrl + '/collections/krasnik_news/points/scroll',\n    body: {\n      limit: 100, with_payload: true, with_vector: false,\n      filter: { must: [{ key: 'category', match: { value: 'sesja-rady-notified' } }] }\n    },\n    json: true\n  });\n  notified = (result.result?.points || []).map(p => p.payload?.session_uuid);\n} catch (e) { console.log('Qdrant check error:', e.message); }\n\nconst newSessions = upcoming.filter(s => !notified.includes(s.uuid));\n\nreturn [{ json: { sessions: upcoming, newSessions, allNotified: notified } }];"
+      },
+      "id": "parse-sesje",
+      "name": "Parsuj Sesje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-new",
+              "leftValue": "={{ $json.newSessions.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-new",
+      "name": "Nowe sesje?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n-marcin/12-kalendarz-sesji.json — Pobierz Agendy + Powiadom\n// Purpose: Fetch agenda for new sessions, format Telegram message, store in Qdrant\n// NOT for: parsing session list (that's Parsuj Sesje)\n\nconst geminiKey = $env.GEMINI_API_KEY || '';\nconst qdrantUrl = 'http://qdrant:6333';\nconst newSessions = $json.newSessions || [];\nconst allSessions = $json.sessions || [];\n\nif (newSessions.length === 0) {\n  return [{ json: { telegram: '', stored: 0 } }];\n}\n\n// Fetch agenda for each new session\nconst sessionsWithAgenda = [];\nfor (const s of newSessions) {\n  let agenda = '(nie udało się pobrać porządku obrad)';\n  try {\n    const html = await this.helpers.httpRequest({\n      method: 'GET', url: s.url,\n      options: { response: { response: { responseFormat: 'text' } } }\n    });\n    const body = typeof html === 'string' ? html : (html.data || html.body || '');\n\n    // Extract agenda items — they follow 'Porządek obrad' heading\n    const agendaSection = body.split(/[Pp]orz[aą]dek\\s+obrad/i)[1] || '';\n    // Find numbered items (1. ..., 2. ..., etc)\n    const items = [];\n    const itemRegex = /(\\d+)\\.\\s*([^<\\n]{5,200})/g;\n    let match;\n    while ((match = itemRegex.exec(agendaSection)) !== null && items.length < 15) {\n      // Clean HTML tags\n      const text = match[2].replace(/<[^>]+>/g, '').trim();\n      if (text.length > 3) items.push(`${match[1]}. ${text}`);\n    }\n    if (items.length > 0) agenda = items.join('\\n');\n  } catch (e) { console.log('Agenda fetch error for', s.uuid, ':', e.message); }\n\n  sessionsWithAgenda.push({ ...s, agenda });\n}\n\n// Format Telegram message\nconst daysOfWeek = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];\n\nlet msg = '🏛️ *Nowe sesje / posiedzenia*\\n\\n';\nfor (const s of sessionsWithAgenda) {\n  const d = new Date(s.date + 'T' + s.time + ':00');\n  const dayName = daysOfWeek[d.getDay()];\n  const daysUntil = Math.ceil((d - new Date()) / 86400000);\n  const urgency = daysUntil <= 1 ? '🔴 JUTRO!' : daysUntil <= 3 ? '🟡 za ' + daysUntil + ' dni' : '🟢 za ' + daysUntil + ' dni';\n\n  msg += `*${s.title} — ${s.body}*\\n`;\n  msg += `📅 ${s.date} (${dayName}) godz. ${s.time}\\n`;\n  msg += `${urgency}\\n`;\n  msg += `🔗 ${s.url}\\n`;\n  msg += `\\n*Porządek obrad:*\\n${s.agenda}\\n\\n`;\n}\n\n// Also show upcoming sessions summary\nif (allSessions.length > sessionsWithAgenda.length) {\n  msg += '\\n📆 *Wszystkie nadchodzące:*\\n';\n  for (const s of allSessions) {\n    msg += `• ${s.date} ${s.time} — ${s.title} (${s.body})\\n`;\n  }\n}\n\n// Truncate for Telegram (4096 limit)\nif (msg.length > 4000) {\n  msg = msg.substring(0, 3950) + '\\n\\n... (skrócono, pełna lista na eSesja)';\n}\n\n// Store notified sessions in Qdrant\n// SHARED: simpleHash+makeUUID — keep identical across all Code nodes that use it\nfunction simpleHash(str) {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < str.length; i++) {\n    const ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);\n  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);\n  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0') + '0000000000000000';\n}\nfunction makeUUID(input) {\n  const h = simpleHash(input);\n  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);\n}\n\nlet stored = 0;\nfor (const s of sessionsWithAgenda) {\n  try {\n    // Generate deterministic embedding (zero vector — we only need payload, not similarity)\n    const zeroVector = new Array(768).fill(0);\n    await this.helpers.httpRequest({\n      method: 'PUT',\n      url: qdrantUrl + '/collections/krasnik_news/points',\n      body: {\n        points: [{\n          id: makeUUID('sesja-' + s.uuid),\n          vector: zeroVector,\n          payload: {\n            category: 'sesja-rady-notified',\n            session_uuid: s.uuid,\n            title: s.title + ' — ' + s.body,\n            date: s.date,\n            time: s.time,\n            url: s.url,\n            agenda: s.agenda,\n            notified_at: new Date().toISOString()\n          }\n        }]\n      },\n      json: true\n    });\n    stored++;\n  } catch (e) { console.log('Qdrant store error:', e.message); }\n}\n\nreturn [{ json: { telegram: msg, stored, count: sessionsWithAgenda.length } }];"
+      },
+      "id": "fetch-agenda",
+      "name": "Pobierz Agendy + Formatuj",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.WAHA_URL || \"http://65.21.88.47:40127\") + \"/api/sendText\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chatId: ($env.WHATSAPP_GROUP_JID || \"120363426348074659@g.us\"), text: $json.telegram, session: \"default\" }) }}",
+        "options": {},
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "839a7bb725914e2b88ce225223f019e2"
+            }
+          ]
+        }
+      },
+      "id": "telegram-sesje",
+      "name": "WhatsApp Sesja Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "noop-end",
+      "name": "Brak nowych sesji",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Kalendarz Sesji Rady Powiatu\n\n**Schedule:** co 12h (7:00, 19:00)\n**Źródło:** powiatkrasnicki.esesja.pl\n**Logika:**\n1. Scrape eSesja → parsuj sesje\n2. Sprawdź Qdrant (sesja-rady-notified) → skip już powiadomionych\n3. Nowe sesje → pobierz porządek obrad\n4. Wyślij Telegram alert z agendą\n5. Zapisz w Qdrant żeby nie powtarzać\n\n**Qdrant category:** sesja-rady-notified",
+        "height": 340,
+        "width": 350
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "path": "sesje-test-a015018b",
+        "options": {}
+      },
+      "id": "webhook-test",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        100,
+        400
+      ],
+      "webhookId": "sesje-test-a015018b"
+    }
+  ],
+  "connections": {
+    "Co 12h (7:00 i 19:00)": {
+      "main": [
+        [
+          {
+            "node": "Fetch eSesja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch eSesja": {
+      "main": [
+        [
+          {
+            "node": "Parsuj Sesje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsuj Sesje": {
+      "main": [
+        [
+          {
+            "node": "Nowe sesje?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nowe sesje?": {
+      "main": [
+        [
+          {
+            "node": "Pobierz Agendy + Formatuj",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brak nowych sesji",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pobierz Agendy + Formatuj": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Sesja Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Fetch eSesja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,116 @@
+# deploy/anna130/docker-compose.yml
+# Purpose: n8n + PostgreSQL + Qdrant networking for Marcin Nastarowicz on anna130
+# NOT for: Qdrant container itself (that's in /root/inner_circle_rag/)
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n-marcin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - N8N_HOST=n8n-marcin.feedmasters.org
+      - N8N_PROTOCOL=https
+      - N8N_SECURE_COOKIE=false
+      - WEBHOOK_URL=https://n8n-marcin.feedmasters.org/
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=marcin
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - GENERIC_TIMEZONE=Europe/Warsaw
+      - TZ=Europe/Warsaw
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n_marcin
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      # Marcin's workflow variables (accessible via $env in n8n expressions)
+      - EMAIL_RADNY=nastarowiczmar@gmail.com
+      - EMAIL_APPROVAL=nastarowiczmar@gmail.com
+      - FB_PAGE_ID=100064758394256
+      - IG_USER_ID=57302243721
+      - META_PAGE_TOKEN=
+      - TELEGRAM_CHAT_ID=7002371113
+      - FB_VERIFY_TOKEN=marcin_bot_2026
+      - UNSUBSCRIBE_URL=https://n8n-marcin.feedmasters.org/webhook/newsletter-unsubscribe
+      - CRISIS_DEFAULT_IMAGE=
+      # RAG: Gemini Embeddings for Qdrant
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # WhatsApp: WAHA on izabela166 (65.21.88.47:40127)
+      - MARCIN_WHATSAPP_JID=${MARCIN_WHATSAPP_JID:-}
+      - WAHA_API_KEY=${WAHA_API_KEY:-}
+      # Groq LLM for AI briefing generation
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      # Optional: SMSAPI for SMS briefing
+      - SMSAPI_TOKEN=${SMSAPI_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: n8n-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=n8n_marcin
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [n8n]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n_marcin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: n8n-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks: [n8n]
+    depends_on:
+      n8n:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+volumes:
+  n8n_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  n8n:
+    name: n8n_network

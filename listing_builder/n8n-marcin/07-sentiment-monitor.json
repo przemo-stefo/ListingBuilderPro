@@ -1,0 +1,273 @@
+{
+  "name": "Sentiment Monitor - Komentarze FB Powiatu",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Co 15 minut",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.FB_PAGE_ID || 'CONFIGURE_ME' }}/feed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "fields", "value": "id,message,created_time,comments.limit(50){message,from,created_time,like_count}" },
+            { "name": "limit", "value": "10" },
+            { "name": "since", "value": "={{ Math.floor((Date.now() - 24*60*60*1000) / 1000) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fb-get-posts",
+      "name": "FB - Ostatnie Posty (24h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Meta Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wyciągnij wszystkie komentarze z postów\nconst posts = $json.data || [];\nconst allComments = [];\n\nfor (const post of posts) {\n  const comments = post.comments?.data || [];\n  for (const c of comments) {\n    allComments.push({\n      post_id: post.id,\n      post_text: (post.message || '').substring(0, 100),\n      comment_id: c.id || '',\n      comment_text: c.message || '',\n      author: c.from?.name || 'Nieznany',\n      author_id: c.from?.id || '',\n      created: c.created_time || '',\n      likes: c.like_count || 0\n    });\n  }\n}\n\nif (allComments.length === 0) {\n  return [{ json: { no_comments: true, count: 0 } }];\n}\n\nreturn [{ json: { comments: allComments, count: allComments.length } }];"
+      },
+      "id": "code-extract",
+      "name": "Wyciagnij Komentarze",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.no_comments }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notTrue" }
+            }
+          ]
+        }
+      },
+      "id": "if-has-comments",
+      "name": "Są Komentarze?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"systemInstruction\": {\n    \"parts\": [{\n      \"text\": \"Jesteś analitykiem sentymentu komentarzy na stronie FB samorządu. Analizujesz komentarze mieszkańców.\\n\\nDla KAŻDEGO komentarza określ:\\n- sentiment: POSITIVE / NEUTRAL / NEGATIVE / CRISIS\\n- temat: krótko o czym (drogi, inwestycje, urzędnicy, wydarzenie, etc.)\\n- priorytet: LOW / MEDIUM / HIGH / URGENT\\n\\nCRISIS = groźby, wulgaryzmy, oskarżenia o korupcję, masowe niezadowolenie\\nURGENT = wymaga natychmiastowej reakcji (groźba wizerunkowa)\\n\\nOdpowiedz TYLKO w formacie JSON (bez markdown, bez ```json):\\n{\\n  \\\"comments\\\": [\\n    {\\\"id\\\": \\\"comment_id\\\", \\\"sentiment\\\": \\\"NEGATIVE\\\", \\\"temat\\\": \\\"stan drog\\\", \\\"priorytet\\\": \\\"MEDIUM\\\", \\\"summary\\\": \\\"krótkie podsumowanie\\\"}\\n  ],\\n  \\\"stats\\\": {\\\"positive\\\": 0, \\\"neutral\\\": 0, \\\"negative\\\": 0, \\\"crisis\\\": 0},\\n  \\\"alert\\\": true/false,\\n  \\\"alert_reason\\\": \\\"dlaczego alert lub null\\\"\\n}\"\n    }]\n  },\n  \"contents\": [{\n    \"role\": \"user\",\n    \"parts\": [{\n      \"text\": \"Przeanalizuj {{ $json.count }} komentarzy:\\n\\n{{ $json.comments.map((c, i) => `[${i+1}] ID: ${c.comment_id}\\nAutor: ${c.author}\\nPod postem: \\\"${c.post_text}\\\"\\nKomentarz: \\\"${c.comment_text}\\\"\\nLajki: ${c.likes}\\n`).join('\\n') }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.1,\n    \"maxOutputTokens\": 1500\n  }\n}",
+        "options": {}
+      },
+      "id": "gemini-sentiment",
+      "name": "Gemini Flash - Analiza Sentymentu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsuj odpowiedź Gemini\nconst aiText = $json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\nconst originalComments = $('Wyciagnij Komentarze').first().json.comments;\n\nlet analysis;\ntry {\n  // Usuń ewentualne markdown backticki\n  const cleaned = aiText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  analysis = JSON.parse(cleaned);\n} catch(e) {\n  analysis = {\n    comments: [],\n    stats: { positive: 0, neutral: 0, negative: 0, crisis: 0 },\n    alert: false,\n    alert_reason: 'Błąd parsowania AI: ' + e.message\n  };\n}\n\n// Zlicz alerty\nconst negativeComments = (analysis.comments || []).filter(c => \n  c.sentiment === 'NEGATIVE' || c.sentiment === 'CRISIS'\n);\n\nconst urgentComments = (analysis.comments || []).filter(c => \n  c.priorytet === 'URGENT' || c.priorytet === 'HIGH'\n);\n\n// Wzbogać negatywne komentarze o oryginalne dane\nconst enrichedNegative = negativeComments.map(nc => {\n  const orig = originalComments.find(oc => oc.comment_id === nc.id) || {};\n  return { ...nc, author: orig.author, full_text: orig.comment_text, post_text: orig.post_text };\n});\n\nreturn [{\n  json: {\n    stats: analysis.stats || {},\n    alert: analysis.alert || urgentComments.length > 0,\n    alert_reason: analysis.alert_reason,\n    negative_count: negativeComments.length,\n    urgent_count: urgentComments.length,\n    total_analyzed: (analysis.comments || []).length,\n    negative_comments: enrichedNegative,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-process",
+      "name": "Przetwórz Wyniki",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.alert }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            },
+            {
+              "leftValue": "={{ $json.negative_count }}",
+              "rightValue": 3,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ]
+        }
+      },
+      "id": "if-alert",
+      "name": "Alert Potrzebny?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'CONFIGURE_ME' }}",
+        "text": "=🔴 *ALERT SENTYMENTU — FB Powiatu*\n\n📊 Przeanalizowano: {{ $json.total_analyzed }} komentarzy\n✅ Pozytywne: {{ $json.stats.positive || 0 }}\n⚪ Neutralne: {{ $json.stats.neutral || 0 }}\n🔴 Negatywne: {{ $json.negative_count }}\n🚨 Kryzysowe: {{ $json.stats.crisis || 0 }}\n\n{{ $json.alert_reason ? '⚠️ Powód alertu: ' + $json.alert_reason : '' }}\n\n{{ $json.negative_comments.slice(0, 5).map((c, i) => `\\n${i+1}. *${c.author || 'Anonim'}* (${c.sentiment}, ${c.priorytet})\\n   _\"${(c.full_text || c.summary || '').substring(0, 150)}\"_\\n   Temat: ${c.temat}\\n   Pod postem: \"${(c.post_text || '').substring(0, 60)}...\"`).join('\\n') }}\n\n🕐 {{ $json.timestamp }}\n👉 Sprawdź i zareaguj!",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-alert",
+      "name": "Telegram - ALERT",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_ME",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "CONFIGURE_ME"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Sentiment Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "analyzed": "={{ $json.total_analyzed }}",
+            "positive": "={{ $json.stats.positive || 0 }}",
+            "neutral": "={{ $json.stats.neutral || 0 }}",
+            "negative": "={{ $json.negative_count }}",
+            "crisis": "={{ $json.stats.crisis || 0 }}",
+            "alert": "={{ $json.alert }}",
+            "alert_reason": "={{ $json.alert_reason || '' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log",
+      "name": "Log Sentymentu",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1780, 440],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CONFIGURE_ME",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🔍 Sentiment Monitor\n\n**Co robi:**\n1. Co 15 minut pobiera ostatnie posty (24h)\n   ze strony FB Powiatu + ich komentarze\n2. Gemini Flash analizuje KAŻDY komentarz:\n   - Sentiment: POSITIVE / NEUTRAL / NEGATIVE / CRISIS\n   - Temat: drogi, inwestycje, urzędnicy...\n   - Priorytet: LOW / MEDIUM / HIGH / URGENT\n3. Jeśli alert (CRISIS/URGENT lub 3+ negatywnych)\n   → natychmiastowy push na Telegram\n4. Loguje statystyki sentymentu w Sheets\n   (dane do trendów i raportów)\n\n**Kiedy alarmuje:**\n- Komentarz CRISIS (groźby, oskarżenia)\n- Komentarz URGENT (wymaga reakcji)\n- 3+ negatywnych komentarzy w jednym skanowaniu\n\n**Google Sheets — arkusz \"Sentiment Log\":**\n| timestamp | analyzed | positive | neutral |\n| negative | crisis | alert | alert_reason |\n\n**Do skonfigurowania:**\n- Meta Access Token (Query Auth)\n- Gemini API Key (Query Auth)\n- Telegram Bot\n- Google Sheets OAuth2\n- Zmienne: FB_PAGE_ID, TELEGRAM_CHAT_ID\n\n**Pro tip:** Dane z logu można użyć\ndo wykresu sentymentu w raportach\nmiesięcznych (workflow #3).",
+        "width": 400,
+        "height": 580,
+        "color": 7
+      },
+      "id": "sticky-info",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 40]
+    }
+  ],
+  "connections": {
+    "Co 15 minut": {
+      "main": [
+        [
+          { "node": "FB - Ostatnie Posty (24h)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "FB - Ostatnie Posty (24h)": {
+      "main": [
+        [
+          { "node": "Wyciagnij Komentarze", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wyciagnij Komentarze": {
+      "main": [
+        [
+          { "node": "Są Komentarze?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Są Komentarze?": {
+      "main": [
+        [
+          { "node": "Gemini Flash - Analiza Sentymentu", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Gemini Flash - Analiza Sentymentu": {
+      "main": [
+        [
+          { "node": "Przetwórz Wyniki", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Przetwórz Wyniki": {
+      "main": [
+        [
+          { "node": "Alert Potrzebny?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Alert Potrzebny?": {
+      "main": [
+        [
+          { "node": "Telegram - ALERT", "type": "main", "index": 0 },
+          { "node": "Log Sentymentu", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Log Sentymentu", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "sentiment" },
+    { "name": "marcin" },
+    { "name": "monitoring" }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}
