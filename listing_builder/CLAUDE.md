@@ -15,7 +15,8 @@
 | What | URL |
 |------|-----|
 | Frontend (prod) | https://panel.octohelper.com |
-| Backend (prod) | https://api-lbp.feedmasters.org |
+| Backend (prod) | https://api.octohelper.com |
+| Backend (legacy alias) | https://api-lbp.feedmasters.org (→ same backend) |
 | Frontend (Vercel, legacy) | https://listing-builder-pro.vercel.app |
 | Backend (Render) | SUSPENDED + auto-deploy OFF — nie używać |
 | Frontend health | `GET /health` → `{"status":"ok","service":"frontend"}` |

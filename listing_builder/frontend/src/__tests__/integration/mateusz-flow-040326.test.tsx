@@ -1,5 +1,5 @@
 // frontend/src/__tests__/integration/mateusz-flow-040326.test.tsx
-// Purpose: 2 full integration tests verifying Mateusz meeting changes (04.03.2026)
+// Purpose: 3 full integration tests verifying Mateusz meeting changes (04.03.2026)
 // NOT for: Unit tests of individual components (see __tests__/ in each component dir)
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
