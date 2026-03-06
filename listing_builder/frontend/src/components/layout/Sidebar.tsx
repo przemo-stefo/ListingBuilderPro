@@ -175,8 +175,9 @@ export function Sidebar({ onClose }: SidebarProps) {
               </button>
 
               {/* WHY: CSS grid animation (0fr→1fr) — smooth expand/collapse, no layout jump */}
+              {/* WHY: relative z-10 ensures submenu is above Wiadomości link tooltip overlay */}
               <div
-                className="grid transition-[grid-template-rows] duration-200 ease-out"
+                className="relative z-10 grid transition-[grid-template-rows] duration-200 ease-out"
                 style={{ gridTemplateRows: complianceOpen ? '1fr' : '0fr' }}
               >
                 <div className="overflow-hidden">
