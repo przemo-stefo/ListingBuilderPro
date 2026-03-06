@@ -151,6 +151,9 @@ test-*.png
 demo-*.png
 formspree-*.png
 test*.png
+apple-*.png
+duns-*.png
+dnb-*.png
 
 # Playwright MCP cache
 .playwright-mcp/
