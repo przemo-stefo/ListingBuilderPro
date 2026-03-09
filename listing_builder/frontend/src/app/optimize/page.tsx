@@ -6,7 +6,7 @@
 
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Layers, FileText, Clock, Crown, Loader2 } from 'lucide-react'
+import { Layers, FileText, Clock, Crown, Loader2, ArrowLeftRight } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 import { FlowIndicator } from '@/components/ui/FlowIndicator'
 import { cn } from '@/lib/utils'
@@ -17,9 +17,10 @@ import { useToast } from '@/lib/hooks/useToast'
 import SingleTab from './components/SingleTab'
 import BatchTab from './components/BatchTab'
 import HistoryTab from './components/HistoryTab'
+import ABTestTab from './components/ABTestTab'
 import type { OptimizerResponse } from '@/lib/types'
 
-type Tab = 'single' | 'batch' | 'history'
+type Tab = 'single' | 'batch' | 'abtest' | 'history'
 
 // WHY: Next.js 14 requires Suspense boundary around useSearchParams()
 function OptimizeContent() {
@@ -96,6 +97,18 @@ function OptimizeContent() {
             Zbiorowe
           </button>
           <button
+            onClick={() => setActiveTab('abtest')}
+            className={cn(
+              'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors',
+              activeTab === 'abtest'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:text-white'
+            )}
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            A/B Test
+          </button>
+          <button
             onClick={handleHistoryClick}
             className={cn(
               'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors',
@@ -114,6 +127,7 @@ function OptimizeContent() {
       {/* Active tab content */}
       {activeTab === 'single' && <SingleTab loadedResult={loadedResult} initialTitle={prefillTitle} productId={productId} />}
       {activeTab === 'batch' && <BatchTab />}
+      {activeTab === 'abtest' && <ABTestTab />}
       {activeTab === 'history' && isPremium && <HistoryTab onLoadResult={handleLoadFromHistory} />}
 
       <FaqSection
