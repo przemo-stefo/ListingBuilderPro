@@ -5,12 +5,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Copy, Check, XCircle, AlertTriangle, Lock, Upload } from 'lucide-react'
+import { Download, Copy, Check, XCircle, AlertTriangle, Lock, Upload, FileText } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useTier } from '@/lib/hooks/useTier'
 import AllegroUpdateDialog from './AllegroUpdateDialog'
 import { downloadCSV, downloadEbayCsv, CopyButton, ListingSection } from './ResultDisplay'
+import { downloadPDF } from '@/lib/utils/pdfExport'
 import type { OptimizerResponse } from '@/lib/types'
 
 export function ListingCard({
@@ -41,6 +42,18 @@ export function ListingCard({
               >
                 <Download className="mr-1 h-3 w-3" />
                 CSV
+                {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
+              </Button>
+            )}
+            {fullResponse && (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => isPremium && downloadPDF(fullResponse)}
+                disabled={!isPremium}
+                title={!isPremium ? 'PDF Export dostepny w Premium' : undefined}
+              >
+                <FileText className="mr-1 h-3 w-3" />
+                PDF
                 {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
               </Button>
             )}
