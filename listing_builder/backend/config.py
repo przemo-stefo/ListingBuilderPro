@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     kaufland_client_key: str = ""
     kaufland_secret_key: str = ""
 
+    # Telegram alerts — business-critical notifications to Shawn
+    telegram_bot_token: str = ""  # WHY: Empty = Telegram alerts disabled
+    telegram_chat_id: str = "7002371113"
+
     # RAG Search Mode + Cloudflare Workers AI embeddings (free)
     rag_mode: str = "hybrid"  # WHY: "lexical" | "hybrid" | "semantic" — embeddings ready, hybrid active
     cf_account_id: str = ""  # WHY: Cloudflare account for Workers AI embeddings

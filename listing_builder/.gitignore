@@ -167,3 +167,8 @@ optimizer-*.md
 
 # Misc temporary docs
 README_remote-control.md
+
+# Google Maps scraper dev artifacts (production version in deploy/bill182/)
+backend/scripts/google_maps_scraper.py
+n8n_workflows/google_maps_scraper.json
+n8n_workflows/google_maps_scraper_setup.sql

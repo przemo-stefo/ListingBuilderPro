@@ -82,6 +82,12 @@ def handle_checkout_completed(session_data: dict, db: Session):
         db.add(license_obj)
         db.commit()
         logger.info("license_created", email=email, plan_type=plan_type, session_id=session_id)
+
+        # WHY: Shawn needs to know immediately when someone pays
+        from services.telegram_notify import send_telegram_sync
+        send_telegram_sync(
+            f"💰 *Nowa płatność LBP!*\nEmail: `{email}`\nPlan: {plan_type}\nKwota: 49 PLN/mies"
+        )
     except IntegrityError:
         # WHY: Idempotent — Stripe may send duplicate webhooks
         db.rollback()
@@ -104,6 +110,10 @@ def handle_subscription_cancelled(sub_data: dict, db: Session):
     license_obj.updated_at = datetime.now(timezone.utc)
     db.commit()
     logger.info("license_revoked", email=license_obj.email, stripe_sub_id=stripe_sub_id)
+
+    # WHY: Shawn needs to know when someone cancels — react fast
+    from services.telegram_notify import send_telegram_sync
+    send_telegram_sync(f"⚠️ *Anulowana subskrypcja LBP*\nEmail: `{license_obj.email}`")
 
 
 def validate_license(license_key: str, db: Session) -> bool:
