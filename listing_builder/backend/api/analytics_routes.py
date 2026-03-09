@@ -103,10 +103,17 @@ async def get_analytics(
     total_orders = sum(m.orders for m in marketplace_data)
     avg_order_value = round(grand_revenue / total_orders, 2) if total_orders > 0 else 0
 
+    # WHY: Avg conversion rate from top products as proxy — no sessions table yet
+    avg_cr = (
+        round(sum(p.conversion_rate for p in top_products) / len(top_products), 1)
+        if top_products
+        else 0.0
+    )
+
     return AnalyticsResponse(
         total_revenue=round(grand_revenue, 2),
         total_orders=total_orders,
-        conversion_rate=4.7,  # TODO: calculate from real data when order tracking is implemented
+        conversion_rate=avg_cr,
         avg_order_value=avg_order_value,
         revenue_by_marketplace=marketplace_data,
         monthly_revenue=monthly_data,
