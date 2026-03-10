@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  ArrowRightLeft,
 } from 'lucide-react'
 import type { AllegroOffersParams } from '@/lib/types'
 
@@ -161,6 +162,13 @@ export default function AllegroImport() {
           >
             <Sparkles className="h-4 w-4" />
             Optymalizuj teraz
+          </Link>
+          <Link
+            href="/converter"
+            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 transition-colors"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            Konwertuj
           </Link>
           <Link
             href="/products"

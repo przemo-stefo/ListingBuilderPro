@@ -14,6 +14,9 @@ from .oauth_connection import OAuthConnection
 from .subscription import Subscription
 from .premium_license import PremiumLicense
 from .baselinker_sync import BaseLinkerSyncLog
+from .google_connection import GoogleConnection
+from .shared_listing import SharedListing
+from .team import Team, TeamMember, TeamInvitation, TeamRole
 
 __all__ = [
     "Product",
@@ -39,4 +42,10 @@ __all__ = [
     "Subscription",
     "PremiumLicense",
     "BaseLinkerSyncLog",
+    "GoogleConnection",
+    "SharedListing",
+    "Team",
+    "TeamMember",
+    "TeamInvitation",
+    "TeamRole",
 ]

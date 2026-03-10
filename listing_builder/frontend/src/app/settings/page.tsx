@@ -33,11 +33,12 @@ const SETTINGS_FAQ = [
 ]
 
 // WHY: Provider options for the AI Model card — Groq is free (included), others need user's key
-const LLM_PROVIDERS: { id: LLMProvider; label: string; desc: string }[] = [
-  { id: 'groq', label: 'Groq', desc: 'Llama 3.3 70B (w cenie)' },
-  { id: 'gemini_flash', label: 'Gemini Flash', desc: 'Szybki, tani (Twoj klucz)' },
-  { id: 'gemini_pro', label: 'Gemini Pro', desc: 'Najlepsza jakosc (Twoj klucz)' },
-  { id: 'openai', label: 'OpenAI', desc: 'GPT-4o Mini (Twoj klucz)' },
+const LLM_PROVIDERS: { id: LLMProvider; label: string; desc: string; needsKey: boolean }[] = [
+  { id: 'groq', label: 'Groq', desc: 'Llama 3.3 70B (w cenie)', needsKey: false },
+  { id: 'beast', label: 'Beast AI', desc: 'Qwen3 235B — unlimited, darmowy', needsKey: false },
+  { id: 'gemini_flash', label: 'Gemini Flash', desc: 'Szybki, tani (Twoj klucz)', needsKey: true },
+  { id: 'gemini_pro', label: 'Gemini Pro', desc: 'Najlepsza jakosc (Twoj klucz)', needsKey: true },
+  { id: 'openai', label: 'OpenAI', desc: 'GPT-4o Mini (Twoj klucz)', needsKey: true },
 ]
 
 const MARKETPLACE_OPTIONS: { id: MarketplaceId; label: string }[] = [
@@ -253,8 +254,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* WHY: Show API key input only for non-Groq providers */}
-          {llmProvider !== 'groq' && (
+          {/* WHY: Show API key input only for providers that need one (not Groq, not Beast) */}
+          {LLM_PROVIDERS.find((p) => p.id === llmProvider)?.needsKey && (
             <div>
               <label className="mb-1 block text-sm text-gray-400">
                 Klucz API ({LLM_PROVIDERS.find((p) => p.id === llmProvider)?.label})

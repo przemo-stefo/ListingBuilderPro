@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Download,
   RotateCcw,
+  Braces,
+  Table,
   CheckCircle,
   XCircle,
   Copy,
@@ -18,8 +20,10 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { exportResultsCSV } from '@/lib/utils/csvParser'
+import { useTier } from '@/lib/hooks/useTier'
+import { exportResultsCSV, exportResultsExcel, exportResultsJSON } from '@/lib/utils/csvParser'
 import { ScoresCard } from './ResultDisplay'
 import { ListingCard } from './ListingCard'
 import { KeywordIntelCard } from './KeywordIntelCard'
@@ -31,6 +35,7 @@ interface BatchResultsProps {
 }
 
 export default function BatchResults({ response, onReset }: BatchResultsProps) {
+  const { isPremium } = useTier()
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
@@ -70,14 +75,23 @@ export default function BatchResults({ response, onReset }: BatchResultsProps) {
           </div>
           <div className="flex gap-2">
             {response.succeeded > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportResultsCSV(response)}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Pobierz wszystko (CSV)
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={() => isPremium && exportResultsCSV(response)} disabled={!isPremium}>
+                  <Download className="mr-2 h-4 w-4" />
+                  CSV
+                  {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => isPremium && exportResultsExcel(response)} disabled={!isPremium}>
+                  <Table className="mr-2 h-4 w-4" />
+                  Excel
+                  {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => isPremium && exportResultsJSON(response)} disabled={!isPremium}>
+                  <Braces className="mr-2 h-4 w-4" />
+                  JSON
+                  {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
+                </Button>
+              </>
             )}
             <Button variant="outline" size="sm" onClick={onReset}>
               <RotateCcw className="mr-2 h-4 w-4" />

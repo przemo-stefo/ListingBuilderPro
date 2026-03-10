@@ -5,13 +5,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Copy, Check, XCircle, AlertTriangle, Lock, Upload, FileText } from 'lucide-react'
+import { Download, Copy, Check, XCircle, AlertTriangle, Lock, Upload, FileText, Braces, Table, Share2, Loader2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useTier } from '@/lib/hooks/useTier'
 import AllegroUpdateDialog from './AllegroUpdateDialog'
-import { downloadCSV, downloadEbayCsv, CopyButton, ListingSection } from './ResultDisplay'
+import { downloadCSV, downloadEbayCsv, downloadJSON, downloadExcel, CopyButton, ListingSection } from './ResultDisplay'
 import { downloadPDF } from '@/lib/utils/pdfExport'
+import { createShareLink } from '@/lib/api/optimizerHistory'
 import type { OptimizerResponse } from '@/lib/types'
 
 export function ListingCard({
@@ -26,6 +27,33 @@ export function ListingCard({
 }) {
   const { isPremium } = useTier()
   const [showAllegroDialog, setShowAllegroDialog] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [shareError, setShareError] = useState(false)
+
+  const handleShare = async () => {
+    if (!fullResponse || sharing) return
+    setSharing(true)
+    setShareError(false)
+    try {
+      const token = await createShareLink({
+        listing: fullResponse.listing,
+        scores: fullResponse.scores,
+        compliance: fullResponse.compliance,
+        product_title: fullResponse.listing.title.slice(0, 100),
+        brand: fullResponse.brand,
+        marketplace: fullResponse.marketplace,
+      })
+      const url = `${window.location.origin}/share/${token}`
+      setShareUrl(url)
+      navigator.clipboard.writeText(url)
+    } catch {
+      setShareError(true)
+      setTimeout(() => setShareError(false), 3000)
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <Card>
@@ -69,6 +97,30 @@ export function ListingCard({
                 {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
               </Button>
             )}
+            {fullResponse && (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => isPremium && downloadJSON(fullResponse)}
+                disabled={!isPremium}
+                title={!isPremium ? 'JSON Export dostepny w Premium' : undefined}
+              >
+                <Braces className="mr-1 h-3 w-3" />
+                JSON
+                {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
+              </Button>
+            )}
+            {fullResponse && (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => isPremium && downloadExcel(fullResponse)}
+                disabled={!isPremium}
+                title={!isPremium ? 'Excel Export dostepny w Premium' : undefined}
+              >
+                <Table className="mr-1 h-3 w-3" />
+                Excel
+                {!isPremium && <Lock className="ml-1 h-2.5 w-2.5 text-amber-400" />}
+              </Button>
+            )}
             {isAllegroConnected && (
               <Button
                 variant="outline" size="sm"
@@ -96,6 +148,24 @@ export function ListingCard({
               {copiedField === 'all' ? <Check className="mr-1 h-3 w-3" /> : <Copy className="mr-1 h-3 w-3" />}
               Kopiuj wszystko
             </Button>
+            {fullResponse && isPremium && (
+              <Button
+                variant="outline" size="sm"
+                disabled={sharing}
+                onClick={handleShare}
+              >
+                {sharing ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : shareError ? (
+                  <XCircle className="mr-1 h-3 w-3 text-red-400" />
+                ) : shareUrl ? (
+                  <Check className="mr-1 h-3 w-3 text-green-400" />
+                ) : (
+                  <Share2 className="mr-1 h-3 w-3" />
+                )}
+                {shareError ? 'Blad' : shareUrl ? 'Skopiowano link' : 'Udostepnij'}
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>

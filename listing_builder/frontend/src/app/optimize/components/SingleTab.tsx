@@ -1,22 +1,11 @@
 // frontend/src/app/optimize/components/SingleTab.tsx
-// Purpose: Single-product listing optimizer form — extracted from page.tsx
-// NOT for: Batch optimization (that's BatchTab.tsx)
+// Purpose: Single-product listing optimizer — orchestrates form, settings, and results
+// NOT for: Batch optimization (BatchTab.tsx), UI components (extracted to own files)
 
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import {
-  Sparkles,
-  Loader2,
-  ChevronDown,
-  ChevronRight,
-  XCircle,
-  FileText,
-  Hash,
-  Zap,
-  Target,
-  Database,
-} from 'lucide-react'
+import { Sparkles, Loader2, ChevronDown, ChevronRight, FileText, Save, FolderOpen, Trash2, X } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,52 +15,41 @@ import { useTier } from '@/lib/hooks/useTier'
 import { useOAuthConnections } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
 import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
-import { ScoresCard } from './ResultDisplay'
-import { ListingCard } from './ListingCard'
-import { RankingJuiceCard } from './RankingJuiceCard'
-import { FeedbackWidget } from './FeedbackWidget'
-import { KeywordIntelCard } from './KeywordIntelCard'
-import AudienceResearchCard from './AudienceResearchCard'
-import { PPCRecommendationsCard } from './PPCRecommendationsCard'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { useUpdateProduct } from '@/lib/hooks/useProducts'
-import { ListingScoreCard } from './ListingScoreCard'
 import { ProductPicker } from './ProductPicker'
 import { apiClient } from '@/lib/api/client'
-import type { OptimizerRequest, OptimizerResponse, OptimizerKeyword, LLMProvider, ScoreResult, Product } from '@/lib/types'
+import KeywordsInput, { parseKeywordLines } from './KeywordsInput'
+import AudienceResearchCard from './AudienceResearchCard'
+import { OriginalDataCard } from './OriginalDataCard'
+import { TargetModeCard, LLM_PROVIDERS } from './TargetModeCard'
+import { OptimizerResults } from './OptimizerResults'
+import { CompetitorImport } from './CompetitorImport'
+import { getTemplates, saveTemplate, deleteTemplate } from '@/lib/utils/optimizerTemplates'
+import type { OptimizerTemplate } from '@/lib/utils/optimizerTemplates'
+import type { OptimizerRequest, OptimizerResponse, LLMProvider, ScoreResult, Product } from '@/lib/types'
 
-// WHY: Same provider list as settings — keeps UI consistent
-const LLM_PROVIDERS: { id: LLMProvider; label: string; hint: string }[] = [
-  { id: 'groq', label: 'Groq (w cenie)', hint: 'Llama 3.3 70B — darmowy' },
-  { id: 'gemini_flash', label: 'Gemini Flash', hint: 'Szybki i tani' },
-  { id: 'gemini_pro', label: 'Gemini Pro', hint: 'Najlepsza jakosc' },
-  { id: 'openai', label: 'OpenAI', hint: 'GPT-4o Mini' },
-]
-
-// WHY: Marketplace options match what the n8n workflow supports
-const MARKETPLACES = [
-  { id: 'amazon_de', name: 'Amazon DE', flag: 'DE' },
-  { id: 'amazon_us', name: 'Amazon US', flag: 'US' },
-  { id: 'amazon_pl', name: 'Amazon PL', flag: 'PL' },
-  { id: 'ebay_de', name: 'eBay DE', flag: 'DE' },
-  { id: 'kaufland', name: 'Kaufland', flag: 'DE' },
-]
+// WHY: Marketplace code from scraper (e.g. "DE") → frontend select value (e.g. "amazon_de")
+const MARKETPLACE_CODE_MAP: Record<string, string> = {
+  US: 'amazon_us', DE: 'amazon_de', UK: 'amazon_uk', FR: 'amazon_fr',
+  IT: 'amazon_it', ES: 'amazon_es', PL: 'amazon_pl', NL: 'amazon_nl',
+  SE: 'amazon_se', CA: 'amazon_ca', MX: 'amazon_mx', JP: 'amazon_jp',
+  AU: 'amazon_au', IN: 'amazon_in', BR: 'amazon_br',
+}
 
 interface SingleTabProps {
   loadedResult?: OptimizerResponse | null
-  // WHY: Allegro Manager passes ?prefill=title to pre-populate the form
   initialTitle?: string
-  // WHY: When coming from product detail page, we can save optimized listing back to the product
   productId?: string
 }
 
 export default function SingleTab({ loadedResult, initialTitle, productId }: SingleTabProps) {
-  // WHY: Track whether form was filled from product picker (vs manual input)
+  // Product picker state
   const [pickedProductTitle, setPickedProductTitle] = useState<string | undefined>()
-  // WHY: Track product ID from picker so "Zapisz" button works even without productId prop
   const [pickedProductId, setPickedProductId] = useState<number | undefined>()
+  const [pickedProductImages, setPickedProductImages] = useState<string[]>([])
 
-  // Form state — WHY initialTitle: prefill from Allegro Manager's "Optymalizuj z AI" button
+  // Form state
   const [productTitle, setProductTitle] = useState(initialTitle ?? '')
   const [brand, setBrand] = useState('')
   const [productLine, setProductLine] = useState('')
@@ -81,94 +59,99 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   const [accountType, setAccountType] = useState<'seller' | 'vendor'>('seller')
   const [llmProvider, setLlmProvider] = useState<LLMProvider>('groq')
   const [inlineLlmKey, setInlineLlmKey] = useState('')
-
-  // WHY: Read saved LLM settings — masked keys mean user saved a key in Settings
-  const { data: settingsData } = useSettings()
-  const savedLlmKey = settingsData?.llm?.providers?.[llmProvider]?.api_key || ''
-  // WHY: Masked key (****) means backend HAS a saved key — backend will read it directly
-  const hasSavedKey = savedLlmKey === '****'
-
-  // Results — use loaded result from history if provided
-  const [results, setResults] = useState<OptimizerResponse | null>(null)
-  const displayResults = loadedResult ?? results
-  const [copiedField, setCopiedField] = useState<string | null>(null)
-
-  // WHY: Auto-score state — fires after optimization completes
-  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null)
-  const [scoreLoading, setScoreLoading] = useState(false)
-
-  // WHY: Audience research result feeds into optimizer as LLM context
-  const [audienceContext, setAudienceContext] = useState('')
-  // WHY: Ref avoids stale closure in handleImprove → setTimeout → handleGenerate chain
-  const audienceContextRef = useRef(audienceContext)
-
-  // WHY: Original listing from import — shown as read-only reference, sent to AI
-  const [originalDescription, setOriginalDescription] = useState('')
-  const [originalBullets, setOriginalBullets] = useState<string[]>([])
-
-  // Collapsible sections
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [asin, setAsin] = useState('')
   const [category, setCategory] = useState('')
 
-  // Tier
-  const { canOptimize, incrementUsage, isPremium, usageToday } = useTier()
+  // Original listing from import
+  const [originalDescription, setOriginalDescription] = useState('')
+  const [originalBullets, setOriginalBullets] = useState<string[]>([])
 
-  // WHY: Show "Aktualizuj na Allegro" button only when OAuth connected
+  // Results + scoring
+  const [results, setResults] = useState<OptimizerResponse | null>(null)
+  const displayResults = loadedResult ?? results
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null)
+  const [scoreLoading, setScoreLoading] = useState(false)
+  const [savedToProduct, setSavedToProduct] = useState(false)
+
+  // Audience research
+  const [audienceContext, setAudienceContext] = useState('')
+  const audienceContextRef = useRef(audienceContext)
+
+  // Templates
+  const [templates, setTemplates] = useState<OptimizerTemplate[]>(() => getTemplates())
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+
+  const handleSaveTemplate = () => {
+    const name = templateName.trim() || `${marketplace} ${mode} ${brand || 'szablon'}`
+    const t = saveTemplate({ name, marketplace, mode, accountType, brand, productLine, category, keywordsText, llmProvider })
+    setTemplates(getTemplates())
+    setTemplateName('')
+    toast({ title: 'Szablon zapisany', description: t.name })
+  }
+
+  const handleLoadTemplate = (t: OptimizerTemplate) => {
+    setMarketplace(t.marketplace)
+    setMode(t.mode as 'aggressive' | 'standard')
+    setAccountType(t.accountType as 'seller' | 'vendor')
+    setBrand(t.brand)
+    setProductLine(t.productLine)
+    setCategory(t.category)
+    setKeywordsText(t.keywordsText)
+    setLlmProvider(t.llmProvider as LLMProvider)
+    setShowTemplates(false)
+    toast({ title: 'Szablon zaladowany', description: t.name })
+  }
+
+  const handleDeleteTemplate = (id: string) => {
+    deleteTemplate(id)
+    setTemplates(getTemplates())
+  }
+
+  // Hooks
+  const { data: settingsData } = useSettings()
+  const savedLlmKey = settingsData?.llm?.providers?.[llmProvider]?.api_key || ''
+  const hasSavedKey = savedLlmKey === '****'
+  const { canOptimize, incrementUsage, isPremium, usageToday } = useTier()
   const { data: oauthData } = useOAuthConnections()
   const isAllegroConnected = oauthData?.connections?.some(
     (c) => c.marketplace === 'allegro' && c.status === 'active'
   ) ?? false
   const { toast } = useToast()
-
-  // Hooks
   const generateMutation = useGenerateListing()
   const saveToProductMutation = useUpdateProduct()
-  const [savedToProduct, setSavedToProduct] = useState(false)
 
-  // WHY: Score API expects plain text, but optimizer returns HTML description
   const stripHtml = (html: string): string =>
     html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 
-  // WHY: Auto-trigger listing score after optimization to close the feedback loop
   const triggerScore = async (listing: OptimizerResponse['listing']) => {
     setScoreLoading(true)
     setScoreResult(null)
     try {
-      // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
       const { data } = await apiClient.post<ScoreResult>('/score/listing', {
-        title: listing.title,
-        bullets: listing.bullet_points,
-        description: stripHtml(listing.description),
+        title: listing.title, bullets: listing.bullet_points, description: stripHtml(listing.description),
       })
       setScoreResult(data)
     } catch (err) {
-      // WHY: Score is non-critical — don't break the flow, just log for debugging
       console.warn('Auto-score failed:', err)
     } finally {
       setScoreLoading(false)
     }
   }
 
-  // WHY: "Popraw" button — re-generates with improvement hints from low-scoring dimensions
-  // WHY: Build new context inline and pass to handleGenerate via ref to avoid stale closure
   const handleImprove = () => {
     if (!scoreResult) return
-    const tips = scoreResult.dimensions
-      .filter((d) => d.score < 7)
-      .map((d) => `${d.name}: ${d.tip}`)
-      .join('\n')
+    const tips = scoreResult.dimensions.filter((d) => d.score < 7).map((d) => `${d.name}: ${d.tip}`).join('\n')
     const newContext = (audienceContext ? audienceContext + '\n\n' : '') + '--- IMPROVEMENT HINTS ---\n' + tips
-    // WHY: Set state AND use the new value directly — avoids stale closure in setTimeout
     setAudienceContext(newContext)
     audienceContextRef.current = newContext
     setTimeout(() => handleGenerate(), 50)
   }
 
-  // WHY: Prop productId (from product detail page) OR pickedProductId (from ProductPicker)
   const effectiveProductId = productId ?? (pickedProductId ? String(pickedProductId) : undefined)
 
-  // WHY: Bridge between Optimizer and Product Database — saves optimized listing back to the product
   const handleSaveToProduct = () => {
     if (!effectiveProductId || !displayResults?.listing) return
     const { title, bullet_points, description, backend_keywords } = displayResults.listing
@@ -176,12 +159,8 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
       {
         id: effectiveProductId,
         data: {
-          title_optimized: title,
-          description_optimized: description,
-          attributes: {
-            bullet_points,
-            seo_keywords: backend_keywords ? backend_keywords.split(',').map((k: string) => k.trim()) : [],
-          },
+          title_optimized: title, description_optimized: description,
+          attributes: { bullet_points, seo_keywords: backend_keywords ? backend_keywords.split(',').map((k: string) => k.trim()) : [] },
           status: 'optimized' as const,
         },
       },
@@ -189,32 +168,9 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     )
   }
 
-  // WHY: Parse keywords from textarea — supports CSV (phrase,volume) and plain text (one per line)
-  // WHY: useMemo prevents re-parsing on every render (was called 2x per keystroke before)
-  const parsedKeywords = useMemo((): OptimizerKeyword[] => {
-    return keywordsText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        // Try CSV format: "keyword phrase,1234"
-        const commaIdx = line.lastIndexOf(',')
-        if (commaIdx > 0) {
-          const phrase = line.substring(0, commaIdx).trim().replace(/^["']|["']$/g, '')
-          const vol = parseInt(line.substring(commaIdx + 1).trim())
-          if (!isNaN(vol) && vol > 0) {
-            return { phrase, search_volume: vol }
-          }
-        }
-        // Plain text — no volume
-        return { phrase: line.replace(/^["']|["']$/g, ''), search_volume: 0 }
-      })
-  }, [keywordsText])
+  const parsedKeywords = useMemo(() => parseKeywordLines(keywordsText), [keywordsText])
+  const canSubmit = productTitle.length >= 3 && brand.length >= 1 && parsedKeywords.length >= 1
 
-  const keywordCount = parsedKeywords.length
-  const canSubmit = productTitle.length >= 3 && brand.length >= 1 && keywordCount >= 1
-
-  // WHY: Auto-fill form fields when user picks a product from the database
   const handleProductSelect = (product: Product) => {
     setProductTitle(product.title_original)
     setBrand(product.brand ?? '')
@@ -222,80 +178,61 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
     setCategory(product.category ?? '')
     setPickedProductTitle(product.title_original)
     setPickedProductId(product.id)
-    // WHY: Show original listing data so AI can improve it rather than generate from scratch
-    // WHY: Strip HTML — Allegro descriptions come as HTML, display and AI need plain text
     setOriginalDescription(stripHtml(product.description_original ?? ''))
     const bp = product.attributes?.bullet_points
     setOriginalBullets(Array.isArray(bp) ? bp as string[] : [])
+    setPickedProductImages(Array.isArray(product.images) ? product.images : [])
   }
 
   const handleProductClear = () => {
-    setProductTitle('')
-    setBrand('')
-    setAsin('')
-    setCategory('')
-    setPickedProductTitle(undefined)
-    setPickedProductId(undefined)
-    setOriginalDescription('')
-    setOriginalBullets([])
+    setProductTitle(''); setBrand(''); setAsin(''); setCategory('')
+    setPickedProductTitle(undefined); setPickedProductId(undefined)
+    setOriginalDescription(''); setOriginalBullets([]); setPickedProductImages([])
+  }
+
+  const handleCompetitorImport = (data: {
+    title: string; asin: string; marketplace: string; bullets: string[]; description: string
+  }) => {
+    setProductTitle(data.title)
+    setAsin(data.asin)
+    if (data.marketplace && MARKETPLACE_CODE_MAP[data.marketplace]) {
+      setMarketplace(MARKETPLACE_CODE_MAP[data.marketplace])
+    }
+    setOriginalBullets(data.bullets)
+    setOriginalDescription(data.description)
+    toast({ title: 'Listing pobrany', description: `${data.asin} (${data.marketplace}) — uzupelnij marke i slowa kluczowe` })
   }
 
   const handleGenerate = () => {
-    // WHY: Free tier daily limit check
     if (!canOptimize()) {
-      toast({
-        title: 'Dzienny limit osiagniety',
-        description: `Darmowy plan pozwala na ${FREE_DAILY_LIMIT} optymalizacje dziennie. Odblokuj Premium!`,
-        variant: 'destructive',
-      })
+      toast({ title: 'Dzienny limit osiagniety', description: `Darmowy plan pozwala na ${FREE_DAILY_LIMIT} optymalizacje dziennie. Odblokuj Premium!`, variant: 'destructive' })
       return
     }
-
     const payload: OptimizerRequest = {
-      product_title: productTitle,
-      brand,
-      product_line: productLine || undefined,
-      keywords: parsedKeywords,
-      marketplace,
-      mode,
-      asin: asin || undefined,
-      category: category || undefined,
-      audience_context: audienceContextRef.current || audienceContext || undefined,
-      account_type: accountType,
-      // WHY: Only send provider info when not default Groq
+      product_title: productTitle, brand, product_line: productLine || undefined,
+      keywords: parsedKeywords, marketplace, mode, asin: asin || undefined, category: category || undefined,
+      audience_context: audienceContextRef.current || audienceContext || undefined, account_type: accountType,
       ...(llmProvider !== 'groq' && {
         llm_provider: llmProvider,
-        llm_api_key: inlineLlmKey || undefined,
+        ...(LLM_PROVIDERS.find((p) => p.id === llmProvider)?.needsKey && { llm_api_key: inlineLlmKey || undefined }),
       }),
-      // WHY: Original listing from import — AI improves it instead of generating from scratch
       ...(originalDescription && { original_description: originalDescription }),
       ...(originalBullets.length > 0 && { original_bullets: originalBullets }),
     }
-
     generateMutation.mutate(payload, {
       onSuccess: (data) => {
-        setResults(data)
-        incrementUsage()
-        setSavedToProduct(false)
-        // WHY: Auto-score the generated listing to show quality feedback
+        setResults(data); incrementUsage(); setSavedToProduct(false)
         if (data.listing) triggerScore(data.listing)
-        // WHY: Warn user when their chosen provider failed and Groq was used instead
         if (data.llm_fallback_from) {
-          const providerLabel = LLM_PROVIDERS.find((p) => p.id === data.llm_fallback_from)?.label || data.llm_fallback_from
-          toast({
-            title: `${providerLabel} nie zadziałał`,
-            description: 'Klucz API jest nieprawidłowy lub wygasł. Użyto Groq jako fallback. Sprawdź klucz w Ustawieniach.',
-            variant: 'destructive',
-          })
+          const label = LLM_PROVIDERS.find((p) => p.id === data.llm_fallback_from)?.label || data.llm_fallback_from
+          toast({ title: `${label} nie zadziałał`, description: 'Użyto Groq jako fallback. Sprawdź klucz w Ustawieniach.', variant: 'destructive' })
         }
       },
     })
   }
 
   const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text).catch(() => {
-      // WHY: Clipboard API can fail in non-secure contexts — silent fallback
-    })
+    navigator.clipboard.writeText(text).catch(() => {})
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
   }
@@ -304,45 +241,13 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
 
   return (
     <div className="space-y-6">
-      {/* WHY: Product picker — lets user select from imported products instead of typing manually */}
-      <ProductPicker
-        onSelect={handleProductSelect}
-        onClear={handleProductClear}
-        selectedTitle={pickedProductTitle}
-      />
+      <ProductPicker onSelect={handleProductSelect} onClear={handleProductClear} selectedTitle={pickedProductTitle} />
 
-      {/* WHY: Show imported bullets + description so user sees what AI will improve */}
-      {(originalBullets.length > 0 || originalDescription) && (
-        <Card className="border-gray-800 bg-[#121212]">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-gray-500" />
-              <span className="text-xs font-medium text-gray-400">Oryginalne dane z importu</span>
-              <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">z bazy</span>
-            </div>
-            {originalBullets.length > 0 && (
-              <div>
-                <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-600">Bullet points</p>
-                <ul className="space-y-1">
-                  {originalBullets.map((b, i) => (
-                    <li key={i} className="text-xs text-gray-400 leading-relaxed">
-                      <span className="text-gray-600 mr-1">{i + 1}.</span>{b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {originalDescription && (
-              <div>
-                <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-600">Opis</p>
-                <p className="text-xs text-gray-400 leading-relaxed line-clamp-4">{originalDescription}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {isPremium && <CompetitorImport onImport={handleCompetitorImport} />}
 
-      {/* Section 1: Product Info */}
+      <OriginalDataCard images={pickedProductImages} bullets={originalBullets} description={originalDescription} />
+
+      {/* Product Info */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -353,375 +258,133 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-gray-400">
-              Tytul produktu <span className="text-red-400">*</span>
-            </label>
-            <Input
-              value={productTitle}
-              onChange={(e) => setProductTitle(e.target.value)}
-              placeholder="np. Silikonowy zestaw przyborow kuchennych 12 elementow"
-            />
+            <label className="mb-1 block text-sm text-gray-400">Tytul produktu <span className="text-red-400">*</span></label>
+            <Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} placeholder="np. Silikonowy zestaw przyborow kuchennych 12 elementow" />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-gray-400">
-                Marka <span className="text-red-400">*</span>
-              </label>
-              <Input
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                placeholder="np. ZULAY"
-              />
+              <label className="mb-1 block text-sm text-gray-400">Marka <span className="text-red-400">*</span></label>
+              <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="np. ZULAY" />
             </div>
             <div>
               <label className="mb-1 block text-sm text-gray-400">Linia produktu</label>
-              <Input
-                value={productLine}
-                onChange={(e) => setProductLine(e.target.value)}
-                placeholder="np. Premium Kitchen (opcjonalnie)"
-              />
+              <Input value={productLine} onChange={(e) => setProductLine(e.target.value)} placeholder="np. Premium Kitchen (opcjonalnie)" />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Audience Research (optional, between product info and keywords) */}
-      <AudienceResearchCard
-        productTitle={productTitle}
-        onResearchComplete={setAudienceContext}
+      <AudienceResearchCard productTitle={productTitle} onResearchComplete={setAudienceContext} />
+      <KeywordsInput value={keywordsText} onChange={setKeywordsText} />
+
+      <TargetModeCard
+        marketplace={marketplace} setMarketplace={setMarketplace}
+        mode={mode} setMode={setMode}
+        accountType={accountType} setAccountType={setAccountType}
+        llmProvider={llmProvider} setLlmProvider={setLlmProvider}
+        inlineLlmKey={inlineLlmKey} setInlineLlmKey={setInlineLlmKey}
+        isPremium={isPremium} hasSavedKey={hasSavedKey}
       />
 
-      {/* Section 2: Keywords */}
+      {/* Advanced (collapsible) */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Hash className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Slowa kluczowe</CardTitle>
-          </div>
-          <CardDescription>
-            Wklej slowa kluczowe, po jednym w linii. Opcjonalnie dodaj wolumen wyszukiwan po przecinku.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <textarea
-            value={keywordsText}
-            onChange={(e) => setKeywordsText(e.target.value)}
-            placeholder={
-              'silicone kitchen utensils,12000\nkitchen utensil set,8500\ncooking utensils silicone,6200\nheat resistant spatula,3400\nnon stick cooking tools'
-            }
-            rows={8}
-            className="w-full rounded-lg border border-gray-800 bg-[#1A1A1A] px-4 py-3 font-mono text-sm text-white placeholder-gray-600 focus:border-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-600"
-          />
-          <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>
-              Wykryto {keywordCount} {keywordCount === 1 ? 'slowo' : keywordCount < 5 ? 'slowa' : 'slow'}
-            </span>
-            <span>Format: fraza kluczowa,wolumen (wolumen opcjonalny)</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Section 3: Marketplace & Mode */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-gray-400" />
-            <CardTitle className="text-lg">Cel i tryb</CardTitle>
-          </div>
-          <CardDescription>Wybierz marketplace, tryb optymalizacji, typ konta i model AI</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm text-gray-400">Marketplace</label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {MARKETPLACES.map((mp) => {
-                // WHY: Free tier = Amazon only
-                const isAmazon = mp.id.startsWith('amazon')
-                const isLocked = !isPremium && !isAmazon
-                return (
-                  <button
-                    key={mp.id}
-                    onClick={() => !isLocked && setMarketplace(mp.id)}
-                    disabled={isLocked}
-                    title={isLocked ? 'Dostepne w Premium' : undefined}
-                    className={cn(
-                      'rounded-lg border px-3 py-2 text-sm transition-colors relative',
-                      isLocked
-                        ? 'border-gray-800 text-gray-600 cursor-not-allowed opacity-50'
-                        : marketplace === mp.id
-                          ? 'border-white bg-white/5 text-white'
-                          : 'border-gray-800 text-gray-400 hover:border-gray-600 hover:text-white'
-                    )}
-                  >
-                    <span className="mr-1 text-xs">{mp.flag}</span>
-                    {mp.name}
-                    {isLocked && <span className="ml-1 text-[10px] text-amber-400">PRO</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm text-gray-400">Tryb optymalizacji</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setMode('aggressive')}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors',
-                  mode === 'aggressive'
-                    ? 'border-white bg-white/5 text-white'
-                    : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                )}
-              >
-                <Zap className="h-4 w-4" />
-                Agresywny
-                <span className="text-[10px] text-gray-500">96%+ pokrycie</span>
-              </button>
-              <button
-                onClick={() => setMode('standard')}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors',
-                  mode === 'standard'
-                    ? 'border-white bg-white/5 text-white'
-                    : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                )}
-              >
-                <Target className="h-4 w-4" />
-                Standardowy
-                <span className="text-[10px] text-gray-500">82%+ pokrycie</span>
-              </button>
-            </div>
-          </div>
-
-          {/* WHY: Vendor accounts get 10 bullet points instead of 5 */}
-          <div>
-            <label className="mb-2 block text-sm text-gray-400">Typ konta Amazon</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setAccountType('seller')}
-                className={cn(
-                  'rounded-lg border px-4 py-2 text-sm transition-colors',
-                  accountType === 'seller'
-                    ? 'border-white bg-white/5 text-white'
-                    : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                )}
-              >
-                Seller
-                <span className="ml-1 text-[10px] text-gray-500">5 bulletow</span>
-              </button>
-              <button
-                onClick={() => setAccountType('vendor')}
-                className={cn(
-                  'rounded-lg border px-4 py-2 text-sm transition-colors',
-                  accountType === 'vendor'
-                    ? 'border-white bg-white/5 text-white'
-                    : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                )}
-              >
-                Vendor
-                <span className="ml-1 text-[10px] text-gray-500">10 bulletow</span>
-              </button>
-            </div>
-          </div>
-
-          {/* WHY: LLM provider picker — lets user choose Gemini/OpenAI per optimization */}
-          <div>
-            <label className="mb-1 block text-sm text-gray-400">Model AI</label>
-            <p className="mb-2 text-[10px] text-gray-500">Silnik AI generujacy listing. Groq jest darmowy. Inne wymagaja klucza API (zapisz go w Ustawieniach).</p>
-            <div className="flex flex-wrap gap-2">
-              {LLM_PROVIDERS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => { setLlmProvider(p.id); setInlineLlmKey('') }}
-                  title={p.hint}
-                  className={cn(
-                    'rounded-lg border px-3 py-1.5 text-sm transition-colors',
-                    llmProvider === p.id
-                      ? 'border-white bg-white/5 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  )}
-                >
-                  {p.label}
-                  <span className="ml-1 text-[9px] text-gray-600">{p.hint}</span>
-                </button>
-              ))}
-            </div>
-            {/* WHY: Show inline key input when no saved key for this provider */}
-            {llmProvider !== 'groq' && !hasSavedKey && (
-              <div className="mt-2">
-                <Input
-                  type="password"
-                  value={inlineLlmKey}
-                  onChange={(e) => setInlineLlmKey(e.target.value)}
-                  placeholder="Wklej klucz API (lub zapisz w Ustawieniach)"
-                  className="text-sm"
-                />
-              </div>
-            )}
-            {llmProvider !== 'groq' && hasSavedKey && (
-              <p className="mt-1 text-[10px] text-gray-500">Uzyje klucza zapisanego w Ustawieniach</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Section 4: Advanced (collapsible) */}
-      <Card>
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex w-full items-center justify-between p-6"
-        >
+        <button onClick={() => setShowAdvanced(!showAdvanced)} className="flex w-full items-center justify-between p-6">
           <div>
             <h3 className="text-lg font-semibold text-white">Zaawansowane</h3>
             <p className="text-sm text-gray-400">ASIN, kategoria (opcjonalnie)</p>
           </div>
-          {showAdvanced ? (
-            <ChevronDown className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronRight className="h-5 w-5 text-gray-400" />
-          )}
+          {showAdvanced ? <ChevronDown className="h-5 w-5 text-gray-400" /> : <ChevronRight className="h-5 w-5 text-gray-400" />}
         </button>
         {showAdvanced && (
           <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-gray-400">ASIN</label>
-              <Input
-                value={asin}
-                onChange={(e) => setAsin(e.target.value)}
-                placeholder="B0XXXXXXXX"
-              />
+              <Input value={asin} onChange={(e) => setAsin(e.target.value)} placeholder="B0XXXXXXXX" />
             </div>
             <div>
               <label className="mb-1 block text-sm text-gray-400">Kategoria</label>
-              <Input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Kuchnia i jadalnia"
-              />
+              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Kuchnia i jadalnia" />
             </div>
           </CardContent>
         )}
       </Card>
 
+      {/* Templates */}
+      {isPremium && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowTemplates(!showTemplates)}>
+                <FolderOpen className="mr-1 h-3 w-3" />
+                Szablony ({templates.length})
+              </Button>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Nazwa szablonu..."
+                className="flex-1 rounded border border-gray-700 bg-[#1A1A1A] px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:border-gray-500 focus:outline-none"
+                maxLength={60}
+              />
+              <Button variant="outline" size="sm" onClick={handleSaveTemplate}>
+                <Save className="mr-1 h-3 w-3" />
+                Zapisz
+              </Button>
+            </div>
+            {showTemplates && templates.length > 0 && (
+              <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                {templates.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between rounded border border-gray-800 px-3 py-2 text-xs">
+                    <button onClick={() => handleLoadTemplate(t)} className="flex-1 text-left text-white hover:text-gray-300">
+                      <span className="font-medium">{t.name}</span>
+                      <span className="ml-2 text-gray-500">{t.marketplace} · {t.mode}</span>
+                    </button>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDeleteTemplate(t.id)}>
+                      <Trash2 className="h-3 w-3 text-gray-500 hover:text-red-400" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {showTemplates && templates.length === 0 && (
+              <p className="mt-3 text-xs text-gray-500">Brak zapisanych szablonow. Wypelnij formularz i kliknij Zapisz.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Generate Button */}
       <div className="flex items-center gap-3">
         <Button onClick={handleGenerate} disabled={!canSubmit || isLoading || !canOptimize()} size="lg">
-          {isLoading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="mr-2 h-4 w-4" />
-          )}
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
           {isLoading ? 'Generowanie listingu...' : 'Wygeneruj zoptymalizowany listing'}
         </Button>
         {!isPremium && (
-          <span className={cn(
-            'text-xs',
-            usageToday >= FREE_DAILY_LIMIT ? 'text-red-400' : 'text-gray-500'
-          )}>
-            {usageToday}/{FREE_DAILY_LIMIT} optymalizacje dzis
+          <span className={cn('text-xs', usageToday >= FREE_DAILY_LIMIT ? 'text-red-400' : 'text-gray-500')}>
+            {usageToday}/{FREE_DAILY_LIMIT} dzis
           </span>
         )}
-        {isLoading && (
-          <span className="text-xs text-gray-500 animate-pulse">
-            AI generuje listing (tytuł → bullety → opis)...
-          </span>
-        )}
+        {isLoading && <span className="text-xs text-gray-500 animate-pulse">AI generuje listing...</span>}
         {generateMutation.isError && !isLoading && (
           <span className="text-xs text-red-400">
-            {(generateMutation.error as Error & { code?: string })?.code === '402'
-              ? 'Dzienny limit wyczerpany — wykup Premium'
-              : (generateMutation.error as Error & { code?: string })?.code === '503'
-                ? 'Serwer AI przeciążony — spróbuj za minutę'
-                : 'Błąd — kliknij ponownie lub zmniejsz liczbę słów kluczowych'}
+            {(generateMutation.error as Error & { code?: string })?.code === '402' ? 'Dzienny limit — wykup Premium'
+              : (generateMutation.error as Error & { code?: string })?.code === '503' ? 'Serwer AI przeciążony — spróbuj za minutę'
+              : 'Błąd — kliknij ponownie'}
           </span>
         )}
       </div>
 
       {/* Results */}
-      {displayResults && (displayResults.status === 'success' || displayResults.status === 'completed') && (
-        <div className="space-y-4">
-          {displayResults.ranking_juice && (
-            <RankingJuiceCard
-              rankingJuice={displayResults.ranking_juice}
-              optimizationSource={displayResults.optimization_source}
-            />
-          )}
-          {/* WHY: Auto-score card — shows listing quality right after optimization */}
-          {scoreLoading && (
-            <Card>
-              <CardContent className="flex items-center gap-3 p-6">
-                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                <span className="text-sm text-gray-400">Oceniamy Twoj listing...</span>
-              </CardContent>
-            </Card>
-          )}
-          {scoreResult && (
-            <ListingScoreCard scoreResult={scoreResult} onImprove={handleImprove} />
-          )}
-          <ScoresCard scores={displayResults.scores} intel={displayResults.keyword_intel} coverageBreakdown={displayResults.coverage_breakdown} llmProvider={displayResults.llm_provider} />
-          <ListingCard
-            listing={displayResults.listing}
-            compliance={displayResults.compliance}
-            copiedField={copiedField}
-            onCopy={copyToClipboard}
-            fullResponse={displayResults}
-            isAllegroConnected={isAllegroConnected}
-          />
-          <KeywordIntelCard intel={displayResults.keyword_intel} />
-          {displayResults.ppc_recommendations && (
-            <PPCRecommendationsCard ppc={displayResults.ppc_recommendations} />
-          )}
-          <FeedbackWidget listingHistoryId={displayResults.listing_history_id} />
-          {/* WHY: Bridge — saves optimized listing back to the product in DB */}
-          {effectiveProductId && (
-            <Card>
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-2">
-                  <Database className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-300">
-                    {savedToProduct
-                      ? 'Listing zapisany do produktu'
-                      : 'Zapisz zoptymalizowany listing do Bazy Produktow'}
-                  </span>
-                </div>
-                <Button
-                  onClick={handleSaveToProduct}
-                  disabled={savedToProduct || saveToProductMutation.isPending}
-                  variant={savedToProduct ? 'ghost' : 'outline'}
-                  size="sm"
-                >
-                  {saveToProductMutation.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                  ) : savedToProduct ? (
-                    '✓ Zapisano'
-                  ) : (
-                    <>
-                      <Database className="h-3.5 w-3.5 mr-1.5" />
-                      Zapisz do produktu
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {displayResults && displayResults.status === 'error' && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-red-400">
-                <XCircle className="h-5 w-5" />
-                <span>Optymalizacja nie powiodla sie. Sprawdz logi workflow.</span>
-              </div>
-              <Button onClick={handleGenerate} disabled={!canSubmit || isLoading} size="sm" variant="outline">
-                Spróbuj ponownie
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {displayResults && (
+        <OptimizerResults
+          displayResults={displayResults}
+          scoreResult={scoreResult} scoreLoading={scoreLoading} onImprove={handleImprove}
+          copiedField={copiedField} onCopy={copyToClipboard} isAllegroConnected={isAllegroConnected}
+          productName={productTitle} brand={brand} category={category} marketplace={marketplace}
+          effectiveProductId={effectiveProductId} savedToProduct={savedToProduct}
+          onSaveToProduct={handleSaveToProduct} savePending={saveToProductMutation.isPending}
+          onRetry={handleGenerate} canRetry={canSubmit} isLoading={isLoading}
+        />
       )}
     </div>
   )

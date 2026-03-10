@@ -494,7 +494,7 @@ export interface ComplianceReportsListResponse {
 }
 
 // LLM Provider types
-export type LLMProvider = 'groq' | 'gemini_flash' | 'gemini_pro' | 'openai'
+export type LLMProvider = 'groq' | 'beast' | 'gemini_flash' | 'gemini_pro' | 'openai'
 
 export interface LLMProviderConfig {
   api_key: string

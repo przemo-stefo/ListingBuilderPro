@@ -13,6 +13,13 @@ CHAT_ID = getattr(settings, "telegram_chat_id", "7002371113")
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
+def _escape_md(text: str) -> str:
+    """Escape Markdown special chars in user-provided strings (emails, names)."""
+    for ch in ("_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"):
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+
 async def send_telegram(message: str) -> bool:
     """Fire-and-forget Telegram alert. Never raises — logs errors only."""
     if not BOT_TOKEN:

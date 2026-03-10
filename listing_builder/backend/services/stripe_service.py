@@ -83,11 +83,20 @@ def handle_checkout_completed(session_data: dict, db: Session):
         db.commit()
         logger.info("license_created", email=email, plan_type=plan_type, session_id=session_id)
 
-        # WHY: Shawn needs to know immediately when someone pays
-        from services.telegram_notify import send_telegram_sync
-        send_telegram_sync(
-            f"💰 *Nowa płatność LBP!*\nEmail: `{email}`\nPlan: {plan_type}\nKwota: 49 PLN/mies"
-        )
+        # WHY: Shawn needs to know immediately when someone pays — async, non-blocking
+        import asyncio
+        from services.telegram_notify import send_telegram, _escape_md
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(send_telegram(
+                f"💰 *Nowa płatność LBP!*\nEmail: `{_escape_md(email)}`\nPlan: {plan_type}\nKwota: 49 PLN/mies"
+            ))
+        except RuntimeError:
+            # WHY: No event loop (e.g. sync test) — fall back to sync
+            from services.telegram_notify import send_telegram_sync
+            send_telegram_sync(
+                f"💰 *Nowa płatność LBP!*\nEmail: `{_escape_md(email)}`\nPlan: {plan_type}\nKwota: 49 PLN/mies"
+            )
     except IntegrityError:
         # WHY: Idempotent — Stripe may send duplicate webhooks
         db.rollback()
@@ -111,9 +120,17 @@ def handle_subscription_cancelled(sub_data: dict, db: Session):
     db.commit()
     logger.info("license_revoked", email=license_obj.email, stripe_sub_id=stripe_sub_id)
 
-    # WHY: Shawn needs to know when someone cancels — react fast
-    from services.telegram_notify import send_telegram_sync
-    send_telegram_sync(f"⚠️ *Anulowana subskrypcja LBP*\nEmail: `{license_obj.email}`")
+    # WHY: Shawn needs to know when someone cancels — async, non-blocking
+    import asyncio
+    from services.telegram_notify import send_telegram, _escape_md
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(send_telegram(
+            f"⚠️ *Anulowana subskrypcja LBP*\nEmail: `{_escape_md(license_obj.email)}`"
+        ))
+    except RuntimeError:
+        from services.telegram_notify import send_telegram_sync
+        send_telegram_sync(f"⚠️ *Anulowana subskrypcja LBP*\nEmail: `{_escape_md(license_obj.email)}`")
 
 
 def validate_license(license_key: str, db: Session) -> bool:

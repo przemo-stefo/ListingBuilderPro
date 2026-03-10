@@ -18,6 +18,7 @@ import {
   XCircle,
   Save,
   Package,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -172,11 +173,16 @@ export default function ConverterPage() {
     <div className="space-y-6">
       {/* Header + Stepper */}
       <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Konwerter → Marketplace</h1>
-          <p className="text-sm text-gray-400">
-            Przenieś produkty na Amazon, eBay lub Kaufland w 4 krokach
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-amber-500/20 p-2">
+            <ArrowRightLeft className="h-6 w-6 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Konwerter → Marketplace</h1>
+            <p className="text-sm text-gray-400">
+              Przenieś produkty na Amazon, eBay lub Kaufland w 4 krokach
+            </p>
+          </div>
         </div>
         <ConverterStepper
           currentStep={currentStep}

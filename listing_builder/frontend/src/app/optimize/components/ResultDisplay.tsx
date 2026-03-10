@@ -65,6 +65,66 @@ export function downloadCSV(response: OptimizerResponse) {
   URL.revokeObjectURL(url)
 }
 
+// WHY: JSON export — strip trace/internal data, only export user-facing fields
+export function downloadJSON(response: OptimizerResponse) {
+  const { listing, scores, compliance, keyword_intel, ranking_juice, coverage_breakdown, marketplace, brand, mode, language } = response
+  const exportData = { listing, scores, compliance, keyword_intel, ranking_juice, coverage_breakdown, marketplace, brand, mode, language }
+  const json = JSON.stringify(exportData, null, 2)
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `listing_${response.brand}_${response.marketplace}_${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// WHY: Dynamic import — xlsx is 200KB, only load when user clicks Export
+export async function downloadExcel(response: OptimizerResponse) {
+  const XLSX = await import('xlsx')
+  const { listing, scores, compliance, keyword_intel, marketplace, brand } = response
+  const wb = XLSX.utils.book_new()
+
+  const listingData = [
+    ['Pole', 'Wartosc'],
+    ['Tytul', listing.title],
+    ...listing.bullet_points.map((b, i) => [`Bullet ${i + 1}`, b]),
+    ['Opis', listing.description],
+    ['Backend Keywords', listing.backend_keywords],
+    ['Marketplace', marketplace],
+    ['Marka', brand],
+  ]
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(listingData), 'Listing')
+
+  const scoresData = [
+    ['Metryka', 'Wartosc'],
+    ['Pokrycie %', scores.coverage_pct],
+    ['Tryb pokrycia', scores.coverage_mode],
+    ['Trafienia w tytule', scores.exact_matches_in_title],
+    ['Pokrycie tytulu %', scores.title_coverage_pct],
+    ['Wykorzystanie backendu %', scores.backend_utilization_pct],
+    ['Backend bajty', scores.backend_byte_size],
+    ['Zgodnosc', scores.compliance_status],
+    ['Bledy zgodnosci', compliance.error_count],
+    ['Ostrzezenia zgodnosci', compliance.warning_count],
+  ]
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scoresData), 'Wyniki')
+
+  if (keyword_intel) {
+    const kwData = [
+      ['Metryka', 'Wartosc'],
+      ['Przeanalizowanych', keyword_intel.total_analyzed],
+      ['Tier 1 (tytul)', keyword_intel.tier1_title],
+      ['Tier 2 (bullety)', keyword_intel.tier2_bullets],
+      ['Tier 3 (backend)', keyword_intel.tier3_backend],
+      ['Brakujace', keyword_intel.missing_keywords.join(', ')],
+    ]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kwData), 'Slowa kluczowe')
+  }
+
+  XLSX.writeFile(wb, `listing_${brand}_${marketplace}_${Date.now()}.xlsx`)
+}
+
 // WHY: Mini progress bar for per-placement coverage breakdown
 function CoverageBar({ label, pct }: { label: string; pct: number }) {
   const color = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'

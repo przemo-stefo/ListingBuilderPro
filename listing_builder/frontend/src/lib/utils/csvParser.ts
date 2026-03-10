@@ -101,3 +101,47 @@ export function exportResultsCSV(response: BatchOptimizerResponse): void {
   link.click()
   URL.revokeObjectURL(url)
 }
+
+// WHY: Dynamic import — xlsx is 200KB, only load when user clicks Export
+export async function exportResultsExcel(response: BatchOptimizerResponse): Promise<void> {
+  const XLSX = await import('xlsx')
+  const rows = response.results
+    .filter((r) => r.status === 'completed' && r.result)
+    .map((r) => {
+      const res = r.result!
+      return [
+        r.product_title,
+        res.listing.title,
+        ...Array.from({ length: 5 }, (_, i) => res.listing.bullet_points[i] || ''),
+        res.listing.description,
+        res.listing.backend_keywords,
+        res.scores.coverage_pct,
+        res.scores.compliance_status,
+      ]
+    })
+
+  const headers = ['Produkt', 'Tytul', 'Bullet 1', 'Bullet 2', 'Bullet 3', 'Bullet 4', 'Bullet 5', 'Opis', 'Backend Keywords', 'Pokrycie %', 'Zgodnosc']
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), 'Listingi')
+  XLSX.writeFile(wb, `optimized_listings_${Date.now()}.xlsx`)
+}
+
+// WHY: Batch JSON export — strip trace/internal data from each result
+export function exportResultsJSON(response: BatchOptimizerResponse): void {
+  const clean = {
+    ...response,
+    results: response.results.map((r) => {
+      if (!r.result) return r
+      const { listing, scores, compliance, keyword_intel, ranking_juice, coverage_breakdown, marketplace, brand, mode, language } = r.result
+      return { ...r, result: { listing, scores, compliance, keyword_intel, ranking_juice, coverage_breakdown, marketplace, brand, mode, language } }
+    }),
+  }
+  const json = JSON.stringify(clean, null, 2)
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `optimized_listings_${Date.now()}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+}

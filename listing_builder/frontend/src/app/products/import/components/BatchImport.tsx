@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '@/lib/hooks/useToast'
 import { cn } from '@/lib/utils'
-import { FileUp, Clipboard, Loader2, CheckCircle2, XCircle, ImagePlus } from 'lucide-react'
+import { FileUp, Clipboard, Loader2, CheckCircle2, XCircle, ImagePlus, ArrowRightLeft } from 'lucide-react'
 import Papa from 'papaparse'
 import { apiRequest } from '@/lib/api/client'
 import { MARKETPLACES, COLUMN_MAP, MAX_BATCH_SIZE } from '../constants'
@@ -240,6 +240,11 @@ export default function BatchImport() {
               <Link href="/optimize"
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
                 Optymalizuj teraz
+              </Link>
+              <Link href="/converter"
+                className="flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 transition-colors">
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                Konwertuj
               </Link>
               <Link href="/products"
                 className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors">

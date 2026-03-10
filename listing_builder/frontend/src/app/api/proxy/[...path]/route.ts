@@ -15,6 +15,7 @@ const ALLOWED_PATH_PREFIXES = [
   'optimizer/health',
   'optimizer/traces',
   'optimizer/grey-market-score',
+  'optimizer/share',
   'knowledge/chat',
   'knowledge/stats',
   'products',
@@ -43,6 +44,11 @@ const ALLOWED_PATH_PREFIXES = [
   'score',
   'demo',
   'admin',
+  'images',
+  'reports',
+  'office',
+  'automation',
+  'teams',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints — defense in depth

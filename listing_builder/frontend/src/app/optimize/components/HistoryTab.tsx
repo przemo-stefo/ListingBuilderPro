@@ -5,15 +5,19 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Download, Trash2, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, Download, Trash2, ArrowRight, ChevronLeft, ChevronRight, Eye, RefreshCw, Table, Lock } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useTier } from '@/lib/hooks/useTier'
+import { useToast } from '@/lib/hooks/useToast'
 import { useHistoryList, useDeleteHistory } from '@/lib/hooks/useOptimizerHistory'
-import { getHistoryDetail } from '@/lib/api/optimizerHistory'
+import { getHistoryDetail, improveFromHistory } from '@/lib/api/optimizerHistory'
+import { apiRequest } from '@/lib/api/client'
 import { downloadCSV } from './ResultDisplay'
-import type { OptimizerResponse } from '@/lib/types'
+import { HistoryCompare } from './HistoryCompare'
+import type { OptimizerResponse, OptimizationHistoryDetail } from '@/lib/types'
 
 interface HistoryTabProps {
   onLoadResult: (result: OptimizerResponse) => void
@@ -23,7 +27,13 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
   const [page, setPage] = useState(1)
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [compareDetail, setCompareDetail] = useState<OptimizationHistoryDetail | null>(null)
+  const [comparingId, setComparingId] = useState<number | null>(null)
+  const [improvingId, setImprovingId] = useState<number | null>(null)
+  const [exporting, setExporting] = useState(false)
 
+  const { isPremium } = useTier()
+  const { toast } = useToast()
   const { data, isLoading, error } = useHistoryList(page)
   const deleteMutation = useDeleteHistory()
 
@@ -48,10 +58,71 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
     }
   }
 
+  const handleCompare = async (id: number) => {
+    setComparingId(id)
+    try {
+      const detail = await getHistoryDetail(id)
+      setCompareDetail(detail)
+    } catch {
+      // Silently fail
+    } finally {
+      setComparingId(null)
+    }
+  }
+
+  const handleImprove = async (id: number) => {
+    setImprovingId(id)
+    try {
+      const result = await improveFromHistory(id)
+      onLoadResult(result)
+    } catch {
+      // Error shown via toast/boundary
+    } finally {
+      setImprovingId(null)
+    }
+  }
+
   const handleDelete = (id: number) => {
     if (!confirm('Usunac te optymalizacje?')) return
     setDeletingId(id)
     deleteMutation.mutate(id, { onSettled: () => setDeletingId(null) })
+  }
+
+  // WHY: Fetch all pages in parallel then build Excel workbook with xlsx (already a dependency)
+  const handleExportAll = async () => {
+    if (!data) return
+    setExporting(true)
+    try {
+      const allItems = [...data.items]
+      const pages = Math.ceil(data.total / 20)
+      // WHY: Parallel fetch — much faster than sequential for users with many pages
+      const otherPages = Array.from({ length: pages }, (_, i) => i + 1).filter((p) => p !== page)
+      const results = await Promise.all(
+        otherPages.map((p) => apiRequest<{ items: typeof data.items }>('get', '/optimizer/history', undefined, { page: p }))
+      )
+      for (const res of results) {
+        if (res.data?.items) allItems.push(...res.data.items)
+      }
+      const XLSX = await import('xlsx')
+      const rows = allItems.map((item) => ({
+        Data: new Date(item.created_at).toLocaleString('pl-PL'),
+        Produkt: item.product_title,
+        Marka: item.brand,
+        Marketplace: item.marketplace,
+        Tryb: item.mode,
+        'Pokrycie %': item.coverage_pct,
+        Zgodnosc: item.compliance_status,
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Historia')
+      XLSX.writeFile(wb, `historia-optymalizacji-${new Date().toISOString().slice(0, 10)}.xlsx`)
+      toast({ title: 'Excel pobrany', description: `${allItems.length} rekordow` })
+    } catch {
+      toast({ title: 'Eksport nie powiodl sie', description: 'Sprobuj ponownie', variant: 'destructive' })
+    } finally {
+      setExporting(false)
+    }
   }
 
   const totalPages = data ? Math.ceil(data.total / 20) : 1
@@ -86,15 +157,42 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">
           Historia optymalizacji
           <span className="ml-2 text-sm font-normal text-gray-500">
             {data.total} {data.total === 1 ? 'rekord' : data.total < 5 ? 'rekordy' : 'rekordow'}
           </span>
         </CardTitle>
+        {isPremium ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportAll}
+            disabled={exporting}
+            className="gap-1.5"
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Table className="h-3.5 w-3.5" />
+            )}
+            Eksportuj Excel
+          </Button>
+        ) : (
+          <span className="flex items-center gap-1 text-xs text-gray-500" title="Funkcja Premium">
+            <Lock className="h-3 w-3" /> Excel
+          </span>
+        )}
       </CardHeader>
       <CardContent>
+        {/* Compare panel */}
+        {compareDetail && (
+          <div className="mb-6">
+            <HistoryCompare detail={compareDetail} onClose={() => setCompareDetail(null)} />
+          </div>
+        )}
+
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -142,6 +240,34 @@ export default function HistoryTab({ onLoadResult }: HistoryTabProps) {
                   </td>
                   <td className="py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCompare(item.id)}
+                        disabled={comparingId === item.id}
+                        title="Porownaj Before/After"
+                        className={cn(compareDetail?.id === item.id && 'text-cyan-400')}
+                      >
+                        {comparingId === item.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Eye className="h-3 w-3" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleImprove(item.id)}
+                        disabled={improvingId === item.id}
+                        title="Re-optymalizuj z podpowiedziami"
+                        className={cn(item.coverage_pct < 96 && 'text-amber-400')}
+                      >
+                        {improvingId === item.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

@@ -80,7 +80,10 @@ export default function ABTestTab() {
       setVariantA(resA)
       setVariantB(resB)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Blad generowania wariantow')
+      const msg = err instanceof Error ? err.message : 'Blad generowania wariantow'
+      // WHY: 402 = daily free limit or premium-only marketplace — show clear message
+      const is402 = msg.includes('402') || msg.toLowerCase().includes('limit') || msg.toLowerCase().includes('premium')
+      setError(is402 ? 'Darmowy limit wyczerpany lub marketplace Premium. Wykup subskrypcje aby kontynuowac.' : msg)
     } finally {
       setLoading(false)
     }

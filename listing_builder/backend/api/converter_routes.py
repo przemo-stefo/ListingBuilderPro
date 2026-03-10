@@ -656,3 +656,53 @@ async def get_bol_offers(
     return StoreUrlsResponse(**result)
 
 
+# ── BOL.com product scraping ─────────────────────────────────────────
+
+class BolScrapeRequest(BaseModel):
+    """Request to scrape BOL.com product URLs."""
+    urls: List[str]
+    delay: float = 3.0
+
+    @field_validator("urls")
+    @classmethod
+    def validate_urls(cls, v):
+        if not v:
+            raise ValueError("At least one URL required")
+        if len(v) > 50:
+            raise ValueError("Max 50 URLs per request")
+        for url in v:
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+            if not (host == "bol.com" or host.endswith(".bol.com")):
+                raise ValueError(f"Not a BOL.com URL: {url}")
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"Invalid URL scheme: {url}")
+        return v
+
+
+@router.post("/bol-scrape", response_model=ScrapeResponse)
+@limiter.limit("5/minute")
+async def scrape_bol(
+    request: Request,
+    body: BolScrapeRequest,
+    _user_id: str = Depends(require_user_id),
+):
+    """Scrape product data from BOL.com product pages.
+
+    WHY separate from /scrape: Different URL validation (bol.com vs allegro.pl)
+    and different scraper (bol_scraper vs allegro_scraper).
+    """
+    from services.scraper.bol_scraper import scrape_bol_batch
+
+    logger.info("bol_scrape_request", urls_count=len(body.urls))
+    products = await scrape_bol_batch(body.urls, body.delay)
+    succeeded = sum(1 for p in products if not p.error)
+
+    return ScrapeResponse(
+        total=len(products),
+        succeeded=succeeded,
+        failed=len(products) - succeeded,
+        products=[p.to_dict() for p in products],
+    )
+
+

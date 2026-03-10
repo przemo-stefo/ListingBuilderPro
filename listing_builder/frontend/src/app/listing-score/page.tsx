@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import { BarChart3, Loader2, Plus, X, Sparkles, TrendingUp, AlertTriangle, CheckCircle2, Link2, Search } from 'lucide-react'
+import { FaqSection } from '@/components/ui/FaqSection'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,6 +108,13 @@ function ScoreBar({ score }: { score: number }) {
     </div>
   )
 }
+
+const LISTING_SCORE_FAQ = [
+  { question: 'Co ocenia Listing Score?', answer: 'AI analizuje Twoj listing w 5 wymiarach copywriterskich: chwytliwosc tytulu, perswazyjnosc bulletow, jakość opisu, pokrycie SEO i czytelnosc. Kazdy wymiar dostaje ocene 1-10 z wyjasnieniem i wskazowka.' },
+  { question: 'Skad bierze dane?', answer: 'Mozesz wkleic listing recznie lub podac link Amazon / ASIN — system automatycznie pobierze tytul, bullety, opis i A+ Content. Obsluguje 20+ marketplace Amazon.' },
+  { question: 'Jak interpretowac wynik?', answer: '8-10 = swietny listing, 6-7 = dobry ale mozna poprawic, ponizej 6 = wymaga pracy. Kazdy wymiar ma wskazowke co konkretnie poprawic.' },
+  { question: 'Czy to wplywa na pozycje na Amazon?', answer: 'Tak — dobrze napisany listing ma wyzszy CTR i conversion rate, co algorytm A9/COSMO nagradza wyzsza pozycja. Listing Score mierzy czynniki ktore bezposrednio wplywaja na ranking.' },
+]
 
 export default function ListingScorePage() {
   const [title, setTitle] = useState('')
@@ -426,6 +434,12 @@ export default function ListingScorePage() {
           </CardContent>
         </Card>
       )}
+
+      <FaqSection
+        title="FAQ — Listing Score"
+        subtitle="Najczesciej zadawane pytania o ocenie listingow"
+        items={LISTING_SCORE_FAQ}
+      />
     </div>
   )
 }

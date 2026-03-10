@@ -85,11 +85,16 @@ function ProductsContent() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Produkty</h1>
-          <p className="text-gray-400 mt-2">
-            Zarzadzaj swoimi produktami. Tutaj zobaczysz wszystkie zaimportowane oferty — ich status, ocene AI i akcje.
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-gray-500/20 p-2">
+            <Package className="h-6 w-6 text-gray-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Baza Produktów</h1>
+            <p className="text-sm text-gray-400">
+              Zarzadzaj produktami — przegladaj, filtruj, optymalizuj i eksportuj na marketplace
+            </p>
+          </div>
         </div>
         <Link href="/products/import">
           <Button>Importuj produkty</Button>

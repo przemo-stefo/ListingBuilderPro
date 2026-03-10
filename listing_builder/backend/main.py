@@ -45,6 +45,11 @@ from api import listing_score_routes
 from api import listing_changes_routes
 from api import demo_routes
 from api import demo_wow_routes
+from api import image_routes
+from api import report_routes
+from api import office_routes
+from api import automation_routes
+from api import team_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -182,6 +187,11 @@ app.include_router(listing_score_routes.router)
 app.include_router(listing_changes_routes.router)
 app.include_router(demo_routes.router)
 app.include_router(demo_wow_routes.router)
+app.include_router(image_routes.router)
+app.include_router(report_routes.router)
+app.include_router(office_routes.router)
+app.include_router(automation_routes.router)
+app.include_router(team_routes.router)
 
 
 @app.get("/")

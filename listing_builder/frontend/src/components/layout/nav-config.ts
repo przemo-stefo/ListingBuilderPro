@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Store,
   Users,
+  UsersRound,
   BarChart3,
   Search,
   Bell,
@@ -68,6 +69,12 @@ export const navSections: NavSection[] = [
     label: 'Demo',
     items: [
       { title: 'Amazon Pro', href: '/demo/amazon-pro', icon: Rocket, desc: 'Pełny pipeline: ASIN → AI → Compliance → Publish → Coupon', highlight: true },
+    ],
+  },
+  {
+    label: 'Zespol',
+    items: [
+      { title: 'Zespol', href: '/team', icon: UsersRound, desc: 'Zaproszenia, role, wspoldzielone dane', premiumOnly: true },
     ],
   },
   {

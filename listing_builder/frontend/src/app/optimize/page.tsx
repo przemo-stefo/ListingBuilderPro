@@ -6,7 +6,7 @@
 
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Layers, FileText, Clock, Crown, Loader2, ArrowLeftRight } from 'lucide-react'
+import { Layers, FileText, Clock, Crown, Loader2, ArrowLeftRight, Sparkles } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 import { FlowIndicator } from '@/components/ui/FlowIndicator'
 import { cn } from '@/lib/utils'
@@ -63,11 +63,16 @@ function OptimizeContent() {
 
       {/* Page header + tab toggle */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Optymalizator listingów</h1>
-          <p className="text-sm text-gray-400">
-            Generuj zoptymalizowane tytuły, bullety, opisy i słowa kluczowe backend
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-blue-500/20 p-2">
+            <Sparkles className="h-6 w-6 text-blue-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Optymalizator listingów</h1>
+            <p className="text-sm text-gray-400">
+              Generuj zoptymalizowane tytuły, bullety, opisy i słowa kluczowe backend
+            </p>
+          </div>
         </div>
 
         {/* Tab toggle */}

@@ -18,8 +18,10 @@ from services.llm_providers import PROVIDERS
 from services.stripe_service import validate_license
 from database import get_db
 from models.optimization import OptimizationRun
+from models.shared_listing import SharedListing
 from api.dependencies import require_user_id, require_admin
 from utils.privacy import hash_ip
+import secrets
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -201,25 +203,38 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
         if body.llm_provider not in PROVIDERS:
             raise HTTPException(status_code=400, detail=f"Nieznany provider: {body.llm_provider}")
 
-        api_key = body.llm_api_key
-        # WHY: If frontend didn't send a key, try to read the saved key from user settings
-        if not api_key:
-            from api.settings_routes import _load_settings
-            settings_data = _load_settings(db, user_id)
-            saved_providers = settings_data.get("llm", {}).get("providers", {})
-            saved_conf = saved_providers.get(body.llm_provider, {})
-            api_key = saved_conf.get("api_key", "") if isinstance(saved_conf, dict) else ""
+        # WHY: Beast uses local Ollama — no API key needed, just BEAST_OLLAMA_URL in .env
+        if body.llm_provider == "beast":
+            from config import settings as app_settings
+            if not app_settings.beast_ollama_url:
+                raise HTTPException(status_code=400, detail="Beast AI nie jest skonfigurowany. Skontaktuj sie z administratorem.")
+            provider_config = {
+                "provider": "beast",
+                "api_key": "ollama",  # WHY: Ollama ignores this but call_llm needs it
+            }
+        else:
+            api_key = body.llm_api_key
+            # WHY: If frontend didn't send a key, try to read the saved key from user settings
+            if not api_key:
+                from api.settings_routes import _load_settings
+                settings_data = _load_settings(db, user_id)
+                saved_providers = settings_data.get("llm", {}).get("providers", {})
+                saved_conf = saved_providers.get(body.llm_provider, {})
+                api_key = saved_conf.get("api_key", "") if isinstance(saved_conf, dict) else ""
 
-        if not api_key:
-            raise HTTPException(status_code=400, detail="Klucz API wymagany dla tego providera. Zapisz go w Ustawieniach lub wklej w formularzu.")
+            if not api_key:
+                raise HTTPException(status_code=400, detail="Klucz API wymagany dla tego providera. Zapisz go w Ustawieniach lub wklej w formularzu.")
 
-        provider_config = {
-            "provider": body.llm_provider,
-            "api_key": api_key,
-        }
+            provider_config = {
+                "provider": body.llm_provider,
+                "api_key": api_key,
+            }
+
+    # WHY: Beast (qwen3:235b) runs 4 sequential LLM calls ~14s each = ~56s total.
+    # Groq is fast (2-5s total), so 60s is fine. Beast needs 180s.
+    llm_timeout = 180.0 if (provider_config and provider_config.get("provider") == "beast") else 60.0
 
     try:
-        # WHY: 60s timeout prevents infinite spinner — Groq can hang on large products
         result = await asyncio.wait_for(
             optimize_listing(
                 product_title=body.product_title,
@@ -241,7 +256,7 @@ async def generate_listing(request: Request, body: OptimizerRequest, db: Session
                 original_description=body.original_description or "",
                 original_bullets=body.original_bullets or [],
             ),
-            timeout=60.0,
+            timeout=llm_timeout,
         )
 
         logger.info(
@@ -347,7 +362,7 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest, db: Sess
                         "api_key": product.llm_api_key,
                     }
 
-            # WHY: 60s timeout per product — prevents one hung call from blocking entire batch
+            batch_timeout = 180.0 if (batch_provider_config and batch_provider_config.get("provider") == "beast") else 60.0
             data = await asyncio.wait_for(
                 optimize_listing(
                     product_title=product.product_title,
@@ -369,7 +384,7 @@ async def generate_batch(request: Request, body: BatchOptimizerRequest, db: Sess
                     original_description=product.original_description or "",
                     original_bullets=product.original_bullets or [],
                 ),
-                timeout=60.0,
+                timeout=batch_timeout,
             )
 
             results.append(BatchOptimizerResult(
@@ -510,6 +525,99 @@ async def delete_history(request: Request, run_id: int, db: Session = Depends(ge
     return {"status": "deleted", "id": run_id}
 
 
+@router.post("/history/{run_id}/improve")
+@limiter.limit("5/minute")
+async def improve_from_history(request: Request, run_id: int, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
+    """
+    Re-optimize a listing from history with improvement hints.
+    WHY: Loads request_data + response_data, builds hints from missing keywords
+    and low coverage, then re-runs optimize_listing with those hints.
+    """
+    _check_tier_limit(request, db)
+
+    run = db.query(OptimizationRun).filter(OptimizationRun.id == run_id, OptimizationRun.user_id == user_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    req = run.request_data or {}
+    resp = run.response_data or {}
+    scores = resp.get("scores", {})
+    intel = resp.get("keyword_intel", {})
+
+    # WHY: Build improvement context from previous run's weaknesses
+    hints = []
+    missing = intel.get("missing_keywords", [])
+    if missing:
+        hints.append(f"BRAKUJACE SLOWA KLUCZOWE z poprzedniej optymalizacji (MUSISZ je umiescic): {', '.join(missing)}")
+    if scores.get("coverage_pct", 100) < 95:
+        hints.append(f"Poprzednie pokrycie: {scores.get('coverage_pct')}% — cel to 96%+. Uzyj wiecej slow kluczowych w tytule i bulletach.")
+    if scores.get("backend_utilization_pct", 100) < 80:
+        hints.append(f"Backend wykorzystany w {scores.get('backend_utilization_pct')}% — wypelnij do 249 bajtow unikalnymi slowami.")
+
+    improvement_context = '\n'.join(hints) if hints else "Popraw ogolna jakosc listingu."
+    audience_ctx = req.get("audience_context", "")
+    if audience_ctx:
+        improvement_context = audience_ctx + "\n\n--- IMPROVEMENT HINTS ---\n" + improvement_context
+    else:
+        improvement_context = "--- IMPROVEMENT HINTS ---\n" + improvement_context
+
+    keywords = req.get("keywords", [])
+    if not keywords:
+        raise HTTPException(status_code=400, detail="Brak slow kluczowych w historii — nie mozna re-optymalizowac.")
+
+    try:
+        result = await asyncio.wait_for(
+            optimize_listing(
+                product_title=req.get("product_title", ""),
+                brand=req.get("brand", ""),
+                keywords=keywords,
+                marketplace=req.get("marketplace", "amazon_de"),
+                mode=req.get("mode", "aggressive"),
+                product_line=req.get("product_line", ""),
+                language=req.get("language"),
+                db=db,
+                audience_context=improvement_context,
+                account_type=req.get("account_type", "seller"),
+                category=req.get("category", ""),
+                provider_config=None,
+                user_id=user_id,
+                original_description=req.get("original_description", ""),
+                original_bullets=req.get("original_bullets", []),
+            ),
+            timeout=60.0,
+        )
+
+        # WHY: Auto-save improved version to history
+        try:
+            new_run = OptimizationRun(
+                user_id=user_id,
+                product_title=req.get("product_title", ""),
+                brand=req.get("brand", ""),
+                marketplace=req.get("marketplace", "amazon_de"),
+                mode=req.get("mode", "aggressive"),
+                coverage_pct=result.get("scores", {}).get("coverage_pct", 0),
+                compliance_status=result.get("compliance", {}).get("status", "UNKNOWN"),
+                request_data={**req, "audience_context": improvement_context, "improved_from": run_id},
+                response_data=result,
+                trace_data=result.get("trace"),
+                client_ip=_hashed_ip(request),
+            )
+            db.add(new_run)
+            db.commit()
+        except Exception as save_err:
+            logger.warning("improve_history_save_failed", error=str(save_err))
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Re-optymalizacja przekroczyla limit czasu.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("improve_error", error=str(e), run_id=run_id, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class FeedbackRequest(BaseModel):
     rating: int = Field(..., ge=1, le=5)
 
@@ -645,3 +753,122 @@ async def grey_market_score(request: Request, body: GreyMarketRequest, _user_id:
         suppressed_asins=body.suppressed_asins,
         hijack_reports=body.hijack_reports,
     )
+
+
+# --- Share endpoints ---
+
+class ShareListingData(BaseModel):
+    """WHY: Validate listing structure — prevent arbitrary JSON storage."""
+    title: str = Field(..., min_length=1, max_length=500)
+    bullet_points: List[str] = Field(default_factory=list, max_length=10)
+    description: str = Field(default="", max_length=10000)
+    backend_keywords: str = Field(default="", max_length=500)
+
+
+class ShareRequest(BaseModel):
+    listing: ShareListingData
+    scores: Optional[Dict[str, Any]] = None
+    compliance: Optional[Dict[str, Any]] = None
+    product_title: str = Field(..., min_length=1, max_length=500)
+    brand: str = Field(..., min_length=1, max_length=200)
+    marketplace: str = "amazon_de"
+
+
+@router.post("/share")
+@limiter.limit("10/minute")
+async def create_share(request: Request, body: ShareRequest, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)):
+    """Create a public share link for a listing snapshot."""
+    token = secrets.token_urlsafe(16)
+
+    shared = SharedListing(
+        token=token,
+        user_id=user_id,
+        product_title=body.product_title,
+        brand=body.brand,
+        marketplace=body.marketplace,
+        listing_data=body.listing.model_dump(),
+        scores_data=body.scores,
+        compliance_data=body.compliance,
+    )
+    db.add(shared)
+    db.commit()
+
+    logger.info("share_created", token=token, product=body.product_title[:50])
+    return {"token": token}
+
+
+@router.get("/share/{token}")
+@limiter.limit("30/minute")
+async def get_share(request: Request, token: str, db: Session = Depends(get_db)):
+    """
+    Public endpoint — no auth required. Returns shared listing snapshot.
+    WHY: Anyone with the link can view the listing.
+    """
+    # WHY: Reject obviously invalid tokens before hitting DB
+    if not token or len(token) < 10 or len(token) > 30:
+        raise HTTPException(status_code=404, detail="Link nie istnieje lub wygasl")
+
+    shared = db.query(SharedListing).filter(SharedListing.token == token).first()
+    if not shared:
+        logger.debug("share_not_found", token_prefix=token[:6])
+        raise HTTPException(status_code=404, detail="Link nie istnieje lub wygasl")
+
+    # WHY: Check expiry if set
+    if shared.expires_at:
+        from datetime import datetime, timezone
+        if shared.expires_at < datetime.now(timezone.utc):
+            logger.info("share_expired", token_prefix=token[:6])
+            raise HTTPException(status_code=410, detail="Link wygasl")
+
+    return {
+        "product_title": shared.product_title,
+        "brand": shared.brand,
+        "marketplace": shared.marketplace,
+        "listing": shared.listing_data,
+        "scores": shared.scores_data,
+        "compliance": shared.compliance_data,
+        "created_at": shared.created_at.isoformat() if shared.created_at else None,
+    }
+
+
+# --- Keyword Suggestions ---
+
+@router.get("/keyword-suggestions")
+@limiter.limit("20/minute")
+async def keyword_suggestions(
+    request: Request,
+    marketplace: Optional[str] = Query(None, max_length=50),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
+    """Return popular keywords from user's optimization history.
+
+    WHY: Users re-use similar keywords across products — suggesting from
+    history saves typing and ensures consistency.
+    """
+    # WHY: Extract keywords from request_data JSON across all user's runs
+    query = db.query(OptimizationRun.request_data).filter(
+        OptimizationRun.user_id == user_id,
+        OptimizationRun.request_data.isnot(None),
+    )
+    if marketplace:
+        query = query.filter(OptimizationRun.marketplace == marketplace)
+
+    # WHY: Last 100 runs max — enough for good suggestions, fast query
+    rows = query.order_by(OptimizationRun.created_at.desc()).limit(100).all()
+
+    # Count keyword phrase frequency across runs
+    freq: dict[str, int] = {}
+    for (req_data,) in rows:
+        if not req_data or not isinstance(req_data, dict):
+            continue
+        kws = req_data.get("keywords", [])
+        for kw in kws:
+            phrase = kw.get("phrase", "").strip().lower() if isinstance(kw, dict) else str(kw).strip().lower()
+            if phrase and len(phrase) >= 2:
+                freq[phrase] = freq.get(phrase, 0) + 1
+
+    # Sort by frequency, return top N
+    sorted_kws = sorted(freq.items(), key=lambda x: -x[1])[:limit]
+    return [{"phrase": p, "count": c} for p, c in sorted_kws]

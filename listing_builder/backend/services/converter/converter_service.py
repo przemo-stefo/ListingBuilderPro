@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 import structlog
 
 from services.scraper.allegro_scraper import AllegroProduct, scrape_allegro_product
-from services.converter.ai_translator import (
-    AITranslator,
+from services.converter.ai_translator import AITranslator
+from services.converter.static_translations import (
     translate_color,
     translate_material,
     translate_gender,
@@ -351,6 +351,76 @@ def convert_to_kaufland(
     return result
 
 
+def convert_to_bol(
+    product: AllegroProduct,
+    ai: Dict,
+    gpsr_data: Dict,
+    eur_rate: float = 0.23,
+) -> ConvertedProduct:
+    """Map scraped Allegro product to BOL.com Retailer CSV fields.
+
+    WHY: BOL.com (Netherlands/Belgium) uses Dutch product data.
+    AI translator handles PL→NL. No GPSR required (yet).
+    """
+    result = ConvertedProduct(
+        source_url=product.source_url,
+        source_id=product.source_id,
+        marketplace="bol",
+    )
+
+    f = result.fields
+
+    # Identity
+    f["ean"] = product.ean
+    f["sku"] = f"ALG-{product.source_id}"
+    f["condition"] = "NEW"
+
+    # Title + Description (AI-translated to Dutch)
+    f["title"] = ai.get("title_nl", product.title)[:500]
+    f["short_description"] = ai.get("short_description_nl", "")[:300]
+    f["description"] = ai.get("description_nl", "")[:2000]
+
+    # Brand / Manufacturer
+    f["brand"] = product.brand or get_param(product, "Marka")
+    f["manufacturer"] = product.manufacturer or get_param(product, "Producent")
+    f["mpn"] = get_param(product, "MPN", "Numer producenta")
+
+    # Pricing (EUR — BOL uses EUR natively)
+    f["price"] = convert_pln_to_eur(product.price, eur_rate)
+    f["stock"] = product.quantity or "1"
+
+    # Delivery (BOL requires delivery code)
+    f["delivery_code"] = "3-5d"  # WHY: Safe default — 3-5 business days
+
+    # Images (BOL supports up to 10)
+    for i, img_url in enumerate(product.images[:10]):
+        f[f"image_{i+1}"] = img_url
+
+    # Physical attributes
+    f["weight_kg"] = parse_weight(get_param(product, "Waga"))
+    f["length_cm"] = parse_dimension_cm(get_param(product, "Długość"))
+    f["width_cm"] = parse_dimension_cm(get_param(product, "Szerokość"))
+    f["height_cm"] = parse_dimension_cm(get_param(product, "Wysokość"))
+
+    # Color / Material (Dutch)
+    f["color"] = ai.get("color_nl", "")
+    f["material"] = ai.get("material_nl", "")
+    f["size"] = get_param(product, "Rozmiar")
+
+    # Bullet points (BOL supports up to 8)
+    bullets = ai.get("bullet_points_nl", [])
+    for i, bp in enumerate(bullets[:8]):
+        f[f"bullet_point_{i+1}"] = bp
+
+    # Warnings
+    if not product.ean:
+        result.warnings.append("EAN missing — required for BOL.com")
+    if not f["brand"]:
+        result.warnings.append("Brand missing — required for BOL.com")
+
+    return result
+
+
 # ── Main orchestrator ─────────────────────────────────────────────────────
 
 def convert_product(
@@ -399,6 +469,7 @@ def convert_product(
         "amazon": convert_to_amazon,
         "ebay": convert_to_ebay,
         "kaufland": convert_to_kaufland,
+        "bol": convert_to_bol,
     }
 
     converter_fn = converters.get(marketplace)
@@ -412,6 +483,7 @@ def convert_product(
     if marketplace == "kaufland":
         result = converter_fn(product, ai_content, gpsr_data)
     else:
+        # WHY: amazon, ebay, bol all need eur_rate for PLN→EUR conversion
         result = converter_fn(product, ai_content, gpsr_data, eur_rate)
 
     logger.info(

@@ -102,6 +102,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if path in self.PUBLIC_PATHS:
             return await call_next(request)
 
+        # WHY: Share links are public — anyone with token can view
+        if path.startswith("/api/optimizer/share/") and request.method == "GET":
+            return await call_next(request)
+
         # Allow docs in development only
         if settings.app_debug and (path.startswith("/docs") or path.startswith("/redoc")):
             return await call_next(request)

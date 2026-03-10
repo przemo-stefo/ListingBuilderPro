@@ -43,11 +43,16 @@ export default function MonitoringPage() {
     <FeatureGate mode="redirect" redirectTo="/">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Monitoring & Alerts</h1>
-            <p className="text-sm text-gray-400">
-              Track products across marketplaces and get alerted on changes
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-red-500/20 p-2">
+              <AlertTriangle className="h-6 w-6 text-red-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Monitoring & Alerty</h1>
+              <p className="text-sm text-gray-400">
+                Sledz produkty na marketplace i otrzymuj alerty o zmianach cen, pozycji i opinii
+              </p>
+            </div>
           </div>
 
           <div className="flex rounded-lg border border-gray-800 p-1">

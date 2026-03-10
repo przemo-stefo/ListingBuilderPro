@@ -3,14 +3,11 @@
 // NOT for: Page-specific layouts or business logic
 
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { AuthGuard } from '@/components/providers/AuthGuard'
 import { AppShell } from '@/components/layout/AppShell'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'OctoHelper — Asystent sprzedawcy',
@@ -25,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pl" className="dark">
-      <body className={inter.className}>
+      <body className="font-sans">
         <QueryProvider>
           <AuthProvider>
             <AuthGuard>

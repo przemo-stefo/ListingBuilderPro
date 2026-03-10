@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     groq_api_key_7: str = ""  # WHY: 7th key for extended rotation pool
     groq_api_key_8: str = ""  # WHY: 8th key for extended rotation pool
 
+    # Beast (Mac Studio M3 Ultra 512GB) — local Ollama, OpenAI-compatible API
+    beast_ollama_url: str = ""  # WHY: Empty = Beast disabled. Set to http://100.99.20.51:11434 when available
+    beast_model: str = "qwen3:235b"  # WHY: 235B param model on 512GB — unlimited, free, no rate limits
+
+    # Gemini Image Generation (system-level key for AI-generated product infographics)
+    gemini_image_api_key: str = ""  # WHY: Empty = Gemini image gen disabled, falls back to Pillow
+
+    # Google Workspace OAuth (for AI Office Automation — clients connect their own Google accounts)
+    google_oauth_client_id: str = ""  # WHY: Same GCP project as gws CLI, popup flow (postmessage)
+    google_oauth_client_secret: str = ""
+
     # Marketplace APIs
     amazon_refresh_token: str = ""
     amazon_client_id: str = ""
