@@ -147,4 +147,5 @@ class TestAdminMeEndpoint:
 
         result = await get_admin_status(req)
         assert result["is_admin"] is False
-        assert result["email"] == ""
+        # WHY: Non-admin response intentionally omits email (info leak prevention)
+        assert "email" not in result

@@ -76,6 +76,7 @@ def _create_listing_history_table(db):
     db.execute(text("""
         CREATE TABLE IF NOT EXISTS listing_history (
             id TEXT PRIMARY KEY,
+            user_id TEXT,
             brand TEXT,
             marketplace TEXT,
             product_title TEXT,
@@ -569,8 +570,9 @@ class TestJ17ConverterAuth:
         )
         assert resp.status_code == 401
 
-    def test_marketplaces_is_public(self, client, test_settings):
-        resp = client.get("/api/converter/marketplaces", headers=_headers())
+    def test_marketplaces_requires_auth(self, auth_client, test_settings):
+        """WHY: /marketplaces now requires JWT auth (require_user_id)."""
+        resp = auth_client.get("/api/converter/marketplaces", headers=_headers())
         assert resp.status_code == 200
 
 
@@ -606,9 +608,9 @@ class TestJ19OptimizationFeedback:
         import uuid
         listing_id = str(uuid.uuid4())
         db_session.execute(
-            text("INSERT INTO listing_history (id, brand, marketplace, product_title, title) "
-                 "VALUES (:id, :brand, :mp, :pt, :title)"),
-            {"id": listing_id, "brand": "TestBrand", "mp": "amazon_de",
+            text("INSERT INTO listing_history (id, user_id, brand, marketplace, product_title, title) "
+                 "VALUES (:id, :uid, :brand, :mp, :pt, :title)"),
+            {"id": listing_id, "uid": TEST_USER_ID, "brand": "TestBrand", "mp": "amazon_de",
              "pt": "Rated Product", "title": "AI Title"},
         )
         db_session.commit()
