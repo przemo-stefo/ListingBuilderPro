@@ -71,6 +71,9 @@ class TestSettings:
     supabase_jwt_secret = "test-jwt-secret-minimum-32-chars!"
     admin_emails = "admin@test.com"
     webhook_secret = "test-webhook-secret-min16"
+    baselinker_api_token = ""
+    beast_ollama_url = ""
+    beast_model = "qwen3:235b"
 
     @property
     def cors_origins_list(self):
