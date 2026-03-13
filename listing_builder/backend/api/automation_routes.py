@@ -34,13 +34,13 @@ async def google_authorize(
     request: Request,
     user_id: str = Depends(require_user_id),
 ):
-    """Generate Google OAuth URL for popup-based authorization.
+    """Return Google OAuth config for GIS (Google Identity Services) popup flow.
 
-    WHY: Popup flow with redirect_uri=postmessage works with Desktop OAuth clients.
-    No need for registered redirect URIs. Frontend opens popup, gets code via postMessage.
+    WHY: GIS JS library handles popup natively with postmessage redirect.
+    Frontend loads GIS script, calls initCodeClient() with returned config.
     """
-    url = get_authorize_url(user_id)
-    return {"status": "ok", "authorize_url": url, "client_id": settings.google_oauth_client_id}
+    config = get_authorize_url(user_id)
+    return {"status": "ok", **config}
 
 
 class GoogleConnectRequest(BaseModel):

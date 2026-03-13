@@ -303,6 +303,72 @@ def generate_bol_csv(products: List[ConvertedProduct]) -> bytes:
     return content.encode("utf-8")
 
 
+# ── Rozetka CSV column order ───────────────────────────────────────────
+# WHY: Matches Rozetka seller portal bulk upload format (comma-separated, UTF-8)
+
+ROZETKA_COLUMNS = [
+    "ean",
+    "sku",
+    "condition",
+    "title",
+    "description",
+    "brand",
+    "manufacturer",
+    "price",
+    "currency",
+    "stock",
+    "image_1",
+    "image_2",
+    "image_3",
+    "image_4",
+    "image_5",
+    "image_6",
+    "image_7",
+    "image_8",
+    "image_9",
+    "image_10",
+    "weight_kg",
+    "length_cm",
+    "width_cm",
+    "height_cm",
+    "color",
+    "material",
+    "size",
+    "bullet_point_1",
+    "bullet_point_2",
+    "bullet_point_3",
+    "bullet_point_4",
+    "bullet_point_5",
+    "bullet_point_6",
+    "bullet_point_7",
+    "bullet_point_8",
+]
+
+
+def generate_rozetka_csv(products: List[ConvertedProduct]) -> bytes:
+    """Generate Rozetka bulk upload CSV from converted products.
+
+    Rozetka uses comma-separated CSV with UTF-8 encoding.
+    """
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=ROZETKA_COLUMNS,
+        delimiter=",",
+        extrasaction="ignore",
+    )
+    writer.writeheader()
+
+    for product in products:
+        if product.error:
+            continue
+        writer.writerow(product.fields)
+
+    content = output.getvalue()
+    logger.info("rozetka_csv_generated", products=len(products), size=len(content))
+    return content.encode("utf-8")
+
+
 def generate_template(
     products: List[ConvertedProduct],
     marketplace: str,
@@ -321,6 +387,7 @@ def generate_template(
         "ebay": generate_ebay_csv,
         "kaufland": generate_kaufland_csv,
         "bol": generate_bol_csv,
+        "rozetka": generate_rozetka_csv,
     }
 
     generator = generators.get(marketplace)
@@ -337,6 +404,7 @@ def get_filename(marketplace: str) -> str:
         "ebay": "ebay_bulk_listing.csv",
         "kaufland": "kaufland_product_data.csv",
         "bol": "bol_product_upload.csv",
+        "rozetka": "rozetka_product_upload.csv",
     }
     return filenames.get(marketplace, f"{marketplace}_export.csv")
 

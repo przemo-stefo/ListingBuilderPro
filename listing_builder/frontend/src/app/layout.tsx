@@ -8,6 +8,7 @@ import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { AuthGuard } from '@/components/providers/AuthGuard'
 import { AppShell } from '@/components/layout/AppShell'
+import { MediaGenProvider } from '@/components/providers/MediaGenProvider'
 
 export const metadata: Metadata = {
   title: 'OctoHelper — Asystent sprzedawcy',
@@ -26,9 +27,11 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <AuthGuard>
-              <AppShell>
-                {children}
-              </AppShell>
+              <MediaGenProvider>
+                <AppShell>
+                  {children}
+                </AppShell>
+              </MediaGenProvider>
             </AuthGuard>
           </AuthProvider>
         </QueryProvider>

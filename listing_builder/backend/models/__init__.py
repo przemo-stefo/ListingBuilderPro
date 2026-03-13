@@ -17,6 +17,7 @@ from .baselinker_sync import BaseLinkerSyncLog
 from .google_connection import GoogleConnection
 from .shared_listing import SharedListing
 from .team import Team, TeamMember, TeamInvitation, TeamRole
+from .media_generation import MediaGeneration
 
 __all__ = [
     "Product",
@@ -48,4 +49,5 @@ __all__ = [
     "TeamMember",
     "TeamInvitation",
     "TeamRole",
+    "MediaGeneration",
 ]

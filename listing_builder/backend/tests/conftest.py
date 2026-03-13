@@ -5,6 +5,7 @@
 import os
 import sys
 import pytest
+from unittest.mock import patch
 
 # WHY: backend/ is the import root for the app — add it to sys.path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -214,7 +215,6 @@ def auth_client(mock_settings, db_session):
     """
     from fastapi.testclient import TestClient
     from database import get_db
-    from unittest.mock import patch
 
     def _override_get_db():
         try:
@@ -239,3 +239,62 @@ def auth_client(mock_settings, db_session):
         with TestClient(app) as c:
             yield c
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def dynamic_auth_client(mock_settings, db_session):
+    """TestClient with switchable user identity — avoids recreating clients.
+
+    WHY: Multi-tenant tests need to switch users rapidly. Creating 50 TestClient
+    instances is slow (~100ms each = 5s overhead). This fixture uses a mutable
+    container so tests can switch user_id/email between requests instantly.
+
+    Usage:
+        client, switch_user = dynamic_auth_client
+        switch_user("user-A", "a@test.com")
+        client.get("/api/products")
+        switch_user("user-B", "b@test.com")
+        client.get("/api/products")
+    """
+    from fastapi.testclient import TestClient
+    from database import get_db
+
+    def _override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    # WHY: Mutable list so _fake_jwt closure captures the container, not the value
+    current_user = [TEST_USER_ID, TEST_USER_EMAIL]
+
+    def _fake_jwt(request):
+        request.state.user_email = current_user[1]
+        return current_user[0]
+
+    def switch_user(user_id: str, email: str):
+        current_user[0] = user_id
+        current_user[1] = email
+
+    with patch("middleware.supabase_auth.get_user_id_from_jwt", side_effect=_fake_jwt):
+        from main import app
+        app.dependency_overrides[get_db] = _override_get_db
+        with TestClient(app) as c:
+            yield c, switch_user
+        app.dependency_overrides.clear()
+
+
+def create_user_settings_table(db) -> None:
+    """Create user_settings table in SQLite (not a SQLAlchemy model — uses raw SQL).
+
+    WHY: Shared helper — used by test_user_journeys and test_stress_multiuser.
+    """
+    from sqlalchemy import text
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id TEXT PRIMARY KEY,
+            settings TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.commit()

@@ -30,22 +30,17 @@ GOOGLE_SCOPES = [
 ]
 
 
-def get_authorize_url(user_id: str) -> str:
-    """Generate Google OAuth2 authorization URL for popup-based flow.
+def get_authorize_url(user_id: str) -> dict:
+    """Return OAuth2 config for Google Identity Services (GIS) popup flow.
 
-    WHY: Desktop OAuth client can't redirect to external URLs.
-    Popup flow with redirect_uri=postmessage works with any client type.
-    Frontend opens this URL in popup, Google returns code via postMessage.
+    WHY: GIS JS library handles popup + postmessage natively.
+    Frontend loads https://accounts.google.com/gsi/client, calls initCodeClient()
+    with client_id + scope, gets auth code via callback, sends to backend.
     """
-    params = {
+    return {
         "client_id": settings.google_oauth_client_id,
-        "redirect_uri": "postmessage",
-        "response_type": "code",
         "scope": " ".join(GOOGLE_SCOPES),
-        "access_type": "offline",
-        "prompt": "consent",
     }
-    return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
 
 def connect_with_code(code: str, user_id: str, db: Session) -> Optional[GoogleConnection]:

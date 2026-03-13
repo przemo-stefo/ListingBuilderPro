@@ -45,9 +45,13 @@ class Settings(BaseSettings):
     # Gemini Image Generation (system-level key for AI-generated product infographics)
     gemini_image_api_key: str = ""  # WHY: Empty = Gemini image gen disabled, falls back to Pillow
 
-    # Google Workspace OAuth (for AI Office Automation — clients connect their own Google accounts)
-    google_oauth_client_id: str = ""  # WHY: Same GCP project as gws CLI, popup flow (postmessage)
+    # Google Workspace OAuth — client-facing (Web App client, GIS popup flow)
+    google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
+    # WHY: Internal ops (reports) use old Desktop client — separate from client-facing Web App client
+    google_internal_client_id: str = ""
+    google_internal_client_secret: str = ""
+    google_internal_refresh_token: str = ""
 
     # Marketplace APIs
     amazon_refresh_token: str = ""

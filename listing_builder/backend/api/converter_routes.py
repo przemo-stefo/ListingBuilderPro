@@ -23,7 +23,7 @@ from services.allegro_api import (
     fetch_seller_offers, fetch_offer_details,
     get_access_token,
 )
-from services.bol_api import fetch_bol_offers
+from services.bol_api import fetch_bol_offers, push_bol_offers_batch
 
 limiter = Limiter(key_func=get_remote_address)
 from services.scraper.allegro_scraper import (
@@ -109,7 +109,7 @@ class ConvertRequest(BaseModel):
     @field_validator("marketplace")
     @classmethod
     def validate_marketplace(cls, v):
-        allowed = ["amazon", "ebay", "kaufland", "bol"]
+        allowed = ["amazon", "ebay", "kaufland", "bol", "rozetka"]
         if v not in allowed:
             raise ValueError(f"marketplace must be one of: {allowed}")
         return v
@@ -165,7 +165,7 @@ class StoreConvertRequest(BaseModel):
     @field_validator("marketplace")
     @classmethod
     def validate_marketplace(cls, v):
-        allowed = ["amazon", "ebay", "kaufland", "bol"]
+        allowed = ["amazon", "ebay", "kaufland", "bol", "rozetka"]
         if v not in allowed:
             raise ValueError(f"marketplace must be one of: {allowed}")
         return v
@@ -423,6 +423,14 @@ async def list_marketplaces(_user_id: str = Depends(require_user_id)):
                 "fields": "EAN, tytuł, opis, cena, zdjęcia, atrybuty",
                 "requires_gpsr": False,
             },
+            {
+                "id": "rozetka",
+                "name": "Rozetka (UA)",
+                "format": "CSV",
+                "region": "Ukraina",
+                "fields": "EAN, tytuł, opis, cena UAH, zdjęcia, atrybuty",
+                "requires_gpsr": False,
+            },
         ]
     }
 
@@ -440,7 +448,7 @@ class ConvertFromDbRequest(BaseModel):
     @field_validator("marketplace")
     @classmethod
     def validate_marketplace(cls, v):
-        allowed = ["amazon", "ebay", "kaufland", "bol"]
+        allowed = ["amazon", "ebay", "kaufland", "bol", "rozetka"]
         if v not in allowed:
             raise ValueError(f"marketplace must be one of: {allowed}")
         return v
@@ -706,3 +714,45 @@ async def scrape_bol(
     )
 
 
+# ── BOL.com push offers ─────────────────────────────────────────────
+
+class BolPushRequest(BaseModel):
+    """Push converted products to BOL.com seller account."""
+    offers: List[dict]
+
+    @field_validator("offers")
+    @classmethod
+    def validate_offers(cls, v):
+        if not v:
+            raise ValueError("At least one offer required")
+        if len(v) > 50:
+            raise ValueError("Max 50 offers per request")
+        for offer in v:
+            if not offer.get("ean"):
+                raise ValueError("Each offer must have an EAN")
+        return v
+
+
+class BolPushResponse(BaseModel):
+    total: int
+    succeeded: int
+    failed: int
+    results: List[dict]
+
+
+@router.post("/bol-push", response_model=BolPushResponse)
+@limiter.limit("5/minute")
+async def push_to_bol(
+    request: Request,
+    body: BolPushRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(require_user_id),
+):
+    """Push converted offers to BOL.com via Retailer API.
+
+    WHY separate from CSV download: Some users want to push directly
+    to their BOL.com account instead of manually uploading CSV.
+    """
+    logger.info("bol_push_request", offers_count=len(body.offers), user_id=user_id)
+    result = await push_bol_offers_batch(db, user_id, body.offers)
+    return BolPushResponse(**result)

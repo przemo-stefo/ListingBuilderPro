@@ -5,7 +5,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ImageIcon, Loader2, Download, Sun, Moon } from 'lucide-react'
+import { ImageIcon, Loader2, Download, Sun, Moon, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -32,6 +32,8 @@ interface ImageResult {
   images: Record<string, string>
   image_types: string[]
   llm_provider: string
+  example_ids?: number[]
+  content_data?: Record<string, unknown>
 }
 
 export default function ImageGenerator({
@@ -47,6 +49,7 @@ export default function ImageGenerator({
   const [error, setError] = useState<string | null>(null)
   const [theme, setTheme] = useState<string>('dark_premium')
   const [provider, setProvider] = useState<LLMProvider>('beast')
+  const [feedbackSent, setFeedbackSent] = useState(false)
 
   const canGenerate = productName.length >= 3 && brand.length >= 1
 
@@ -54,6 +57,7 @@ export default function ImageGenerator({
     setIsLoading(true)
     setError(null)
     setResult(null)
+    setFeedbackSent(false)
 
     try {
       const { data } = await apiClient.post<ImageResult>('/images/generate', {
@@ -91,6 +95,25 @@ export default function ImageGenerator({
     }
   }
 
+  const handleFeedback = async (accepted: boolean) => {
+    if (!result || feedbackSent) return
+    try {
+      await apiClient.post('/images/feedback', {
+        example_ids: result.example_ids || [],
+        accepted,
+        product_name: productName,
+        brand,
+        category,
+        language,
+        // WHY: Send content_data on accept so backend saves as new training example
+        ...(accepted && result.content_data ? { content_data: result.content_data } : {}),
+      })
+      setFeedbackSent(true)
+    } catch {
+      // WHY: Non-critical — don't block UX if feedback fails
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -125,18 +148,18 @@ export default function ImageGenerator({
             ))}
           </div>
 
-          {/* Provider picker — Beast preferred (free/unlimited) */}
+          {/* Provider picker */}
           <div className="flex items-center gap-1 rounded-lg border border-gray-800 p-1">
-            {(['beast', 'groq'] as const).map((p) => (
+            {([{ id: 'beast' as const, label: 'AI Premium' }, { id: 'groq' as const, label: 'AI Szybkie' }]).map((p) => (
               <button
-                key={p}
-                onClick={() => setProvider(p)}
+                key={p.id}
+                onClick={() => setProvider(p.id)}
                 className={cn(
                   'rounded px-2 py-1 text-xs transition-colors',
-                  provider === p ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'
+                  provider === p.id ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'
                 )}
               >
-                {p === 'beast' ? 'Beast AI' : 'Groq'}
+                {p.label}
               </button>
             ))}
           </div>
@@ -185,7 +208,21 @@ export default function ImageGenerator({
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span>Wygenerowano {result.image_types.length} grafik</span>
               <span>•</span>
-              <span>Model: {result.llm_provider === 'beast' ? 'Beast AI (Qwen3 235B)' : 'Groq (Llama 3.3)'}</span>
+              <span>Zaawansowany model AI</span>
+              <span>•</span>
+              {feedbackSent ? (
+                <span className="text-green-500">Dziekujemy za opinie!</span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  Ocen jakosc:
+                  <button onClick={() => handleFeedback(true)} className="rounded p-1 hover:bg-white/10 text-green-500" title="Dobre grafiki">
+                    <ThumbsUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => handleFeedback(false)} className="rounded p-1 hover:bg-white/10 text-red-400" title="Do poprawy">
+                    <ThumbsDown className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

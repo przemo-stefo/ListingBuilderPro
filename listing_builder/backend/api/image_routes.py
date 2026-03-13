@@ -11,10 +11,13 @@ import asyncio
 import json
 import structlog
 
+from database import SessionLocal
 from services.image_core import VALID_THEMES
 from services.image_service import build_image_content_prompt, render_all_images, IMAGE_TYPES
 from services.llm_providers import PROVIDERS, call_llm
 from services.groq_client import call_groq
+from services.aplus_rag import fetch_examples, record_feedback, save_user_example
+from utils.json_extract import extract_json as _extract_json
 from api.dependencies import require_user_id
 
 limiter = Limiter(key_func=get_remote_address)
@@ -43,6 +46,22 @@ class ImageGenerateResponse(BaseModel):
     images: Dict[str, str]  # WHY: {image_type: base64_png} — frontend renders as <img src="data:image/png;base64,...">
     image_types: List[str]  # WHY: Ordered list for frontend display
     llm_provider: str
+    example_ids: List[int] = Field(default_factory=list)  # WHY: RAG — frontend sends back with feedback
+    content_data: Optional[Dict] = None  # WHY: Structural JSON for feedback loop — frontend sends back on accept
+
+
+class ImageFeedbackRequest(BaseModel):
+    """User feedback on generated A+ Content — feeds RAG quality scores."""
+    # WHY: Cap at 10 IDs — prevents abuse with large IN queries
+    example_ids: List[int] = Field(default_factory=list, max_length=10)
+    accepted: bool
+    gen_id: Optional[int] = None
+    # WHY: If accepted, save the generated content as new training example
+    product_name: Optional[str] = Field(default=None, max_length=500)
+    brand: Optional[str] = Field(default=None, max_length=200)
+    category: Optional[str] = Field(default=None, max_length=200)
+    language: Optional[str] = Field(default=None, max_length=10)
+    content_data: Optional[Dict] = None
 
 
 @router.post("/generate", response_model=ImageGenerateResponse)
@@ -67,6 +86,20 @@ async def generate_images(
 
     logger.info("image_gen_start", product=body.product_name[:50], provider=body.llm_provider)
 
+    # Step 0: RAG — fetch best training examples for few-shot injection
+    db = SessionLocal()
+    example_ids = []
+    rag_examples = []
+    try:
+        raw_examples = fetch_examples(body.category, body.language, limit=3, db=db)
+        example_ids = [e["id"] for e in raw_examples]
+        rag_examples = [e["content_data"] for e in raw_examples]
+        logger.info("image_gen_rag", count=len(rag_examples), ids=example_ids)
+    except Exception as e:
+        logger.warning("image_gen_rag_skip", error=str(e))
+    finally:
+        db.close()
+
     # Step 1: Build content prompt
     prompt = build_image_content_prompt(
         product_name=body.product_name,
@@ -75,6 +108,7 @@ async def generate_images(
         description=body.description,
         category=body.category,
         lang=body.language,
+        examples=rag_examples,
     )
 
     # Step 2: Call LLM to generate structured content
@@ -85,15 +119,15 @@ async def generate_images(
             if not app_settings.beast_ollama_url:
                 raise ValueError("Beast nie skonfigurowany")
             text, _ = await asyncio.to_thread(
-                call_llm, "beast", "ollama", None, prompt, 0.4, 2000,
+                call_llm, "beast", "ollama", None, prompt, 0.4, 4000,
             )
         elif provider == "groq":
-            text, _ = await asyncio.to_thread(call_groq, prompt, 0.4, 2000)
+            text, _ = await asyncio.to_thread(call_groq, prompt, 0.4, 4000)
         elif provider in PROVIDERS:
             if not body.llm_api_key:
                 raise ValueError("Klucz API wymagany")
             text, _ = await asyncio.to_thread(
-                call_llm, provider, body.llm_api_key, None, prompt, 0.4, 2000,
+                call_llm, provider, body.llm_api_key, None, prompt, 0.4, 4000,
             )
         else:
             raise ValueError(f"Nieznany provider: {provider}")
@@ -102,7 +136,7 @@ async def generate_images(
         if provider != "groq":
             logger.warning("image_gen_provider_fallback", original=provider, error=str(e))
             try:
-                text, _ = await asyncio.to_thread(call_groq, prompt, 0.4, 2000)
+                text, _ = await asyncio.to_thread(call_groq, prompt, 0.4, 4000)
                 provider = "groq"
             except Exception as fallback_err:
                 raise HTTPException(status_code=503, detail="AI niedostepne. Sprobuj pozniej.")
@@ -111,15 +145,8 @@ async def generate_images(
 
     # Step 3: Parse LLM response as JSON
     try:
-        # WHY: LLM sometimes wraps JSON in ```json ... ``` — strip it
-        clean_text = text.strip()
-        if clean_text.startswith("```"):
-            clean_text = clean_text.split("\n", 1)[1] if "\n" in clean_text else clean_text[3:]
-        if clean_text.endswith("```"):
-            clean_text = clean_text[:-3]
-        clean_text = clean_text.strip()
-
-        content_data = json.loads(clean_text)
+        # WHY: Reuse robust parser from media_gen_worker — handles fences, truncation
+        content_data = _extract_json(text)
     except json.JSONDecodeError as e:
         logger.error("image_gen_json_parse_failed", error=str(e), text_preview=text[:200])
         raise HTTPException(
@@ -156,4 +183,31 @@ async def generate_images(
         images=images,
         image_types=ordered_types,
         llm_provider=provider,
+        example_ids=example_ids,
+        content_data=content_data,
     )
+
+
+@router.post("/feedback")
+async def image_feedback(
+    body: ImageFeedbackRequest,
+    user_id: str = Depends(require_user_id),
+):
+    """Record user feedback on A+ Content — updates RAG quality scores.
+
+    WHY: Self-improving loop — accepted content boosts example scores,
+    rejected content lowers them. Accepted content becomes new training example.
+    """
+    db = SessionLocal()
+    try:
+        if body.example_ids:
+            record_feedback(body.example_ids, body.accepted, db)
+        # WHY: Save accepted generation as new training example for future RAG
+        if body.accepted and body.content_data and body.product_name:
+            save_user_example(
+                body.product_name, body.brand or "", body.category or "",
+                body.language or "pl", body.content_data, db,
+            )
+        return {"status": "ok"}
+    finally:
+        db.close()

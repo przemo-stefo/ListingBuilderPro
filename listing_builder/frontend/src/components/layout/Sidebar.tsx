@@ -13,6 +13,7 @@ import { useTier } from '@/lib/hooks/useTier'
 import { useAdmin } from '@/lib/hooks/useAdmin'
 import { TierBadge } from '@/components/tier/TierBadge'
 import { navSections, complianceSubItems } from '@/components/layout/nav-config'
+import { useMediaGen } from '@/components/providers/MediaGenProvider'
 import { Shield, ChevronDown, Newspaper, Info, Bell, Settings, UserCircle, Crown } from 'lucide-react'
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const router = useRouter()
   const { tier, isPremium, isLoading } = useTier()
   const { isAdmin } = useAdmin()
+  const { activeJobs } = useMediaGen()
 
   const isOnCompliance = pathname === '/compliance'
   const [complianceOpen, setComplianceOpen] = useState(isOnCompliance)
@@ -106,6 +108,10 @@ export function Sidebar({ onClose }: SidebarProps) {
                       >
                         <Icon className="h-4 w-4" />
                         {item.title}
+                        {/* WHY: Pulsing dot when background generation is running */}
+                        {item.href === '/video-gen' && activeJobs.length > 0 && (
+                          <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse shrink-0" title={`${activeJobs.length} generacji w toku`} />
+                        )}
                         {item.beta && !isActive && (
                           <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
                             BETA

@@ -1,5 +1,5 @@
 # backend/services/bol_api.py
-# Purpose: BOL.com Retailer API v10 client — fetch offers via Client Credentials
+# Purpose: BOL.com Retailer API v10 client — fetch + push offers
 # NOT for: OAuth browser redirect flow (BOL uses server-to-server only)
 
 import asyncio
@@ -61,10 +61,13 @@ async def _get_fresh_token(conn: OAuthConnection, db: Session) -> Optional[str]:
     60s because BOL token is much shorter-lived.
     """
     now = datetime.now(timezone.utc)
-    if (conn.access_token
-            and conn.token_expires_at
-            and conn.token_expires_at > now + timedelta(seconds=60)):
-        return conn.access_token
+    if conn.access_token and conn.token_expires_at:
+        # WHY: SQLite returns naive datetimes, PG returns aware. Normalize both.
+        expires = conn.token_expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if expires > now + timedelta(seconds=60):
+            return conn.access_token
 
     # WHY: BOL Client Credentials = just re-fetch token (no refresh_token needed)
     client_id = conn.raw_data.get("client_id", "") if conn.raw_data else ""
@@ -200,3 +203,166 @@ async def fetch_bol_offers(db: Session, user_id: str = "default") -> Dict:
     except Exception as e:
         logger.error("bol_api_error", error=str(e))
         return _empty_result(f"BOL.com API error: {str(e)}")
+
+
+# ── Push offers (create/update) ──────────────────────────────────────
+
+
+def _build_offer_payload(fields: Dict) -> Dict:
+    """Build BOL Retailer API v10 offer payload from ConvertedProduct.fields.
+
+    WHY separate function: Keeps API contract mapping testable without HTTP.
+    BOL API docs: POST /offers requires EAN, condition, pricing, stock, fulfilment.
+    """
+    # Pricing — BOL requires bundlePrices list
+    price = float(fields.get("price", "0") or "0")
+    stock = int(fields.get("stock", "1") or "1")
+
+    payload: Dict = {
+        "ean": fields.get("ean", ""),
+        "condition": {
+            "name": fields.get("condition", "NEW"),
+        },
+        "reference": fields.get("sku", ""),
+        "onHoldByRetailer": False,
+        "unknownProductTitle": fields.get("title", ""),
+        "pricing": {
+            "bundlePrices": [
+                {"quantity": 1, "unitPrice": round(price, 2)}
+            ]
+        },
+        "stock": {
+            "amount": stock,
+            "managedByRetailer": True,
+        },
+        "fulfilment": {
+            "method": "FBR",
+            "deliveryCode": fields.get("delivery_code", "3-5d"),
+        },
+    }
+
+    return payload
+
+
+async def _push_single_offer(
+    client: httpx.AsyncClient, headers: Dict, fields: Dict
+) -> Dict:
+    """Push one offer to BOL.com. Caller provides authenticated client + headers.
+
+    WHY extracted from push_bol_offer: Allows batch to reuse token + client.
+    """
+    ean = fields.get("ean", "")
+    if not ean:
+        return {"success": False, "error": "EAN jest wymagany do utworzenia oferty na BOL.com"}
+
+    payload = _build_offer_payload(fields)
+
+    try:
+        resp = await client.post(
+            f"{BOL_API_BASE}/offers", headers=headers, json=payload,
+        )
+
+        if resp.status_code in (200, 201, 202):
+            data = resp.json()
+            process_id = data.get("processStatusId", "")
+            logger.info("bol_offer_pushed", ean=ean, process_id=process_id)
+            return {"success": True, "ean": ean, "processStatusId": process_id}
+
+        # WHY: BOL returns structured errors in violations array
+        error_msg = f"BOL.com {resp.status_code}"
+        try:
+            err_data = resp.json()
+            violations = err_data.get("violations", [])
+            if violations:
+                error_msg = "; ".join(v.get("reason", "") for v in violations)
+            elif err_data.get("detail"):
+                error_msg = err_data["detail"]
+        except Exception:
+            error_msg = resp.text[:200] if resp.text else error_msg
+
+        logger.warning("bol_offer_push_failed", ean=ean, status=resp.status_code, error=error_msg)
+        return {"success": False, "ean": ean, "error": error_msg}
+
+    except httpx.TimeoutException:
+        return {"success": False, "ean": ean, "error": "BOL.com API timeout"}
+    except Exception as e:
+        logger.error("bol_push_error", ean=ean, error=str(e))
+        return {"success": False, "ean": ean, "error": str(e)}
+
+
+async def push_bol_offer(
+    db: Session, user_id: str, fields: Dict
+) -> Dict:
+    """Push a single offer to BOL.com. Convenience wrapper for one-off pushes."""
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
+        OAuthConnection.marketplace == "bol",
+    ).first()
+
+    if not conn or conn.status != "active":
+        return {"success": False, "error": "BOL.com nie jest połączony."}
+
+    token = await _get_fresh_token(conn, db)
+    if not token:
+        return {"success": False, "error": "Token BOL.com wygasł. Połącz ponownie."}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": BOL_ACCEPT,
+        "Content-Type": BOL_ACCEPT,
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await _push_single_offer(client, headers, fields)
+
+
+async def push_bol_offers_batch(
+    db: Session, user_id: str, offers: List[Dict]
+) -> Dict:
+    """Push multiple offers to BOL.com sequentially.
+
+    WHY sequential: BOL rate limits at ~50 req/min. Parallel would hit 429.
+    WHY single token: Fetches token ONCE for entire batch (was N queries before).
+    """
+    conn = db.query(OAuthConnection).filter(
+        OAuthConnection.user_id == user_id,
+        OAuthConnection.marketplace == "bol",
+    ).first()
+
+    if not conn or conn.status != "active":
+        return {"total": len(offers), "succeeded": 0, "failed": len(offers),
+                "results": [{"success": False, "error": "BOL.com nie jest połączony."}]}
+
+    token = await _get_fresh_token(conn, db)
+    if not token:
+        return {"total": len(offers), "succeeded": 0, "failed": len(offers),
+                "results": [{"success": False, "error": "Token BOL.com wygasł."}]}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": BOL_ACCEPT,
+        "Content-Type": BOL_ACCEPT,
+    }
+
+    results = []
+    succeeded = 0
+    failed = 0
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for fields in offers:
+            result = await _push_single_offer(client, headers, fields)
+            results.append(result)
+            if result.get("success"):
+                succeeded += 1
+            else:
+                failed += 1
+            # WHY: 1.5s delay avoids BOL rate limits (50/min ≈ 1.2s between)
+            if len(offers) > 1:
+                await asyncio.sleep(1.5)
+
+    return {
+        "total": len(offers),
+        "succeeded": succeeded,
+        "failed": failed,
+        "results": results,
+    }

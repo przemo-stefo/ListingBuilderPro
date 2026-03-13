@@ -1,18 +1,23 @@
 # backend/services/gws_office.py
-# Purpose: PYROX AI office automation via gws CLI — Docs templates, Sheets invoices, Calendar events
-# NOT for: LBP reports (gws_reports.py) or analytics (analytics_routes.py)
+# Purpose: PYROX AI office automation via REST API — Docs templates, Sheets invoices, Calendar events
+# NOT for: LBP reports (gws_reports.py) or client OAuth (gws_client_service.py)
 
 from __future__ import annotations
 
-import json
+import base64
 from datetime import datetime
 from typing import Dict, List, Optional
 
 import structlog
 
-from services.gws_reports import _gws
+from services.gws_auth import google_api
 
 logger = structlog.get_logger()
+
+DOCS_API = "https://docs.googleapis.com/v1/documents"
+SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
+DRIVE_API = "https://www.googleapis.com/drive/v3"
+CALENDAR_API = "https://www.googleapis.com/calendar/v3"
 
 
 # ─── GOOGLE DOCS: Drip campaign templates ───────────────────────────────────
@@ -27,10 +32,16 @@ def create_drip_template(
 
     WHY: Google Docs = versionable, team-editable, shareable. Replaces hardcoded
     n8n HTML strings. Variables like {{name}}, {{company}} are preserved as-is.
-
     Returns document ID or None on failure.
     """
-    # WHY: Markdown-style header in Doc so team knows this is a template
+    result = google_api("POST", DOCS_API, json_data={"title": f"[Drip] {template_name}"})
+
+    doc_id = result.get("documentId")
+    if not doc_id:
+        logger.error("doc_create_failed", template=template_name, error=result)
+        return None
+
+    # WHY: Insert content after creation — Docs API requires batchUpdate for content
     content = (
         f"SZABLON EMAIL: {template_name}\n"
         f"Temat: {subject}\n"
@@ -38,36 +49,24 @@ def create_drip_template(
         f"---\n\n"
         f"{html_body}"
     )
+    google_api("POST", f"{DOCS_API}/{doc_id}:batchUpdate", json_data={
+        "requests": [{"insertText": {"location": {"index": 1}, "text": content}}],
+    })
 
-    result = _gws([
-        "docs", "documents", "create",
-        "--json", json.dumps({
-            "title": f"[Drip] {template_name}",
-            "body": {"content": [{"paragraph": {"elements": [{"textRun": {"content": content}}]}}]},
-        }),
-    ])
-
-    doc_id = result.get("documentId")
-    if not doc_id:
-        logger.error("gws_doc_create_failed", template=template_name, error=result)
-        return None
-
-    logger.info("gws_doc_created", id=doc_id, template=template_name)
+    logger.info("doc_created", id=doc_id, template=template_name)
     return doc_id
 
 
 def read_drip_template(doc_id: str) -> Optional[str]:
     """Read a Google Doc template content.
 
-    WHY: n8n Code node can fetch template from Docs before sending email,
-    instead of hardcoding HTML in workflow JSON.
+    WHY: n8n Code node can fetch template from Docs before sending email.
     """
-    result = _gws(["docs", "documents", "get", "--params", json.dumps({"documentId": doc_id})])
+    result = google_api("GET", f"{DOCS_API}/{doc_id}")
 
     if "error" in result:
         return None
 
-    # WHY: Extract text from Doc body — Docs API returns nested structure
     body = result.get("body", {})
     content = body.get("content", [])
     text_parts = []
@@ -78,26 +77,18 @@ def read_drip_template(doc_id: str) -> Optional[str]:
                 text_parts.append(text_run["content"])
 
     full_text = "".join(text_parts)
-    # WHY: Skip header (everything before "---\n\n") — return only email body
     if "---\n\n" in full_text:
         return full_text.split("---\n\n", 1)[1]
     return full_text
 
 
 def list_drip_templates() -> List[Dict]:
-    """List all drip campaign templates from Drive.
-
-    WHY: Search by "[Drip]" prefix — all templates are named "[Drip] Template Name".
-    """
-    result = _gws([
-        "drive", "files", "list",
-        "--params", json.dumps({
-            "q": "name contains '[Drip]' and mimeType = 'application/vnd.google-apps.document'",
-            "fields": "files(id,name,modifiedTime)",
-            "orderBy": "modifiedTime desc",
-        }),
-    ])
-
+    """List all drip campaign templates from Drive."""
+    result = google_api("GET", f"{DRIVE_API}/files", params={
+        "q": "name contains '[Drip]' and mimeType = 'application/vnd.google-apps.document'",
+        "fields": "files(id,name,modifiedTime)",
+        "orderBy": "modifiedTime desc",
+    })
     files = result.get("files", [])
     return [{"id": f["id"], "name": f["name"], "modified": f.get("modifiedTime", "")} for f in files]
 
@@ -126,32 +117,22 @@ def create_invoice_sheet(
 ) -> Optional[str]:
     """Create a Google Sheet invoice.
 
-    WHY: Google Sheets = shareable, printable, auto-updates. Replaces Zoho for simple invoices.
     Items format: [{"description": "...", "quantity": 1, "rate": 100.00}]
-
     Returns spreadsheet ID or None on failure.
     """
-    now = datetime.now()
-    issue_date = now.strftime("%Y-%m-%d")
-    due_date_str = now.strftime("%Y-%m-%d")  # Net 30 calculated in sheet
-
-    # Build item rows
     subtotal = sum(item["quantity"] * item["rate"] for item in items)
+    issue_date = datetime.now().strftime("%Y-%m-%d")
 
-    create_result = _gws([
-        "sheets", "spreadsheets", "create",
-        "--json", json.dumps({
-            "properties": {"title": f"Invoice {invoice_number} — {client_name}"},
-            "sheets": [{"properties": {"title": "Invoice", "index": 0}}],
-        }),
-    ])
+    result = google_api("POST", SHEETS_API, json_data={
+        "properties": {"title": f"Invoice {invoice_number} — {client_name}"},
+        "sheets": [{"properties": {"title": "Invoice", "index": 0}}],
+    })
 
-    spreadsheet_id = create_result.get("spreadsheetId")
+    spreadsheet_id = result.get("spreadsheetId")
     if not spreadsheet_id:
-        logger.error("gws_invoice_create_failed", error=create_result)
+        logger.error("invoice_create_failed", error=result)
         return None
 
-    # WHY: Build invoice layout — header, client info, line items, totals, payment info
     rows = [
         ["INVOICE", "", "", invoice_number],
         [],
@@ -188,24 +169,22 @@ def create_invoice_sheet(
     if notes:
         rows.extend([[], ["Notes:", notes]])
 
-    from services.gws_reports import _write_sheet_values
-    _write_sheet_values(spreadsheet_id, "Invoice!A1", rows)
+    # Write data
+    url = f"{SHEETS_API}/{spreadsheet_id}/values/Invoice!A1"
+    google_api("PUT", url, json_data={"values": rows}, params={"valueInputOption": "USER_ENTERED"})
 
-    logger.info("gws_invoice_created", id=spreadsheet_id, invoice=invoice_number, total=subtotal)
+    logger.info("invoice_created", id=spreadsheet_id, invoice=invoice_number, total=subtotal)
     return spreadsheet_id
 
 
 def list_invoices() -> List[Dict]:
     """List all invoice spreadsheets from Drive."""
-    result = _gws([
-        "drive", "files", "list",
-        "--params", json.dumps({
-            "q": "name contains 'Invoice' and mimeType = 'application/vnd.google-apps.spreadsheet'",
-            "fields": "files(id,name,modifiedTime)",
-            "orderBy": "modifiedTime desc",
-            "pageSize": 20,
-        }),
-    ])
+    result = google_api("GET", f"{DRIVE_API}/files", params={
+        "q": "name contains 'Invoice' and mimeType = 'application/vnd.google-apps.spreadsheet'",
+        "fields": "files(id,name,modifiedTime)",
+        "orderBy": "modifiedTime desc",
+        "pageSize": 20,
+    })
     files = result.get("files", [])
     return [{"id": f["id"], "name": f["name"], "modified": f.get("modifiedTime", "")} for f in files]
 
@@ -220,12 +199,7 @@ def create_calendar_event(
     attendees: Optional[List[str]] = None,
     timezone: str = "Europe/Warsaw",
 ) -> Optional[str]:
-    """Create a Google Calendar event.
-
-    WHY: gws CLI handles OAuth + timezone conversion. Attendees get invite emails automatically.
-
-    Returns event ID or None on failure.
-    """
+    """Create a Google Calendar event. Returns event ID or None."""
     event = {
         "summary": summary,
         "start": {"dateTime": start_iso, "timeZone": timezone},
@@ -236,34 +210,26 @@ def create_calendar_event(
     if attendees:
         event["attendees"] = [{"email": e} for e in attendees]
 
-    result = _gws([
-        "calendar", "events", "insert",
-        "--params", json.dumps({"calendarId": "primary"}),
-        "--json", json.dumps(event),
-    ])
+    result = google_api("POST", f"{CALENDAR_API}/calendars/primary/events", json_data=event)
 
     event_id = result.get("id")
     if not event_id:
-        logger.error("gws_event_create_failed", error=result)
+        logger.error("event_create_failed", error=result)
         return None
 
-    logger.info("gws_event_created", id=event_id, summary=summary)
+    logger.info("event_created", id=event_id, summary=summary)
     return event_id
 
 
 def list_upcoming_events(max_results: int = 10) -> List[Dict]:
     """List upcoming calendar events."""
-    now_iso = datetime.now().isoformat() + "Z"
-    result = _gws([
-        "calendar", "events", "list",
-        "--params", json.dumps({
-            "calendarId": "primary",
-            "timeMin": now_iso,
-            "maxResults": max_results,
-            "singleEvents": True,
-            "orderBy": "startTime",
-        }),
-    ])
+    now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    result = google_api("GET", f"{CALENDAR_API}/calendars/primary/events", params={
+        "timeMin": now_iso,
+        "maxResults": max_results,
+        "singleEvents": "true",
+        "orderBy": "startTime",
+    })
 
     events = result.get("items", [])
     return [
@@ -280,8 +246,5 @@ def list_upcoming_events(max_results: int = 10) -> List[Dict]:
 
 def delete_calendar_event(event_id: str) -> bool:
     """Delete a calendar event."""
-    result = _gws([
-        "calendar", "events", "delete",
-        "--params", json.dumps({"calendarId": "primary", "eventId": event_id}),
-    ])
+    result = google_api("DELETE", f"{CALENDAR_API}/calendars/primary/events/{event_id}")
     return "error" not in result

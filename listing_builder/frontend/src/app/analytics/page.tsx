@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import { useAnalytics } from '@/lib/hooks/useAnalytics'
+import { useGenerateReport } from '@/lib/hooks/useAutomation'
 import { GetAnalyticsParams } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import {
   ShoppingCart,
   TrendingUp,
   BarChart3,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
@@ -53,6 +55,7 @@ function getConversionColor(rate: number): string {
 export default function AnalyticsPage() {
   const [params, setParams] = useState<GetAnalyticsParams>({ period: '30d' })
   const { data, isLoading, error, refetch } = useAnalytics(params)
+  const reportMutation = useGenerateReport()
 
   const handleMarketplaceFilter = (marketplace: string) => {
     setParams((prev) => ({
@@ -75,14 +78,25 @@ export default function AnalyticsPage() {
             Wyniki sprzedazowe, rozklad przychodow i najpopularniejsze produkty. Filtruj po marketplace i okresie.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
-          Odswiez
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => reportMutation.mutate({ marketplace: params.marketplace, period: params.period })}
+            disabled={reportMutation.isPending}
+          >
+            <FileSpreadsheet className={cn('mr-2 h-4 w-4', reportMutation.isPending && 'animate-spin')} />
+            Eksportuj do Sheets
+            <span className="ml-1 rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">BETA</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+            Odswiez
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

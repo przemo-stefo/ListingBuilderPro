@@ -49,6 +49,8 @@ const ALLOWED_PATH_PREFIXES = [
   'office',
   'automation',
   'teams',
+  'video',
+  'media-gen',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints — defense in depth

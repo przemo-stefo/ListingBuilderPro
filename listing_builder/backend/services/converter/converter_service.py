@@ -1,424 +1,36 @@
 # backend/services/converter/converter_service.py
 # Purpose: Orchestrate Allegro→Marketplace conversion (scrape→translate→map→generate)
-# NOT for: Individual scraping, AI calls, or template file I/O
+# NOT for: Individual converter functions (marketplace_converters.py), value parsers (converter_helpers.py)
 
 import asyncio
 import random
-import re
 import uuid
 from typing import Dict, List, Optional
-from dataclasses import dataclass, field
 
 import structlog
 
 from services.scraper.allegro_scraper import AllegroProduct, scrape_allegro_product
 from services.converter.ai_translator import AITranslator
-from services.converter.static_translations import (
-    translate_color,
-    translate_material,
-    translate_gender,
-    translate_condition,
+
+# WHY re-export: Many files import ConvertedProduct etc. from converter_service.
+# Keeping re-exports avoids breaking existing imports across the codebase.
+from services.converter.converter_helpers import (  # noqa: F401
+    ConvertedProduct,
+    get_param,
+    parse_weight,
+    parse_dimension_cm,
+    parse_dimension_mm,
+    convert_pln_to_eur,
 )
-from services.converter.field_mapping import (
-    CONDITION_ALLEGRO_TO_EBAY,
-    GENDER_ALLEGRO_TO_MARKETPLACE,
+from services.converter.marketplace_converters import (
+    convert_to_amazon,
+    convert_to_ebay,
+    convert_to_kaufland,
+    convert_to_bol,
+    convert_to_rozetka,
 )
 
 logger = structlog.get_logger()
-
-
-@dataclass
-class ConvertedProduct:
-    """Product data mapped and translated for a specific marketplace."""
-
-    source_url: str = ""
-    source_id: str = ""
-    marketplace: str = ""
-    fields: Dict[str, str] = field(default_factory=dict)
-    warnings: List[str] = field(default_factory=list)
-    error: Optional[str] = None
-
-
-# ── Value parsers ─────────────────────────────────────────────────────────
-
-def parse_weight(weight_str: str) -> str:
-    """Parse Allegro weight format ('0,500 kg', '500 g') to decimal kg."""
-    if not weight_str:
-        return ""
-    weight_str = weight_str.lower().strip()
-    match = re.search(r'([\d,\.]+)\s*(kg|g)', weight_str)
-    if not match:
-        return weight_str
-    value = float(match.group(1).replace(",", "."))
-    unit = match.group(2)
-    if unit == "g":
-        value = value / 1000
-    return f"{value:.3f}"
-
-
-def parse_dimension_mm(dim_str: str) -> str:
-    """Parse Allegro dimension to millimeters (Kaufland format)."""
-    if not dim_str:
-        return ""
-    dim_str = dim_str.lower().strip()
-    match = re.search(r'([\d,\.]+)\s*(mm|cm|m)', dim_str)
-    if not match:
-        return dim_str
-    value = float(match.group(1).replace(",", "."))
-    unit = match.group(2)
-    if unit == "cm":
-        value = value * 10
-    elif unit == "m":
-        value = value * 1000
-    return f"{value:.0f}"
-
-
-def parse_dimension_cm(dim_str: str) -> str:
-    """Parse Allegro dimension to centimeters (Amazon format)."""
-    if not dim_str:
-        return ""
-    dim_str = dim_str.lower().strip()
-    match = re.search(r'([\d,\.]+)\s*(mm|cm|m)', dim_str)
-    if not match:
-        return dim_str
-    value = float(match.group(1).replace(",", "."))
-    unit = match.group(2)
-    if unit == "mm":
-        value = value / 10
-    elif unit == "m":
-        value = value * 100
-    return f"{value:.1f}"
-
-
-def convert_pln_to_eur(pln_price: str, rate: float = 0.23) -> str:
-    """Convert PLN price to EUR. Default rate ~0.23 (1 PLN ≈ 0.23 EUR).
-
-    Rate should be updated from a live source in production.
-    """
-    try:
-        value = float(pln_price.replace(",", ".").strip())
-        eur = value * rate
-        return f"{eur:.2f}"
-    except (ValueError, AttributeError):
-        return pln_price
-
-
-def get_param(product: AllegroProduct, *keys: str) -> str:
-    """Get parameter value by trying multiple Polish key variants."""
-    for key in keys:
-        # Exact match
-        if key in product.parameters:
-            return product.parameters[key]
-        # Case-insensitive match
-        for pk, pv in product.parameters.items():
-            if key.lower() in pk.lower():
-                return pv
-    return ""
-
-
-# ── Marketplace converters ────────────────────────────────────────────────
-
-def convert_to_amazon(
-    product: AllegroProduct,
-    ai: Dict,
-    gpsr_data: Dict,
-    eur_rate: float = 0.23,
-) -> ConvertedProduct:
-    """Map scraped Allegro product to Amazon.de flat file fields.
-
-    Args:
-        product: Scraped Allegro data
-        ai: AI-translated content from AITranslator.translate_product_batch()
-        gpsr_data: User-provided GPSR/manufacturer data (reused across products)
-        eur_rate: PLN→EUR exchange rate
-    """
-    result = ConvertedProduct(
-        source_url=product.source_url,
-        source_id=product.source_id,
-        marketplace="amazon",
-    )
-
-    f = result.fields  # Shorthand
-
-    # Identity
-    f["item_sku"] = f"ALG-{product.source_id}"
-    f["update_delete"] = "Update"
-    f["external_product_id"] = product.ean
-    f["external_product_id_type"] = "EAN" if product.ean else ""
-
-    # Title + Description (AI-translated)
-    f["item_name"] = ai.get("title_de", product.title)
-    f["product_description"] = ai.get("description_de", "")
-
-    # Bullet points (AI-generated, Amazon only)
-    bullets = ai.get("bullet_points", [""] * 5)
-    for i, bp in enumerate(bullets[:5]):
-        f[f"bullet_point{i+1}"] = bp
-
-    # Search keywords
-    f["generic_keywords"] = ai.get("search_keywords", "")
-
-    # Brand / Manufacturer
-    f["brand_name"] = product.brand or get_param(product, "Marka")
-    f["manufacturer"] = product.manufacturer or get_param(product, "Producent")
-    f["part_number"] = get_param(product, "MPN", "Numer producenta")
-    f["model"] = get_param(product, "Model")
-
-    # GPSR (user-provided, same for all products from same manufacturer)
-    f["manufacturer_contact_information"] = gpsr_data.get("manufacturer_contact", "")
-    f["country_of_origin"] = gpsr_data.get("country_of_origin", "")
-    f["gpsr_safety_attestation"] = gpsr_data.get("safety_attestation", "")
-
-    # Pricing
-    f["standard_price"] = convert_pln_to_eur(product.price, eur_rate)
-    f["quantity"] = product.quantity or "1"
-
-    # Images
-    for i, img_url in enumerate(product.images[:9]):
-        if i == 0:
-            f["main_image_url"] = img_url
-        else:
-            f[f"other_image_url{i}"] = img_url
-
-    # Physical attributes
-    f["item_weight"] = parse_weight(get_param(product, "Waga"))
-    f["item_dimensions_length"] = parse_dimension_cm(get_param(product, "Długość"))
-    f["item_dimensions_width"] = parse_dimension_cm(get_param(product, "Szerokość"))
-    f["item_dimensions_height"] = parse_dimension_cm(get_param(product, "Wysokość"))
-
-    # Color / Material (lookup first, AI fallback)
-    f["color_name"] = ai.get("color_de", "")
-    f["material_type"] = ai.get("material_de", "")
-
-    # Size / Gender
-    f["size_name"] = get_param(product, "Rozmiar")
-    gender = get_param(product, "Płeć")
-    f["target_gender"] = translate_gender(gender, "amazon") or ""
-
-    # Language
-    f["language_value1"] = "German"
-
-    # Category (user must provide)
-    f["recommended_browse_nodes"] = gpsr_data.get("amazon_browse_node", "")
-    f["feed_product_type"] = gpsr_data.get("amazon_product_type", "")
-
-    # Warnings for missing required fields
-    if not product.ean:
-        result.warnings.append("EAN missing — required for Amazon")
-    if not f["brand_name"]:
-        result.warnings.append("Brand missing — required for Amazon")
-    if not f["manufacturer_contact_information"]:
-        result.warnings.append("GPSR manufacturer contact missing — provide in settings")
-    if not f["recommended_browse_nodes"]:
-        result.warnings.append("Amazon browse node missing — select category")
-
-    return result
-
-
-def convert_to_ebay(
-    product: AllegroProduct,
-    ai: Dict,
-    gpsr_data: Dict,
-    eur_rate: float = 0.23,
-) -> ConvertedProduct:
-    """Map scraped Allegro product to eBay.de bulk listing fields."""
-
-    result = ConvertedProduct(
-        source_url=product.source_url,
-        source_id=product.source_id,
-        marketplace="ebay",
-    )
-
-    f = result.fields
-
-    # System fields
-    f["*Action(SiteID=77)"] = "Add"
-    f["Category ID"] = gpsr_data.get("ebay_category_id", "")
-
-    # Title + Description (AI)
-    f["Title"] = ai.get("title_de", product.title)[:80]
-    f["Description"] = ai.get("description_de", "")
-
-    # Identifiers
-    f["Custom label (SKU)"] = f"ALG-{product.source_id}"
-    f["Product:EAN"] = product.ean
-    f["Product:MPN"] = get_param(product, "MPN", "Numer producenta")
-
-    # Pricing
-    f["Start Price"] = convert_pln_to_eur(product.price, eur_rate)
-    f["Quantity"] = product.quantity or "1"
-
-    # Condition
-    condition = product.condition or get_param(product, "Stan")
-    f["Condition ID"] = str(translate_condition(condition) or 1000)
-
-    # Images (pipe-separated for eBay)
-    f["PicURL"] = "|".join(product.images[:12]) if product.images else ""
-
-    # Item specifics
-    f["C:Marke"] = product.brand or get_param(product, "Marka")
-    f["C:Hersteller"] = product.manufacturer or get_param(product, "Producent")
-    f["C:Herstellernummer"] = get_param(product, "MPN", "Numer producenta")
-    f["C:Farbe"] = ai.get("color_de", "")
-    f["C:Material"] = ai.get("material_de", "")
-    f["C:Größe"] = get_param(product, "Rozmiar")
-
-    # GPSR manufacturer
-    f["Manufacturer Name"] = product.manufacturer or get_param(product, "Producent")
-    f["Manufacturer Address Line 1"] = gpsr_data.get("manufacturer_address", "")
-    f["Manufacturer City"] = gpsr_data.get("manufacturer_city", "")
-    f["Manufacturer Country"] = gpsr_data.get("manufacturer_country", "")
-
-    # GPSR responsible person
-    f["Responsible Person 1 Type"] = gpsr_data.get("responsible_person_type", "")
-    f["Responsible Person 1 Name"] = gpsr_data.get("responsible_person_name", "")
-    f["Responsible Person 1 Address Line 1"] = gpsr_data.get("responsible_person_address", "")
-    f["Responsible Person 1 Country"] = gpsr_data.get("responsible_person_country", "")
-
-    # Listing format
-    f["Format"] = "FixedPrice"
-    f["Duration"] = "GTC"
-
-    # Warnings
-    if not product.ean:
-        result.warnings.append("EAN missing — required for eBay")
-    if not f["Category ID"]:
-        result.warnings.append("eBay Category ID missing — select category")
-    if not f["Manufacturer Address Line 1"]:
-        result.warnings.append("GPSR manufacturer address missing — provide in settings")
-
-    return result
-
-
-def convert_to_kaufland(
-    product: AllegroProduct,
-    ai: Dict,
-    gpsr_data: Dict,
-) -> ConvertedProduct:
-    """Map scraped Allegro product to Kaufland.de CSV fields."""
-
-    result = ConvertedProduct(
-        source_url=product.source_url,
-        source_id=product.source_id,
-        marketplace="kaufland",
-    )
-
-    f = result.fields
-
-    # Identity
-    f["ean"] = product.ean
-    f["locale"] = "de-DE"
-    f["category"] = gpsr_data.get("kaufland_category", "")
-
-    # Title + Description (AI)
-    f["title"] = ai.get("title_de", product.title)[:120]
-    f["short_description"] = ai.get("short_description_de", "")
-    f["description"] = ai.get("description_de", "")
-
-    # Manufacturer
-    f["manufacturer"] = product.manufacturer or get_param(product, "Producent")
-    f["mpn"] = get_param(product, "MPN", "Numer producenta")
-
-    # Images (Kaufland: 4 slots, all same column name "picture")
-    for i, img_url in enumerate(product.images[:4]):
-        # Kaufland template has 4 columns all named "picture"
-        f[f"picture_{i+1}"] = img_url
-
-    # Physical attributes
-    f["colour"] = ai.get("color_de", "")
-    gender = get_param(product, "Płeć")
-    f["target"] = translate_gender(gender, "kaufland") or ""
-    f["material_composition"] = ai.get("material_de", "")
-    f["weight"] = parse_weight(get_param(product, "Waga"))
-    f["quantity"] = product.quantity or "1"
-    f["length"] = parse_dimension_mm(get_param(product, "Długość"))
-    f["width"] = parse_dimension_mm(get_param(product, "Szerokość"))
-    f["height"] = parse_dimension_mm(get_param(product, "Wysokość"))
-
-    # Size (Kaufland splits shoe/clothing — we put in both, user picks)
-    size = get_param(product, "Rozmiar")
-    f["shoe_size"] = ""
-    f["clothing_size"] = size
-
-    # Warnings
-    if not product.ean:
-        result.warnings.append("EAN missing — required for Kaufland")
-    if not f["category"]:
-        result.warnings.append("Kaufland category missing — select category (German name)")
-    if not f["manufacturer"]:
-        result.warnings.append("Manufacturer missing — required for Kaufland")
-
-    return result
-
-
-def convert_to_bol(
-    product: AllegroProduct,
-    ai: Dict,
-    gpsr_data: Dict,
-    eur_rate: float = 0.23,
-) -> ConvertedProduct:
-    """Map scraped Allegro product to BOL.com Retailer CSV fields.
-
-    WHY: BOL.com (Netherlands/Belgium) uses Dutch product data.
-    AI translator handles PL→NL. No GPSR required (yet).
-    """
-    result = ConvertedProduct(
-        source_url=product.source_url,
-        source_id=product.source_id,
-        marketplace="bol",
-    )
-
-    f = result.fields
-
-    # Identity
-    f["ean"] = product.ean
-    f["sku"] = f"ALG-{product.source_id}"
-    f["condition"] = "NEW"
-
-    # Title + Description (AI-translated to Dutch)
-    f["title"] = ai.get("title_nl", product.title)[:500]
-    f["short_description"] = ai.get("short_description_nl", "")[:300]
-    f["description"] = ai.get("description_nl", "")[:2000]
-
-    # Brand / Manufacturer
-    f["brand"] = product.brand or get_param(product, "Marka")
-    f["manufacturer"] = product.manufacturer or get_param(product, "Producent")
-    f["mpn"] = get_param(product, "MPN", "Numer producenta")
-
-    # Pricing (EUR — BOL uses EUR natively)
-    f["price"] = convert_pln_to_eur(product.price, eur_rate)
-    f["stock"] = product.quantity or "1"
-
-    # Delivery (BOL requires delivery code)
-    f["delivery_code"] = "3-5d"  # WHY: Safe default — 3-5 business days
-
-    # Images (BOL supports up to 10)
-    for i, img_url in enumerate(product.images[:10]):
-        f[f"image_{i+1}"] = img_url
-
-    # Physical attributes
-    f["weight_kg"] = parse_weight(get_param(product, "Waga"))
-    f["length_cm"] = parse_dimension_cm(get_param(product, "Długość"))
-    f["width_cm"] = parse_dimension_cm(get_param(product, "Szerokość"))
-    f["height_cm"] = parse_dimension_cm(get_param(product, "Wysokość"))
-
-    # Color / Material (Dutch)
-    f["color"] = ai.get("color_nl", "")
-    f["material"] = ai.get("material_nl", "")
-    f["size"] = get_param(product, "Rozmiar")
-
-    # Bullet points (BOL supports up to 8)
-    bullets = ai.get("bullet_points_nl", [])
-    for i, bp in enumerate(bullets[:8]):
-        f[f"bullet_point_{i+1}"] = bp
-
-    # Warnings
-    if not product.ean:
-        result.warnings.append("EAN missing — required for BOL.com")
-    if not f["brand"]:
-        result.warnings.append("Brand missing — required for BOL.com")
-
-    return result
 
 
 # ── Main orchestrator ─────────────────────────────────────────────────────
@@ -470,6 +82,7 @@ def convert_product(
         "ebay": convert_to_ebay,
         "kaufland": convert_to_kaufland,
         "bol": convert_to_bol,
+        "rozetka": convert_to_rozetka,
     }
 
     converter_fn = converters.get(marketplace)
@@ -481,6 +94,9 @@ def convert_product(
         )
 
     if marketplace == "kaufland":
+        result = converter_fn(product, ai_content, gpsr_data)
+    elif marketplace == "rozetka":
+        # WHY: Rozetka uses UAH, not EUR — default rate ~9.5 PLN→UAH
         result = converter_fn(product, ai_content, gpsr_data)
     else:
         # WHY: amazon, ebay, bol all need eur_rate for PLN→EUR conversion

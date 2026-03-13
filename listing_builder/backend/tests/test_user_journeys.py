@@ -59,16 +59,7 @@ def _seed_optimization(db, title="Optimized Product", marketplace="amazon_de"):
     return run
 
 
-def _create_user_settings_table(db):
-    """Create user_settings table in SQLite (not a SQLAlchemy model — uses raw SQL)."""
-    db.execute(text("""
-        CREATE TABLE IF NOT EXISTS user_settings (
-            user_id TEXT PRIMARY KEY,
-            settings TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """))
-    db.commit()
+from tests.conftest import create_user_settings_table as _create_user_settings_table
 
 
 def _create_listing_history_table(db):

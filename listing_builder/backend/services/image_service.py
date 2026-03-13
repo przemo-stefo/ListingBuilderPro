@@ -39,7 +39,7 @@ BULLETS: {bullets}
 DESCRIPTION: {description}
 CATEGORY: {category}
 
-Generate a JSON object with these sections:
+Generate a JSON object with EXACTLY these sections:
 
 1. "features" — 6 key product features for a feature grid:
    Each: {{"headline": "short 3-5 word headline", "description": "1-2 sentence benefit-focused description"}}
@@ -53,6 +53,9 @@ Generate a JSON object with these sections:
 4. "hero" — hero banner content:
    {{"headline": "Powerful 5-8 word headline", "subheadline": "Supporting benefit statement"}}
 
+REFERENCE EXAMPLE — follow this exact structure:
+{{"features":[{{"headline":"Dlugi czas pracy","description":"Ciesz sie muzyka przez 60 godzin dzieki dlugiej zywotnosci baterii."}},{{"headline":"Bezprzewodowa swoboda","description":"Rozloz skrzydla dzieki technologii Bluetooth 5.3. Laczsie bez ograniczen."}},{{"headline":"Cisza i spokoj","description":"Zredukuj szumy o 42dB dzieki zaawansowanej technologii ANC."}},{{"headline":"Wygodna konstrukcja","description":"Skladana konstrukcja ulatwia przechowywanie i transport."}},{{"headline":"Najwyzsza jakosc dzwieku","description":"Technologia LDAC zapewnia pelna klarownosc dzwieku."}},{{"headline":"Latwa obsluga","description":"Intuicyjna obsluga pozwala na latwe sterowanie."}}],"comparison":[{{"feature":"Czas pracy baterii","ours":"60h","others":"20h"}},{{"feature":"Technologia ANC","ours":"tak","others":"nie"}},{{"feature":"Wersja Bluetooth","ours":"5.3","others":"4.0"}},{{"feature":"Skladana konstrukcja","ours":"tak","others":"nie"}},{{"feature":"Redukcja szumow","ours":"-42dB","others":"-20dB"}},{{"feature":"Technologia LDAC","ours":"tak","others":"nie"}}],"specs":[{{"label":"Czas pracy baterii","value":"60 godzin"}},{{"label":"Wersja Bluetooth","value":"5.3"}},{{"label":"Technologia ANC","value":"tak"}},{{"label":"Redukcja szumow","value":"-42dB"}},{{"label":"Waga","value":"280g"}},{{"label":"Impedancja","value":"32 Ohm"}},{{"label":"Pasmo przenoszenia","value":"20Hz-40kHz"}},{{"label":"Czas ladowania","value":"2h"}}],"hero":{{"headline":"Bezprzewodowa cisza i muzyka","subheadline":"60h baterii i zaawansowana technologia ANC"}}}}
+{examples_block}
 RULES:
 - Write in the SAME LANGUAGE as the product data ({lang})
 - Focus on BENEFITS, not just features — what does the customer gain?
@@ -68,12 +71,26 @@ Return ONLY valid JSON, no markdown, no explanation.
 def build_image_content_prompt(
     product_name: str, brand: str, bullets: List[str],
     description: str, category: str = "", lang: str = "pl",
+    examples: List[Dict] | None = None,
 ) -> str:
-    """Build structured-data prompt for LLM → infographic content generation."""
+    """Build structured-data prompt for LLM → infographic content generation.
+
+    WHY examples param: RAG injects 2-3 best training examples matching category+lang.
+    """
+    import json as _json
+    examples_block = ""
+    if examples:
+        parts = []
+        for i, ex in enumerate(examples[:3], 1):
+            # WHY: Truncate to 1500 chars — keep prompt under token limits
+            ex_json = _json.dumps(ex, ensure_ascii=False, separators=(",", ":"))[:1500]
+            parts.append(f"Additional example {i}:\n{ex_json}")
+        examples_block = "\n".join(parts) + "\n\n"
     return IMAGE_CONTENT_PROMPT.format(
         product_name=product_name, brand=brand,
         bullets="\n".join(f"- {b}" for b in bullets[:10]),
         description=description[:2000], category=category, lang=lang,
+        examples_block=examples_block,
     )
 
 

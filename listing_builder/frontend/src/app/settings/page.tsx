@@ -6,13 +6,16 @@
 
 import { useEffect, useState } from 'react'
 import { Suspense } from 'react'
-import { Settings as SettingsIcon, Bell, Download, Save, Cpu } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, Download, Save, Cpu, Link2, Unlink } from 'lucide-react'
 import IntegrationsTab from '@/app/compliance/components/IntegrationsTab'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FaqSection } from '@/components/ui/FaqSection'
 import { useSettings, useUpdateSettings } from '@/lib/hooks/useSettings'
+import { useGoogleStatus, useGoogleConnect, useGoogleDisconnect } from '@/lib/hooks/useAutomation'
+import { getGoogleAuthorizeUrl } from '@/lib/api/automation'
+import { useToast } from '@/lib/hooks/useToast'
 import type {
   MarketplaceId,
   NotificationSettings,
@@ -82,6 +85,101 @@ function LoadingSkeleton() {
         />
       ))}
     </div>
+  )
+}
+
+// WHY: Separate component so it has its own query lifecycle (doesn't block settings load)
+function GoogleConnectCard() {
+  const { data: status, isLoading } = useGoogleStatus()
+  const connectMutation = useGoogleConnect()
+  const disconnectMutation = useGoogleDisconnect()
+  const { toast } = useToast()
+
+  const handleConnect = async () => {
+    try {
+      const config = await getGoogleAuthorizeUrl()
+      console.log('[GoogleConnect] config received:', config)
+      // WHY: GIS (Google Identity Services) handles popup + postmessage natively.
+      // Load script dynamically, then initCodeClient() opens Google consent popup.
+      const script = document.createElement('script')
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.onerror = () => {
+        toast({ title: 'Blad ladowania Google', description: 'Nie udalo sie zaladowac skryptu GIS', variant: 'destructive' })
+      }
+      script.onload = () => {
+        console.log('[GoogleConnect] GIS script loaded, initializing...')
+        const client = (window as any).google.accounts.oauth2.initCodeClient({
+          client_id: config.client_id,
+          scope: config.scope,
+          ux_mode: 'popup',
+          callback: (response: { code?: string; error?: string }) => {
+            console.log('[GoogleConnect] callback:', response.error || 'code received')
+            if (response.code) {
+              connectMutation.mutate(response.code)
+            } else if (response.error) {
+              toast({ title: 'Google OAuth blad', description: response.error, variant: 'destructive' })
+            }
+          },
+        })
+        client.requestCode()
+      }
+      document.head.appendChild(script)
+    } catch (err) {
+      console.error('[GoogleConnect] error:', err)
+      toast({ title: 'Blad laczenia z Google', description: String(err), variant: 'destructive' })
+    }
+  }
+
+  const connected = status?.status === 'connected'
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Link2 className="h-5 w-5 text-gray-400" />
+          <CardTitle className="text-lg">Google Workspace</CardTitle>
+        </div>
+        <CardDescription>
+          Polacz konto Google aby eksportowac raporty do Sheets, wysylac emaile i zarzadzac kalendarzem.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="h-12 animate-pulse rounded bg-gray-700" />
+        ) : connected ? (
+          <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+            <div>
+              <p className="text-sm font-medium text-green-500">Polaczono</p>
+              <p className="text-xs text-gray-400">{status?.email}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+            >
+              <Unlink className="mr-2 h-4 w-4" />
+              Rozlacz
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+            <div>
+              <p className="text-sm font-medium text-gray-400">Nie polaczono</p>
+              <p className="text-xs text-gray-500">Kliknij aby zalogowac sie przez Google</p>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleConnect}
+              disabled={connectMutation.isPending}
+            >
+              <Link2 className="mr-2 h-4 w-4" />
+              Polacz Google
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -429,6 +527,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Card 5 — Google Workspace */}
+      <GoogleConnectCard />
 
       <FaqSection
         title="Najczęściej zadawane pytania"
