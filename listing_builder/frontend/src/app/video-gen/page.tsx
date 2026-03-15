@@ -1,241 +1,335 @@
 // frontend/src/app/video-gen/page.tsx
-// Purpose: AI Media Generator — video (ComfyUI) + A+ images (LLM->Pillow)
-// NOT for: Generation logic (useMediaGeneration.ts), UI components (components/)
+// Purpose: TikTok 9:16 Video Generator — template-based product videos
+// NOT for: A+ Content images (removed), ComfyUI (replaced with MoviePy)
 
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { Video, ImageIcon, Sparkles, Clock } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Video, Sparkles, Play, Download, RotateCcw, Loader2, Film, Tag, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useQueryClient } from '@tanstack/react-query'
 import { PremiumGate } from '@/components/tier/PremiumGate'
-import { useToast } from '@/lib/hooks/useToast'
-import { useMediaGen } from '@/components/providers/MediaGenProvider'
-import { startGeneration } from '@/lib/api/mediaGeneration'
-import { MarketplaceSelector } from './components/MarketplaceSelector'
-import { VideoOutput } from './components/VideoOutput'
-import { ImageOutput } from './components/ImageOutput'
-import { ProductDataForm } from './components/ProductDataForm'
-import { InputModeTabs, FileUploadSection, PromptSection, GenerateButton } from './components/VideoInputControls'
-import { HowItWorks, InfoCards, UseCases, VideoFaq } from './components/VideoInfoSections'
-import { MediaHistoryTab } from './components/MediaHistoryTab'
-import { useMediaGeneration } from './useMediaGeneration'
-import type { InputMode, MediaMode, ImageResult } from './types'
+import apiClient from '@/lib/api/client'
 
-type PageTab = 'generate' | 'history'
+type Template = 'product_highlight' | 'feature_breakdown' | 'sale_promo'
+type Theme = 'dark_premium' | 'light' | 'amazon_white'
+type Status = 'idle' | 'pending' | 'running' | 'completed' | 'failed'
+
+const TEMPLATES: { id: Template; name: string; icon: typeof Film; desc: string }[] = [
+  { id: 'product_highlight', name: 'Prezentacja', icon: Film, desc: 'Hero + produkt + cechy + CTA' },
+  { id: 'feature_breakdown', name: 'Cechy', icon: Zap, desc: 'Kazda cecha osobno z numerem' },
+  { id: 'sale_promo', name: 'Promocja', icon: Tag, desc: 'Cena, rabat, urgency CTA' },
+]
+
+const THEMES: { id: Theme; name: string; colors: string }[] = [
+  { id: 'dark_premium', name: 'Ciemny', colors: 'bg-gray-900' },
+  { id: 'light', name: 'Jasny', colors: 'bg-gray-200' },
+  { id: 'amazon_white', name: 'Amazon', colors: 'bg-orange-100' },
+]
 
 export default function VideoGenPage() {
-  const [pageTab, setPageTab] = useState<PageTab>('generate')
-  const [mediaMode, setMediaMode] = useState<MediaMode>('video')
-  const [inputMode, setInputMode] = useState<InputMode>('url')
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [productUrl, setProductUrl] = useState('')
-  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(null)
-  const [prompt, setPrompt] = useState('product showcase, smooth rotation, studio lighting, white background, commercial quality')
+  const [template, setTemplate] = useState<Template>('product_highlight')
+  const [theme, setTheme] = useState<Theme>('dark_premium')
   const [productName, setProductName] = useState('')
   const [brand, setBrand] = useState('')
-  const [bulletPoints, setBulletPoints] = useState('')
-  const [imageTheme, setImageTheme] = useState('dark_premium')
+  const [features, setFeatures] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [originalPrice, setOriginalPrice] = useState('')
+  const [salePrice, setSalePrice] = useState('')
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
-  const { addJob, activeJobs } = useMediaGen()
-  const { status, videoBase64, imageResult, error, reset, generateVideo, generateImages, setStatus, setImageResult } = useMediaGeneration({ toast })
+  const [status, setStatus] = useState<Status>('idle')
+  const [jobId, setJobId] = useState<number | null>(null)
+  const [videoBase64, setVideoBase64] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'Nieprawidlowy plik', description: 'Wybierz obraz (PNG, JPG)', variant: 'destructive' })
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: 'Plik za duzy', description: 'Maksymalny rozmiar: 10 MB', variant: 'destructive' })
-      return
-    }
-    setSelectedImage(file)
-    reset()
-    const reader = new FileReader()
-    reader.onload = (ev) => setImagePreview(ev.target?.result as string)
-    reader.readAsDataURL(file)
-  }, [toast, reset])
+  const canGenerate = productName.trim().length >= 3 && brand.trim().length >= 1
+  const isWorking = status === 'pending' || status === 'running'
 
-  const canGenerateVideo = (inputMode === 'file' && !!selectedImage) || (inputMode === 'url' && !!productUrl.trim())
-  const canGenerateImages = productName.trim().length >= 3 && brand.trim().length >= 1
-  const canGenerate = mediaMode === 'video' ? canGenerateVideo : canGenerateImages
-  const isWorking = status === 'uploading' || status === 'generating'
+  // WHY: Poll job status every 2s until completed/failed
+  useEffect(() => {
+    if (!jobId || !isWorking) return
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await apiClient.get(`/media-gen/status/${jobId}`)
+        if (data.status === 'completed') {
+          setStatus('completed')
+          const result = await apiClient.get(`/media-gen/result/${jobId}`)
+          setVideoBase64(result.data.result_data?.video_base64 || null)
+        } else if (data.status === 'failed') {
+          setStatus('failed')
+          setError(data.error_message || 'Generacja nie powiodla sie')
+        }
+      } catch {
+        // WHY: Network hiccup — keep polling, don't fail
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [jobId, isWorking])
 
-  // WHY: Background generation — starts job on server, user can navigate away
   const handleGenerate = useCallback(async () => {
     if (!canGenerate) return
+    setStatus('pending')
+    setError(null)
+    setVideoBase64(null)
 
-    if (mediaMode === 'images') {
-      try {
-        const bullets = bulletPoints.split('\n').filter(b => b.trim())
-        const result = await startGeneration({
-          media_type: 'images',
-          product_name: productName.trim(),
-          brand: brand.trim(),
-          bullet_points: bullets.length ? bullets : ['Produkt premium'],
-          theme: imageTheme,
-          llm_provider: 'beast',
-        })
-        addJob(result.id, 'images')
-        // WHY: Invalidate history cache so new job appears immediately in Historia tab
-        queryClient.invalidateQueries({ queryKey: ['media-history'] })
-        // WHY: Auto-switch to Historia so user sees their job "W kolejce" / "Generuje..."
-        setPageTab('history')
-        toast({
-          title: 'Generowanie rozpoczete',
-          description: 'Mozesz swobodnie uzywac panelu. Powiadomimy Cie gdy grafiki beda gotowe.',
-        })
-      } catch (err) {
-        toast({
-          title: 'Blad uruchamiania generacji',
-          description: (err as Error).message,
-          variant: 'destructive',
-        })
-      }
-    } else {
-      // WHY: Video still uses direct generation (ComfyUI needs image upload, not easily backgroundable via JSON)
-      await generateVideo({ inputMode, productUrl, selectedImage, prompt })
+    try {
+      const featureList = features.split('\n').filter(f => f.trim())
+      const { data } = await apiClient.post('/media-gen/start', {
+        media_type: 'video',
+        template,
+        product_name: productName.trim(),
+        brand: brand.trim(),
+        features: featureList.length ? featureList : ['Produkt premium'],
+        theme,
+        image_url: imageUrl.trim() || undefined,
+        original_price: originalPrice.trim() || undefined,
+        sale_price: salePrice.trim() || undefined,
+      })
+      setJobId(data.id)
+      setStatus('pending')
+    } catch (err: any) {
+      setStatus('failed')
+      setError(err.response?.data?.detail || err.message || 'Blad uruchamiania generacji')
     }
-  }, [canGenerate, mediaMode, inputMode, productUrl, selectedImage, prompt, productName, brand, bulletPoints, imageTheme, generateVideo, addJob, toast, queryClient])
+  }, [canGenerate, template, productName, brand, features, theme, imageUrl, originalPrice, salePrice])
 
   const handleDownload = useCallback(() => {
     if (!videoBase64) return
     const link = document.createElement('a')
-    link.href = `data:image/webp;base64,${videoBase64}`
-    link.download = `product-video-${Date.now()}.webp`
+    link.href = `data:video/mp4;base64,${videoBase64}`
+    link.download = `tiktok-${template}-${Date.now()}.mp4`
     link.click()
-  }, [videoBase64])
+  }, [videoBase64, template])
 
   const handleReset = useCallback(() => {
-    setSelectedImage(null)
-    setImagePreview(null)
-    reset()
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }, [reset])
-
-  // WHY: When viewing history result, load it into the output panel
-  const handleViewHistoryResult = useCallback((result: ImageResult, resultBrand: string) => {
-    setImageResult(result)
-    setStatus('completed')
-    setBrand(resultBrand)
-    setMediaMode('images')
-    setPageTab('generate')
-  }, [setImageResult, setStatus])
+    setStatus('idle')
+    setJobId(null)
+    setVideoBase64(null)
+    setError(null)
+  }, [])
 
   return (
-    <PremiumGate feature="Kreator mediow AI">
+    <PremiumGate feature="Generator TikTok">
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-blue-500/20 p-2">
-            <Sparkles className="h-6 w-6 text-blue-400" />
+            <Video className="h-6 w-6 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Kreator mediow AI</h1>
-            <p className="text-sm text-gray-400">Generuj wideo produktowe lub infografiki A+ Content</p>
+            <h1 className="text-2xl font-bold text-white">Generator TikTok / Reels</h1>
+            <p className="text-sm text-gray-400">Wideo produktowe 9:16 z szablonami i efektami</p>
           </div>
         </div>
 
-        {/* WHY: Page-level tabs — Generuj / Historia */}
-        <div className="flex rounded-lg bg-[#121212] p-1 border border-gray-800 max-w-xs">
-          <button
-            onClick={() => setPageTab('generate')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all',
-              pageTab === 'generate' ? 'bg-[#1A1A1A] text-white shadow-sm border border-gray-700' : 'text-gray-500 hover:text-gray-300'
-            )}
-          >
-            <Sparkles className="h-4 w-4" /> Generuj
-          </button>
-          <button
-            onClick={() => setPageTab('history')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all',
-              pageTab === 'history' ? 'bg-[#1A1A1A] text-white shadow-sm border border-gray-700' : 'text-gray-500 hover:text-gray-300'
-            )}
-          >
-            <Clock className="h-4 w-4" /> Historia
-            {activeJobs.length > 0 && (
-              <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-            )}
-          </button>
-        </div>
-
-        {pageTab === 'history' ? (
-          <MediaHistoryTab onViewResult={handleViewHistoryResult} />
-        ) : (
-          <>
-            {/* Media mode toggle */}
-            <div className="flex rounded-lg bg-[#121212] p-1 border border-gray-800 max-w-md">
-              {([['video', Video, 'Wideo AI'], ['images', ImageIcon, 'Obrazy A+']] as const).map(([mode, Icon, label]) => (
-                <button
-                  key={mode}
-                  onClick={() => { setMediaMode(mode as MediaMode); handleReset() }}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-                    mediaMode === mode ? 'bg-[#1A1A1A] text-white shadow-sm border border-gray-700' : 'text-gray-500 hover:text-gray-300'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </button>
-              ))}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left: Form */}
+          <div className="space-y-4">
+            {/* Template picker */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-300">Szablon</label>
+              <div className="grid grid-cols-3 gap-2">
+                {TEMPLATES.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTemplate(t.id)}
+                    className={cn(
+                      'rounded-lg border p-3 text-left transition-all',
+                      template === t.id
+                        ? 'border-blue-500 bg-blue-500/10 text-white'
+                        : 'border-gray-700 bg-[#1A1A1A] text-gray-400 hover:border-gray-600'
+                    )}
+                  >
+                    <t.icon className="mb-1 h-5 w-5" />
+                    <div className="text-sm font-medium">{t.name}</div>
+                    <div className="text-xs text-gray-500">{t.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-4">
-                {mediaMode === 'video' ? (
-                  <>
-                    <InputModeTabs inputMode={inputMode} onChange={setInputMode} />
-                    {inputMode === 'url' && (
-                      <MarketplaceSelector
-                        selectedMarketplace={selectedMarketplace}
-                        onSelectMarketplace={(id) => { setSelectedMarketplace(id); setProductUrl('') }}
-                        productUrl={productUrl}
-                        onUrlChange={setProductUrl}
-                      />
+            {/* Theme picker */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-300">Motyw</label>
+              <div className="flex gap-2">
+                {THEMES.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTheme(t.id)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-all',
+                      theme === t.id
+                        ? 'border-blue-500 bg-blue-500/10 text-white'
+                        : 'border-gray-700 bg-[#1A1A1A] text-gray-400 hover:border-gray-600'
                     )}
-                    {inputMode === 'file' && (
-                      <FileUploadSection imagePreview={imagePreview} fileInputRef={fileInputRef} onImageSelect={handleImageSelect} />
-                    )}
-                    <PromptSection prompt={prompt} onPromptChange={setPrompt} />
-                    <GenerateButton canGenerate={canGenerate} isWorking={isWorking} status={status} onClick={handleGenerate} mediaMode="video" />
-                  </>
-                ) : (
-                  <>
-                    <ProductDataForm
-                      productName={productName} onProductNameChange={setProductName}
-                      brand={brand} onBrandChange={setBrand}
-                      bulletPoints={bulletPoints} onBulletPointsChange={setBulletPoints}
-                      imageTheme={imageTheme} onThemeChange={setImageTheme}
-                    />
-                    <GenerateButton canGenerate={canGenerate} isWorking={isWorking} status={status} onClick={handleGenerate} mediaMode="images" />
-                  </>
-                )}
+                  >
+                    <div className={cn('h-3 w-3 rounded-full', t.colors)} />
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Product data */}
+            <div className="space-y-3 rounded-lg border border-gray-800 bg-[#1A1A1A] p-4">
+              <div>
+                <label className="mb-1 block text-sm text-gray-400">Nazwa produktu *</label>
+                <input
+                  type="text"
+                  value={productName}
+                  onChange={e => setProductName(e.target.value)}
+                  placeholder="np. Bezprzewodowe sluchawki ProMax"
+                  className="w-full rounded-md border border-gray-700 bg-[#121212] px-3 py-2 text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-gray-400">Marka *</label>
+                <input
+                  type="text"
+                  value={brand}
+                  onChange={e => setBrand(e.target.value)}
+                  placeholder="np. TechBrand"
+                  className="w-full rounded-md border border-gray-700 bg-[#121212] px-3 py-2 text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-gray-400">Cechy produktu (jedna na linie)</label>
+                <textarea
+                  value={features}
+                  onChange={e => setFeatures(e.target.value)}
+                  placeholder={"Redukcja szumow ANC\nBateria 40h\nBluetooth 5.3\nSzybkie ladowanie"}
+                  rows={4}
+                  className="w-full rounded-md border border-gray-700 bg-[#121212] px-3 py-2 text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-gray-400">URL zdjecia produktu (opcjonalnie)</label>
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={e => setImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-md border border-gray-700 bg-[#121212] px-3 py-2 text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                />
               </div>
 
-              {mediaMode === 'video' ? (
-                <VideoOutput status={status} videoBase64={videoBase64} error={error} onDownload={handleDownload} onReset={handleReset} onRetry={() => setStatus('idle')} />
-              ) : (
-                <ImageOutput status={status} result={imageResult} error={error} brand={brand} onRetry={() => setStatus('idle')} />
+              {/* WHY: Price fields only for sale_promo template */}
+              {template === 'sale_promo' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">Cena oryginalna</label>
+                    <input
+                      type="text"
+                      value={originalPrice}
+                      onChange={e => setOriginalPrice(e.target.value)}
+                      placeholder="199 zl"
+                      className="w-full rounded-md border border-gray-700 bg-[#121212] px-3 py-2 text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-gray-400">Cena promocyjna</label>
+                    <input
+                      type="text"
+                      value={salePrice}
+                      onChange={e => setSalePrice(e.target.value)}
+                      placeholder="149 zl"
+                      className="w-full rounded-md border border-gray-700 bg-[#121212] px-3 py-2 text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
               )}
             </div>
 
-            {mediaMode === 'video' && (
-              <>
-                <HowItWorks />
-                <InfoCards />
-                <UseCases />
-                <VideoFaq />
-              </>
+            {/* Generate button */}
+            <button
+              onClick={handleGenerate}
+              disabled={!canGenerate || isWorking}
+              className={cn(
+                'flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-medium transition-all',
+                canGenerate && !isWorking
+                  ? 'bg-blue-600 text-white hover:bg-blue-500'
+                  : 'cursor-not-allowed bg-gray-800 text-gray-500'
+              )}
+            >
+              {isWorking ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {status === 'pending' ? 'W kolejce...' : 'Generuje wideo...'}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generuj wideo TikTok
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Right: Output */}
+          <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-6">
+            {status === 'idle' && (
+              <div className="flex h-full min-h-[400px] flex-col items-center justify-center text-gray-500">
+                <Play className="mb-3 h-12 w-12" />
+                <p className="text-sm">Wypelnij dane i kliknij Generuj</p>
+                <p className="mt-1 text-xs text-gray-600">Wideo 9:16 (1080x1920) • MP4 • ~20s</p>
+              </div>
             )}
-          </>
-        )}
+
+            {isWorking && (
+              <div className="flex h-full min-h-[400px] flex-col items-center justify-center">
+                <Loader2 className="mb-3 h-12 w-12 animate-spin text-blue-400" />
+                <p className="text-sm text-gray-300">
+                  {status === 'pending' ? 'Zadanie w kolejce...' : 'Renderowanie wideo...'}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">To moze potrwac 30-60 sekund</p>
+              </div>
+            )}
+
+            {status === 'completed' && videoBase64 && (
+              <div className="space-y-4">
+                <video
+                  src={`data:video/mp4;base64,${videoBase64}`}
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  className="mx-auto max-h-[500px] rounded-lg"
+                  style={{ aspectRatio: '9/16' }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownload}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500"
+                  >
+                    <Download className="h-4 w-4" />
+                    Pobierz MP4
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-400 hover:text-white"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Nowe
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {status === 'failed' && (
+              <div className="flex h-full min-h-[400px] flex-col items-center justify-center">
+                <div className="mb-3 rounded-lg bg-red-500/10 p-4 text-center">
+                  <p className="text-sm text-red-400">{error || 'Wystapil blad'}</p>
+                </div>
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-2 rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-400 hover:text-white"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Sprobuj ponownie
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </PremiumGate>
   )

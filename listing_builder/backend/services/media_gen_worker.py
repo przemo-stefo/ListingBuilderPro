@@ -4,6 +4,7 @@
 
 import json
 from datetime import datetime, timezone
+from typing import Optional
 import structlog
 
 from database import SessionLocal
@@ -117,7 +118,7 @@ def run_image_generation(gen_id: int):
 
 
 def run_video_generation(gen_id: int):
-    """Background task: generate product video via ComfyUI pipeline."""
+    """Background task: generate TikTok 9:16 video via MoviePy templates."""
     db = SessionLocal()
     try:
         gen = db.query(MediaGeneration).filter(MediaGeneration.id == gen_id).first()
@@ -128,24 +129,20 @@ def run_video_generation(gen_id: int):
         db.commit()
 
         params = gen.input_params
-        logger.info("media_gen_video_start", gen_id=gen_id)
+        logger.info("media_gen_video_start", gen_id=gen_id, template=params.get("template"))
 
-        from services.comfyui_service import run_comfyui_pipeline
-        from services.product_image_fetcher import fetch_product_image
-        from utils.url_validator import validate_marketplace_url
+        from services.video_render import render_video
 
-        if params.get("url"):
-            validated_url = validate_marketplace_url(params["url"])
-            image_bytes, filename = fetch_product_image(validated_url)
-        elif params.get("image_base64"):
-            import base64
-            image_bytes = base64.b64decode(params["image_base64"])
-            filename = params.get("filename", "input.png")
-        else:
-            raise ValueError("Brak zrodla obrazu (URL lub plik)")
-
-        prompt = params.get("prompt", "product showcase, smooth rotation, studio lighting")
-        result = run_comfyui_pipeline(image_bytes, filename, prompt)
+        result = render_video(
+            template=params.get("template", "product_highlight"),
+            product_name=params.get("product_name", "Produkt"),
+            brand=params.get("brand", "Marka"),
+            features=params.get("features", params.get("bullet_points", [])),
+            theme=params.get("theme", "dark_premium"),
+            image_url=params.get("image_url"),
+            original_price=params.get("original_price"),
+            sale_price=params.get("sale_price"),
+        )
 
         gen.result_data = result
         gen.status = JobStatus.COMPLETED
@@ -170,7 +167,7 @@ def run_video_generation(gen_id: int):
         db.close()
 
 
-def _call_llm_sync(provider: str, prompt: str, api_key: str | None = None) -> str:
+def _call_llm_sync(provider: str, prompt: str, api_key: Optional[str] = None) -> str:
     """Call LLM synchronously with fallback to Groq."""
     from services.llm_providers import PROVIDERS, call_llm
     from services.groq_client import call_groq

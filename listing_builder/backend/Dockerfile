@@ -9,6 +9,8 @@ WORKDIR /app
 # WHY: System deps for psycopg2-binary
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    ffmpeg \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

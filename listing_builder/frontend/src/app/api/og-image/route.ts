@@ -4,6 +4,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
+// WHY: Prevent Next.js from statically generating this route at build time (causes timeout)
+export const dynamic = 'force-dynamic'
+
 // WHY: Block SSRF — reject internal/private IPs and non-http protocols
 function isPrivateUrl(urlStr: string): boolean {
   try {

@@ -24,16 +24,18 @@ router = APIRouter(prefix="/api/media-gen", tags=["media-gen"])
 
 class StartImageRequest(BaseModel):
     media_type: str = Field(..., pattern="^(video|images)$")
-    # Image generation params
     product_name: Optional[str] = Field(default=None, max_length=500)
     brand: Optional[str] = Field(default=None, max_length=200)
     bullet_points: List[str] = Field(default_factory=list)
     description: str = Field(default="")
     theme: str = Field(default="dark_premium", pattern="^(dark_premium|light|amazon_white)$")
     llm_provider: Optional[str] = Field(default=None, pattern="^(beast|groq|openai|anthropic)$")
-    # Video generation params
-    url: Optional[str] = Field(default=None, max_length=2000)
-    prompt: Optional[str] = Field(default=None, max_length=1000)
+    # Video generation params (TikTok 9:16 templates)
+    template: str = Field(default="product_highlight", pattern="^(product_highlight|feature_breakdown|sale_promo)$")
+    features: List[str] = Field(default_factory=list)
+    image_url: Optional[str] = Field(default=None, max_length=2000)
+    original_price: Optional[str] = Field(default=None, max_length=50)
+    sale_price: Optional[str] = Field(default=None, max_length=50)
 
 
 class JobStatusResponse(BaseModel):
@@ -59,11 +61,11 @@ async def start_generation(
     user_id: str = Depends(require_user_id),
 ):
     """Start background media generation. Returns job ID immediately."""
-    if body.media_type == "images":
-        if not body.product_name or len(body.product_name.strip()) < 3:
-            raise HTTPException(400, "Nazwa produktu wymagana (min 3 znaki)")
-        if not body.brand or len(body.brand.strip()) < 1:
-            raise HTTPException(400, "Marka wymagana")
+    # WHY: Both video and images require product_name + brand
+    if not body.product_name or len(body.product_name.strip()) < 3:
+        raise HTTPException(400, "Nazwa produktu wymagana (min 3 znaki)")
+    if not body.brand or len(body.brand.strip()) < 1:
+        raise HTTPException(400, "Marka wymagana")
 
     gen = MediaGeneration(
         user_id=user_id,
@@ -167,6 +169,13 @@ async def get_active_jobs(
     return {"jobs": [{"id": j.id, "status": j.status.value, "media_type": j.media_type} for j in jobs]}
 
 
+@router.get("/templates")
+async def get_templates():
+    """Return available video templates metadata."""
+    from services.video_render import AVAILABLE_TEMPLATES
+    return {"templates": AVAILABLE_TEMPLATES}
+
+
 @router.patch("/{gen_id}/feedback")
 async def save_feedback(
     gen_id: int,
@@ -218,7 +227,7 @@ def _to_summary(gen: MediaGeneration) -> dict:
         "product_name": params.get("product_name", ""),
         "brand": params.get("brand", ""),
         "theme": params.get("theme", ""),
-        "url": (params.get("url", "") or "")[:80],
+        "template": params.get("template", ""),
         "created_at": gen.created_at.isoformat() if gen.created_at else None,
         "completed_at": gen.completed_at.isoformat() if gen.completed_at else None,
         "error_message": gen.error_message,

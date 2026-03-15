@@ -21,7 +21,6 @@ import {
   Megaphone,
   Rocket,
   Video,
-  Eye,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -65,7 +64,7 @@ export const navSections: NavSection[] = [
       { title: 'Ekspert Rozetka', href: '/expert-qa?mode=rozetka', icon: Store, desc: 'Pytania o Rozetka — ukraiński marketplace, listingi, SEO, dostawa', premiumOnly: true },
       { title: 'Reklamy AI', href: '/ad-copy', icon: Megaphone, desc: '3 warianty reklam (hook, story, benefit) z wiedzy ekspertów', premiumOnly: true, beta: true },
       { title: 'Badanie rynku', href: '/research', icon: Users, desc: '10 skilli AI: badanie klienta, ICP, brief, reklamy Facebook/Google, skrypty wideo', premiumOnly: true, beta: true },
-      { title: 'Kreator mediow', href: '/video-gen', icon: Eye, desc: 'Wideo produktowe AI + infografiki A+ Content (baner, cechy, porownanie, specyfikacja)', premiumOnly: true, beta: true },
+      { title: 'Generator TikTok', href: '/video-gen', icon: Video, desc: 'Wideo produktowe 9:16 — szablony TikTok/Reels z efektami', premiumOnly: true, beta: true },
     ],
   },
   {
