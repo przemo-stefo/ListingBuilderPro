@@ -2,8 +2,7 @@
 # Purpose: TikTok 9:16 video templates — PIL frame sequences for each template type
 # NOT for: Encoding (video_render.py), core utils (video_core.py)
 
-from typing import List, Optional, Tuple
-import numpy as np
+from typing import List, Optional
 from PIL import Image, ImageDraw
 
 from services.video_core import (
@@ -14,8 +13,8 @@ from services.video_core import (
 
 
 def render_product_highlight(product_name: str, brand: str, features: List[str],
-                              theme: str, image_url: Optional[str] = None) -> List[np.ndarray]:
-    """5 slides: hero+brand, title+image, 2x features, CTA."""
+                              theme: str, image_url: Optional[str] = None) -> List[Image.Image]:
+    """5 slides: hero+brand, title+image, 2x features, CTA. Returns PIL Images."""
     t = THEMES.get(theme, THEMES["dark_premium"])
     product_img = fetch_image_from_url(image_url) if image_url else None
     slides = []
@@ -62,12 +61,12 @@ def render_product_highlight(product_name: str, brand: str, features: List[str],
     draw_text_centered(draw, "SPRAWDZ OFERTE", 1025, get_font(36, bold=True), t["badge_text"])
     slides.append(bg)
 
-    return _make_frames_from_slides(slides)
+    return slides
 
 
 def render_feature_breakdown(product_name: str, brand: str, features: List[str],
-                              theme: str, image_url: Optional[str] = None) -> List[np.ndarray]:
-    """Intro + individual feature slides with large numbers + CTA."""
+                              theme: str, image_url: Optional[str] = None) -> List[Image.Image]:
+    """Intro + individual feature slides with large numbers + CTA. Returns PIL Images."""
     t = THEMES.get(theme, THEMES["dark_premium"])
     slides = []
 
@@ -99,13 +98,13 @@ def render_feature_breakdown(product_name: str, brand: str, features: List[str],
     draw_text_centered(draw, "KUP TERAZ", 975, get_font(36, bold=True), t["badge_text"])
     slides.append(bg)
 
-    return _make_frames_from_slides(slides)
+    return slides
 
 
 def render_sale_promo(product_name: str, brand: str, features: List[str], theme: str,
                       image_url: Optional[str] = None, original_price: Optional[str] = None,
-                      sale_price: Optional[str] = None) -> List[np.ndarray]:
-    """4 slides: product+price, PROMOCJA+discount, features with checks, urgency CTA."""
+                      sale_price: Optional[str] = None) -> List[Image.Image]:
+    """4 slides: product+price, PROMOCJA+discount, features with checks, urgency CTA. Returns PIL Images."""
     t = THEMES.get(theme, THEMES["dark_premium"])
     product_img = fetch_image_from_url(image_url) if image_url else None
     slides = []
@@ -155,27 +154,4 @@ def render_sale_promo(product_name: str, brand: str, features: List[str], theme:
     draw_text_centered(draw, brand.upper(), 1100, get_font(32), t["text_secondary"])
     slides.append(bg)
 
-    return _make_frames_from_slides(slides)
-
-
-def _make_frames_from_slides(slides: List[Image.Image]) -> List[np.ndarray]:
-    """Convert PIL slides to numpy frame sequence with 0.5s crossfade."""
-    frames = []
-    crossfade_frames = FPS // 2  # 0.5s crossfade
-    hold_frames = DURATION_PER_SLIDE * FPS - crossfade_frames
-
-    for i, slide in enumerate(slides):
-        arr = np.array(slide.convert("RGB"))
-        # WHY: Hold slide for (duration - crossfade) frames
-        for _ in range(hold_frames):
-            frames.append(arr)
-
-        # WHY: Crossfade to next slide (skip for last slide)
-        if i < len(slides) - 1:
-            next_arr = np.array(slides[i + 1].convert("RGB"))
-            for f in range(crossfade_frames):
-                alpha = f / crossfade_frames
-                blended = (arr * (1 - alpha) + next_arr * alpha).astype(np.uint8)
-                frames.append(blended)
-
-    return frames
+    return slides

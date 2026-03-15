@@ -60,8 +60,7 @@ defusedxml>=0.7.1  # WHY: Prevents XXE attacks in RSS/Atom XML parsing
 # Image Generation (A+ Content infographics)
 Pillow>=10.0.0
 
-# Video Generation (TikTok 9:16 via MoviePy + FFmpeg)
-moviepy>=2.0.0
+# Video Generation (TikTok 9:16 via FFmpeg subprocess + PIL/numpy)
 numpy>=1.24.0
 
 # Logging

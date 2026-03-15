@@ -1,15 +1,16 @@
 # backend/services/video_render.py
-# Purpose: Video rendering entry point — dispatch to template, encode MP4
+# Purpose: Video rendering entry point — dispatch to template, encode MP4 via FFmpeg pipe
 # NOT for: Template logic (video_templates.py), core utils (video_core.py)
 
 import base64
+import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from moviepy import ImageSequenceClip
+from PIL import Image
 
-from services.video_core import FPS
+from services.video_core import WIDTH, HEIGHT, FPS, DURATION_PER_SLIDE
 from services.video_templates import render_product_highlight, render_feature_breakdown, render_sale_promo
 
 # WHY: Metadata for /templates endpoint — frontend shows template picker
@@ -66,30 +67,90 @@ def render_video(
         kwargs["original_price"] = original_price
         kwargs["sale_price"] = sale_price
 
-    frames = renderer(**kwargs)
-    video_b64 = _encode_mp4(frames)
+    slides = renderer(**kwargs)
+    video_b64 = _encode_mp4_streaming(slides)
 
     return {
         "video_base64": video_b64,
         "template": template,
         "format": "mp4",
-        "resolution": "1080x1920",
+        "resolution": f"{WIDTH}x{HEIGHT}",
         "fps": FPS,
     }
 
 
-def _encode_mp4(frames: List[np.ndarray]) -> str:
-    """Encode numpy frames to MP4 via MoviePy + FFmpeg, return base64."""
-    clip = ImageSequenceClip(frames, fps=FPS)
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as tmp:
-        clip.write_videofile(
-            tmp.name,
-            fps=FPS,
-            codec="libx264",
-            audio=False,
-            preset="fast",
-            ffmpeg_params=["-crf", "23", "-pix_fmt", "yuv420p"],
-            logger=None,
-        )
-        tmp.seek(0)
-        return base64.b64encode(tmp.read()).decode("utf-8")
+def _encode_mp4_streaming(slides: List[Image.Image]) -> str:
+    """Encode PIL slides to MP4 via FFmpeg pipe — streams frames, ~12MB RAM instead of ~3.6GB.
+
+    WHY: MoviePy ImageSequenceClip loads ALL frames into memory. With 1080x1920x3 bytes x 600 frames
+    = ~3.6GB, which OOMs in 768MB container. Piping raw frames to FFmpeg uses only 2 frames at a time.
+    """
+    crossfade_frames = FPS // 2  # 0.5s crossfade
+    hold_frames = DURATION_PER_SLIDE * FPS - crossfade_frames
+    frame_size = WIDTH * HEIGHT * 3
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        tmp_path = tmp.name
+    # WHY: stderr to file, not PIPE — avoids deadlock when FFmpeg outputs
+    # progress info faster than 64KB buffer allows while we write frames to stdin
+    stderr_path = tmp_path + ".log"
+
+    try:
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "rawvideo",
+            "-vcodec", "rawvideo",
+            "-s", f"{WIDTH}x{HEIGHT}",
+            "-pix_fmt", "rgb24",
+            "-r", str(FPS),
+            "-i", "pipe:0",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-crf", "23",
+            "-preset", "ultrafast",
+            "-threads", "1",
+            "-an",
+            tmp_path,
+        ]
+
+        with open(stderr_path, "w") as stderr_file:
+            # WHY: bufsize = 1 frame avoids small-buffer stdin blocking
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=stderr_file, bufsize=WIDTH * HEIGHT * 3)
+
+            for i, slide in enumerate(slides):
+                arr = np.array(slide.convert("RGB"))
+
+                # WHY: Write hold frames (same frame repeated)
+                raw = arr.tobytes()
+                for _ in range(hold_frames):
+                    proc.stdin.write(raw)
+
+                # WHY: Crossfade to next slide (skip for last)
+                if i < len(slides) - 1:
+                    next_arr = np.array(slides[i + 1].convert("RGB"))
+                    for f in range(crossfade_frames):
+                        alpha = f / crossfade_frames
+                        blended = (arr * (1 - alpha) + next_arr * alpha).astype(np.uint8)
+                        proc.stdin.write(blended.tobytes())
+                    del next_arr
+
+                del arr
+
+            proc.stdin.close()
+            proc.wait(timeout=120)
+
+        if proc.returncode != 0:
+            with open(stderr_path, "r") as f:
+                err = f.read()[-500:]
+            raise RuntimeError(f"FFmpeg error: {err}")
+
+        with open(tmp_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+
+    finally:
+        import os
+        for p in (tmp_path, stderr_path):
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
