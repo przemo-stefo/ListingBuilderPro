@@ -65,20 +65,21 @@ async def _poll_until_done(api_id: str, api_key: str, job_id: str, endpoint: str
     headers = {"X-API-ID": api_id, "X-API-KEY": api_key}
     url = f"{CREATIFY_BASE}/{endpoint}/{job_id}/"
 
-    for attempt in range(120):
-        await asyncio.sleep(5)
-        async with httpx.AsyncClient(timeout=15) as client:
+    # WHY: Reuse single client for all poll requests — avoids 120 new connections
+    async with httpx.AsyncClient(timeout=15) as client:
+        for attempt in range(120):
+            await asyncio.sleep(5)
             resp = await client.get(url, headers=headers)
             resp.raise_for_status()
             data = resp.json()
 
-        status = data.get("status", "")
-        logger.debug("creatify_poll", job_id=job_id, attempt=attempt, status=status)
+            status = data.get("status", "")
+            logger.debug("creatify_poll", job_id=job_id, attempt=attempt, status=status)
 
-        if status == "done":
-            return data
-        if status in ("failed", "error"):
-            raise RuntimeError(f"Creatify job failed: {data.get('error', 'unknown')}")
+            if status == "done":
+                return data
+            if status in ("failed", "error"):
+                raise RuntimeError(f"Creatify job failed: {data.get('error', 'unknown')}")
 
     raise TimeoutError(f"Creatify job {job_id} timeout po 10 min")
 

@@ -15,6 +15,7 @@ from models.jobs import JobStatus
 from models.media_generation import MediaGeneration
 from api.dependencies import require_user_id
 from services.media_gen_worker import run_image_generation, run_video_generation, run_creatify_video_generation
+from utils.url_validator import _reject_private_host
 
 limiter = Limiter(key_func=get_remote_address)
 logger = structlog.get_logger()
@@ -66,11 +67,30 @@ async def start_generation(
     user_id: str = Depends(require_user_id),
 ):
     """Start background media generation. Returns job ID immediately."""
-    # WHY: Both video and images require product_name + brand
-    if not body.product_name or len(body.product_name.strip()) < 3:
-        raise HTTPException(400, "Nazwa produktu wymagana (min 3 znaki)")
-    if not body.brand or len(body.brand.strip()) < 1:
-        raise HTTPException(400, "Marka wymagana")
+    # WHY: Creatify URL-only mode doesn't need name+brand — Creatify scrapes the page
+    creatify_url_mode = (
+        body.media_type == "video"
+        and body.generation_mode == "ai_creatify"
+        and body.product_url
+    )
+    if not creatify_url_mode:
+        if not body.product_name or len(body.product_name.strip()) < 3:
+            raise HTTPException(400, "Nazwa produktu wymagana (min 3 znaki)")
+        if not body.brand or len(body.brand.strip()) < 1:
+            raise HTTPException(400, "Marka wymagana")
+
+    # SECURITY: Reject private/internal URLs to prevent SSRF
+    for url_field, label in [(body.product_url, "product_url"), (body.image_url, "image_url")]:
+        if url_field:
+            from urllib.parse import urlparse
+            parsed = urlparse(url_field)
+            if parsed.scheme not in ("http", "https"):
+                raise HTTPException(400, f"{label}: tylko HTTP/HTTPS dozwolone")
+            if parsed.hostname:
+                try:
+                    _reject_private_host(parsed.hostname)
+                except ValueError as e:
+                    raise HTTPException(400, f"{label}: {e}")
 
     gen = MediaGeneration(
         user_id=user_id,
