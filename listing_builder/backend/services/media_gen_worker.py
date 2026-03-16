@@ -167,6 +167,79 @@ def run_video_generation(gen_id: int):
         db.close()
 
 
+def run_creatify_video_generation(gen_id: int, user_id: str) -> None:
+    """Background task: generate professional video via Creatify API."""
+    import asyncio
+    from sqlalchemy import text as sa_text
+
+    db = SessionLocal()
+    try:
+        gen = db.query(MediaGeneration).filter(MediaGeneration.id == gen_id).first()
+        if not gen:
+            logger.error("creatify_gen_not_found", gen_id=gen_id)
+            return
+
+        gen.status = JobStatus.RUNNING
+        db.commit()
+
+        # WHY: Load per-user Creatify credentials from user_settings
+        row = db.execute(
+            sa_text("SELECT settings FROM user_settings WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).fetchone()
+        settings = row[0] if row and row[0] else {}
+        video_ai = settings.get("video_ai", {})
+        api_id = video_ai.get("creatify_api_id", "")
+        api_key = video_ai.get("creatify_api_key", "")
+
+        if not api_id or not api_key:
+            raise ValueError("Brak kluczy Creatify — dodaj je w Ustawieniach > Wideo AI")
+
+        params = gen.input_params or {}
+        logger.info("creatify_gen_start", gen_id=gen_id, has_url=bool(params.get("product_url")))
+
+        from services.video_creatify import generate_url_to_video, generate_product_to_video
+
+        if params.get("product_url"):
+            result = asyncio.run(generate_url_to_video(
+                api_id, api_key, params["product_url"],
+                visual_style=params.get("visual_style", "modern"),
+                script=params.get("script"),
+            ))
+        else:
+            result = asyncio.run(generate_product_to_video(
+                api_id, api_key,
+                product_name=params.get("product_name", ""),
+                brand=params.get("brand", ""),
+                description=params.get("description", ""),
+                image_url=params.get("image_url"),
+                visual_style=params.get("visual_style", "modern"),
+                script=params.get("script"),
+            ))
+
+        gen.result_data = result
+        gen.status = JobStatus.COMPLETED
+        gen.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+        logger.info("creatify_gen_done", gen_id=gen_id, video_url=result.get("video_url", "")[:80])
+
+    except Exception as e:
+        logger.error("creatify_gen_failed", gen_id=gen_id, error=str(e))
+        try:
+            db.rollback()
+            gen = db.query(MediaGeneration).filter(MediaGeneration.id == gen_id).first()
+            if gen:
+                gen.status = JobStatus.FAILED
+                gen.error_message = str(e)[:500]
+                gen.completed_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception as inner:
+            logger.error("creatify_gen_status_update_failed", gen_id=gen_id, error=str(inner))
+    finally:
+        db.close()
+
+
 def _call_llm_sync(provider: str, prompt: str, api_key: Optional[str] = None) -> str:
     """Call LLM synchronously with fallback to Groq."""
     from services.llm_providers import PROVIDERS, call_llm

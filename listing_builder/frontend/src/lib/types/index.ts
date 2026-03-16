@@ -351,6 +351,7 @@ export interface SettingsResponse {
   notifications: NotificationSettings
   data_export: DataExportSettings
   llm?: LLMSettings
+  video_ai?: VideoAISettings
   gpsr?: GPSRData
 }
 
@@ -503,6 +504,12 @@ export interface LLMProviderConfig {
 export interface LLMSettings {
   default_provider: LLMProvider
   providers: Partial<Record<LLMProvider, LLMProviderConfig>>
+}
+
+// WHY: Per-user Creatify credentials for professional AI video generation
+export interface VideoAISettings {
+  creatify_api_id: string
+  creatify_api_key: string
 }
 
 // Listing Optimizer types (n8n workflow)

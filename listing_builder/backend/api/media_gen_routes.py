@@ -14,7 +14,7 @@ from database import get_db
 from models.jobs import JobStatus
 from models.media_generation import MediaGeneration
 from api.dependencies import require_user_id
-from services.media_gen_worker import run_image_generation, run_video_generation
+from services.media_gen_worker import run_image_generation, run_video_generation, run_creatify_video_generation
 
 limiter = Limiter(key_func=get_remote_address)
 logger = structlog.get_logger()
@@ -36,6 +36,11 @@ class StartImageRequest(BaseModel):
     image_url: Optional[str] = Field(default=None, max_length=2000)
     original_price: Optional[str] = Field(default=None, max_length=50)
     sale_price: Optional[str] = Field(default=None, max_length=50)
+    # WHY: Creatify AI mode vs basic template mode
+    generation_mode: str = Field(default="template", pattern="^(template|ai_creatify)$")
+    product_url: Optional[str] = Field(default=None, max_length=2000)
+    visual_style: str = Field(default="modern", pattern="^(modern|minimalist|bold|elegant|playful)$")
+    script: Optional[str] = Field(default=None, max_length=5000)
 
 
 class JobStatusResponse(BaseModel):
@@ -81,6 +86,8 @@ async def start_generation(
 
     if body.media_type == "images":
         background_tasks.add_task(run_image_generation, gen.id)
+    elif body.generation_mode == "ai_creatify":
+        background_tasks.add_task(run_creatify_video_generation, gen.id, user_id)
     else:
         background_tasks.add_task(run_video_generation, gen.id)
 

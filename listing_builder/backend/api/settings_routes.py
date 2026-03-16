@@ -22,6 +22,7 @@ from schemas import (
     LLMProviderConfig,
     GPSRSettings,
     CompanySettings,
+    VideoAISettings,
 )
 from services.llm_providers import mask_api_key
 import structlog
@@ -42,6 +43,7 @@ class SettingsUpdateRequest(BaseModel):
     notifications: Optional[NotificationSettings] = None
     data_export: Optional[DataExportSettings] = None
     llm: Optional[LLMSettings] = None
+    video_ai: Optional[VideoAISettings] = None
     gpsr: Optional[GPSRSettings] = None
     company: Optional[CompanySettings] = None
 
@@ -75,6 +77,10 @@ _DEFAULT_SETTINGS = {
     "llm": {
         "default_provider": "groq",
         "providers": {},
+    },
+    "video_ai": {
+        "creatify_api_id": "",
+        "creatify_api_key": "",
     },
     "gpsr": {
         "manufacturer_contact": "",
@@ -147,6 +153,10 @@ def _build_response(data: dict) -> SettingsResponse:
             default_provider=llm_data.get("default_provider", "groq"),
             providers=masked_providers,
         ),
+        video_ai=VideoAISettings(
+            creatify_api_id=mask_api_key(data.get("video_ai", {}).get("creatify_api_id", "")),
+            creatify_api_key=mask_api_key(data.get("video_ai", {}).get("creatify_api_key", "")),
+        ),
         gpsr=GPSRSettings(**data.get("gpsr", _DEFAULT_SETTINGS["gpsr"])),
         company=CompanySettings(**data.get("company", _DEFAULT_SETTINGS["company"])),
     )
@@ -202,6 +212,16 @@ async def update_settings(
                 # WHY: Skip masked keys (****) — means client didn't change the key
                 if key_val and "****" not in key_val:
                     data["llm"]["providers"][pname] = {"api_key": key_val}
+
+    if payload.video_ai is not None:
+        if "video_ai" not in data:
+            data["video_ai"] = dict(_DEFAULT_SETTINGS["video_ai"])
+        update = payload.video_ai.model_dump(exclude_unset=True)
+        for field in ("creatify_api_id", "creatify_api_key"):
+            val = update.get(field, "")
+            # WHY: Skip masked keys (****) — means client didn't change the key
+            if val and "****" not in val:
+                data["video_ai"][field] = val
 
     if payload.gpsr is not None:
         if "gpsr" not in data:

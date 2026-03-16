@@ -220,6 +220,12 @@ class LLMSettings(BaseModel):
     providers: dict[str, LLMProviderConfig] = {}
 
 
+# WHY: Per-user Creatify credentials for professional AI video generation
+class VideoAISettings(BaseModel):
+    creatify_api_id: str = ""
+    creatify_api_key: str = ""
+
+
 # WHY: Persisted GPSR defaults so converter auto-fills them on load
 class GPSRSettings(BaseModel):
     manufacturer_contact: str = ""
@@ -254,6 +260,7 @@ class SettingsResponse(BaseModel):
     notifications: NotificationSettings
     data_export: DataExportSettings
     llm: Optional[LLMSettings] = None
+    video_ai: Optional[VideoAISettings] = None
     gpsr: Optional[GPSRSettings] = None
     company: Optional[CompanySettings] = None
 

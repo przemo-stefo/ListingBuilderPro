@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { Suspense } from 'react'
-import { Settings as SettingsIcon, Bell, Download, Save, Cpu, Link2, Unlink } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, Download, Save, Cpu, Link2, Unlink, Video } from 'lucide-react'
 import IntegrationsTab from '@/app/compliance/components/IntegrationsTab'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -202,6 +202,9 @@ export default function SettingsPage() {
   const [llmProvider, setLlmProvider] = useState<LLMProvider>('groq')
   // WHY: Store per-provider API keys locally. Groq doesn't need one (our key).
   const [llmKeys, setLlmKeys] = useState<Record<string, string>>({})
+  // WHY: Per-user Creatify credentials for professional AI video generation
+  const [creatifyApiId, setCreatifyApiId] = useState('')
+  const [creatifyApiKey, setCreatifyApiKey] = useState('')
 
   // WHY: Populate local state when server data arrives or changes
   useEffect(() => {
@@ -219,6 +222,10 @@ export default function SettingsPage() {
         keys[pname] = pconf?.api_key || ''
       }
       setLlmKeys(keys)
+    }
+    if (data.video_ai) {
+      setCreatifyApiId(data.video_ai.creatify_api_id || '')
+      setCreatifyApiKey(data.video_ai.creatify_api_key || '')
     }
   }, [data])
 
@@ -381,6 +388,54 @@ export default function SettingsPage() {
                 }
                 updateSettings.mutate({
                   llm: { default_provider: llmProvider, providers },
+                })
+              }}
+              disabled={updateSettings.isPending}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Zapisz
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card — Wideo AI (Creatify) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Video className="h-5 w-5 text-gray-400" />
+            <CardTitle className="text-lg">Wideo AI (Creatify)</CardTitle>
+          </div>
+          <CardDescription>Klucze API do profesjonalnej generacji wideo</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm text-gray-400">API ID</label>
+            <Input
+              value={creatifyApiId}
+              onChange={(e) => setCreatifyApiId(e.target.value)}
+              placeholder="Twoj Creatify API ID"
+              className="bg-[#1A1A1A]"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-gray-400">API Key</label>
+            <Input
+              type="password"
+              value={creatifyApiKey}
+              onChange={(e) => setCreatifyApiKey(e.target.value)}
+              placeholder="Twoj Creatify API Key"
+              className="bg-[#1A1A1A]"
+            />
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={() => {
+                updateSettings.mutate({
+                  video_ai: {
+                    creatify_api_id: creatifyApiId,
+                    creatify_api_key: creatifyApiKey,
+                  },
                 })
               }}
               disabled={updateSettings.isPending}
