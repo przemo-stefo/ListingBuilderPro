@@ -107,6 +107,7 @@ async def put_listing(
 async def patch_listing(
     seller_id: str,
     sku: str,
+    product_type: str,
     patches: List[Dict[str, Any]],
     marketplace: str = "DE",
     db: Optional[Session] = None,
@@ -129,7 +130,7 @@ async def patch_listing(
 
     url = f"{_base_url()}/listings/{LISTINGS_API_VERSION}/items/{seller_id}/{sku}"
     params = {"marketplaceIds": marketplace_id}
-    body = {"productType": "DIETARY_SUPPLEMENT", "patches": patches}
+    body = {"productType": product_type, "patches": patches}
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:

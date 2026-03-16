@@ -232,7 +232,7 @@ if __name__ == "__main__":
     # Or use: uvicorn main:app --reload
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=int(os.getenv("PORT", 8000)),  # WHY: Render injects PORT env var
         reload=settings.app_debug,
         log_level="info",
