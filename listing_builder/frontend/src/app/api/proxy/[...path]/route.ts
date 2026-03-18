@@ -51,6 +51,7 @@ const ALLOWED_PATH_PREFIXES = [
   'teams',
   'video',
   'media-gen',
+  'validator',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints — defense in depth

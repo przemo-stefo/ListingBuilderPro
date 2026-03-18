@@ -63,6 +63,9 @@ Pillow>=10.0.0
 # Video Generation (TikTok 9:16 via FFmpeg subprocess + PIL/numpy)
 numpy>=1.24.0
 
+# Product Validator (Google Trends data)
+pytrends>=4.9.2
+
 # Logging
 structlog==24.1.0
 PyJWT[crypto]==2.8.0  # WHY: [crypto] needed for ES256 (Supabase JWKS verification)

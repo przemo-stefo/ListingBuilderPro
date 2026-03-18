@@ -18,6 +18,7 @@ from .google_connection import GoogleConnection
 from .shared_listing import SharedListing
 from .team import Team, TeamMember, TeamInvitation, TeamRole
 from .media_generation import MediaGeneration
+from .validator import ValidationRun
 
 __all__ = [
     "Product",
@@ -50,4 +51,5 @@ __all__ = [
     "TeamInvitation",
     "TeamRole",
     "MediaGeneration",
+    "ValidationRun",
 ]

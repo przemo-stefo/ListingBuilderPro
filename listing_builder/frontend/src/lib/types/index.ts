@@ -996,6 +996,42 @@ export interface ListingChangeSummary {
   last_change: string | null
 }
 
+// Product Validator types
+export interface ValidatorDimension {
+  name: string
+  score: number
+  comment: string
+}
+
+export interface ValidatorResponse {
+  id: number
+  product_input: string
+  input_type: string
+  marketplace: string
+  score: number
+  verdict: 'warto' | 'ryzykowne' | 'odpusc'
+  explanation: string
+  dimensions: ValidatorDimension[]
+  provider_used: string
+  latency_ms: number
+  created_at: string | null
+}
+
+export interface ValidatorHistoryItem {
+  id: number
+  product_input: string
+  marketplace: string
+  score: number
+  verdict: 'warto' | 'ryzykowne' | 'odpusc'
+  explanation: string
+  created_at: string | null
+}
+
+export interface ValidatorHistoryResponse {
+  items: ValidatorHistoryItem[]
+  total: number
+}
+
 // Error types
 export interface ApiError {
   message: string
