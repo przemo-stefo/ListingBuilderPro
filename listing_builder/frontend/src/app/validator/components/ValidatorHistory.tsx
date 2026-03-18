@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getValidatorHistory, deleteValidatorHistory } from '@/lib/api/validator'
 import type { ValidatorHistoryItem } from '@/lib/types'
+import { scoreColor } from './score-utils'
 
 function verdictBadge(verdict: string) {
   const config: Record<string, { label: string; classes: string }> = {
@@ -24,12 +25,6 @@ function verdictBadge(verdict: string) {
       {c.label}
     </span>
   )
-}
-
-function scoreColor(score: number): string {
-  if (score >= 8) return 'text-green-400'
-  if (score >= 6) return 'text-amber-400'
-  return 'text-red-400'
 }
 
 export function ValidatorHistory() {

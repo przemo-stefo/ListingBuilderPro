@@ -3,6 +3,7 @@
 # NOT for: LLM logic (validator_service.py) or data fetching (validator_data_sources.py)
 
 from fastapi import APIRouter, Depends, Request, HTTPException, status
+from typing import Literal
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -22,9 +23,13 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/validator", tags=["validator"])
 
 
+# WHY: Whitelist prevents garbage/injection in marketplace field reaching LLM prompt + DB
+VALID_MARKETPLACES = ("amazon", "allegro", "both")
+
+
 class ValidatorRequest(BaseModel):
     product_input: str = Field(..., min_length=1, max_length=500)
-    marketplace: str = Field(default="amazon", max_length=50)
+    marketplace: Literal["amazon", "allegro", "both"] = "amazon"
 
 
 class ValidatorDimension(BaseModel):

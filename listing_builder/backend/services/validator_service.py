@@ -8,7 +8,7 @@ import asyncio
 import json
 import re
 import time
-from typing import Dict, Tuple
+from typing import Dict
 
 import structlog
 from sqlalchemy.orm import Session
@@ -58,7 +58,7 @@ def _build_prompt(product_name: str, trends_data: Dict, competition_data: Dict, 
     return f"""Jesteś ekspertem od e-commerce i analizy rynku. Oceń potencjał sprzedażowy produktu.
 
 PRODUKT: {sanitize_llm_input(product_name)}
-MARKETPLACE: {marketplace}
+MARKETPLACE: {sanitize_llm_input(marketplace)}
 
 === ZWERYFIKOWANE FAKTY ===
 Bazuj TYLKO na danych poniżej. NIE wymyślaj statystyk ani trendów.
