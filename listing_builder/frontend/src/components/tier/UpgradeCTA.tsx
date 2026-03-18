@@ -68,7 +68,7 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
           className="flex items-center gap-1 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors disabled:opacity-50"
         >
           <Sparkles className="h-3 w-3" />
-          {loading ? 'Ladowanie...' : '49 PLN/mies'}
+          {loading ? 'Ladowanie...' : '19,99 PLN/mies'}
           <ArrowRight className="h-3 w-3" />
         </button>
       </div>
@@ -116,7 +116,7 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
         className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Sparkles className="h-4 w-4" />
-        {loading ? 'Ladowanie...' : '49 PLN / miesiac'}
+        {loading ? 'Ladowanie...' : '19,99 PLN / miesiac'}
       </button>
     </div>
   )

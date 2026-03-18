@@ -10,7 +10,6 @@ import { Send, Loader2, Brain, ShoppingCart, Store, BookOpen, Settings2, FileTex
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FaqSection } from '@/components/ui/FaqSection'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 import { apiClient } from '@/lib/api/client'
 
 interface Message {
@@ -214,7 +213,6 @@ function ExpertQAContent() {
   }
 
   return (
-    <PremiumGate feature={expert.gate}>
       <div className="flex h-[calc(100vh-2rem)] flex-col space-y-4">
       {/* Header */}
       <div>
@@ -413,7 +411,6 @@ function ExpertQAContent() {
         />
       )}
       </div>
-    </PremiumGate>
   )
 }
 

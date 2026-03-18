@@ -89,13 +89,13 @@ def handle_checkout_completed(session_data: dict, db: Session):
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(send_telegram(
-                f"💰 *Nowa płatność LBP!*\nEmail: `{_escape_md(email)}`\nPlan: {plan_type}\nKwota: 49 PLN/mies"
+                f"💰 *Nowa płatność LBP!*\nEmail: `{_escape_md(email)}`\nPlan: {plan_type}\nKwota: 19,99 PLN/mies"
             ))
         except RuntimeError:
             # WHY: No event loop (e.g. sync test) — fall back to sync
             from services.telegram_notify import send_telegram_sync
             send_telegram_sync(
-                f"💰 *Nowa płatność LBP!*\nEmail: `{_escape_md(email)}`\nPlan: {plan_type}\nKwota: 49 PLN/mies"
+                f"💰 *Nowa płatność LBP!*\nEmail: `{_escape_md(email)}`\nPlan: {plan_type}\nKwota: 19,99 PLN/mies"
             )
     except IntegrityError:
         # WHY: Idempotent — Stripe may send duplicate webhooks

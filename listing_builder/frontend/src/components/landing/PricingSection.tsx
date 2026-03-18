@@ -9,21 +9,17 @@ import { motion } from 'framer-motion'
 import { Check, ArrowRight } from 'lucide-react'
 
 const FREE_FEATURES = [
-  '3 optymalizacje dziennie',
-  'Amazon marketplace',
-  'Optymalizator AI (podstawowy)',
-  'Import z URL',
+  'Import produktów z URL',
+  'Baza produktów',
+  'Konwerter ofert',
 ]
 
 const PREMIUM_FEATURES = [
-  'Nieograniczone optymalizacje',
-  'Wszystkie marketplace (Amazon, Allegro, eBay, Kaufland, Temu, AliExpress)',
-  'Pełny optymalizator AI (7 modułów)',
-  'Konwerter ofert między platformami',
-  'Ekspert AI z bazą wiedzy',
-  'Badanie rynku (10 skilli AI)',
+  'Listing Score — ocena listingu AI',
+  'Walidator Produktu — analiza potencjału sprzedażowego',
+  'Ekspert Kaufland — AI chatbot z bazą wiedzy',
+  'Nieograniczone analizy',
   'Import CSV + eksport',
-  'Compliance Guard',
   'Priorytetowe wsparcie',
 ]
 
@@ -79,7 +75,7 @@ export function PricingSection() {
 
             <h3 className="text-lg font-semibold text-white">Premium</h3>
             <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-bold text-white">49 zł</span>
+              <span className="text-4xl font-bold text-white">19,99 zł</span>
               <span className="text-sm text-gray-500">/mies</span>
             </div>
             <p className="mt-3 text-sm text-gray-400">Pełna moc AI dla Twojego biznesu</p>

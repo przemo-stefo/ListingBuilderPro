@@ -40,7 +40,7 @@ export function PremiumGate({ children, feature }: PremiumGateProps) {
         Uaktualnij do Premium
         <ArrowRight className="h-4 w-4" />
       </Link>
-      <p className="text-xs text-gray-600">49 PLN/miesiąc · Promo 39 PLN</p>
+      <p className="text-xs text-gray-600">19,99 PLN/miesiąc</p>
     </div>
   )
 }

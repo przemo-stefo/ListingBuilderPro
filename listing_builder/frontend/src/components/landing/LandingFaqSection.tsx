@@ -8,7 +8,7 @@ import { FaqItem } from '@/components/ui/FaqSection'
 const FAQ_ITEMS = [
   {
     question: 'Czy OctoHelper jest darmowy?',
-    answer: 'Tak! Plan Free daje Ci 3 optymalizacje dziennie na platformie Amazon. Jeśli potrzebujesz więcej — plan Premium za 49 zł/mies odblokowuje nielimitowane optymalizacje i wszystkie marketplace.',
+    answer: 'Tak! Plan Free daje dostęp do importu produktów, bazy produktów i konwertera ofert. Plan Premium za 19,99 zł/mies odblokowuje Listing Score, Walidator Produktu i Eksperta Kaufland.',
   },
   {
     question: 'Jakie marketplace są obsługiwane?',

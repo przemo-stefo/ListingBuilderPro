@@ -7,7 +7,6 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 import { ValidatorForm } from './components/ValidatorForm'
 import { ValidatorResult } from './components/ValidatorResult'
 import { ValidatorHistory } from './components/ValidatorHistory'
@@ -40,7 +39,6 @@ export default function ValidatorPage() {
   }
 
   return (
-    <PremiumGate feature="Walidator Produktu">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -93,6 +91,5 @@ export default function ValidatorPage() {
 
         {activeTab === 'history' && <ValidatorHistory />}
       </div>
-    </PremiumGate>
   )
 }
