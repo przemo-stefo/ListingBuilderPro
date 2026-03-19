@@ -11,6 +11,8 @@ from services.allegro_api import get_client_credentials_token, ALLEGRO_API_BASE
 logger = structlog.get_logger()
 
 # WHY: In-memory cache — category structure rarely changes, avoids repeat API calls
+# WHY: Max 500 entries — prevents OOM from unbounded growth on long-running instances
+_MAX_CACHE_SIZE = 500
 _category_cache: Dict[str, List[dict]] = {}
 _params_cache: Dict[str, List[dict]] = {}
 
@@ -56,6 +58,8 @@ async def search_categories(query: str) -> List[dict]:
                 "leaf": cat.get("leaf", False),
             })
 
+        if len(_category_cache) >= _MAX_CACHE_SIZE:
+            _category_cache.clear()
         _category_cache[cache_key] = categories
         logger.info("allegro_categories_found", query=query, count=len(categories))
         return categories
@@ -119,6 +123,8 @@ async def fetch_category_parameters(category_id: str) -> List[dict]:
 
             params.append(param)
 
+        if len(_params_cache) >= _MAX_CACHE_SIZE:
+            _params_cache.clear()
         _params_cache[category_id] = params
         logger.info("allegro_params_fetched", category_id=category_id, count=len(params))
         return params

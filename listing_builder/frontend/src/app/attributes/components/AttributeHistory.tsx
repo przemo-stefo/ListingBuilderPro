@@ -32,7 +32,23 @@ export function AttributeHistory() {
   }
 
   useEffect(() => {
-    fetchHistory()
+    let cancelled = false
+    const load = async () => {
+      setIsLoading(true)
+      try {
+        const data = await getAttributeHistory(50, 0)
+        if (!cancelled) {
+          setItems(data.items)
+          setTotal(data.total)
+        }
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [])
 
   const handleDelete = async (id: number) => {

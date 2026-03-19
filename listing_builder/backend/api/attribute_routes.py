@@ -127,6 +127,9 @@ async def get_category_parameters(
     user_id: str = Depends(get_user_id),
 ) -> CategoryParametersResponse:
     """Fetch all parameters for an Allegro category."""
+    # WHY: Allegro category IDs are numeric — reject anything else to prevent injection
+    if not category_id.isdigit():
+        raise HTTPException(status_code=400, detail="Nieprawidłowe ID kategorii")
     params = await fetch_category_parameters(category_id)
     return CategoryParametersResponse(
         parameters=[CategoryParameter(
