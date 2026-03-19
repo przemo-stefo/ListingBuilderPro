@@ -50,7 +50,7 @@ async def notify_payment(email: str, plan_type: str):
         f"💰 *Nowa płatność LBP!*\n"
         f"Email: `{email}`\n"
         f"Plan: {plan_type}\n"
-        f"Kwota: 19,99 PLN/mies"
+        f"Kwota: 19,00 PLN/mies"
     )
 
 

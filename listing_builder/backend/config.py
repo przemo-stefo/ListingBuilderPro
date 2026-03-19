@@ -106,7 +106,7 @@ class Settings(BaseSettings):
 
     # Stripe (license key monetization — monthly subscription)
     stripe_secret_key: str = ""  # WHY: Empty = Stripe disabled (dev mode)
-    stripe_price_monthly: str = ""  # WHY: 49 PLN/month subscription
+    stripe_price_monthly: str = ""  # WHY: 19 PLN/month subscription
     stripe_webhook_secret: str = ""  # WHY: Stripe signs webhooks with this
 
     # Supabase Auth (JWT verification)

@@ -180,7 +180,7 @@ export default function AccountPage() {
           ) : (
             <button onClick={handleCheckout}
               className="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-gray-200 transition-colors">
-              Kup Premium — 19,99 PLN/mies.
+              Kup Premium — 19,00 PLN/mies.
             </button>
           )}
         </CardContent>

@@ -75,7 +75,7 @@ export function PricingSection() {
 
             <h3 className="text-lg font-semibold text-white">Premium</h3>
             <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-bold text-white">19,99 zł</span>
+              <span className="text-4xl font-bold text-white">19,00 zł</span>
               <span className="text-sm text-gray-500">/mies</span>
             </div>
             <p className="mt-3 text-sm text-gray-400">Pełna moc AI dla Twojego biznesu</p>

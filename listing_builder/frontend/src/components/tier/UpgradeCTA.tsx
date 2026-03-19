@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { Crown, Sparkles, ArrowRight } from 'lucide-react'
 import { useTier } from '@/lib/hooks/useTier'
+import { useAuth } from '@/components/providers/AuthProvider'
 import { cn } from '@/lib/utils'
 import { apiClient } from '@/lib/api/client'
 import { safeRedirect } from '@/lib/utils/redirect'
@@ -16,33 +17,27 @@ interface UpgradeCTAProps {
   className?: string
 }
 
-async function redirectToCheckout() {
-  const email = prompt('Podaj email (do odzyskania klucza licencyjnego):')
-  if (!email) return
-
-  try {
-    // WHY: apiClient sends JWT + License-Key (raw fetch() was missing them)
-    const { data } = await apiClient.post('/stripe/create-checkout', {
-      plan_type: 'monthly', email,
-    })
-    if (data.checkout_url) {
-      safeRedirect(data.checkout_url)
-    }
-  } catch {
-    alert('Blad tworzenia sesji platnosci. Sprobuj ponownie.')
-  }
-}
-
 export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
   const { isPremium } = useTier()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
 
   if (isPremium) return null
 
   const handleUpgrade = async () => {
+    // WHY: Use logged-in user's email; fallback to prompt for unauthenticated views
+    const email = user?.email || prompt('Podaj email (do odzyskania klucza licencyjnego):')
+    if (!email) return
     setLoading(true)
     try {
-      await redirectToCheckout()
+      const { data } = await apiClient.post('/stripe/create-checkout', {
+        plan_type: 'monthly', email,
+      })
+      if (data.checkout_url) {
+        safeRedirect(data.checkout_url)
+      }
+    } catch {
+      alert('Błąd tworzenia sesji płatności. Spróbuj ponownie.')
     } finally {
       setLoading(false)
     }
@@ -68,7 +63,7 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
           className="flex items-center gap-1 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors disabled:opacity-50"
         >
           <Sparkles className="h-3 w-3" />
-          {loading ? 'Ladowanie...' : '19,99 PLN/mies'}
+          {loading ? 'Ladowanie...' : '19,00 PLN/mies'}
           <ArrowRight className="h-3 w-3" />
         </button>
       </div>
@@ -89,25 +84,22 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
       </div>
       <ul className="space-y-2 mb-4 text-sm text-gray-300">
         <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Nieograniczone optymalizacje
+          <span className="text-amber-400">+</span> Listing Score — ocena listingu AI
         </li>
         <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> RAG Knowledge Base
+          <span className="text-amber-400">+</span> Walidator Produktu — analiza potencjału
         </li>
         <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Keyword Intelligence
+          <span className="text-amber-400">+</span> Ekspert Kaufland — AI chatbot z bazą wiedzy
         </li>
         <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Monitoring & Alerty
+          <span className="text-amber-400">+</span> Nieograniczone analizy
         </li>
         <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Historia + CSV Export
+          <span className="text-amber-400">+</span> Import CSV + eksport
         </li>
         <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Wszystkie marketplace&apos;y
-        </li>
-        <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Ranking Juice breakdown
+          <span className="text-amber-400">+</span> Priorytetowe wsparcie
         </li>
       </ul>
       <button
@@ -116,7 +108,7 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
         className="w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-black hover:bg-amber-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Sparkles className="h-4 w-4" />
-        {loading ? 'Ladowanie...' : '19,99 PLN / miesiac'}
+        {loading ? 'Ladowanie...' : '19,00 PLN / miesiac'}
       </button>
     </div>
   )

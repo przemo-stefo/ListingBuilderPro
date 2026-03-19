@@ -68,8 +68,16 @@ apiClient.interceptors.response.use(
 
     if (error.response) {
       // Server responded with error status
+      // WHY: Pydantic 422 returns detail as array [{loc, msg, type}], not string
       const data = error.response.data as Record<string, unknown>
-      apiError.message = (data.detail as string) || (data.message as string) || error.message
+      const rawDetail = data.detail
+      apiError.message = typeof rawDetail === 'string'
+        ? rawDetail
+        : Array.isArray(rawDetail)
+          ? rawDetail.map((d: Record<string, unknown>) => String(d.msg || '')).join('; ')
+          : typeof data.message === 'string'
+            ? data.message
+            : error.message
       apiError.code = String(error.response.status)
       apiError.details = data
     } else if (error.request) {

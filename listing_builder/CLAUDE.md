@@ -62,7 +62,7 @@ with `Authorization: Bearer {mgmt_token}`. NOT RPC.
 
 ## Monetization
 
-- **Monthly only:** 49 PLN/mies via Stripe Checkout (subscription mode)
+- **Monthly only:** 19 PLN/mies via Stripe Checkout (subscription mode)
 - License key system — `premium_licenses` table
 - Free tier: 3 optimizations/day (per-IP), Amazon only
 - Premium: unlimited optimizations, all marketplaces, full features

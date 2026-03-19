@@ -105,7 +105,7 @@ async def get_admin_overview(
     }
 
     # --- MRR (Monthly Recurring Revenue) ---
-    # WHY: active monthly subscriptions * 19.99 PLN = current MRR
+    # WHY: active monthly subscriptions * 19.00 PLN = current MRR
     mrr_count = db.execute(text(
         "SELECT COUNT(*) FROM premium_licenses WHERE status = 'active' AND plan_type = 'monthly'"
     )).scalar() or 0
@@ -116,7 +116,7 @@ async def get_admin_overview(
         "usage_30d": usage_30d,
         "oauth_connections": oauth_connections,
         "alerts": alerts,
-        "mrr_pln": round(mrr_count * 19.99, 2),
+        "mrr_pln": round(mrr_count * 19.00, 2),
     }
 
 

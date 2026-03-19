@@ -17,12 +17,10 @@ import { OnboardingChecklist } from '@/components/ui/OnboardingChecklist'
 import { ActivityFeed } from '@/components/ui/ActivityFeed'
 import { StatCards } from '@/components/dashboard/StatCards'
 import { AppTiles } from '@/components/dashboard/AppTiles'
-import { ExpertWidget } from '@/components/dashboard/ExpertWidget'
 
 const DASHBOARD_FAQ = [
   { question: 'Co pokazuje Pulpit?', answer: 'Pulpit wyświetla statystyki Twojego konta: liczbę produktów, status optymalizacji, średni wynik AI i ostatnie importy. To przegląd całego systemu w jednym miejscu.' },
   { question: 'Co oznacza "Do optymalizacji"?', answer: 'To produkty zaimportowane do systemu, które jeszcze nie zostały przetworzone przez AI. Kliknij "Optymalizuj listingi" aby je przetworzyć.' },
-  { question: 'Jak działa Ekspert AI na Pulpicie?', answer: 'Widget Eksperta AI pozwala szybko zadać pytanie o sprzedaży na marketplace bez opuszczania Pulpitu. Wynik otwiera pełną stronę Eksperta AI z odpowiedzią opartego na wiedzy eksperckiej.' },
 ]
 
 export default function DashboardPage() {
@@ -158,8 +156,6 @@ export default function DashboardPage() {
       {stats && <AppTiles stats={stats} />}
 
       {totalProducts > 0 && <ActivityFeed />}
-
-      <ExpertWidget />
 
       <FaqSection title="Najczęściej zadawane pytania" subtitle="Pulpit i nawigacja" items={DASHBOARD_FAQ} />
     </div>
