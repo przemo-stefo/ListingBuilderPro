@@ -15,6 +15,7 @@ import {
   Database,
   DollarSign,
   Rocket,
+  Tags,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -46,6 +47,7 @@ export const navSections: NavSection[] = [
       { title: 'Listing Score', href: '/listing-score', icon: BarChart3, desc: 'Oceń listing 1-10 w 5 wymiarach copywriterskich' },
       { title: 'Walidator', href: '/validator', icon: Search, desc: 'Sprawdź potencjał produktu' },
       { title: 'Ekspert Kaufland', href: '/expert-qa?mode=kaufland', icon: Store, desc: 'Pytania o Kaufland — listingi, SEO, kategorie, EAN, wysyłka, GPSR' },
+      { title: 'Auto-Atrybuty', href: '/attributes', icon: Tags, desc: 'Wygeneruj atrybuty produktowe', beta: true },
     ],
   },
   {

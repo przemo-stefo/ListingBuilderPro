@@ -1032,6 +1032,60 @@ export interface ValidatorHistoryResponse {
   total: number
 }
 
+// Auto-Atrybuty types
+export interface AllegroCategory {
+  id: string
+  name: string
+  path: string
+  leaf: boolean
+}
+
+export interface CategoryParameter {
+  id: string
+  name: string
+  type: 'STRING' | 'INTEGER' | 'FLOAT' | 'DICTIONARY' | 'RANGE'
+  required: boolean
+  unit: string | null
+  options: { id: string; value: string }[]
+}
+
+export interface GeneratedAttribute {
+  name: string
+  value: string | null
+  param_id: string
+  required: boolean
+  type: string
+  options?: { id: string; value: string }[]
+}
+
+export interface AttributeRunResponse {
+  id: number
+  product_input: string
+  category_name: string
+  category_path: string
+  attributes: GeneratedAttribute[]
+  params_count: number
+  provider_used: string
+  latency_ms: number
+  created_at: string | null
+}
+
+export interface AttributeHistoryItem {
+  id: number
+  product_input: string
+  marketplace: string
+  category_name: string | null
+  category_path: string | null
+  params_count: number
+  attributes: Record<string, unknown>[]
+  created_at: string | null
+}
+
+export interface AttributeHistoryResponse {
+  items: AttributeHistoryItem[]
+  total: number
+}
+
 // Error types
 export interface ApiError {
   message: string
