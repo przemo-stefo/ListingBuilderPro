@@ -13,7 +13,7 @@ const ROWS = [
   { aspect: 'Marketplace', manual: 'Jeden marketplace na raz', ai: '6 platform jednocześnie' },
   { aspect: 'SEO Keywords', manual: 'Ręczny research', ai: 'Automatyczna analiza i rozmieszczenie' },
   { aspect: 'Konwersja', manual: 'Przepisywanie od zera', ai: 'Jednym kliknięciem między platformami' },
-  { aspect: 'Compliance', manual: 'Ręczne sprawdzanie regulaminów', ai: 'Automatyczny Compliance Guard' },
+  { aspect: 'Jakość listingu', manual: 'Ocena na oko', ai: 'Listing Score 0-100 z rekomendacjami AI' },
   { aspect: 'Skalowalność', manual: 'Nie skaluje się', ai: 'Nieograniczona liczba produktów' },
   { aspect: 'Koszt', manual: 'Copywriter od 50 zł/listing', ai: 'Od 0 zł — free tier dostępny' },
 ]

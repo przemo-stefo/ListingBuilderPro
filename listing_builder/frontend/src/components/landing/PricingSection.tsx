@@ -9,17 +9,18 @@ import { motion } from 'framer-motion'
 import { Check, ArrowRight } from 'lucide-react'
 
 const FREE_FEATURES = [
-  'Import produktów z URL',
-  'Baza produktów',
-  'Konwerter ofert',
+  'Przeglądanie panelu',
+  '3 optymalizacje dziennie (Amazon)',
+  'Baza produktów (podgląd)',
 ]
 
 const PREMIUM_FEATURES = [
+  'Optymalizator AI — bez limitów, wszystkie marketplace',
+  'Import produktów z URL, CSV i Allegro',
+  'Konwerter ofert między platformami',
   'Listing Score — ocena listingu AI',
   'Walidator Produktu — analiza potencjału sprzedażowego',
   'Ekspert Kaufland — AI chatbot z bazą wiedzy',
-  'Nieograniczone analizy',
-  'Import CSV + eksport',
   'Priorytetowe wsparcie',
 ]
 

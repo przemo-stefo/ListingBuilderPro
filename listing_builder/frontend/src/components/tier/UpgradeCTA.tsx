@@ -84,6 +84,15 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
       </div>
       <ul className="space-y-2 mb-4 text-sm text-gray-300">
         <li className="flex items-center gap-2">
+          <span className="text-amber-400">+</span> Optymalizator AI — bez limitów, wszystkie marketplace
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-amber-400">+</span> Import produktów z URL, CSV i Allegro
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-amber-400">+</span> Konwerter ofert między platformami
+        </li>
+        <li className="flex items-center gap-2">
           <span className="text-amber-400">+</span> Listing Score — ocena listingu AI
         </li>
         <li className="flex items-center gap-2">
@@ -91,15 +100,6 @@ export function UpgradeCTA({ variant = 'inline', className }: UpgradeCTAProps) {
         </li>
         <li className="flex items-center gap-2">
           <span className="text-amber-400">+</span> Ekspert Kaufland — AI chatbot z bazą wiedzy
-        </li>
-        <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Nieograniczone analizy
-        </li>
-        <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Import CSV + eksport
-        </li>
-        <li className="flex items-center gap-2">
-          <span className="text-amber-400">+</span> Priorytetowe wsparcie
         </li>
       </ul>
       <button

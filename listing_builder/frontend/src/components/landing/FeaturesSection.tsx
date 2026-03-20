@@ -5,7 +5,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Sparkles, RefreshCw, MessageSquare, BarChart3, ShieldCheck, ArrowDownUp } from 'lucide-react'
+import { Sparkles, RefreshCw, MessageSquare, BarChart3, Target, ArrowDownUp } from 'lucide-react'
 
 const FEATURES = [
   {
@@ -23,20 +23,20 @@ const FEATURES = [
   {
     icon: MessageSquare,
     badge: 'Wiedza',
-    title: 'Ekspert AI',
-    desc: 'Zadaj pytanie o marketplace i otrzymaj odpowiedź opartą na bazie wiedzy od top sprzedawców.',
+    title: 'Ekspert Kaufland',
+    desc: 'Zadaj pytanie o Kaufland i otrzymaj odpowiedź opartą na bazie wiedzy od top sprzedawców.',
   },
   {
     icon: BarChart3,
     badge: 'Analityka',
-    title: 'Badanie Rynku',
-    desc: 'ICP, brief reklamowy, analiza grupy docelowej — 10 skilli AI do budowania przewagi konkurencyjnej.',
+    title: 'Listing Score',
+    desc: 'Automatyczna ocena jakości Twojego listingu. Tytuł, bullety, opis i keywords — wynik 0-100 z rekomendacjami.',
   },
   {
-    icon: ShieldCheck,
-    badge: 'Compliance',
-    title: 'Compliance Guard',
-    desc: 'Automatyczne sprawdzanie zgodności ofert z regulaminem marketplace. Zero ryzyka blokady konta.',
+    icon: Target,
+    badge: 'Walidacja',
+    title: 'Walidator Produktu',
+    desc: 'AI ocenia potencjał sprzedażowy produktu w skali 1-10. Sprawdź zanim zainwestujesz w stock.',
   },
   {
     icon: ArrowDownUp,
