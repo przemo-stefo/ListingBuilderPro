@@ -14,6 +14,21 @@ export const metadata: Metadata = {
   title: 'OctoHelper — Asystent sprzedawcy',
   description: 'AI-powered asystent sprzedawcy marketplace. Optymalizuj listingi, monitoruj compliance, konwertuj oferty.',
   icons: { icon: '/favicon.svg' },
+  openGraph: {
+    type: 'website',
+    locale: 'pl_PL',
+    url: 'https://panel.octohelper.com',
+    siteName: 'OctoHelper',
+    title: 'OctoHelper — Asystent sprzedawcy',
+    description: 'AI-powered asystent sprzedawcy marketplace. Optymalizuj listingi, monitoruj compliance, konwertuj oferty.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'OctoHelper — Asystent sprzedawcy',
+    description: 'AI-powered asystent sprzedawcy marketplace.',
+  },
+  metadataBase: new URL('https://panel.octohelper.com'),
+  robots: { index: false, follow: false },
 }
 
 export default function RootLayout({

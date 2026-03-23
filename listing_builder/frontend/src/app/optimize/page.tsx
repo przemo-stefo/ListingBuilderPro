@@ -14,10 +14,20 @@ import { useTier } from '@/lib/hooks/useTier'
 import { useDashboardStats } from '@/lib/hooks/useProducts'
 import { PremiumGate } from '@/components/tier/PremiumGate'
 import { useToast } from '@/lib/hooks/useToast'
-import SingleTab from './components/SingleTab'
-import BatchTab from './components/BatchTab'
-import HistoryTab from './components/HistoryTab'
-import ABTestTab from './components/ABTestTab'
+import dynamic from 'next/dynamic'
+
+const SingleTab = dynamic(() => import('./components/SingleTab'), {
+  loading: () => <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-500" /></div>,
+})
+const BatchTab = dynamic(() => import('./components/BatchTab'), {
+  loading: () => <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-500" /></div>,
+})
+const HistoryTab = dynamic(() => import('./components/HistoryTab'), {
+  loading: () => <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-500" /></div>,
+})
+const ABTestTab = dynamic(() => import('./components/ABTestTab'), {
+  loading: () => <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-500" /></div>,
+})
 import type { OptimizerResponse } from '@/lib/types'
 
 type Tab = 'single' | 'batch' | 'abtest' | 'history'

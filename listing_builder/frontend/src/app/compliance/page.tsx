@@ -6,15 +6,19 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Shield } from 'lucide-react'
+import { Shield, Loader2 } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
-import DashboardTab from './components/DashboardTab'
-import AlertSettingsTab from './components/AlertSettingsTab'
-import AlertsTab from './components/AlertsTab'
-import IntegrationsTab from './components/IntegrationsTab'
-import UploadTab from './components/UploadTab'
-import EprTab from './components/EprTab'
-import AuditTab from './components/AuditTab'
+import dynamic from 'next/dynamic'
+
+const spinnerFallback = <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-500" /></div>
+
+const DashboardTab = dynamic(() => import('./components/DashboardTab'), { loading: () => spinnerFallback })
+const AlertSettingsTab = dynamic(() => import('./components/AlertSettingsTab'), { loading: () => spinnerFallback })
+const AlertsTab = dynamic(() => import('./components/AlertsTab'), { loading: () => spinnerFallback })
+const IntegrationsTab = dynamic(() => import('./components/IntegrationsTab'), { loading: () => spinnerFallback })
+const UploadTab = dynamic(() => import('./components/UploadTab'), { loading: () => spinnerFallback })
+const EprTab = dynamic(() => import('./components/EprTab'), { loading: () => spinnerFallback })
+const AuditTab = dynamic(() => import('./components/AuditTab'), { loading: () => spinnerFallback })
 
 type Tab = 'dashboard' | 'audit' | 'settings' | 'alerts' | 'integrations' | 'upload' | 'epr'
 
