@@ -11,11 +11,13 @@ const API_KEY = process.env.API_KEY || ''
 // WHY: Allowlist prevents the proxy from being an open relay to arbitrary backend paths
 const ALLOWED_PATH_PREFIXES = [
   'optimizer/generate',
+  'optimizer/generate-batch',
   'optimizer/history',
   'optimizer/health',
   'optimizer/traces',
   'optimizer/grey-market-score',
   'optimizer/share',
+  'optimizer/keyword-suggestions',
   'knowledge/chat',
   'knowledge/stats',
   'products',
