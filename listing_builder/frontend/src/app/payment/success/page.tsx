@@ -28,13 +28,16 @@ function SuccessContent() {
 
     let attempts = 0
     const maxAttempts = 20
+    let cancelled = false
 
     // WHY: Webhook may arrive after redirect — poll until license key appears
     // WHY apiClient: raw fetch() was missing JWT Authorization header → 401 from require_user_id
     const poll = async () => {
+      if (cancelled) return
       try {
         const res = await apiClient.get(`/stripe/session/${sessionId}/license`)
         const data = res.data
+        if (cancelled) return
         if (data.status === 'ready' && data.license_key) {
           setLicenseKey(data.license_key)
           setStatus('ready')
@@ -50,6 +53,7 @@ function SuccessContent() {
 
         setTimeout(poll, 2000)
       } catch {
+        if (cancelled) return
         attempts++
         if (attempts >= maxAttempts) {
           setStatus('error')
@@ -60,6 +64,8 @@ function SuccessContent() {
     }
 
     poll()
+    // WHY: Stop polling on unmount — prevents state updates on unmounted component
+    return () => { cancelled = true }
   }, [sessionId, unlockPremium])
 
   const handleCopy = () => {
