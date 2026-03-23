@@ -225,7 +225,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
         if (data.listing) triggerScore(data.listing)
         if (data.llm_fallback_from) {
           const label = LLM_PROVIDERS.find((p) => p.id === data.llm_fallback_from)?.label || data.llm_fallback_from
-          toast({ title: `${label} nie zadziałał`, description: 'Użyto Groq jako fallback. Sprawdź klucz w Ustawieniach.', variant: 'destructive' })
+          toast({ title: `${label} nie zadziałał`, description: 'Użyto modelu Standardowego jako fallback. Sprawdź klucz w Ustawieniach.', variant: 'destructive' })
         }
       },
     })

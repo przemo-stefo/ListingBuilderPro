@@ -29,19 +29,19 @@ const SETTINGS_FAQ = [
   { question: 'Jak połączyć marketplace?', answer: 'Przejdź do strony Integracje w menu głównym. Tam możesz połączyć konto przez OAuth (Amazon, Allegro, eBay) i zarządzać wszystkimi połączeniami w jednym miejscu.' },
   { question: 'Jakie powiadomienia są dostępne?', answer: 'Możesz włączyć alerty email, powiadomienia o niskim stanie magazynowym, zmianach cen konkurencji i ostrzeżeniach o zgodności (compliance). Każdy typ można włączać/wyłączać niezależnie.' },
   { question: 'Jak zmienić format eksportu?', answer: 'W sekcji "Dane i eksport" wybierz preferowany format (CSV, JSON, Excel). Wszystkie pobrania z systemu będą używały wybranego formatu.' },
-  { question: 'Co to jest "Model AI" i po co mi to?', answer: 'Model AI to silnik sztucznej inteligencji generujacy listingi. Domyslnie uzywa Groq (Llama 3.3 70B) — jest darmowy i wystarczajacy w wiekszosci przypadkow. Jesli chcesz wyzsza jakosc (np. Gemini Pro), mozesz podac swoj klucz API.' },
-  { question: 'Skad wziac klucz API Gemini lub OpenAI?', answer: 'Gemini: wejdz na aistudio.google.com → kliknij "Get API key" → skopiuj klucz. OpenAI: wejdz na platform.openai.com → API keys → "Create new secret key". Klucze sa platne wg zuzycia — sprawdz cennik danego providera.' },
-  { question: 'Czy Groq jest naprawde darmowy?', answer: 'Tak! Groq jest wliczony w cene i nie wymaga klucza API. Uzywa modelu Llama 3.3 70B Versatile — wystarczajaco dobrego do wiekszosci listingow. Platne providery (Gemini Pro, OpenAI) moga dawac lepsza jakosc tekstu.' },
-  { question: 'Co sie stanie jesli moj klucz API jest nieprawidlowy?', answer: 'System automatycznie przelacza na Groq (darmowy) jesli Twoj klucz API nie zadziala. Zobaczysz wynik wygenerowany przez Groq zamiast wybranego providera. Sprawdz klucz w Ustawieniach i sprobuj ponownie.' },
+  { question: 'Co to jest "Model AI" i po co mi to?', answer: 'Model AI to silnik sztucznej inteligencji generujacy listingi. Domyslnie uzywamy modelu Standardowego — jest darmowy i wystarczajacy w wiekszosci przypadkow. Jesli chcesz wyzsza jakosc, mozesz wybrac model Ultra lub Premium (wymagaja Twojego klucza API).' },
+  { question: 'Skad wziac klucz API?', answer: 'Dla modeli Turbo/Ultra: wejdz na aistudio.google.com → kliknij "Get API key" → skopiuj klucz. Dla modelu Premium: wejdz na platform.openai.com → API keys → "Create new secret key". Klucze sa platne wg zuzycia — sprawdz cennik danego providera.' },
+  { question: 'Czy model Standardowy jest naprawde darmowy?', answer: 'Tak! Model Standardowy jest wliczony w cene i nie wymaga klucza API — wystarczajaco dobry do wiekszosci listingow. Modele platne (Ultra, Premium) moga dawac lepsza jakosc tekstu.' },
+  { question: 'Co sie stanie jesli moj klucz API jest nieprawidlowy?', answer: 'System automatycznie przelacza na model Standardowy (darmowy) jesli Twoj klucz API nie zadziala. Sprawdz klucz w Ustawieniach i sprobuj ponownie.' },
 ]
 
 // WHY: Provider options for the AI Model card — Groq is free (included), others need user's key
 const LLM_PROVIDERS: { id: LLMProvider; label: string; desc: string; needsKey: boolean }[] = [
-  { id: 'groq', label: 'Groq', desc: 'Llama 3.3 70B (w cenie)', needsKey: false },
-  { id: 'beast', label: 'Beast AI', desc: 'Qwen3 235B — unlimited, darmowy', needsKey: false },
-  { id: 'gemini_flash', label: 'Gemini Flash', desc: 'Szybki, tani (Twoj klucz)', needsKey: true },
-  { id: 'gemini_pro', label: 'Gemini Pro', desc: 'Najlepsza jakosc (Twoj klucz)', needsKey: true },
-  { id: 'openai', label: 'OpenAI', desc: 'GPT-4o Mini (Twoj klucz)', needsKey: true },
+  { id: 'groq', label: 'Standardowy', desc: 'Szybki, darmowy (w cenie)', needsKey: false },
+  { id: 'beast', label: 'Zaawansowany', desc: 'Najwyzsza jakosc, bez limitow', needsKey: false },
+  { id: 'gemini_flash', label: 'Turbo', desc: 'Szybki i precyzyjny (Twoj klucz)', needsKey: true },
+  { id: 'gemini_pro', label: 'Ultra', desc: 'Najlepsza jakosc tekstu (Twoj klucz)', needsKey: true },
+  { id: 'openai', label: 'Premium', desc: 'Wszechstronny (Twoj klucz)', needsKey: true },
 ]
 
 const MARKETPLACE_OPTIONS: { id: MarketplaceId; label: string }[] = [
@@ -336,7 +336,7 @@ export default function SettingsPage() {
             <Cpu className="h-5 w-5 text-gray-400" />
             <CardTitle className="text-lg">Model AI</CardTitle>
           </div>
-          <CardDescription>Wybierz silnik AI do generowania listingow. Groq (Llama 3.3) jest darmowy i wliczony w cene. Gemini i OpenAI wymagaja Twojego klucza API.</CardDescription>
+          <CardDescription>Wybierz silnik AI do generowania listingow. Model Standardowy jest darmowy i wliczony w cene. Pozostale modele wymagaja Twojego klucza API.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>

@@ -197,7 +197,8 @@ export default function NewsTab() {
     setError(null)
     try {
       const params = force ? { force: 'true' } : undefined
-      const res = await apiClient.get('/news/feed', { params })
+      // WHY: Backend fetches 16 RSS feeds + translates via Groq — first load takes ~25s
+      const res = await apiClient.get('/news/feed', { params, timeout: 50_000 })
       setNews(res.data.articles || [])
     } catch {
       setError('Nie udało się załadować wiadomości')
@@ -266,7 +267,8 @@ export default function NewsTab() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Pobieranie wiadomości...</p>
+          <p className="text-sm text-gray-500">Pobieranie i tłumaczenie wiadomości...</p>
+          <p className="text-xs text-gray-600">Pierwsze ładowanie może potrwać do 30 sekund</p>
         </div>
       ) : error ? (
         <div className="rounded-xl border border-red-900 bg-red-950/30 p-6 text-center text-sm text-red-400">

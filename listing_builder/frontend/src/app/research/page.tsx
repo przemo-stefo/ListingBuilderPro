@@ -115,7 +115,7 @@ export default function ResearchPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-white">Badanie rynku AI</h1>
-          <p className="text-xs text-gray-400">Original Voices — 10 skilli badawczych opartych na Groq AI (darmowe)</p>
+          <p className="text-xs text-gray-400">Original Voices — 10 skilli badawczych opartych na AI (darmowe)</p>
         </div>
       </div>
 

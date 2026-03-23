@@ -13,10 +13,11 @@ import type { OptimizerResponse, LLMProvider } from '@/lib/types'
 
 // WHY: Human-readable labels for provider badges in results
 const PROVIDER_LABELS: Record<string, string> = {
-  groq: 'Groq',
-  gemini_flash: 'Gemini Flash',
-  gemini_pro: 'Gemini Pro',
-  openai: 'OpenAI',
+  groq: 'Standardowy',
+  beast: 'Zaawansowany',
+  gemini_flash: 'Turbo',
+  gemini_pro: 'Ultra',
+  openai: 'Premium',
 }
 
 // WHY: Map marketplace to eBay SiteID — each eBay market has a different numeric ID
@@ -170,9 +171,9 @@ export function ScoresCard({
       <CardHeader>
         <div className="flex items-center gap-2">
           <CardTitle className="text-lg">Wyniki optymalizacji</CardTitle>
-          {/* WHY: Show which AI model generated this listing when not default Groq */}
+          {/* WHY: Show which AI model generated this listing when not the default */}
           {llmProvider && llmProvider !== 'groq' && (
-            <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 text-[10px]" title="Listing wygenerowany tym modelem AI zamiast domyslnego Groq">
+            <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 text-[10px]" title="Listing wygenerowany innym modelem AI">
               {PROVIDER_LABELS[llmProvider] || llmProvider}
             </Badge>
           )}

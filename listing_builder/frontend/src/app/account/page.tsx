@@ -177,6 +177,8 @@ export default function AccountPage() {
               className="w-full rounded-lg border border-gray-700 py-2.5 text-sm text-white hover:bg-gray-800 transition-colors disabled:opacity-50">
               {portalLoading ? 'Ładowanie...' : 'Zarządzaj subskrypcją'}
             </button>
+          ) : tier === 'premium' ? (
+            <p className="text-xs text-gray-500 text-center">Aktywowano kluczem licencyjnym</p>
           ) : (
             <button onClick={handleCheckout}
               className="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-gray-200 transition-colors">

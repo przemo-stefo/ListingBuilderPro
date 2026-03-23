@@ -132,11 +132,17 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   }
 
   try {
+    // WHY: Backend news/feed takes ~25s (RSS fetch + Groq translate) — default fetch has no timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 55_000)
+
     const response = await fetch(url.toString(), {
       method: request.method,
       headers,
       body,
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     // WHY: Use arrayBuffer for binary responses (file downloads), text for JSON
     const contentDisposition = response.headers.get('Content-Disposition')
