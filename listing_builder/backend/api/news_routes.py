@@ -3,6 +3,7 @@
 # NOT for: Compliance alerts or monitoring (those are separate systems)
 
 import asyncio
+from email.utils import parsedate_to_datetime
 import json
 import re
 import time
@@ -133,7 +134,14 @@ async def _fetch_all_feeds() -> List[dict]:
             if i + 5 < len(RSS_FEEDS):
                 await asyncio.sleep(0.3)
 
-    articles.sort(key=lambda a: a.get("pubDate", ""), reverse=True)
+    # WHY: RFC 2822 string sort is lexicographic, not chronological — parse to datetime
+    def _sort_key(a: dict) -> float:
+        try:
+            return parsedate_to_datetime(a["pubDate"]).timestamp()
+        except Exception:
+            return 0.0
+
+    articles.sort(key=_sort_key, reverse=True)
     return articles
 
 
