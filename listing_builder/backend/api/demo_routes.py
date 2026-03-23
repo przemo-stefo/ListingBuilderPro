@@ -94,7 +94,9 @@ MARKETPLACE_DOMAINS = {
 # --- Step 1: Fetch Product ---
 
 @router.post("/fetch")
+@limiter.limit("5/minute")
 async def demo_fetch(
+    request: Request,
     req: FetchRequest,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_user_id),
@@ -207,7 +209,8 @@ async def demo_optimize(
 # --- Step 3: Compliance Check ---
 
 @router.post("/compliance-check")
-async def demo_compliance_check(req: ComplianceRequest):
+@limiter.limit("10/minute")
+async def demo_compliance_check(request: Request, req: ComplianceRequest):
     """Step 3: EU supplement compliance (HCPR, GPSR, allergens)."""
     result = check_supplement_compliance(
         title=req.title,
@@ -224,7 +227,9 @@ async def demo_compliance_check(req: ComplianceRequest):
 # --- Step 4: Publish to Amazon ---
 
 @router.post("/publish")
+@limiter.limit("5/minute")
 async def demo_publish(
+    request: Request,
     req: PublishRequest,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_user_id),
@@ -260,7 +265,9 @@ async def demo_publish(
 # --- Step 5: Create Coupon ---
 
 @router.post("/create-coupon")
+@limiter.limit("5/minute")
 async def demo_create_coupon(
+    request: Request,
     req: CouponRequest,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_user_id),
@@ -341,7 +348,7 @@ async def demo_chat(
             "has_context": False,
             "mode": req.mode,
             "sources": [],
-            "error": str(e)[:100],
+            "error": "internal_error",
         }
 
 

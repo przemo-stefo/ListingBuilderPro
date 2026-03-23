@@ -206,12 +206,11 @@ async def audit_product_card(request: Request, body: AuditRequest, db: Session =
     try:
         result = await audit_product(url, marketplace, db=db)
         return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Nieprawidłowy URL lub ASIN")
     except Exception as e:
         logger.error("audit_failed", url=url, error=str(e))
-        # SECURITY: Don't leak internal error details to client
-        raise HTTPException(status_code=500, detail="Audit failed")
+        raise HTTPException(status_code=500, detail="Audit nie powiódł się")
 
 
 MAX_STORE_SCAN = 50  # WHY: 50 parallel API calls is safe for Allegro rate limits

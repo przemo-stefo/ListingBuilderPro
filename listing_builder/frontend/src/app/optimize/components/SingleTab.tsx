@@ -135,7 +135,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
       })
       setScoreResult(data)
     } catch (err) {
-      console.warn('Auto-score failed:', err)
+      // score is non-critical — fail silently
     } finally {
       setScoreLoading(false)
     }

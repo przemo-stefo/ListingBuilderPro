@@ -158,7 +158,8 @@ async def demo_competitor_inspire(
 # --- WOW Feature 1: Competitor Compliance Radar ---
 
 @router.post("/scan-competitor")
-async def demo_scan_competitor(req: CompetitorScanRequest):
+@limiter.limit("3/minute")
+async def demo_scan_competitor(request: Request, req: CompetitorScanRequest):
     """Scan competitor ASIN for TOS + EU compliance violations."""
     competitor = get_demo_competitor()
     competitor_marketplace = f"amazon_{req.marketplace.lower()}"
@@ -209,7 +210,8 @@ async def demo_scan_competitor(req: CompetitorScanRequest):
 # --- WOW Feature 2: EFSA Ingredient-to-Claims Mapper ---
 
 @router.post("/ingredient-claims")
-async def demo_ingredient_claims(req: IngredientClaimsRequest):
+@limiter.limit("5/minute")
+async def demo_ingredient_claims(request: Request, req: IngredientClaimsRequest):
     """Map supplement ingredients to EFSA-approved EU health claims."""
     ingredients = req.ingredients
     if not ingredients and (req.title or req.current_bullets):
@@ -240,7 +242,8 @@ async def demo_ingredient_claims(req: IngredientClaimsRequest):
 # --- WOW Feature 3: Listing Change Guard (Simulation) ---
 
 @router.post("/listing-guard")
-async def demo_listing_guard(req: ListingGuardRequest):
+@limiter.limit("5/minute")
+async def demo_listing_guard(request: Request, req: ListingGuardRequest):
     """Simulate Amazon title/bullet changes and show keyword impact."""
     modified_title, changes = _simulate_amazon_changes(req.original_title)
     modified_bullets = _simulate_bullet_changes(req.original_bullets)

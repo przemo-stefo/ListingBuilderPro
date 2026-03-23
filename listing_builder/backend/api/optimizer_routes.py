@@ -615,7 +615,7 @@ async def improve_from_history(request: Request, run_id: int, db: Session = Depe
         raise
     except Exception as e:
         logger.error("improve_error", error=str(e), run_id=run_id, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Re-optymalizacja nie powiodła się")
 
 
 class FeedbackRequest(BaseModel):

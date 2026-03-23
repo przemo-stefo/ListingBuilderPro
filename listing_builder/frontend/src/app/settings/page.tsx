@@ -98,7 +98,6 @@ function GoogleConnectCard() {
   const handleConnect = async () => {
     try {
       const config = await getGoogleAuthorizeUrl()
-      console.log('[GoogleConnect] config received:', config)
       // WHY: GIS (Google Identity Services) handles popup + postmessage natively.
       // Load script dynamically, then initCodeClient() opens Google consent popup.
       const script = document.createElement('script')
@@ -107,13 +106,11 @@ function GoogleConnectCard() {
         toast({ title: 'Blad ladowania Google', description: 'Nie udalo sie zaladowac skryptu GIS', variant: 'destructive' })
       }
       script.onload = () => {
-        console.log('[GoogleConnect] GIS script loaded, initializing...')
         const client = (window as any).google.accounts.oauth2.initCodeClient({
           client_id: config.client_id,
           scope: config.scope,
           ux_mode: 'popup',
           callback: (response: { code?: string; error?: string }) => {
-            console.log('[GoogleConnect] callback:', response.error || 'code received')
             if (response.code) {
               connectMutation.mutate(response.code)
             } else if (response.error) {
@@ -125,7 +122,6 @@ function GoogleConnectCard() {
       }
       document.head.appendChild(script)
     } catch (err) {
-      console.error('[GoogleConnect] error:', err)
       toast({ title: 'Blad laczenia z Google', description: String(err), variant: 'destructive' })
     }
   }
