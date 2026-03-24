@@ -34,43 +34,12 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
   const [searched, setSearched] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // WHY: Auto-search categories after 600ms of no typing (3+ chars)
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-
-    const trimmed = productInput.trim()
-    if (trimmed.length < 3) return
-
-    debounceRef.current = setTimeout(async () => {
-      setIsSearching(true)
-      setSelectedCategory(null)
-      setSearched(false)
-      try {
-        const data = await searchCategories(trimmed)
-        setCategories(data.categories || [])
-        setSearched(true)
-      } catch {
-        setCategories([])
-        setSearched(true)
-      } finally {
-        setIsSearching(false)
-      }
-    }, 600)
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [productInput])
-
-  const handleSearchCategories = async () => {
-    if (!productInput.trim() || productInput.trim().length < 2) return
-
+  const doSearch = async (query: string) => {
     setIsSearching(true)
     setSelectedCategory(null)
     setSearched(false)
-
     try {
-      const data = await searchCategories(productInput.trim())
+      const data = await searchCategories(query)
       setCategories(data.categories || [])
       setSearched(true)
     } catch {
@@ -79,6 +48,25 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
     } finally {
       setIsSearching(false)
     }
+  }
+
+  // WHY: Auto-search categories after 600ms of no typing (3+ chars)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    const trimmed = productInput.trim()
+    if (trimmed.length < 3) return
+
+    debounceRef.current = setTimeout(() => { doSearch(trimmed) }, 600)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [productInput])
+
+  const handleSearchCategories = () => {
+    if (!productInput.trim() || productInput.trim().length < 2) return
+    doSearch(productInput.trim())
   }
 
   const handleReset = () => {

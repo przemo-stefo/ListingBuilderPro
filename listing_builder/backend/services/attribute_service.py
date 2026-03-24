@@ -25,6 +25,9 @@ def _build_prompt(product_input: str, category_name: str, category_path: str, pa
     DICTIONARY params get explicit option lists so LLM can only pick valid values.
     """
     safe_input = sanitize_llm_input(product_input)
+    # WHY: category_name/category_path come from user request body — sanitize to prevent prompt injection
+    safe_category_name = sanitize_llm_input(category_name)
+    safe_category_path = sanitize_llm_input(category_path)
 
     required_section = []
     optional_section = []
@@ -69,7 +72,7 @@ DODATKOWE ATRYBUTY KAUFLAND (dodaj jeśli możesz wywnioskować z tytułu):
 
 ZWERYFIKOWANE FAKTY:
 - Produkt: {safe_input}
-- Kategoria: {category_name} ({category_path})
+- Kategoria: {safe_category_name} ({safe_category_path})
 - Bazuj WYŁĄCZNIE na tytule produktu i wiedzy o kategorii
 - Dla DICTIONARY — wybierz TYLKO z podanych opcji (podaj ID i value)
 - Jeśli nie możesz ustalić wartości — wpisz null

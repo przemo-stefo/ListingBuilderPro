@@ -153,6 +153,10 @@ async def generate_product_attributes(
     db: Session = Depends(get_db),
 ) -> AttributeGenerateResponse:
     """Generate product attributes for a given category using AI."""
+    # WHY: Allegro category IDs are numeric — reject non-numeric to prevent injection
+    if not body.category_id.isdigit():
+        raise HTTPException(status_code=400, detail="Nieprawidłowe ID kategorii")
+
     client_ip = get_remote_address(request)
 
     try:
