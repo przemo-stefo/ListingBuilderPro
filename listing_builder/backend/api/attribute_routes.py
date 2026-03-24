@@ -60,7 +60,7 @@ class AttributeGenerateRequest(BaseModel):
     category_id: str = Field(..., min_length=1, max_length=50)
     category_name: str = Field(..., min_length=1, max_length=255)
     category_path: str = Field("", max_length=1000)
-    marketplace: Literal["allegro"] = "allegro"
+    marketplace: Literal["allegro", "kaufland"] = "allegro"
 
 
 class GeneratedAttribute(BaseModel):

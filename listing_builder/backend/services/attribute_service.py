@@ -18,7 +18,7 @@ from models.attribute_run import AttributeRun
 logger = structlog.get_logger()
 
 
-def _build_prompt(product_input: str, category_name: str, category_path: str, params: List[dict]) -> str:
+def _build_prompt(product_input: str, category_name: str, category_path: str, params: List[dict], marketplace: str = "allegro") -> str:
     """Build Beast/Groq prompt with category parameter schema.
 
     WHY: Structured prompt with parameter types + options prevents LLM konfabulacja.
@@ -49,7 +49,23 @@ def _build_prompt(product_input: str, category_name: str, category_path: str, pa
         else:
             optional_section.append(line)
 
-    prompt = f"""Jesteś ekspertem od e-commerce Allegro. Uzupełnij atrybuty produktowe na podstawie tytułu.
+    # WHY: Kaufland uses Allegro categories but needs extra generic attributes
+    kaufland_extra = ""
+    if marketplace == "kaufland":
+        kaufland_extra = """
+DODATKOWE ATRYBUTY KAUFLAND (dodaj jeśli możesz wywnioskować z tytułu):
+- Kolor (STRING)
+- Rozmiar (STRING)
+- Waga produktu (FLOAT, w kg)
+- Płeć (DICTIONARY: Mężczyzna, Kobieta, Unisex, Dziecko)
+- Materiał (STRING)
+- Marka/Brand (STRING)
+- EAN/GTIN (STRING — wpisz null jeśli nieznany)
+"""
+
+    marketplace_label = "Allegro" if marketplace == "allegro" else "Kaufland"
+
+    prompt = f"""Jesteś ekspertem od e-commerce {marketplace_label}. Uzupełnij atrybuty produktowe na podstawie tytułu.
 
 ZWERYFIKOWANE FAKTY:
 - Produkt: {safe_input}
@@ -63,7 +79,7 @@ WYMAGANE PARAMETRY:
 
 OPCJONALNE PARAMETRY:
 {chr(10).join(optional_section) if optional_section else "(brak)"}
-
+{kaufland_extra}
 Odpowiedz TYLKO poprawnym JSON (bez markdown, bez komentarzy):
 [{{"name": "...", "value": "...", "param_id": "...", "required": true/false}}]
 
@@ -151,7 +167,7 @@ async def generate_attributes(
         raise ValueError(f"Nie znaleziono parametrów dla kategorii {category_id}")
 
     # Step 2: Build prompt
-    prompt = _build_prompt(product_input, category_name, category_path, params)
+    prompt = _build_prompt(product_input, category_name, category_path, params, marketplace)
 
     # Step 3: Call Beast primary, Groq fallback
     provider_used = "beast"
@@ -177,6 +193,10 @@ async def generate_attributes(
 
     # Step 4: Parse response
     attributes = _parse_attributes_response(raw_text, params)
+
+    if not attributes:
+        logger.warning("empty_attributes_result", raw_length=len(raw_text))
+        raise ValueError("AI nie zwróciło atrybutów. Spróbuj bardziej szczegółowy tytuł produktu.")
 
     latency_ms = int((time.time() - start) * 1000)
 

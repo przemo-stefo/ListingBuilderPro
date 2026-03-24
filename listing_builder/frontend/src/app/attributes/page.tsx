@@ -27,13 +27,14 @@ export default function AttributesPage() {
     categoryId: string,
     categoryName: string,
     categoryPath: string,
+    marketplace: 'allegro' | 'kaufland' = 'allegro',
   ) => {
     setIsLoading(true)
     setError('')
     setResult(null)
 
     try {
-      const data = await generateAttributes(productInput, categoryId, categoryName, categoryPath)
+      const data = await generateAttributes(productInput, categoryId, categoryName, categoryPath, marketplace)
       setResult(data)
     } catch (e) {
       const msg = e instanceof Error ? e.message : typeof e === 'object' && e !== null && 'message' in e ? String((e as Record<string, unknown>).message) : 'Nieznany błąd'

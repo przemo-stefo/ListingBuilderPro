@@ -53,13 +53,14 @@ export async function generateAttributes(
   categoryPath: string,
   marketplace: string = 'allegro',
 ): Promise<import('../types').AttributeRunResponse> {
+  // WHY: 90s timeout — LLM attribute generation takes 30-60s, default 30s causes timeouts
   const { data } = await apiClient.post<import('../types').AttributeRunResponse>('/attributes/generate', {
     product_input: productInput,
     category_id: categoryId,
     category_name: categoryName,
     category_path: categoryPath,
     marketplace,
-  })
+  }, { timeout: 90000 })
   return data
 }
 

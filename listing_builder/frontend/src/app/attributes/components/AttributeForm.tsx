@@ -4,12 +4,14 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Search, Loader2, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { searchCategories } from '@/lib/api/attributes'
+
+type Marketplace = 'allegro' | 'kaufland'
 
 interface AllegroCategory {
   id: string
@@ -19,16 +21,46 @@ interface AllegroCategory {
 }
 
 interface AttributeFormProps {
-  onSubmit: (productInput: string, categoryId: string, categoryName: string, categoryPath: string) => void
+  onSubmit: (productInput: string, categoryId: string, categoryName: string, categoryPath: string, marketplace: Marketplace) => void
   isLoading: boolean
 }
 
 export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
   const [productInput, setProductInput] = useState('')
+  const [marketplace, setMarketplace] = useState<Marketplace>('allegro')
   const [categories, setCategories] = useState<AllegroCategory[]>([])
   const [selectedCategory, setSelectedCategory] = useState<AllegroCategory | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searched, setSearched] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // WHY: Auto-search categories after 600ms of no typing (3+ chars)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    const trimmed = productInput.trim()
+    if (trimmed.length < 3) return
+
+    debounceRef.current = setTimeout(async () => {
+      setIsSearching(true)
+      setSelectedCategory(null)
+      setSearched(false)
+      try {
+        const data = await searchCategories(trimmed)
+        setCategories(data.categories || [])
+        setSearched(true)
+      } catch {
+        setCategories([])
+        setSearched(true)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 600)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [productInput])
 
   const handleSearchCategories = async () => {
     if (!productInput.trim() || productInput.trim().length < 2) return
@@ -57,11 +89,28 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
 
   const handleSubmit = () => {
     if (!selectedCategory) return
-    onSubmit(productInput.trim(), selectedCategory.id, selectedCategory.name, selectedCategory.path)
+    onSubmit(productInput.trim(), selectedCategory.id, selectedCategory.name, selectedCategory.path, marketplace)
   }
 
   return (
     <div className="space-y-4">
+      {/* Marketplace Toggle */}
+      <div className="flex gap-2">
+        {(['allegro', 'kaufland'] as Marketplace[]).map((mp) => (
+          <button
+            key={mp}
+            onClick={() => setMarketplace(mp)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              marketplace === mp
+                ? 'bg-blue-600 text-white'
+                : 'bg-[#121212] text-gray-400 hover:text-white border border-gray-700'
+            }`}
+          >
+            {mp === 'allegro' ? 'Allegro' : 'Kaufland'}
+          </button>
+        ))}
+      </div>
+
       {/* Step 1: Product Input */}
       <Card className="border-gray-800">
         <CardContent className="p-4 space-y-3">
@@ -92,7 +141,7 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
         <Card className="border-gray-800">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-300">Wybierz kategorię Allegro</label>
+              <label className="text-sm font-medium text-gray-300">Wybierz kategorię {marketplace === 'kaufland' ? 'Kaufland' : 'Allegro'}</label>
               <button onClick={handleReset} className="text-xs text-gray-500 hover:text-gray-300">Zmień</button>
             </div>
             <div className="space-y-2">
