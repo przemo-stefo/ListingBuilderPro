@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 import structlog
 
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import require_user_id, require_premium
 from services.validator_service import analyze_product
 from models.validator import ValidationRun
 
@@ -72,10 +72,12 @@ class ValidatorHistoryResponse(BaseModel):
 async def analyze(
     request: Request,
     body: ValidatorRequest,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
 ):
     """Analyze product potential using AI + market data."""
+    # WHY: No free tier — only premium users can validate (LLM token cost)
+    require_premium(request, db)
     client_ip = request.client.host if request.client else None
 
     try:
@@ -100,7 +102,7 @@ async def get_history(
     request: Request,
     limit: int = 20,
     offset: int = 0,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
 ):
     """Get user's validation history (paginated)."""
@@ -138,7 +140,7 @@ async def get_history(
 async def delete_history(
     request: Request,
     run_id: int,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
 ):
     """Delete a validation run. IDOR protection: filters by user_id + id."""

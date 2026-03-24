@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 import structlog
 
 from database import get_db
-from api.dependencies import get_user_id
+from api.dependencies import require_user_id, require_premium
 from api.attribute_schemas import (
     CategoryItem, CategorySearchResponse, ParameterOption, CategoryParameter,
     CategoryParametersResponse, AttributeGenerateRequest, AttributeGenerateResponse,
@@ -39,7 +39,7 @@ _ALLEGRO_URL_RE = re.compile(r"allegro\.pl/oferta/(?:.*-)?(\d+)$")
 async def search_allegro_categories(
     request: Request,
     query: str = Query(..., max_length=500),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ) -> CategorySearchResponse:
     """Search Allegro categories matching a product name."""
     if len(query.strip()) < 2:
@@ -56,7 +56,7 @@ async def search_allegro_categories(
 async def resolve_allegro_url(
     request: Request,
     url: str = Query(..., max_length=500),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ) -> ResolveUrlResponse:
     """Resolve an Allegro offer URL to title + category for attribute generation."""
     match = _ALLEGRO_URL_RE.search(url.strip())
@@ -95,7 +95,7 @@ async def resolve_allegro_url(
 async def get_category_parameters(
     request: Request,
     category_id: str,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
 ) -> CategoryParametersResponse:
     """Fetch all parameters for an Allegro category."""
     # WHY: Allegro category IDs are numeric — reject anything else to prevent injection
@@ -120,13 +120,16 @@ async def get_category_parameters(
 async def generate_product_attributes(
     request: Request,
     body: AttributeGenerateRequest,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
 ) -> AttributeGenerateResponse:
     """Generate product attributes for a given category using AI."""
     # WHY: Allegro category IDs are numeric — reject non-numeric to prevent injection
     if not body.category_id.isdigit():
         raise HTTPException(status_code=400, detail="Nieprawidłowe ID kategorii")
+
+    # WHY: No free tier — only premium users can generate attributes (token cost)
+    require_premium(request, db)
 
     client_ip = get_remote_address(request)
 
@@ -153,7 +156,7 @@ async def get_attribute_history(
     request: Request,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
 ) -> AttributeHistoryResponse:
     """Get paginated attribute generation history for the current user."""
@@ -190,7 +193,7 @@ async def get_attribute_history(
 async def delete_attribute_history(
     request: Request,
     run_id: int,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(require_user_id),
     db: Session = Depends(get_db),
 ) -> None:
     """Delete an attribute generation run. IDOR-safe: filters by user_id."""

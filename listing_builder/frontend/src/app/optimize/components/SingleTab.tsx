@@ -14,7 +14,6 @@ import { useGenerateListing } from '@/lib/hooks/useOptimizer'
 import { useTier } from '@/lib/hooks/useTier'
 import { useOAuthConnections } from '@/lib/hooks/useOAuth'
 import { useToast } from '@/lib/hooks/useToast'
-import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { useUpdateProduct } from '@/lib/hooks/useProducts'
 import { ProductPicker } from './ProductPicker'
@@ -114,7 +113,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
   const { data: settingsData } = useSettings()
   const savedLlmKey = settingsData?.llm?.providers?.[llmProvider]?.api_key || ''
   const hasSavedKey = savedLlmKey === '****'
-  const { canOptimize, incrementUsage, isPremium, usageToday } = useTier()
+  const { canOptimize, incrementUsage, isPremium } = useTier()
   const { data: oauthData } = useOAuthConnections()
   const isAllegroConnected = oauthData?.connections?.some(
     (c) => c.marketplace === 'allegro' && c.status === 'active'

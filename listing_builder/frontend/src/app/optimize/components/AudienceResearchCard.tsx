@@ -25,7 +25,6 @@ export default function AudienceResearchCard({
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
-  const [usedToday, setUsedToday] = useState(false)
 
   const { isPremium } = useTier()
 
@@ -47,10 +46,6 @@ export default function AudienceResearchCard({
 
       setResult(data.result)
       onResearchComplete(data.result)
-
-      if (!isPremium) {
-        setUsedToday(true)
-      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Research failed'
       setError(message)

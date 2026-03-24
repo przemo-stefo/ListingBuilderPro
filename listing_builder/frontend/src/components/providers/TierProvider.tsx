@@ -8,7 +8,6 @@ import { createContext, useState, useEffect, useCallback, type ReactNode } from 
 import { useAuth } from '@/components/providers/AuthProvider'
 import { apiClient } from '@/lib/api/client'
 import type { TierLevel, TierContext } from '@/lib/types/tier'
-import { FREE_DAILY_LIMIT } from '@/lib/types/tier'
 
 const LICENSE_KEY_STORAGE = 'lbp_license_key'
 // WHY: Track which user owns the stored license key — prevents cross-user leakage
