@@ -16,6 +16,7 @@ import {
   DollarSign,
   Rocket,
   Tags,
+  Sparkles,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -43,6 +44,7 @@ export const navSections: NavSection[] = [
       { title: 'Pulpit', href: '/dashboard', icon: LayoutDashboard, desc: 'Przegląd statystyk i szybkie akcje' },
       { title: 'Import', href: '/products/import', icon: Upload, desc: 'Importuj produkty z CSV lub Allegro' },
       { title: 'Baza Produktów', href: '/products', icon: Database, desc: 'Przeglądaj, filtruj i zarządzaj zaimportowanymi produktami' },
+      { title: 'Optymalizator', href: '/optimize', icon: Sparkles, premiumOnly: true, desc: 'Optymalizuj tytuły i opisy pod SEO marketplace' },
       { title: 'Konwerter', href: '/converter', icon: ArrowRightLeft, desc: 'Konwertuj oferty Allegro na Amazon/eBay/Kaufland' },
       { title: 'Listing Score', href: '/listing-score', icon: BarChart3, desc: 'Oceń listing 1-10 w 5 wymiarach copywriterskich' },
       { title: 'Walidator', href: '/validator', icon: Search, desc: 'Sprawdź potencjał produktu' },
@@ -53,7 +55,7 @@ export const navSections: NavSection[] = [
   {
     label: 'Demo',
     items: [
-      { title: 'Amazon Pro', href: '/demo/amazon-pro', icon: Rocket, desc: 'Pełny pipeline: ASIN → AI → Compliance → Publish → Coupon', highlight: true },
+      { title: 'Amazon Pro', href: '/demo/amazon-pro', icon: Rocket, premiumOnly: true, desc: 'Pełny pipeline: ASIN → AI → Compliance → Publish → Coupon', highlight: true },
     ],
   },
   {
