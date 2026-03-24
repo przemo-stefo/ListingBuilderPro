@@ -131,7 +131,8 @@ def _parse_attributes_response(raw: str, params: List[dict]) -> List[dict]:
     # WHY: Build lookup by both ID and name for flexible matching
     param_lookup: Dict[str, dict] = {}
     for p in params:
-        param_lookup[p["id"]] = p
+        # WHY: Allegro API returns int IDs, LLM returns string IDs — normalize to str for matching
+        param_lookup[str(p["id"])] = p
         param_lookup[p["name"].lower()] = p
 
     # Try direct JSON parse
@@ -171,17 +172,34 @@ def _parse_attributes_response(raw: str, params: List[dict]) -> List[dict]:
             continue
         param_id = str(item.get("param_id", ""))
         name = item.get("name", "")
+        # WHY: LLM sometimes returns garbage items with no identifiers — skip them
+        if not param_id and not name:
+            continue
 
         # WHY: Match against known params to get type/options
         ref = param_lookup.get(param_id) or param_lookup.get(name.lower())
+        if ref is None:
+            logger.warning("attribute_unknown_param", param_id=param_id, name=name)
+
+        value = item.get("value")
+
+        # WHY: DICTIONARY params must use values from Allegro's option list.
+        # If LLM picks an invalid value, flag it so frontend can show a dropdown to correct it.
+        valid_option = True
+        if ref and ref["type"] == "DICTIONARY" and ref.get("options") and value is not None:
+            allowed_values = {o["value"] for o in ref["options"]}
+            if value not in allowed_values:
+                valid_option = False
+                logger.warning("attribute_invalid_dict_value", param_id=param_id, value=value)
 
         parsed.append({
             "name": name,
-            "value": item.get("value"),
+            "value": value,
             "param_id": param_id,
             "required": item.get("required", False),
             "type": ref["type"] if ref else "STRING",
             "options": ref.get("options", []) if ref else [],
+            "valid_option": valid_option,
         })
 
     return parsed

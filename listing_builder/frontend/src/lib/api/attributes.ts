@@ -3,30 +3,10 @@
 // NOT for: UI logic or state management
 
 import { apiClient } from './client'
-
-interface CategoryItem {
-  id: string
-  name: string
-  path: string
-  leaf: boolean
-}
+import type { AllegroCategory, CategoryParameter, AttributeRunResponse, AttributeHistoryResponse } from '../types'
 
 interface CategorySearchResponse {
-  categories: CategoryItem[]
-}
-
-interface ParameterOption {
-  id: string
-  value: string
-}
-
-interface CategoryParameter {
-  id: string
-  name: string
-  type: string
-  required: boolean
-  unit: string | null
-  options: ParameterOption[]
+  categories: AllegroCategory[]
 }
 
 interface CategoryParametersResponse {
@@ -49,9 +29,10 @@ export async function resolveAllegroUrl(url: string): Promise<ResolveUrlResponse
   return data
 }
 
-export async function searchCategories(query: string): Promise<CategorySearchResponse> {
+export async function searchCategories(query: string, signal?: AbortSignal): Promise<CategorySearchResponse> {
   const { data } = await apiClient.get<CategorySearchResponse>('/attributes/categories', {
     params: { query },
+    signal,
   })
   return data
 }
@@ -67,9 +48,9 @@ export async function generateAttributes(
   categoryName: string,
   categoryPath: string,
   marketplace: 'allegro' | 'kaufland' = 'allegro',
-): Promise<import('../types').AttributeRunResponse> {
+): Promise<AttributeRunResponse> {
   // WHY: 90s timeout — LLM attribute generation takes 30-60s, default 30s causes timeouts
-  const { data } = await apiClient.post<import('../types').AttributeRunResponse>('/attributes/generate', {
+  const { data } = await apiClient.post<AttributeRunResponse>('/attributes/generate', {
     product_input: productInput,
     category_id: categoryId,
     category_name: categoryName,
@@ -82,8 +63,8 @@ export async function generateAttributes(
 export async function getAttributeHistory(
   limit: number = 20,
   offset: number = 0,
-): Promise<import('../types').AttributeHistoryResponse> {
-  const { data } = await apiClient.get<import('../types').AttributeHistoryResponse>('/attributes/history', {
+): Promise<AttributeHistoryResponse> {
+  const { data } = await apiClient.get<AttributeHistoryResponse>('/attributes/history', {
     params: { limit, offset },
   })
   return data

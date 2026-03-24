@@ -112,7 +112,9 @@ export function AttributeResult({ result }: AttributeResultProps) {
                         <select
                           value={attr.value ?? ''}
                           onChange={(e) => updateValue(i, e.target.value)}
-                          className="w-full rounded border border-gray-700 bg-[#121212] px-2 py-1 text-sm text-white"
+                          className={`w-full rounded border bg-[#121212] px-2 py-1 text-sm text-white ${
+                            attr.valid_option === false ? 'border-red-500' : 'border-gray-700'
+                          }`}
                         >
                           <option value="">-- wybierz --</option>
                           {attr.options.map((opt) => (

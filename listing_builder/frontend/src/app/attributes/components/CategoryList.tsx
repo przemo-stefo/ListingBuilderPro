@@ -6,13 +6,7 @@
 
 import { ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-
-interface AllegroCategory {
-  id: string
-  name: string
-  path: string
-  leaf: boolean
-}
+import type { AllegroCategory } from '@/lib/types'
 
 interface CategoryListProps {
   categories: AllegroCategory[]

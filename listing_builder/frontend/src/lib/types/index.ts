@@ -1056,6 +1056,7 @@ export interface GeneratedAttribute {
   required: boolean
   type: string
   options?: { id: string; value: string }[]
+  valid_option?: boolean
 }
 
 export interface AttributeRunResponse {

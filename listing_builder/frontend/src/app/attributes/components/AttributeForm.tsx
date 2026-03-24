@@ -11,15 +11,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { searchCategories, resolveAllegroUrl } from '@/lib/api/attributes'
 import { CategoryList } from './CategoryList'
+import type { AllegroCategory } from '@/lib/types'
 
 type Marketplace = 'allegro' | 'kaufland'
-
-interface AllegroCategory {
-  id: string
-  name: string
-  path: string
-  leaf: boolean
-}
 
 interface AttributeFormProps {
   onSubmit: (productInput: string, categoryId: string, categoryName: string, categoryPath: string, marketplace: Marketplace) => void
@@ -47,10 +41,12 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
     setSelectedCategory(null)
     setSearched(false)
     try {
-      const data = await searchCategories(query)
+      const data = await searchCategories(query, abortRef.current?.signal)
       setCategories(data.categories || [])
       setSearched(true)
-    } catch {
+    } catch (e: unknown) {
+      // WHY: Aborted requests (rapid typing) should not clear results from a previous successful search
+      if (e && typeof e === 'object' && 'code' in e && e.code === 'ERR_CANCELED') return
       setCategories([])
       setSearched(true)
     } finally {
