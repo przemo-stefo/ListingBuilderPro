@@ -79,3 +79,11 @@ class AttributeHistoryItem(BaseModel):
 class AttributeHistoryResponse(BaseModel):
     items: List[AttributeHistoryItem]
     total: int
+
+
+class ResolveUrlResponse(BaseModel):
+    title: str
+    category_id: str
+    category_name: str
+    category_path: str
+    leaf: bool

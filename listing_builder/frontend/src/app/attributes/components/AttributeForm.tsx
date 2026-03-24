@@ -5,11 +5,12 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, Loader2, ChevronRight } from 'lucide-react'
+import { Search, Loader2, Link } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { searchCategories } from '@/lib/api/attributes'
+import { searchCategories, resolveAllegroUrl } from '@/lib/api/attributes'
+import { CategoryList } from './CategoryList'
 
 type Marketplace = 'allegro' | 'kaufland'
 
@@ -32,6 +33,8 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
   const [selectedCategory, setSelectedCategory] = useState<AllegroCategory | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [isResolving, setIsResolving] = useState(false)
+  const [resolveError, setResolveError] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -60,7 +63,8 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     const trimmed = productInput.trim()
-    if (trimmed.length < 3) return
+    // WHY: Don't auto-search when input is an Allegro URL — user clicks "Pobierz" instead
+    if (trimmed.length < 3 || /allegro\.pl\/oferta\//i.test(trimmed)) return
 
     debounceRef.current = setTimeout(() => { doSearch(trimmed) }, 600)
 
@@ -74,9 +78,46 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
     return () => { if (abortRef.current) abortRef.current.abort() }
   }, [])
 
+  const isAllegroUrl = (text: string) => /allegro\.pl\/oferta\//i.test(text.trim())
+
+  const handleResolveUrl = useCallback(async () => {
+    const url = productInput.trim()
+    if (!isAllegroUrl(url)) return
+    setIsResolving(true)
+    setResolveError('')
+    setCategories([])
+    setSelectedCategory(null)
+    setSearched(false)
+    try {
+      const resolved = await resolveAllegroUrl(url)
+      setProductInput(resolved.title)
+      const cat: AllegroCategory = {
+        id: resolved.category_id, name: resolved.category_name,
+        path: resolved.category_path, leaf: resolved.leaf,
+      }
+      setCategories([cat])
+      setSelectedCategory(cat)
+      setSearched(true)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Nie udało się pobrać danych z Allegro'
+      setResolveError(msg)
+    } finally {
+      setIsResolving(false)
+    }
+  }, [productInput])
+
   const handleSearchCategories = () => {
     if (!productInput.trim() || productInput.trim().length < 2) return
     doSearch(productInput.trim())
+  }
+
+  // WHY: Single action button — resolve URL or search categories based on input
+  const handleAction = () => {
+    if (isAllegroUrl(productInput)) {
+      handleResolveUrl()
+    } else {
+      handleSearchCategories()
+    }
   }
 
   const handleReset = () => {
@@ -112,71 +153,49 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
       {/* Step 1: Product Input */}
       <Card className="border-gray-800">
         <CardContent className="p-4 space-y-3">
-          <label className="text-sm font-medium text-gray-300">Nazwa produktu lub tytuł oferty</label>
+          <label className="text-sm font-medium text-gray-300">Nazwa produktu, tytuł oferty lub link Allegro</label>
           <div className="flex gap-2">
             <Input
               value={productInput}
               onChange={(e) => setProductInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearchCategories()}
-              placeholder="np. Samsung Galaxy S24 Ultra 256GB"
+              onKeyDown={(e) => e.key === 'Enter' && handleAction()}
+              placeholder="np. Samsung Galaxy S24 Ultra 256GB lub link allegro.pl/oferta/..."
               className="flex-1 bg-[#121212] border-gray-700 text-white placeholder:text-gray-500"
               disabled={isLoading}
             />
             <Button
-              onClick={handleSearchCategories}
-              disabled={!productInput.trim() || productInput.trim().length < 2 || isSearching || isLoading}
+              onClick={handleAction}
+              disabled={!productInput.trim() || productInput.trim().length < 2 || isSearching || isResolving || isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              <span className="ml-2 hidden sm:inline">Szukaj kategorii</span>
+              {(isSearching || isResolving) ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isAllegroUrl(productInput) ? (
+                <Link className="h-4 w-4" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              <span className="ml-2 hidden sm:inline">
+                {isAllegroUrl(productInput) ? 'Pobierz z Allegro' : 'Szukaj kategorii'}
+              </span>
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Step 2: Category Selection */}
-      {searched && categories.length > 0 && (
-        <Card className="border-gray-800">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-300">Wybierz kategorię {marketplace === 'kaufland' ? 'Kaufland' : 'Allegro'}</label>
-              <button onClick={handleReset} className="text-xs text-gray-500 hover:text-gray-300">Zmień</button>
-            </div>
-            <div className="space-y-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                    selectedCategory?.id === cat.id
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-700 bg-[#121212] hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-white">{cat.name}</span>
-                      {cat.leaf && (
-                        <span className="ml-2 rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] text-green-400">leaf</span>
-                      )}
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-gray-500" />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">{cat.path}</p>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {resolveError && (
+        <p className="text-sm text-red-400">{resolveError}</p>
       )}
 
-      {searched && categories.length === 0 && (
-        <Card className="border-gray-800">
-          <CardContent className="p-4">
-            <p className="text-sm text-gray-400">Nie znaleziono kategorii. Spróbuj inną nazwę produktu.</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Step 2: Category Selection */}
+      <CategoryList
+        categories={categories}
+        selectedId={selectedCategory?.id ?? null}
+        marketplace={marketplace}
+        searched={searched}
+        onSelect={setSelectedCategory}
+        onReset={handleReset}
+      />
 
       {/* Generate Button */}
       {selectedCategory && (

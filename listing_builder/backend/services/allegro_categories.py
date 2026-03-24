@@ -15,6 +15,7 @@ logger = structlog.get_logger()
 _MAX_CACHE_SIZE = 500
 _category_cache: Dict[str, List[dict]] = {}
 _params_cache: Dict[str, List[dict]] = {}
+_category_by_id_cache: Dict[str, dict] = {}
 
 
 async def search_categories(query: str) -> List[dict]:
@@ -67,6 +68,68 @@ async def search_categories(query: str) -> List[dict]:
     except Exception as e:
         logger.error("allegro_category_search_error", error=str(e), query=query)
         return []
+
+
+async def fetch_category_by_id(category_id: str) -> Optional[dict]:
+    """Fetch a single Allegro category by ID and build full path via parent chain.
+
+    WHY: When resolving an Allegro URL, we get category_id from the offer
+    but need the full name + path for the attribute generation form.
+    """
+    if category_id in _category_by_id_cache:
+        return _category_by_id_cache[category_id]
+
+    token = await get_client_credentials_token()
+    if not token:
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.allegro.public.v1+json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                f"{ALLEGRO_API_BASE}/sale/categories/{category_id}",
+                headers=headers,
+            )
+            if resp.status_code != 200:
+                return None
+
+            data = resp.json()
+            name = data.get("name", "")
+            leaf = data.get("leaf", False)
+
+            # WHY: Walk parent chain to build full path (e.g. "Elektronika > Telefony > Smartfony")
+            path_parts = [name]
+            parent = data.get("parent", {})
+            while parent and parent.get("id"):
+                parent_resp = await client.get(
+                    f"{ALLEGRO_API_BASE}/sale/categories/{parent['id']}",
+                    headers=headers,
+                )
+                if parent_resp.status_code != 200:
+                    break
+                parent_data = parent_resp.json()
+                path_parts.insert(0, parent_data.get("name", ""))
+                parent = parent_data.get("parent", {})
+
+            result = {
+                "id": str(category_id),
+                "name": name,
+                "path": " > ".join(path_parts),
+                "leaf": leaf,
+            }
+
+            if len(_category_by_id_cache) >= _MAX_CACHE_SIZE:
+                _category_by_id_cache.clear()
+            _category_by_id_cache[category_id] = result
+            return result
+
+    except Exception as e:
+        logger.error("allegro_category_by_id_error", error=str(e), category_id=category_id)
+        return None
 
 
 async def fetch_category_parameters(category_id: str) -> List[dict]:

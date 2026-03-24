@@ -34,6 +34,21 @@ interface CategoryParametersResponse {
   category_id: string
 }
 
+interface ResolveUrlResponse {
+  title: string
+  category_id: string
+  category_name: string
+  category_path: string
+  leaf: boolean
+}
+
+export async function resolveAllegroUrl(url: string): Promise<ResolveUrlResponse> {
+  const { data } = await apiClient.get<ResolveUrlResponse>('/attributes/resolve-url', {
+    params: { url },
+  })
+  return data
+}
+
 export async function searchCategories(query: string): Promise<CategorySearchResponse> {
   const { data } = await apiClient.get<CategorySearchResponse>('/attributes/categories', {
     params: { query },

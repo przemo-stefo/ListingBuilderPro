@@ -2,6 +2,8 @@
 # Purpose: Auto-Atrybuty API endpoints — category search, params, generate, history
 # NOT for: LLM logic (attribute_service.py) or Allegro API calls (allegro_categories.py)
 
+import re
+
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -13,9 +15,10 @@ from api.dependencies import get_user_id
 from api.attribute_schemas import (
     CategoryItem, CategorySearchResponse, ParameterOption, CategoryParameter,
     CategoryParametersResponse, AttributeGenerateRequest, AttributeGenerateResponse,
-    AttributeHistoryItem, AttributeHistoryResponse,
+    AttributeHistoryItem, AttributeHistoryResponse, ResolveUrlResponse,
 )
-from services.allegro_categories import search_categories, fetch_category_parameters
+from services.allegro_categories import search_categories, fetch_category_parameters, fetch_category_by_id
+from services.allegro_api import fetch_public_offer_details
 from services.attribute_service import generate_attributes
 from models.attribute_run import AttributeRun
 
@@ -24,6 +27,9 @@ logger = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/attributes", tags=["attributes"])
+
+# WHY: Allegro offer URLs follow pattern allegro.pl/oferta/slug-123456 — extract numeric ID
+_ALLEGRO_URL_RE = re.compile(r"allegro\.pl/oferta/(?:.*-)?(\d+)$")
 
 
 # --- Endpoints ---
@@ -42,6 +48,45 @@ async def search_allegro_categories(
     categories = await search_categories(query.strip())
     return CategorySearchResponse(
         categories=[CategoryItem(**c) for c in categories],
+    )
+
+
+@router.get("/resolve-url", response_model=ResolveUrlResponse)
+@limiter.limit("10/minute")
+async def resolve_allegro_url(
+    request: Request,
+    url: str = Query(..., max_length=500),
+    user_id: str = Depends(get_user_id),
+) -> ResolveUrlResponse:
+    """Resolve an Allegro offer URL to title + category for attribute generation."""
+    match = _ALLEGRO_URL_RE.search(url.strip())
+    if not match:
+        raise HTTPException(status_code=400, detail="Nieprawidłowy link Allegro (oczekiwany: allegro.pl/oferta/...)")
+
+    offer_id = match.group(1)
+    offer = await fetch_public_offer_details(offer_id)
+    if "error" in offer and offer["error"]:
+        raise HTTPException(status_code=502, detail=offer["error"])
+
+    title = offer.get("title", "")
+    category_id = str(offer.get("category", ""))
+    if not title:
+        raise HTTPException(status_code=404, detail="Nie udało się pobrać tytułu oferty")
+    if not category_id:
+        raise HTTPException(status_code=404, detail="Nie udało się pobrać kategorii oferty")
+
+    cat = await fetch_category_by_id(category_id)
+    if cat:
+        return ResolveUrlResponse(
+            title=title, category_id=category_id,
+            category_name=cat["name"], category_path=cat["path"], leaf=cat["leaf"],
+        )
+
+    # WHY: Fallback if category API fails — still return title + ID
+    logger.warning("resolve_url_category_fallback", offer_id=offer_id, category_id=category_id)
+    return ResolveUrlResponse(
+        title=title, category_id=category_id,
+        category_name=f"Kategoria {category_id}", category_path="", leaf=False,
     )
 
 
