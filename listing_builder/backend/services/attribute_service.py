@@ -17,6 +17,21 @@ from models.attribute_run import AttributeRun
 
 logger = structlog.get_logger()
 
+# WHY: Kaufland requires generic attributes (color, size, weight etc.) that Allegro categories don't include.
+# Synthetic param IDs (kaufland_*) let the parser match them back after LLM generation.
+KAUFLAND_REQUIRED_PARAMS: List[dict] = [
+    {"id": "kaufland_color", "name": "Kolor", "type": "STRING", "required": True, "unit": None, "options": [], "restrictions": {}},
+    {"id": "kaufland_size", "name": "Rozmiar", "type": "STRING", "required": True, "unit": None, "options": [], "restrictions": {}},
+    {"id": "kaufland_weight", "name": "Waga produktu", "type": "FLOAT", "required": True, "unit": "kg", "options": [], "restrictions": {}},
+    {"id": "kaufland_gender", "name": "Płeć", "type": "DICTIONARY", "required": True, "unit": None, "options": [
+        {"id": "male", "value": "Mężczyzna"}, {"id": "female", "value": "Kobieta"},
+        {"id": "unisex", "value": "Unisex"}, {"id": "child", "value": "Dziecko"},
+    ], "restrictions": {}},
+    {"id": "kaufland_material", "name": "Materiał", "type": "STRING", "required": True, "unit": None, "options": [], "restrictions": {}},
+    {"id": "kaufland_brand", "name": "Marka/Brand", "type": "STRING", "required": True, "unit": None, "options": [], "restrictions": {}},
+    {"id": "kaufland_ean", "name": "EAN/GTIN", "type": "STRING", "required": False, "unit": None, "options": [], "restrictions": {}},
+]
+
 
 def _build_prompt(product_input: str, category_name: str, category_path: str, params: List[dict], marketplace: str = "allegro") -> str:
     """Build Beast/Groq prompt with category parameter schema.
@@ -52,19 +67,10 @@ def _build_prompt(product_input: str, category_name: str, category_path: str, pa
         else:
             optional_section.append(line)
 
-    # WHY: Kaufland uses Allegro categories but needs extra generic attributes
-    kaufland_extra = ""
-    if marketplace == "kaufland":
-        kaufland_extra = """
-DODATKOWE ATRYBUTY KAUFLAND (dodaj jeśli możesz wywnioskować z tytułu):
-- Kolor (STRING)
-- Rozmiar (STRING)
-- Waga produktu (FLOAT, w kg)
-- Płeć (DICTIONARY: Mężczyzna, Kobieta, Unisex, Dziecko)
-- Materiał (STRING)
-- Marka/Brand (STRING)
-- EAN/GTIN (STRING — wpisz null jeśli nieznany)
-"""
+    # WHY: Categories like watches have 100+ optional params → prompt too large → LLM confused/truncated.
+    # Cap optional params at 40 to keep prompt manageable. Required params always included.
+    if len(optional_section) > 40:
+        optional_section = optional_section[:40]
 
     marketplace_label = "Allegro" if marketplace == "allegro" else "Kaufland"
 
@@ -82,7 +88,7 @@ WYMAGANE PARAMETRY:
 
 OPCJONALNE PARAMETRY:
 {chr(10).join(optional_section) if optional_section else "(brak)"}
-{kaufland_extra}
+
 Odpowiedz TYLKO poprawnym JSON (bez markdown, bez komentarzy):
 [{{"name": "...", "value": "...", "param_id": "...", "required": true/false}}]
 
@@ -91,6 +97,29 @@ Dla STRING/INTEGER/FLOAT: value = sensowna wartość, param_id = id parametru.
 Jeśli nie znasz wartości: value = null."""
 
     return prompt
+
+
+def _try_fix_truncated_json(text: str) -> Optional[List[dict]]:
+    """Try to salvage a truncated JSON array by closing it at the last complete object.
+
+    WHY: When max_tokens is hit mid-response, we get e.g. '[{"a":1},{"b":2},{"c":' —
+    truncate after last '},' and close the array.
+    """
+    # Find the last complete object boundary
+    last_brace = text.rfind("}")
+    if last_brace == -1:
+        return None
+    candidate = text[:last_brace + 1].rstrip().rstrip(",") + "]"
+    if not candidate.startswith("["):
+        candidate = "[" + candidate.lstrip("[")
+    try:
+        result = json.loads(candidate)
+        if isinstance(result, list):
+            logger.warning("attribute_truncated_json_salvaged", salvaged_count=len(result))
+            return result
+    except json.JSONDecodeError:
+        pass
+    return None
 
 
 def _parse_attributes_response(raw: str, params: List[dict]) -> List[dict]:
@@ -121,8 +150,13 @@ def _parse_attributes_response(raw: str, params: List[dict]) -> List[dict]:
             try:
                 items = json.loads(match.group())
             except json.JSONDecodeError:
-                logger.error("attribute_parse_failed", raw_length=len(raw))
-                return []
+                # WHY: LLM may truncate mid-JSON (max_tokens hit). Try to salvage partial array.
+                partial = _try_fix_truncated_json(match.group())
+                if partial is not None:
+                    items = partial
+                else:
+                    logger.error("attribute_parse_failed", raw_length=len(raw))
+                    return []
         else:
             logger.error("attribute_parse_no_json_array", raw_length=len(raw))
             return []
@@ -171,15 +205,27 @@ async def generate_attributes(
     if not params:
         raise ValueError(f"Nie znaleziono parametrów dla kategorii {category_id}")
 
+    # WHY: Kaufland needs generic attrs (color, size, weight) not in Allegro category schema.
+    # Merge them into params so they appear in WYMAGANE section and parser can match them.
+    if marketplace == "kaufland":
+        existing_names = {p["name"].lower() for p in params}
+        for kp in KAUFLAND_REQUIRED_PARAMS:
+            if kp["name"].lower() not in existing_names:
+                params.append(kp)
+
     # Step 2: Build prompt
     prompt = _build_prompt(product_input, category_name, category_path, params, marketplace)
+
+    # WHY: Categories like watches have 80+ params → need more output tokens.
+    # 60 tokens per attribute × params count, clamped to [2000, 4096].
+    max_tokens = min(4096, max(2000, len(params) * 60))
 
     # Step 3: Call Beast primary, Groq fallback
     provider_used = "beast"
     tokens_used = 0
     try:
         raw_text, usage = await asyncio.to_thread(
-            call_llm, "beast", "", None, prompt, 0.2, 2000,
+            call_llm, "beast", "", None, prompt, 0.2, max_tokens,
         )
         if usage:
             tokens_used = usage.get("total_tokens", 0)
@@ -188,7 +234,7 @@ async def generate_attributes(
         provider_used = "groq"
         try:
             raw_text, usage = await asyncio.to_thread(
-                call_groq, prompt, 0.2, 2000,
+                call_groq, prompt, 0.2, max_tokens,
             )
             if usage:
                 tokens_used = usage.get("total_tokens", 0)
