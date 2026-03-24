@@ -45,7 +45,7 @@ export function TierBadge({ tier, className, size = 'sm', isLoading }: TierBadge
       )}
     >
       {isPremium && <Crown className={size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'} />}
-      {isPremium ? 'PREMIUM' : 'FREE'}
+      {isPremium ? 'PREMIUM' : 'BRAK SUBSKRYPCJI'}
     </span>
   )
 }

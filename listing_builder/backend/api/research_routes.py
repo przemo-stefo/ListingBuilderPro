@@ -33,7 +33,8 @@ ALLOWED_SKILLS = {
     "idea-validation",
 }
 
-FREE_DAILY_LIMIT = 1
+# WHY: No free tier — Mateusz 24.03. Limit 0 forces premium subscription.
+FREE_DAILY_LIMIT = 0
 
 
 class AudienceResearchRequest(BaseModel):
@@ -57,7 +58,7 @@ class AudienceResearchResponse(BaseModel):
 
 
 def _check_research_limit(request: Request, db: Session):
-    """Free tier = 1 research/day per IP. Premium = unlimited.
+    """No free tier — Premium subscription required. Rate limited per IP.
 
     WHY per-IP: Without this, free users burn Groq quota unlimited via curl.
     """
@@ -83,7 +84,7 @@ def _check_research_limit(request: Request, db: Session):
     if today_count >= FREE_DAILY_LIMIT:
         raise HTTPException(
             status_code=402,
-            detail=f"Darmowy limit ({FREE_DAILY_LIMIT} badanie/dzien) wyczerpany. Wykup Premium!",
+            detail="Wymagana subskrypcja Premium. Wykup za 19 zł/mies!",
         )
 
 

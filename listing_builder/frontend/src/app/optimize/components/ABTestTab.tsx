@@ -83,7 +83,7 @@ export default function ABTestTab() {
       const msg = err instanceof Error ? err.message : 'Blad generowania wariantow'
       // WHY: 402 = daily free limit or premium-only marketplace — show clear message
       const is402 = msg.includes('402') || msg.toLowerCase().includes('limit') || msg.toLowerCase().includes('premium')
-      setError(is402 ? 'Darmowy limit wyczerpany lub marketplace Premium. Wykup subskrypcje aby kontynuowac.' : msg)
+      setError(is402 ? 'Wymagana subskrypcja Premium. Wykup za 19 zł/mies aby kontynuowac.' : msg)
     } finally {
       setLoading(false)
     }

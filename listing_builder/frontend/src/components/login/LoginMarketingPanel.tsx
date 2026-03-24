@@ -76,10 +76,10 @@ export function LoginMarketingPanel() {
         </div>
       </div>
 
-      {/* WHY: Free tier highlight — lowers signup friction */}
+      {/* WHY: Pricing highlight — clear value prop */}
       <div className="relative z-10 flex items-center gap-2 text-sm text-gray-500">
         <Check className="h-4 w-4 text-emerald-500" />
-        <span>3 darmowe optymalizacje dziennie — bez karty kredytowej</span>
+        <span>Pełny dostęp do wszystkich narzędzi AI — 19 zł/mies</span>
       </div>
     </div>
   )

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import type { LLMProvider } from '@/lib/types'
 
 const LLM_PROVIDERS: { id: LLMProvider; label: string; hint: string; needsKey: boolean }[] = [
-  { id: 'groq', label: 'Standardowy (w cenie)', hint: 'Szybki, darmowy', needsKey: false },
+  { id: 'groq', label: 'Standardowy (w cenie)', hint: 'Szybki, w cenie subskrypcji', needsKey: false },
   { id: 'beast', label: 'Zaawansowany', hint: 'Najwyzsza jakosc, bez limitow', needsKey: false },
   { id: 'gemini_flash', label: 'Turbo', hint: 'Szybki i precyzyjny (Twoj klucz)', needsKey: true },
   { id: 'gemini_pro', label: 'Ultra', hint: 'Najlepsza jakosc tekstu (Twoj klucz)', needsKey: true },
@@ -140,7 +140,7 @@ export function TargetModeCard({
         {/* LLM Provider */}
         <div>
           <label className="mb-1 block text-sm text-gray-400">Model AI</label>
-          <p className="mb-2 text-[10px] text-gray-500">Silnik AI generujacy listing. Standardowy jest darmowy. Inne wymagaja klucza API (zapisz go w Ustawieniach).</p>
+          <p className="mb-2 text-[10px] text-gray-500">Silnik AI generujacy listing. Standardowy jest w cenie subskrypcji. Inne wymagaja klucza API (zapisz go w Ustawieniach).</p>
           <div className="flex flex-wrap gap-2">
             {LLM_PROVIDERS.map((p) => (
               <button

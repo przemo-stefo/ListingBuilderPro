@@ -141,10 +141,10 @@ export function TierProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id])
 
+  // WHY: No free tier — only paying subscribers can optimize (Mateusz 24.03)
   const canOptimize = useCallback(() => {
-    if (isPremium) return true
-    return usageToday < FREE_DAILY_LIMIT
-  }, [isPremium, usageToday])
+    return isPremium
+  }, [isPremium])
 
   const incrementUsage = useCallback(() => {
     if (isPremium) return

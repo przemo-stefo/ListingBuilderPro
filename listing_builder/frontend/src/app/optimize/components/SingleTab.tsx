@@ -205,7 +205,7 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
 
   const handleGenerate = () => {
     if (!canOptimize()) {
-      toast({ title: 'Dzienny limit osiagniety', description: `Darmowy plan pozwala na ${FREE_DAILY_LIMIT} optymalizacje dziennie. Odblokuj Premium!`, variant: 'destructive' })
+      toast({ title: 'Wymagana subskrypcja', description: 'Optymalizator wymaga aktywnej subskrypcji. Wykup Premium za 19 zł/mies!', variant: 'destructive' })
       return
     }
     const payload: OptimizerRequest = {
@@ -360,8 +360,8 @@ export default function SingleTab({ loadedResult, initialTitle, productId }: Sin
           {isLoading ? 'Generowanie listingu...' : 'Wygeneruj zoptymalizowany listing'}
         </Button>
         {!isPremium && (
-          <span className={cn('text-xs', usageToday >= FREE_DAILY_LIMIT ? 'text-red-400' : 'text-gray-500')}>
-            {usageToday}/{FREE_DAILY_LIMIT} dzis
+          <span className="text-xs text-amber-400">
+            Wymagana subskrypcja
           </span>
         )}
         {isLoading && <span className="text-xs text-gray-500 animate-pulse">AI generuje listing...</span>}

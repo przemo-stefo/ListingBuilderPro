@@ -28,5 +28,5 @@ export interface TierContext {
   isLoading: boolean
 }
 
-// WHY: Daily limit for free tier
-export const FREE_DAILY_LIMIT = 3
+// WHY: No free tier — everyone pays 19 PLN/mies from day one (Mateusz 24.03)
+export const FREE_DAILY_LIMIT = 0

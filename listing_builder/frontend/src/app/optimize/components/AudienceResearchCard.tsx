@@ -29,8 +29,8 @@ export default function AudienceResearchCard({
 
   const { isPremium } = useTier()
 
-  // WHY: Free tier = 1 research/day, tracked client-side (backend also enforces rate limit)
-  const isLimited = !isPremium && usedToday
+  // WHY: No free tier — non-premium users blocked (backend also enforces)
+  const isLimited = !isPremium
 
   const handleResearch = async () => {
     if (!productTitle || isLimited) return
@@ -111,7 +111,7 @@ export default function AudienceResearchCard({
             </Button>
             {isLimited && (
               <span className="text-xs text-amber-400">
-                Limit 1/dzien (darmowy plan)
+                Wymagana subskrypcja Premium
               </span>
             )}
             {!productTitle && (

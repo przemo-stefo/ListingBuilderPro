@@ -8,7 +8,7 @@ import { ArrowLeft } from 'lucide-react'
 
 export const metadata = {
   title: 'Cennik — OctoHelper',
-  description: 'Prosty cennik: Free (0 zł) i Premium (19,00 zł/mies). Zacznij za darmo.',
+  description: 'OctoHelper — 19,00 zł/mies. Pełny dostęp do Optymalizatora AI, Import, Konwerter, Listing Score i więcej.',
 }
 
 export default function PricingPage() {

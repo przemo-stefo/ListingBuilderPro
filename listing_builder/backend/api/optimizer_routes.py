@@ -34,40 +34,24 @@ def _hashed_ip(request: Request) -> str:
 
 router = APIRouter(prefix="/api/optimizer", tags=["optimizer"])
 
-# WHY: Server-side tier enforcement — frontend limit alone is bypassable via curl
-FREE_DAILY_LIMIT = 3
+# WHY: No free tier — Mateusz 24.03. Everyone pays 19 PLN/mies from day one.
+FREE_DAILY_LIMIT = 0
 
 
 def _check_tier_limit(request: Request, db: Session, requested_count: int = 1):
     """
-    Check if user can optimize. Valid license key = unlimited. No key = 3/day per IP.
+    Check if user can optimize. Valid license key = unlimited. No key = blocked.
     SECURITY: This is the real gate — frontend limit is cosmetic only.
     """
     license_key = request.headers.get("X-License-Key", "")
     if license_key and validate_license(license_key, db):
         return  # unlimited
 
-    # WHY: Per-IP limit prevents abuse — hashed IP for GDPR, same hash = same person
-    ip_hash = _hashed_ip(request)
-    today_count = (
-        db.query(OptimizationRun)
-        .filter(
-            OptimizationRun.created_at >= date.today(),
-            OptimizationRun.client_ip == ip_hash,
-        )
-        .count()
+    # WHY: No free tier — reject all non-premium users
+    raise HTTPException(
+        status_code=402,
+        detail="Wymagana subskrypcja Premium (19 zł/mies). Wykup aby korzystać z Optymalizatora!",
     )
-    remaining = FREE_DAILY_LIMIT - today_count
-    if remaining <= 0:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Darmowy limit ({FREE_DAILY_LIMIT}/dzien) wyczerpany. Wykup Premium!",
-        )
-    if requested_count > remaining:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Pozostalo {remaining} optymalizacji dzis. Batch wymaga {requested_count}. Wykup Premium!",
-        )
 
 
 class OptimizerKeyword(BaseModel):

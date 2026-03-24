@@ -15,7 +15,7 @@ const ROWS = [
   { aspect: 'Konwersja', manual: 'Przepisywanie od zera', ai: 'Jednym kliknięciem między platformami' },
   { aspect: 'Jakość listingu', manual: 'Ocena na oko', ai: 'Listing Score 0-100 z rekomendacjami AI' },
   { aspect: 'Skalowalność', manual: 'Nie skaluje się', ai: 'Nieograniczona liczba produktów' },
-  { aspect: 'Koszt', manual: 'Copywriter od 50 zł/listing', ai: 'Od 0 zł — free tier dostępny' },
+  { aspect: 'Koszt', manual: 'Copywriter od 50 zł/listing', ai: '19 zł/mies — bez limitów' },
 ]
 
 export function ComparisonSection() {

@@ -7,8 +7,8 @@ import { FaqItem } from '@/components/ui/FaqSection'
 
 const FAQ_ITEMS = [
   {
-    question: 'Czy OctoHelper jest darmowy?',
-    answer: 'Tak! Plan Free pozwala przeglądać panel i wykonać 3 optymalizacje dziennie (Amazon). Plan Premium za 19,00 zł/mies odblokowuje pełny Optymalizator (bez limitów, wszystkie marketplace), Import produktów, Konwerter ofert, Listing Score, Walidator Produktu i Eksperta Kaufland.',
+    question: 'Ile kosztuje OctoHelper?',
+    answer: 'OctoHelper kosztuje 19,00 zł/mies. W cenie masz pełny Optymalizator AI (bez limitów, wszystkie marketplace), Import produktów, Konwerter ofert, Listing Score, Walidator Produktu, Eksperta Kaufland i Auto-Atrybuty.',
   },
   {
     question: 'Jakie marketplace są obsługiwane?',
@@ -28,7 +28,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Mogę anulować subskrypcję w każdej chwili?',
-    answer: 'Tak, bez żadnych zobowiązań. Anuluj kiedy chcesz z poziomu ustawień konta. Po anulowaniu wrócisz do planu Free.',
+    answer: 'Tak, bez żadnych zobowiązań. Anuluj kiedy chcesz z poziomu ustawień konta.',
   },
 ]
 

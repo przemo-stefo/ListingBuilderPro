@@ -156,7 +156,7 @@ export default function AccountPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-lg font-semibold text-white">
-                {tier === 'premium' ? 'Premium' : 'Darmowy'}
+                {tier === 'premium' ? 'Premium' : 'Brak subskrypcji'}
               </p>
               {tier === 'premium' && renewalDate && (
                 <p className="text-xs text-gray-400">Odnowienie: {renewalDate}</p>
