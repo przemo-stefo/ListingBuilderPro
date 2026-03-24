@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, Loader2, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -33,8 +33,13 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
   const [isSearching, setIsSearching] = useState(false)
   const [searched, setSearched] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  const doSearch = async (query: string) => {
+  const doSearch = useCallback(async (query: string) => {
+    // WHY: Cancel any in-flight request before starting a new one
+    if (abortRef.current) abortRef.current.abort()
+    abortRef.current = new AbortController()
+
     setIsSearching(true)
     setSelectedCategory(null)
     setSearched(false)
@@ -48,7 +53,7 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [])
 
   // WHY: Auto-search categories after 600ms of no typing (3+ chars)
   useEffect(() => {
@@ -62,7 +67,12 @@ export function AttributeForm({ onSubmit, isLoading }: AttributeFormProps) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [productInput])
+  }, [productInput, doSearch])
+
+  // WHY: Cancel in-flight requests on unmount
+  useEffect(() => {
+    return () => { if (abortRef.current) abortRef.current.abort() }
+  }, [])
 
   const handleSearchCategories = () => {
     if (!productInput.trim() || productInput.trim().length < 2) return

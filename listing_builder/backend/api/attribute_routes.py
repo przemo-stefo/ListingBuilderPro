@@ -2,9 +2,7 @@
 # Purpose: Auto-Atrybuty API endpoints — category search, params, generate, history
 # NOT for: LLM logic (attribute_service.py) or Allegro API calls (allegro_categories.py)
 
-from fastapi import APIRouter, Depends, Request, HTTPException, status
-from typing import Literal, Optional, List, Dict
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -12,6 +10,11 @@ import structlog
 
 from database import get_db
 from api.dependencies import get_user_id
+from api.attribute_schemas import (
+    CategoryItem, CategorySearchResponse, ParameterOption, CategoryParameter,
+    CategoryParametersResponse, AttributeGenerateRequest, AttributeGenerateResponse,
+    AttributeHistoryItem, AttributeHistoryResponse,
+)
 from services.allegro_categories import search_categories, fetch_category_parameters
 from services.attribute_service import generate_attributes
 from models.attribute_run import AttributeRun
@@ -23,90 +26,13 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/attributes", tags=["attributes"])
 
 
-# --- Pydantic models ---
-
-class CategoryItem(BaseModel):
-    id: str
-    name: str
-    path: str
-    leaf: bool
-
-
-class CategorySearchResponse(BaseModel):
-    categories: List[CategoryItem]
-
-
-class ParameterOption(BaseModel):
-    id: str
-    value: str
-
-
-class CategoryParameter(BaseModel):
-    id: str
-    name: str
-    type: str
-    required: bool
-    unit: Optional[str]
-    options: List[ParameterOption]
-
-
-class CategoryParametersResponse(BaseModel):
-    parameters: List[CategoryParameter]
-    category_id: str
-
-
-class AttributeGenerateRequest(BaseModel):
-    product_input: str = Field(..., min_length=1, max_length=500)
-    category_id: str = Field(..., min_length=1, max_length=50)
-    category_name: str = Field(..., min_length=1, max_length=255)
-    category_path: str = Field("", max_length=1000)
-    marketplace: Literal["allegro", "kaufland"] = "allegro"
-
-
-class GeneratedAttribute(BaseModel):
-    name: str
-    value: Optional[str]
-    param_id: str
-    required: bool
-    type: str
-    options: List[ParameterOption] = []
-
-
-class AttributeGenerateResponse(BaseModel):
-    id: int
-    product_input: str
-    category_name: str
-    category_path: str
-    attributes: List[GeneratedAttribute]
-    params_count: int
-    provider_used: str
-    latency_ms: int
-    created_at: Optional[str]
-
-
-class AttributeHistoryItem(BaseModel):
-    id: int
-    product_input: str
-    marketplace: str
-    category_name: Optional[str]
-    category_path: Optional[str]
-    params_count: int
-    attributes: List[Dict]
-    created_at: Optional[str]
-
-
-class AttributeHistoryResponse(BaseModel):
-    items: List[AttributeHistoryItem]
-    total: int
-
-
 # --- Endpoints ---
 
 @router.get("/categories", response_model=CategorySearchResponse)
 @limiter.limit("10/minute")
 async def search_allegro_categories(
     request: Request,
-    query: str,
+    query: str = Query(..., max_length=500),
     user_id: str = Depends(get_user_id),
 ) -> CategorySearchResponse:
     """Search Allegro categories matching a product name."""
@@ -180,8 +106,8 @@ async def generate_product_attributes(
 @limiter.limit("10/minute")
 async def get_attribute_history(
     request: Request,
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     user_id: str = Depends(get_user_id),
     db: Session = Depends(get_db),
 ) -> AttributeHistoryResponse:
@@ -192,7 +118,7 @@ async def get_attribute_history(
         .filter(AttributeRun.user_id == user_id)
         .order_by(AttributeRun.created_at.desc())
         .offset(offset)
-        .limit(min(limit, 100))
+        .limit(limit)
         .all()
     )
 

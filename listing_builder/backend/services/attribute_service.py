@@ -7,7 +7,7 @@ import json
 import re
 import time
 import structlog
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 from sqlalchemy.orm import Session
 
 from services.allegro_categories import fetch_category_parameters
@@ -124,9 +124,11 @@ def _parse_attributes_response(raw: str, params: List[dict]) -> List[dict]:
                 logger.error("attribute_parse_failed", raw_length=len(raw))
                 return []
         else:
+            logger.error("attribute_parse_no_json_array", raw_length=len(raw))
             return []
 
     if not isinstance(items, list):
+        logger.error("attribute_parse_not_list", type=type(items).__name__)
         return []
 
     parsed = []
@@ -156,7 +158,7 @@ async def generate_attributes(
     category_id: str,
     category_name: str,
     category_path: str,
-    marketplace: str,
+    marketplace: Literal["allegro", "kaufland"],
     user_id: str,
     client_ip: Optional[str],
     db: Session,

@@ -1,5 +1,5 @@
 // frontend/src/app/attributes/page.tsx
-// Purpose: Auto-Atrybuty page shell — generate Allegro product attributes via AI
+// Purpose: Auto-Atrybuty page shell — generate marketplace product attributes via AI
 // NOT for: Listing optimization (optimizer/) or product validation (validator/)
 
 'use client'
