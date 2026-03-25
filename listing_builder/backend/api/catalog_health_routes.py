@@ -2,6 +2,8 @@
 # Purpose: REST endpoints for Catalog Health Check (scan, issues, fix)
 # NOT for: Scan logic (catalog_health_service.py) or SP-API communication
 
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, Request
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -119,8 +121,11 @@ async def get_scan_status(
 @router.get("/scan/{scan_id}/issues", response_model=IssueListResponse)
 async def get_scan_issues_endpoint(
     scan_id: str,
-    issue_type: str = Query(default=None),
-    severity: str = Query(default=None),
+    issue_type: Optional[Literal[
+        "broken_variation", "orphaned_asin", "missing_attribute",
+        "suppressed_listing", "stranded_inventory", "low_quality_image", "invalid_price",
+    ]] = Query(default=None),
+    severity: Optional[Literal["critical", "warning", "info"]] = Query(default=None),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),

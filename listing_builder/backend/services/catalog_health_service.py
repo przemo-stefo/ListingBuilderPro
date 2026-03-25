@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.catalog_health import CatalogScan, CatalogIssue
@@ -91,7 +92,7 @@ async def run_scan(scan_id: str, db: Session) -> None:
 
     except Exception as e:
         scan.status = "failed"
-        scan.error_message = str(e)[:500]
+        scan.error_message = "Scan failed — check logs for details"
         scan.progress = {"phase": "error", "percent": 0}
         db.commit()
         logger.error("catalog_health_scan_error", scan_id=scan_id, error=str(e)[:200])
@@ -420,20 +421,38 @@ async def get_dashboard_stats(user_id: str, db: Session) -> Dict[str, Any]:
         .first()
     )
 
-    # Aggregate issues from latest completed scan
+    # WHY GROUP BY: Aggregate in DB instead of loading all rows into Python
     issues_by_type: Dict[str, int] = {}
     issues_by_severity: Dict[str, int] = {}
     total_issues = 0
     total_fixed = 0
 
     if last_scan and last_scan.status == "completed":
-        issues = db.query(CatalogIssue).filter(CatalogIssue.scan_id == last_scan.id).all()
-        for issue in issues:
-            issues_by_type[issue.issue_type] = issues_by_type.get(issue.issue_type, 0) + 1
-            issues_by_severity[issue.severity] = issues_by_severity.get(issue.severity, 0) + 1
-            total_issues += 1
-            if issue.fix_status == "applied":
-                total_fixed += 1
+        scan_filter = CatalogIssue.scan_id == last_scan.id
+
+        type_counts = (
+            db.query(CatalogIssue.issue_type, func.count())
+            .filter(scan_filter)
+            .group_by(CatalogIssue.issue_type)
+            .all()
+        )
+        issues_by_type = {t: c for t, c in type_counts}
+
+        sev_counts = (
+            db.query(CatalogIssue.severity, func.count())
+            .filter(scan_filter)
+            .group_by(CatalogIssue.severity)
+            .all()
+        )
+        issues_by_severity = {s: c for s, c in sev_counts}
+
+        total_issues = sum(issues_by_type.values())
+        total_fixed = (
+            db.query(func.count())
+            .select_from(CatalogIssue)
+            .filter(scan_filter, CatalogIssue.fix_status == "applied")
+            .scalar() or 0
+        )
 
     return {
         "total_scans": total_scans,

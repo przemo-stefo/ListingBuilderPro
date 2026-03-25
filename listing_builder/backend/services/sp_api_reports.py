@@ -21,6 +21,21 @@ logger = structlog.get_logger()
 
 REPORTS_API_VERSION = "2021-06-30"
 
+# WHY suffix list: Prevent SSRF via lookalike domains (e.g. evil-amazonaws.com)
+_AMAZON_DOMAIN_SUFFIXES = (".amazonaws.com", ".amazon.com")
+
+
+def _is_amazon_domain(hostname: str) -> bool:
+    """Validate hostname is a real Amazon domain, not a lookalike."""
+    return any(
+        hostname == suffix.lstrip(".") or hostname.endswith(suffix)
+        for suffix in _AMAZON_DOMAIN_SUFFIXES
+    )
+
+
+# WHY 100MB cap: Prevent decompression bomb — SP-API reports never exceed this
+_MAX_COMPRESSED_SIZE = 100 * 1024 * 1024
+
 # WHY allowlist: Only catalog-health-related report types — prevents misuse
 CATALOG_REPORT_TYPES = {
     "GET_MERCHANT_LISTINGS_ALL_DATA",
@@ -106,10 +121,11 @@ async def poll_report(
 
     url = f"{_base_url()}/reports/{REPORTS_API_VERSION}/reports/{report_id}"
 
-    for attempt in range(max_attempts):
+    # WHY single client: Reuse TCP connection across up to 30 polling iterations
+    async with httpx.AsyncClient(timeout=15) as client:
+      for attempt in range(max_attempts):
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.get(url, headers=_headers(token))
+            resp = await client.get(url, headers=_headers(token))
 
             if resp.status_code != 200:
                 logger.warning("sp_api_report_poll_error", status=resp.status_code, attempt=attempt)
@@ -135,8 +151,8 @@ async def poll_report(
             logger.error("sp_api_report_poll_exception", error=str(e)[:100], attempt=attempt)
             await asyncio.sleep(interval)
 
-    logger.error("sp_api_report_timeout", report_id=report_id, attempts=max_attempts)
-    return None
+      logger.error("sp_api_report_timeout", report_id=report_id, attempts=max_attempts)
+      return None
 
 
 async def download_report(
@@ -173,10 +189,7 @@ async def download_report(
 
         # WHY URL validation: Prevent SSRF — only allow Amazon S3 domains
         parsed = urlparse(download_url)
-        if not parsed.hostname or not (
-            parsed.hostname.endswith(".amazonaws.com")
-            or parsed.hostname.endswith(".amazon.com")
-        ):
+        if not parsed.hostname or not _is_amazon_domain(parsed.hostname):
             logger.error("sp_api_report_suspicious_url", hostname=parsed.hostname)
             return None
 
@@ -189,6 +202,9 @@ async def download_report(
 
         content = doc_resp.content
         if compression == "GZIP":
+            if len(content) > _MAX_COMPRESSED_SIZE:
+                logger.error("sp_api_report_too_large", size=len(content))
+                return None
             content = gzip.decompress(content)
 
         return content.decode("utf-8", errors="replace")

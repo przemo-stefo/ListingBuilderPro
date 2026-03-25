@@ -3,13 +3,17 @@
 # NOT for: Database models (models/catalog_health.py)
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+ALLOWED_MARKETPLACES = ("DE", "FR", "IT", "ES", "PL", "NL", "SE", "BE", "UK", "US")
+
 
 class ScanStartRequest(BaseModel):
-    marketplace: str = Field(default="DE", description="Amazon marketplace code (DE, FR, IT, ES, PL, etc.)")
+    marketplace: Literal["DE", "FR", "IT", "ES", "PL", "NL", "SE", "BE", "UK", "US"] = Field(
+        default="DE", description="Amazon marketplace code"
+    )
 
 
 class ScanResponse(BaseModel):
