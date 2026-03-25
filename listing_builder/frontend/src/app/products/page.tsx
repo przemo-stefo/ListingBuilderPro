@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatRelativeTime, getStatusColor, getStatusLabel, truncate, cn } from '@/lib/utils'
-import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, ArrowRightLeft, Package, Globe, Send } from 'lucide-react'
+import { Search, Trash2, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ArrowRight, ArrowRightLeft, Package, Globe } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 
 const PRODUCTS_FAQ = [
@@ -243,14 +243,6 @@ function ProductsContent() {
                           <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1.5">
                             <Sparkles className="h-3.5 w-3.5" />
                             Optymalizuj
-                          </Button>
-                        </Link>
-                      )}
-                      {product.status === 'optimized' && (
-                        <Link href="/publish">
-                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs gap-1.5">
-                            <Send className="h-3.5 w-3.5" />
-                            Eksportuj
                           </Button>
                         </Link>
                       )}

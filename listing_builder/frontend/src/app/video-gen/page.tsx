@@ -7,7 +7,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Video, Sparkles, Play, Download, RotateCcw, Loader2, Film, Tag, Zap, Crown, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 import apiClient from '@/lib/api/client'
 
 type GenerationMode = 'ai_creatify' | 'template'
@@ -160,8 +159,7 @@ export default function VideoGenPage() {
   const videoSrc = videoUrl || (videoBase64 ? `data:video/mp4;base64,${videoBase64}` : '')
 
   return (
-    <PremiumGate feature="Generator TikTok">
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-blue-500/20 p-2">
@@ -512,6 +510,5 @@ export default function VideoGenPage() {
           </div>
         </div>
       </div>
-    </PremiumGate>
   )
 }

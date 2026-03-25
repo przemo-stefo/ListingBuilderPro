@@ -1,20 +1,19 @@
 // frontend/src/components/layout/Sidebar.tsx
-// Purpose: Main navigation sidebar — renders nav items + Compliance expandable
+// Purpose: Main navigation sidebar — renders nav items from nav-config
 // NOT for: Nav config data (that's nav-config.ts) or page content
 
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useSearchParams, useRouter } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
 import { useAdmin } from '@/lib/hooks/useAdmin'
 import { TierBadge } from '@/components/tier/TierBadge'
-import { navSections, complianceSubItems } from '@/components/layout/nav-config'
+import { navSections } from '@/components/layout/nav-config'
 import { useMediaGen } from '@/components/providers/MediaGenProvider'
-import { Shield, ChevronDown, Newspaper, Info, Bell, Settings, UserCircle, Crown } from 'lucide-react'
+import { Newspaper, Info, Settings, UserCircle } from 'lucide-react'
 
 interface SidebarProps {
   onClose?: () => void
@@ -23,19 +22,9 @@ interface SidebarProps {
 export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const router = useRouter()
-  const { tier, isPremium, isLoading } = useTier()
+  const { tier, isLoading } = useTier()
   const { isAdmin } = useAdmin()
   const { activeJobs } = useMediaGen()
-
-  const isOnCompliance = pathname === '/compliance'
-  const [complianceOpen, setComplianceOpen] = useState(isOnCompliance)
-
-  // WHY: Auto-expand when navigating TO /compliance (useState only sets initial value)
-  useEffect(() => {
-    if (isOnCompliance) setComplianceOpen(true)
-  }, [isOnCompliance])
-  const activeComplianceTab = searchParams.get('tab') || 'dashboard'
 
   // WHY: Close sidebar on mobile after navigating
   const handleNav = () => onClose?.()
@@ -71,62 +60,34 @@ export function Sidebar({ onClose }: SidebarProps) {
                   !hrefQuery || [...new URLSearchParams(hrefQuery)].every(([k, v]) => searchParams.get(k) === v)
                 )
                 const Icon = item.icon
-                // WHY: Premium items without license → show crown and redirect to upgrade
-                const isLocked = item.premiumOnly && !isPremium
 
                 return (
                   <div key={item.href} className="group/nav relative">
-                    {isLocked ? (
-                      <button
-                        onClick={() => {
-                          handleNav()
-                          router.push('/account?upgrade=1')
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-800/50 transition-colors"
-                      >
-                        <Icon className="h-4 w-4" />
-                        <span className="truncate">{item.title}</span>
-                        {item.beta && (
-                          <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
-                            BETA
-                          </span>
-                        )}
-                        <Crown className="ml-auto h-3.5 w-3.5 text-amber-400 shrink-0" />
-                      </button>
-                    ) : (
-                      <Link
-                        href={item.href}
-                        onClick={handleNav}
-                        className={cn(
-                          'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                          isActive
-                            ? 'bg-white text-black'
-                            : item.highlight
-                              ? 'text-green-400 hover:bg-green-900/20 hover:text-green-300'
-                              : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.title}
-                        {/* WHY: Pulsing dot when background generation is running */}
-                        {item.href === '/video-gen' && activeJobs.length > 0 && (
-                          <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse shrink-0" title={`${activeJobs.length} generacji w toku`} />
-                        )}
-                        {item.beta && !isActive && (
-                          <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
-                            BETA
-                          </span>
-                        )}
-                        {item.highlight && !isActive && !item.beta && (
-                          <span className="ml-auto rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold text-green-400">
-                            AI
-                          </span>
-                        )}
-                        {item.desc && !item.highlight && !item.beta && (
-                          <Info className="h-3 w-3 ml-auto shrink-0 opacity-0 group-hover/nav:opacity-60 transition-opacity" />
-                        )}
-                      </Link>
-                    )}
+                    <Link
+                      href={item.href}
+                      onClick={handleNav}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                        isActive
+                          ? 'bg-white text-black'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.title}
+                      {/* WHY: Pulsing dot when background generation is running */}
+                      {item.href === '/video-gen' && activeJobs.length > 0 && (
+                        <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse shrink-0" title={`${activeJobs.length} generacji w toku`} />
+                      )}
+                      {item.beta && !isActive && (
+                        <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
+                          BETA
+                        </span>
+                      )}
+                      {item.desc && !item.beta && (
+                        <Info className="h-3 w-3 ml-auto shrink-0 opacity-0 group-hover/nav:opacity-60 transition-opacity" />
+                      )}
+                    </Link>
                     {item.desc && (
                       <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-56 rounded-lg border border-gray-700 bg-[#1A1A1A] p-3 text-xs text-gray-300 shadow-xl group-hover/nav:block">
                         <p className="font-medium text-white mb-1">{item.title}</p>
@@ -140,86 +101,9 @@ export function Sidebar({ onClose }: SidebarProps) {
           </div>
         ))}
 
-        {/* WHY: Compliance as expandable section — premium only, beta badge */}
+        {/* WHY: Wiadomości standalone — not part of nav-config (static link) */}
         <div>
-          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
-            Compliance
-          </p>
-          {/* WHY: Non-premium users see locked button redirecting to upgrade */}
-          {!isPremium ? (
-            <button
-              onClick={() => {
-                handleNav()
-                router.push('/account?upgrade=1')
-              }}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-800/50 transition-colors"
-            >
-              <Shield className="h-4 w-4" />
-              <span className="truncate">Compliance Guard</span>
-              <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
-                BETA
-              </span>
-              <Crown className="ml-auto h-3.5 w-3.5 text-amber-400 shrink-0" />
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => setComplianceOpen(!complianceOpen)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                  isOnCompliance ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                )}
-              >
-                <Shield className="h-4 w-4" />
-                Compliance Guard
-                {!isOnCompliance && (
-                  <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
-                    BETA
-                  </span>
-                )}
-                <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', complianceOpen && 'rotate-180')} />
-              </button>
-
-              {/* WHY: CSS grid animation (0fr→1fr) — smooth expand/collapse, no layout jump */}
-              {/* WHY: relative z-10 ensures submenu is above Wiadomości link tooltip overlay */}
-              <div
-                className="relative z-10 grid transition-[grid-template-rows] duration-200 ease-out"
-                style={{ gridTemplateRows: complianceOpen ? '1fr' : '0fr' }}
-              >
-                <div className="overflow-hidden">
-                  {/* WHY: relative z-20 ensures sub-items are above Compliance Guard button and Wiadomości link */}
-                  <div className="relative z-20 ml-3 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
-                    {complianceSubItems.map(({ key, label, icon: SubIcon, desc }) => {
-                      const isSubActive = isOnCompliance && activeComplianceTab === key
-                      return (
-                        <div key={key} className="group/sub relative">
-                          <Link
-                            href={`/compliance?tab=${key}`}
-                            onClick={handleNav}
-                            className={cn(
-                              'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-colors',
-                              isSubActive ? 'bg-white/10 text-white' : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300'
-                            )}
-                          >
-                            <SubIcon className="h-3.5 w-3.5" />
-                            {label}
-                          </Link>
-                          {desc && (
-                            <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-52 rounded-lg border border-gray-700 bg-[#1A1A1A] p-3 text-xs text-gray-300 shadow-xl group-hover/sub:block">
-                              <p className="font-medium text-white mb-1">{label}</p>
-                              {desc}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="group/nav relative mt-0.5">
+          <div className="group/nav relative">
             <Link
               href="/news"
               onClick={handleNav}
@@ -237,15 +121,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Footer — quick links + tier badge + legal */}
       <div className="space-y-3 pt-4">
-        {/* WHY: Bell/Settings/Account moved from top header bar to sidebar footer */}
         <div className="flex items-center justify-center gap-1">
-          <Link
-            href="/compliance?tab=alerts"
-            className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-            title="Alerty"
-          >
-            <Bell className="h-4 w-4" />
-          </Link>
           <Link
             href="/settings"
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"

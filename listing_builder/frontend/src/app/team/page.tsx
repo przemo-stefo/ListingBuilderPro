@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/lib/hooks/useToast'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 import {
   listMyTeams, createTeam, deleteTeam,
   listMembers, updateMemberRole, removeMember,
@@ -45,9 +44,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function TeamPage() {
   return (
-    <PremiumGate feature="Team Workspace">
-      <TeamContent />
-    </PremiumGate>
+    <TeamContent />
   )
 }
 

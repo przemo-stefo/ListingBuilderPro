@@ -8,7 +8,6 @@ import { useState } from 'react'
 import { Loader2, Users, Target, Lightbulb, Megaphone, PenTool, Video, Mail, Rocket, Search, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 import { apiClient } from '@/lib/api/client'
 
 interface ResearchResult {
@@ -106,8 +105,7 @@ export default function ResearchPage() {
   const extraFields = EXTRA_FIELDS[selectedSkill] || []
 
   return (
-    <PremiumGate feature="Badanie rynku">
-      <div className="space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-blue-500/20 p-2">
@@ -245,6 +243,5 @@ export default function ResearchPage() {
         </div>
       )}
       </div>
-    </PremiumGate>
   )
 }

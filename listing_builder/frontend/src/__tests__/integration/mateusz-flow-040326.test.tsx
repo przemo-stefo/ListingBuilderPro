@@ -25,18 +25,19 @@ describe('Meeting Mateusza 04.03.2026 — pełny test flow', () => {
   it('FULL TEST 1: nawigacja + stepper + checklist — nowy flow bez Eksportu', () => {
     // --- NAV-CONFIG: struktura sidebaru ---
     const glowne = navSections.find(s => s.label === 'Główne')!
-    const aiSection = navSections.find(s => s.label === 'Optymalizacja AI')!
     const allItems = navSections.flatMap(s => s.items)
 
-    // Sekcja "Główne" ma poprawną kolejność
+    // Sekcja "Główne" ma poprawne pierwsze 6 pozycji
     const glowneTitles = glowne.items.map(i => i.title)
-    expect(glowneTitles).toEqual([
+    expect(glowneTitles.slice(0, 6)).toEqual([
       'Pulpit', 'Import', 'Baza Produktów', 'Optymalizator', 'Konwerter', 'Listing Score',
     ])
 
-    // Optymalizator JEST w Główne, NIE MA w Optymalizacja AI
+    // Optymalizator JEST w Główne
     expect(glowne.items.some(i => i.title === 'Optymalizator')).toBe(true)
-    expect(aiSection.items.some(i => i.title === 'Optymalizator')).toBe(false)
+    // Sekcje Demo i Optymalizacja AI nie istnieją
+    expect(navSections.find(s => s.label === 'Demo')).toBeUndefined()
+    expect(navSections.find(s => s.label === 'Optymalizacja AI')).toBeUndefined()
 
     // "Eksport do pliku" nie istnieje nigdzie
     expect(allItems.find(i => i.title === 'Eksport do pliku')).toBeUndefined()
@@ -44,9 +45,9 @@ describe('Meeting Mateusza 04.03.2026 — pełny test flow', () => {
     // Żaden link nie prowadzi do /publish
     expect(allItems.map(i => i.href)).not.toContain('/publish')
 
-    // Optymalizator jest premium
+    // Optymalizator nie ma premium gate
     const opt = glowne.items.find(i => i.title === 'Optymalizator')!
-    expect(opt.premiumOnly).toBe(true)
+    expect(opt).not.toHaveProperty('premiumOnly')
     expect(opt.href).toBe('/optimize')
 
     // --- FLOW INDICATOR: stepper na dashboardzie ---

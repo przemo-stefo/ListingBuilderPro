@@ -16,7 +16,6 @@ import { cn, getStatusColor, truncate } from '@/lib/utils'
 import { Send, CheckCircle2, Globe } from 'lucide-react'
 import { FaqSection } from '@/components/ui/FaqSection'
 import { FlowIndicator } from '@/components/ui/FlowIndicator'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 
 const PUBLISH_FAQ = [
   { question: 'Co oznacza "Publikacja"?', answer: 'Publikacja eksportuje Twoje zoptymalizowane produkty na wybrany marketplace. Tylko produkty o statusie "zoptymalizowane" są gotowe do publikacji.' },
@@ -119,8 +118,7 @@ export default function PublishPage() {
   const isLoading = productsLoading || marketplacesLoading
 
   return (
-    <PremiumGate feature="Eksport do pliku">
-      <div className="space-y-6">
+    <div className="space-y-6">
       {/* WHY: Flow indicator — user sees where they are in the 3-step workflow */}
       <FlowIndicator stats={dashStats ?? null} currentStep="export" />
 
@@ -293,6 +291,5 @@ export default function PublishPage() {
         items={PUBLISH_FAQ}
       />
       </div>
-    </PremiumGate>
   )
 }

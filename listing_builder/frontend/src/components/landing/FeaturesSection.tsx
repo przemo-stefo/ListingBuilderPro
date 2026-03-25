@@ -40,9 +40,9 @@ const FEATURES = [
   },
   {
     icon: ArrowDownUp,
-    badge: 'Import/Export',
-    title: 'Import & Eksport',
-    desc: 'Importuj produkty z marketplace lub CSV. Eksportuj zoptymalizowane oferty gotowe do publikacji.',
+    badge: 'Import',
+    title: 'Import Produktów',
+    desc: 'Importuj produkty z marketplace lub CSV. Pobierz dane z Allegro lub wgraj plik z ofertami.',
   },
 ]
 

@@ -1,5 +1,5 @@
 // frontend/src/components/layout/__tests__/nav-config.test.ts
-// Purpose: Verify navigation structure after Mateusz meeting (04.03.2026)
+// Purpose: Verify navigation structure after Mateusz changes (25.03.2026)
 // NOT for: Sidebar rendering or visual tests
 
 import { describe, it, expect } from 'vitest'
@@ -10,20 +10,20 @@ const findSection = (label: string) => navSections.find(s => s.label === label)
 const findItem = (sectionLabel: string, title: string) =>
   findSection(sectionLabel)?.items.find(i => i.title === title)
 
-describe('nav-config — meeting Mateusza 04.03.2026', () => {
-  // --- Sekcja "Główne": kolejność Import → Baza → Optymalizator → Konwerter ---
+describe('nav-config — Mateusz 25.03.2026', () => {
+  // --- Sekcja "Główne" ---
 
   it('1. sekcja "Główne" istnieje', () => {
     expect(findSection('Główne')).toBeDefined()
   })
 
-  it('2. sekcja "Główne" ma 6 pozycji', () => {
-    expect(findSection('Główne')!.items).toHaveLength(6)
+  it('2. sekcja "Główne" ma 10 pozycji', () => {
+    expect(findSection('Główne')!.items).toHaveLength(10)
   })
 
-  it('3. kolejność w "Główne": Pulpit → Import → Baza → Optymalizator → Konwerter → Listing Score', () => {
+  it('3. kolejność pierwszych 6 w "Główne"', () => {
     const titles = findSection('Główne')!.items.map(i => i.title)
-    expect(titles).toEqual([
+    expect(titles.slice(0, 6)).toEqual([
       'Pulpit',
       'Import',
       'Baza Produktów',
@@ -51,16 +51,15 @@ describe('nav-config — meeting Mateusza 04.03.2026', () => {
     expect(findItem('Główne', 'Optymalizator')!.href).toBe('/optimize')
   })
 
-  it('7. Optymalizator w "Główne" jest premiumOnly', () => {
-    expect(findItem('Główne', 'Optymalizator')!.premiumOnly).toBe(true)
+  it('7. Optymalizator nie ma premiumOnly', () => {
+    expect(findItem('Główne', 'Optymalizator')).not.toHaveProperty('premiumOnly')
   })
 
-  // --- Usunięcie "Eksport do pliku" ---
+  // --- Usunięte elementy ---
 
   it('8. "Eksport do pliku" NIE istnieje w żadnej sekcji', () => {
     const allItems = navSections.flatMap(s => s.items)
-    const eksport = allItems.find(i => i.title === 'Eksport do pliku')
-    expect(eksport).toBeUndefined()
+    expect(allItems.find(i => i.title === 'Eksport do pliku')).toBeUndefined()
   })
 
   it('9. żaden link nie prowadzi do /publish', () => {
@@ -68,20 +67,23 @@ describe('nav-config — meeting Mateusza 04.03.2026', () => {
     expect(allHrefs).not.toContain('/publish')
   })
 
-  // --- Optymalizator usunięty z "Optymalizacja AI" ---
-
-  it('10. sekcja "Optymalizacja AI" NIE zawiera Optymalizatora', () => {
-    expect(findItem('Optymalizacja AI', 'Optymalizator')).toBeUndefined()
+  it('10. sekcja "Demo" z Amazon Pro NIE istnieje', () => {
+    expect(findSection('Demo')).toBeUndefined()
   })
 
-  it('11. sekcja "Optymalizacja AI" zaczyna się od Ekspert Amazon', () => {
-    const first = findSection('Optymalizacja AI')!.items[0]
-    expect(first.title).toBe('Ekspert Amazon')
+  it('11. sekcja "Optymalizacja AI" NIE istnieje', () => {
+    expect(findSection('Optymalizacja AI')).toBeUndefined()
   })
 
   it('12. Optymalizator pojawia się TYLKO RAZ w całej nawigacji', () => {
     const allItems = navSections.flatMap(s => s.items)
     const count = allItems.filter(i => i.title === 'Optymalizator').length
     expect(count).toBe(1)
+  })
+
+  it('13. żaden item nie ma premiumOnly', () => {
+    const allItems = navSections.flatMap(s => s.items)
+    const premium = allItems.filter(i => 'premiumOnly' in i)
+    expect(premium).toHaveLength(0)
   })
 })

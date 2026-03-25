@@ -12,7 +12,6 @@ import { FlowIndicator } from '@/components/ui/FlowIndicator'
 import { cn } from '@/lib/utils'
 import { useTier } from '@/lib/hooks/useTier'
 import { useDashboardStats } from '@/lib/hooks/useProducts'
-import { PremiumGate } from '@/components/tier/PremiumGate'
 import { useToast } from '@/lib/hooks/useToast'
 import dynamic from 'next/dynamic'
 
@@ -66,8 +65,7 @@ function OptimizeContent() {
   }
 
   return (
-    <PremiumGate feature="Optymalizator">
-      <div className="space-y-6">
+    <div className="space-y-6">
       {/* WHY: Flow indicator — user sees where they are in the 3-step workflow */}
       <FlowIndicator stats={dashStats ?? null} currentStep="optimize" />
 
@@ -159,7 +157,6 @@ function OptimizeContent() {
         ]}
       />
       </div>
-    </PremiumGate>
   )
 }
 
