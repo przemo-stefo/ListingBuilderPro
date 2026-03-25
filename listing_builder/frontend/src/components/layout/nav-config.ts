@@ -17,6 +17,7 @@ import {
   Rocket,
   Tags,
   Sparkles,
+  Stethoscope,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -50,6 +51,7 @@ export const navSections: NavSection[] = [
       { title: 'Walidator', href: '/validator', icon: Search, desc: 'Sprawdź potencjał produktu' },
       { title: 'Ekspert Kaufland', href: '/expert-qa?mode=kaufland', icon: Store, desc: 'Pytania o Kaufland — listingi, SEO, kategorie, EAN, wysyłka, GPSR' },
       { title: 'Auto-Atrybuty', href: '/attributes', icon: Tags, desc: 'Wygeneruj atrybuty produktowe', beta: true },
+      { title: 'Catalog Health', href: '/catalog-health', icon: Stethoscope, premiumOnly: true, desc: 'Skanuj katalog Amazon — wykrywaj i naprawiaj problemy', beta: true },
     ],
   },
   {
