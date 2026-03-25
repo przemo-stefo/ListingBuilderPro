@@ -13,6 +13,12 @@ const SEVERITY_COLORS: Record<string, string> = {
   info: 'bg-blue-500/20 text-blue-400',
 }
 
+const SEVERITY_LABELS: Record<string, string> = {
+  critical: 'Krytyczny',
+  warning: 'Ostrzezenie',
+  info: 'Informacja',
+}
+
 const ISSUE_TYPE_LABELS: Record<string, string> = {
   broken_variation: 'Zepsute warianty',
   orphaned_asin: 'Osierocone ASIN',
@@ -21,6 +27,16 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   stranded_inventory: 'Zablokowany inventory',
   low_quality_image: 'Slabe zdjecia',
   invalid_price: 'Nieprawidlowa cena',
+}
+
+const ISSUE_TYPE_TOOLTIPS: Record<string, string> = {
+  broken_variation: 'Produkt-dziecko wskazuje na parenta ktory nie istnieje lub nie zawiera tego dziecka',
+  orphaned_asin: 'ASIN bez powiazania z produktem nadrzednym — nie wyswietla sie w wynikach wyszukiwania',
+  missing_attribute: 'Listing nie ma wymaganych atrybutow — moze byc ukryty lub odrzucony przez Amazon',
+  suppressed_listing: 'Amazon ukryl listing z powodu braku danych lub naruszenia zasad',
+  stranded_inventory: 'Towar w magazynie FBA nie ma aktywnego listingu — generuje koszty magazynowe',
+  low_quality_image: 'Zdjecie nie spelnia wymagan Amazon (rozmiar, tlo, jakosc)',
+  invalid_price: 'Cena poza zakresem akceptowanym przez Amazon lub nizsza niz koszt',
 }
 
 function StatCard({
@@ -101,7 +117,7 @@ export default function DashboardTab() {
               {Object.entries(data.issues_by_severity).map(([severity, count]) => (
                 <div key={severity} className="flex items-center justify-between">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${SEVERITY_COLORS[severity] || 'bg-gray-500/20 text-gray-400'}`}>
-                    {severity}
+                    {SEVERITY_LABELS[severity] || severity}
                   </span>
                   <span className="text-sm font-medium text-white">{count}</span>
                 </div>
@@ -110,7 +126,7 @@ export default function DashboardTab() {
           )}
         </div>
 
-        {/* By type */}
+        {/* By type — with tooltips */}
         <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-5">
           <h3 className="mb-3 text-sm font-medium text-gray-300">Problemy wg typu</h3>
           {Object.keys(data.issues_by_type).length === 0 ? (
@@ -119,7 +135,9 @@ export default function DashboardTab() {
             <div className="space-y-2">
               {Object.entries(data.issues_by_type).map(([type, count]) => (
                 <div key={type} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">{ISSUE_TYPE_LABELS[type] || type}</span>
+                  <span className="text-sm text-gray-400" title={ISSUE_TYPE_TOOLTIPS[type]}>
+                    {ISSUE_TYPE_LABELS[type] || type}
+                  </span>
                   <span className="text-sm font-medium text-white">{count}</span>
                 </div>
               ))}

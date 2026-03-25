@@ -45,8 +45,10 @@ export default function CatalogHealthPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Catalog Health Check</h1>
-              <p className="text-sm text-gray-400">
-                Skanuj katalog Amazon, wykrywaj problemy i naprawiaj jednym kliknieciem
+              <p className="max-w-xl text-sm text-gray-400">
+                Automatyczny audyt Twojego katalogu Amazon — wykrywa zepsute warianty, ukryte listingi,
+                brakujace atrybuty i inne problemy, ktore obnizaja widocznosc i sprzedaz.
+                Napraw je jednym kliknieciem.
               </p>
             </div>
           </div>
