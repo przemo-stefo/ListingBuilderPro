@@ -148,6 +148,48 @@ def _parse_catalog_response(data: Dict, asin: str, marketplace: str) -> Dict:
     return result
 
 
+async def fetch_catalog_item_with_relationships(
+    asin: str, marketplace: str = "DE", db: Optional[Session] = None, user_id: str = ""
+) -> Dict:
+    """Fetch catalog item with relationships + productTypes for variation detection.
+
+    WHY separate: Standard fetch uses summaries,attributes,images.
+    Catalog Health needs relationships (parent/child links) and productTypes.
+    """
+    if not credentials_configured():
+        return {"error": "Amazon SP-API nie skonfigurowane"}
+
+    marketplace_id = MARKETPLACE_IDS.get(marketplace.upper(), MARKETPLACE_IDS["DE"])
+
+    try:
+        token = await get_access_token(db=db)
+    except (ValueError, RuntimeError) as e:
+        return {"error": f"Błąd autoryzacji SP-API: {str(e)[:100]}"}
+
+    base = SP_API_BASE_SANDBOX if settings.amazon_sandbox else SP_API_BASE_PROD
+    url = f"{base}/catalog/2022-04-01/items/{asin}"
+    params = {
+        "marketplaceIds": marketplace_id,
+        "includedData": "summaries,attributes,relationships,productTypes",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url, headers={"x-amz-access-token": token, "Content-Type": "application/json"}, params=params)
+
+        if resp.status_code != 200:
+            return {"error": f"Catalog API error (kod {resp.status_code})"}
+
+        data = resp.json()
+        result = _parse_catalog_response(data, asin, marketplace)
+        result["relationships"] = data.get("relationships", [])
+        result["productTypes"] = data.get("productTypes", [])
+        return result
+    except Exception as e:
+        logger.error("sp_api_catalog_relationships_error", asin=asin, error=str(e)[:100])
+        return {"error": f"Błąd Catalog API: {str(e)[:100]}"}
+
+
 async def fetch_catalog_items_batch(
     asins: List[str], marketplace: str = "DE", db: Optional[Session] = None
 ) -> Dict[str, Dict]:

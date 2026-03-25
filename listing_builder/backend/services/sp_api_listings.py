@@ -146,5 +146,66 @@ async def patch_listing(
         return {"error": f"Błąd Listings API PATCH: {str(e)[:100]}"}
 
 
+async def search_listings_items(
+    seller_id: str,
+    marketplace: str = "DE",
+    page_size: int = 20,
+    identifiers: Optional[List[str]] = None,
+    db: Optional[Session] = None,
+    user_id: str = "",
+) -> Dict[str, Any]:
+    """Search listings with issues via Listings Items API.
+
+    WHY: searchListingsItems returns issues array per listing —
+    bulk detection of suppressed, missing attributes, image problems.
+    """
+    if not credentials_configured():
+        return {"error": "Amazon SP-API nie skonfigurowane"}
+
+    marketplace_id = MARKETPLACE_IDS.get(marketplace.upper(), MARKETPLACE_IDS["DE"])
+
+    try:
+        token = await get_access_token(db=db, user_id=user_id)
+    except (ValueError, RuntimeError) as e:
+        return {"error": f"Błąd autoryzacji: {str(e)[:100]}"}
+
+    url = f"{_base_url()}/listings/{LISTINGS_API_VERSION}/items/{seller_id}"
+    params: Dict[str, Any] = {
+        "marketplaceIds": marketplace_id,
+        "includedData": "summaries,attributes,issues,offers",
+        "pageSize": min(page_size, 20),
+    }
+    if identifiers:
+        params["identifiers"] = ",".join(identifiers[:20])
+        params["identifiersType"] = "SKU"
+
+    all_items: List[Dict[str, Any]] = []
+    next_token: Optional[str] = None
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            for _ in range(50):  # Max 50 pages = 1000 listings
+                if next_token:
+                    params["pageToken"] = next_token
+
+                resp = await client.get(url, headers=_headers(token), params=params)
+
+                if resp.status_code != 200:
+                    logger.warning("search_listings_error", status=resp.status_code)
+                    break
+
+                data = resp.json()
+                all_items.extend(data.get("listingsItems", []))
+                next_token = data.get("nextToken")
+
+                if not next_token:
+                    break
+
+        return {"items": all_items, "total": len(all_items)}
+    except Exception as e:
+        logger.error("search_listings_error", error=str(e)[:100])
+        return {"error": f"Błąd searchListingsItems: {str(e)[:100]}"}
+
+
 def _headers(token: str) -> Dict[str, str]:
     return {"x-amz-access-token": token, "Content-Type": "application/json"}

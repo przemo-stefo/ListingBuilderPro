@@ -54,6 +54,7 @@ from api import video_routes
 from api import media_gen_routes
 from api import validator_routes
 from api import attribute_routes
+from api import catalog_health_routes
 
 # Import security middleware
 from middleware import APIKeyMiddleware, SecurityHeadersMiddleware, https_redirect_middleware
@@ -200,6 +201,7 @@ app.include_router(video_routes.router)
 app.include_router(media_gen_routes.router)
 app.include_router(validator_routes.router)
 app.include_router(attribute_routes.router)
+app.include_router(catalog_health_routes.router)
 
 
 @app.get("/")

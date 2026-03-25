@@ -55,6 +55,7 @@ const ALLOWED_PATH_PREFIXES = [
   'media-gen',
   'validator',
   'attributes',
+  'catalog-health',
 ]
 
 // WHY: Block destructive methods on sensitive endpoints — defense in depth
