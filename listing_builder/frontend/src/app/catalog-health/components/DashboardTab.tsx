@@ -107,43 +107,110 @@ export default function DashboardTab({ onGoToScan }: DashboardTabProps) {
         {!credentialsOk && (
           <div className="rounded-lg border border-amber-900 bg-amber-950/30 p-5">
             <div className="flex items-center gap-3 mb-3">
-              <AlertTriangle className="h-5 w-5 text-amber-400" />
-              <h3 className="text-sm font-medium text-amber-300">Krok 1: Polacz konto Amazon</h3>
+              <div className="flex items-center justify-center rounded-full bg-amber-500/20 h-7 w-7 text-xs font-bold text-amber-400">1</div>
+              <h3 className="text-sm font-medium text-amber-300">Polacz konto Amazon Seller Central</h3>
             </div>
-            <p className="text-sm text-gray-400 mb-4">
-              Aby przeskanowac katalog, najpierw polacz swoje konto Amazon Seller Central.
-              Uzyskamy dostep do danych katalogu przez Amazon SP-API.
+            <p className="text-sm text-gray-400 mb-3">
+              Catalog Health wymaga dostepu do Twojego konta Amazon przez SP-API.
+              Bez tego nie mozemy odczytac Twoich listingow.
             </p>
+            <div className="rounded-md bg-black/30 p-4 mb-4 space-y-2.5">
+              <p className="text-xs font-medium text-gray-300 mb-2">Co zrobic:</p>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-amber-400 mt-px">1.</span>
+                <p className="text-xs text-gray-400">
+                  Kliknij przycisk <span className="text-white font-medium">&quot;Przejdz do Integracji&quot;</span> ponizej
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-amber-400 mt-px">2.</span>
+                <p className="text-xs text-gray-400">
+                  Znajdz karte <span className="text-white font-medium">&quot;Amazon Seller Central&quot;</span> i kliknij przycisk <span className="text-white font-medium">&quot;Polacz&quot;</span>
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-amber-400 mt-px">3.</span>
+                <p className="text-xs text-gray-400">
+                  Wpisz dane z <span className="text-white font-medium">Amazon Developer Central</span>: Client ID, Client Secret i Refresh Token
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-amber-400 mt-px">4.</span>
+                <p className="text-xs text-gray-400">
+                  Kliknij <span className="text-white font-medium">&quot;Polacz&quot;</span> w formularzu — po chwili pojawi sie zielony znacznik
+                </p>
+              </div>
+            </div>
             <Link
               href="/integrations"
               className="inline-flex items-center gap-2 rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 transition-colors"
             >
-              Polacz konto Amazon
+              Przejdz do Integracji
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         )}
 
-        {/* Connected confirmation */}
+        {/* Step 2: Run first scan (shown when connected) */}
         {credentialsOk && (
           <div className="rounded-lg border border-green-900 bg-green-950/30 p-5">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 mb-3">
               <CheckCircle className="h-5 w-5 text-green-400" />
-              <span className="text-sm font-medium text-green-300">Konto Amazon polaczone — mozesz uruchomic skan</span>
+              <h3 className="text-sm font-medium text-green-300">Konto Amazon polaczone</h3>
             </div>
+            <p className="text-sm text-gray-400 mb-3">
+              Mozesz teraz uruchomic pierwszy skan katalogowy.
+            </p>
+            <div className="rounded-md bg-black/30 p-4 mb-4 space-y-2.5">
+              <p className="text-xs font-medium text-gray-300 mb-2">Co zrobic:</p>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-green-400 mt-px">1.</span>
+                <p className="text-xs text-gray-400">
+                  Kliknij przycisk <span className="text-white font-medium">&quot;Rozpocznij pierwszy skan&quot;</span> ponizej
+                  (lub zakladke <span className="text-white font-medium">&quot;Skanuj&quot;</span> w gornym menu)
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-green-400 mt-px">2.</span>
+                <p className="text-xs text-gray-400">
+                  Wybierz marketplace z listy (np. <span className="text-white font-medium">Amazon.de</span>)
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-green-400 mt-px">3.</span>
+                <p className="text-xs text-gray-400">
+                  Kliknij <span className="text-white font-medium">&quot;Rozpocznij skan&quot;</span> — zobaczysz pasek postepu
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-bold text-green-400 mt-px">4.</span>
+                <p className="text-xs text-gray-400">
+                  Po zakonczeniu kliknij <span className="text-white font-medium">&quot;Zobacz problemy&quot;</span> — zobaczysz liste wykrytych bledow z propozycjami napraw
+                </p>
+              </div>
+            </div>
+            {onGoToScan && (
+              <button
+                onClick={onGoToScan}
+                className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-200 transition-colors"
+              >
+                Rozpocznij pierwszy skan
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
 
-        {/* How it works */}
+        {/* How it works — compact overview */}
         <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-6">
-          <h3 className="mb-4 text-lg font-medium text-white">Jak to dziala?</h3>
+          <h3 className="mb-4 text-lg font-medium text-white">Jak dziala Catalog Health?</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="flex gap-3">
               <div className="rounded-md bg-blue-500/10 p-2 h-fit">
                 <FileSearch className="h-5 w-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">1. Skan katalogowy</p>
+                <p className="text-sm font-medium text-white">Skan katalogowy</p>
                 <p className="text-xs text-gray-400">
                   Pobieramy raporty z Amazon (listingi, ukryte oferty, zablokowany inventory)
                   i analizujemy kazdy produkt.
@@ -155,7 +222,7 @@ export default function DashboardTab({ onGoToScan }: DashboardTabProps) {
                 <AlertTriangle className="h-5 w-5 text-amber-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">2. Wykrywanie problemow</p>
+                <p className="text-sm font-medium text-white">Wykrywanie problemow</p>
                 <p className="text-xs text-gray-400">
                   Identyfikujemy zepsute warianty, osierocone ASIN-y, brakujace atrybuty,
                   ukryte listingi i problemy z cenami.
@@ -167,7 +234,7 @@ export default function DashboardTab({ onGoToScan }: DashboardTabProps) {
                 <Wrench className="h-5 w-5 text-green-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">3. Naprawy jednym kliknieciem</p>
+                <p className="text-sm font-medium text-white">Naprawy jednym kliknieciem</p>
                 <p className="text-xs text-gray-400">
                   Dla kazdego problemu generujemy propozycje naprawy.
                   Mozesz ja zastosowac jednym kliknieciem przez SP-API.
@@ -179,7 +246,7 @@ export default function DashboardTab({ onGoToScan }: DashboardTabProps) {
 
         {/* Detectable issues list */}
         <div className="rounded-lg border border-gray-800 bg-[#1A1A1A] p-6">
-          <h3 className="mb-3 text-sm font-medium text-gray-300">Wykrywane problemy</h3>
+          <h3 className="mb-3 text-sm font-medium text-gray-300">Jakie problemy wykrywamy?</h3>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {Object.entries(ISSUE_TYPE_LABELS).map(([key, label]) => (
               <div key={key} className="flex items-start gap-2">
@@ -194,17 +261,6 @@ export default function DashboardTab({ onGoToScan }: DashboardTabProps) {
             ))}
           </div>
         </div>
-
-        {/* CTA to scan */}
-        {credentialsOk && onGoToScan && (
-          <button
-            onClick={onGoToScan}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-medium text-black transition-colors hover:bg-gray-200"
-          >
-            Rozpocznij pierwszy skan
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        )}
       </div>
     )
   }
