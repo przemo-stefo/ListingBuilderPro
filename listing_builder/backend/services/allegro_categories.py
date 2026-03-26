@@ -6,7 +6,7 @@ import httpx
 import structlog
 from typing import List, Dict, Optional
 
-from services.allegro_api import get_client_credentials_token, ALLEGRO_API_BASE
+from services.allegro_api import get_client_credentials_token, ALLEGRO_API_BASE, _client_token_cache
 
 logger = structlog.get_logger()
 
@@ -137,29 +137,52 @@ async def fetch_category_parameters(category_id: str) -> List[dict]:
 
     Uses GET /sale/categories/{categoryId}/parameters.
     Returns list of params with type, required flag, options (for DICTIONARY), restrictions.
+    WHY retry: Transient token failures (expired/revoked) caused "Nie znaleziono parametrów"
+    errors — one retry with token invalidation fixes it transparently.
     """
     if category_id in _params_cache:
         return _params_cache[category_id]
 
-    token = await get_client_credentials_token()
-    if not token:
-        logger.error("allegro_params_no_token")
+    # WHY: 2 attempts — if first fails due to stale token, invalidate and retry once
+    resp = None
+    for attempt in range(2):
+        token = await get_client_credentials_token()
+        if not token:
+            logger.error("allegro_params_no_token", attempt=attempt)
+            return []
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    f"{ALLEGRO_API_BASE}/sale/categories/{category_id}/parameters",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/vnd.allegro.public.v1+json",
+                    },
+                )
+        except Exception as e:
+            logger.error("allegro_params_request_error", error=str(e), attempt=attempt)
+            if attempt == 0:
+                _client_token_cache["token"] = None
+                continue
+            return []
+
+        if resp.status_code == 200:
+            break
+
+        # WHY: 401/403 = stale token — invalidate cache and retry
+        if resp.status_code in (401, 403) and attempt == 0:
+            logger.warning("allegro_params_auth_retry", status=resp.status_code, category_id=category_id)
+            _client_token_cache["token"] = None
+            continue
+
+        logger.error("allegro_params_fetch_failed", status=resp.status_code, category_id=category_id)
+        return []
+
+    if not resp or resp.status_code != 200:
         return []
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                f"{ALLEGRO_API_BASE}/sale/categories/{category_id}/parameters",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Accept": "application/vnd.allegro.public.v1+json",
-                },
-            )
-
-        if resp.status_code != 200:
-            logger.error("allegro_params_fetch_failed", status=resp.status_code, category_id=category_id)
-            return []
-
         data = resp.json()
         params = []
         for p in data.get("parameters", []):
@@ -193,5 +216,5 @@ async def fetch_category_parameters(category_id: str) -> List[dict]:
         return params
 
     except Exception as e:
-        logger.error("allegro_params_error", error=str(e), category_id=category_id)
+        logger.error("allegro_params_parse_error", error=str(e), category_id=category_id)
         return []

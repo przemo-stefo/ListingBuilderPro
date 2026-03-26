@@ -29,7 +29,8 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/attributes", tags=["attributes"])
 
 # WHY: Allegro offer URLs follow pattern allegro.pl/oferta/slug-123456 — extract numeric ID
-_ALLEGRO_URL_RE = re.compile(r"allegro\.pl/oferta/(?:.*-)?(\d+)$")
+# WHY: (?:[?/#]|$) instead of $ — Allegro URLs often have ?reco_id=... query params
+_ALLEGRO_URL_RE = re.compile(r"allegro\.pl/oferta/(?:.*-)?(\d+)(?:[?/#]|$)")
 
 
 # --- Endpoints ---
