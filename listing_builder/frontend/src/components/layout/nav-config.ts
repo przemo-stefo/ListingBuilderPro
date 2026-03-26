@@ -14,6 +14,7 @@ import {
   Tags,
   Sparkles,
   Stethoscope,
+  Megaphone,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -23,6 +24,8 @@ export interface NavItem {
   desc?: string
   // WHY: Beta features get amber badge in sidebar
   beta?: boolean
+  // WHY: betaOnly items are hidden from non-beta-testers entirely
+  betaOnly?: boolean
 }
 
 export interface NavSection {
@@ -45,6 +48,12 @@ export const navSections: NavSection[] = [
       { title: 'Ekspert Kaufland', href: '/expert-qa?mode=kaufland', icon: Store, desc: 'Pytania o Kaufland — listingi, SEO, kategorie, EAN, wysyłka, GPSR' },
       { title: 'Auto-Atrybuty', href: '/attributes', icon: Tags, desc: 'Wygeneruj atrybuty produktowe', beta: true },
       { title: 'Catalog Health', href: '/catalog-health', icon: Stethoscope, desc: 'Skanuj katalog Amazon — wykrywaj i naprawiaj problemy', beta: true },
+    ],
+  },
+  {
+    label: 'Meta Ads Lab',
+    items: [
+      { title: 'Meta Ads Studio', href: '/meta-ads', icon: Megaphone, desc: 'Generuj reklamy, nagłówki, hooki video i briefy kreatywne AI', beta: true, betaOnly: true },
     ],
   },
   {

@@ -30,8 +30,8 @@ async def get_admin_status(request: Request):
     # WHY: Only return email for admins — non-admin users don't need to see it,
     # and exposing email to unauthenticated/non-admin requests is an info leak.
     if is_admin:
-        return {"is_admin": True, "email": email}
-    return {"is_admin": False}
+        return {"is_admin": True, "is_beta_tester": True, "email": email}
+    return {"is_admin": False, "is_beta_tester": False}
 
 
 @router.get("/overview")

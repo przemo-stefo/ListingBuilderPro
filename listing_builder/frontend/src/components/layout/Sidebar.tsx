@@ -23,7 +23,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { tier, isLoading } = useTier()
-  const { isAdmin } = useAdmin()
+  const { isAdmin, isBetaTester } = useAdmin()
   const { activeJobs } = useMediaGen()
 
   // WHY: Close sidebar on mobile after navigating
@@ -44,8 +44,12 @@ export function Sidebar({ onClose }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-4">
-        {/* WHY: Filter out Admin section for non-admin users */}
-        {navSections.filter(s => s.label !== 'Admin' || isAdmin).map((section) => (
+        {/* WHY: Filter sections — Admin for admins, betaOnly sections for beta testers */}
+        {navSections.filter(s => {
+          if (s.label === 'Admin') return isAdmin
+          if (s.items.every(i => i.betaOnly)) return isBetaTester
+          return true
+        }).map((section) => (
           <div key={section.label}>
             <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
               {section.label}
