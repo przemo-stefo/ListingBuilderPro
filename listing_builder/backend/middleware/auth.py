@@ -124,7 +124,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         api_key = request.headers.get("X-API-Key")
 
         if not api_key:
-            logger.warning("auth_missing", path=path, ip=request.client.host)
+            logger.warning("auth_missing", path=path, ip=request.client.host if request.client else "unknown")
             return self._unauthorized_response("Missing authentication. Include Authorization or X-API-Key header.")
 
         if not hmac.compare_digest(api_key, settings.api_secret_key):
@@ -134,7 +134,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             logger.warning(
                 "api_key_invalid",
                 path=path,
-                ip=request.client.host,
+                ip=request.client.host if request.client else "unknown",
                 key_hash=key_hash,
             )
             return self._unauthorized_response("Invalid API key")

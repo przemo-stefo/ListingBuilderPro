@@ -88,11 +88,12 @@ def check_db_connection() -> bool:
     Health check for database connection.
     Returns True if database is accessible.
     """
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         db.execute(text("SELECT 1"))
-        db.close()
         return True
     except Exception as e:
         logger.error("database_health_check_failed", error=str(e))
         return False
+    finally:
+        db.close()

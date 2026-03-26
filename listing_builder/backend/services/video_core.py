@@ -125,8 +125,13 @@ def load_product_image(image_bytes: bytes, target_size: Tuple[int, int] = (500, 
 
 
 def fetch_image_from_url(url: str, target_size: Tuple[int, int] = (500, 500)) -> Optional[Image.Image]:
-    """Fetch product image from URL and resize."""
+    """Fetch product image from URL and resize.
+
+    WHY SSRF check: URL comes from user input — block requests to private/internal IPs.
+    """
+    from utils.url_validator import _reject_private_host
     try:
+        _reject_private_host(url)
         resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
         return load_product_image(resp.content, target_size)

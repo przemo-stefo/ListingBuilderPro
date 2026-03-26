@@ -39,6 +39,8 @@ async def analyze_query(query: str) -> dict | None:
     try:
         def _call():
             keys = settings.groq_api_keys
+            if not keys:
+                raise RuntimeError("No Groq API keys configured")
             last_error = None
             for key in keys:
                 try:

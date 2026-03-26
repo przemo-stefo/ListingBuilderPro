@@ -198,7 +198,7 @@ async def fetch_category_parameters(category_id: str) -> List[dict]:
             }
             # WHY: DICTIONARY params have predefined values — LLM must pick from these
             if p.get("type") == "dictionary" or p.get("dictionary"):
-                raw_dict = p.get("dictionary", {})
+                raw_dict = p.get("dictionary") or {}
                 # WHY: Allegro returns dictionary as list [...] OR dict {"values": [...]} depending on category
                 values = raw_dict if isinstance(raw_dict, list) else raw_dict.get("values", [])
                 for item in values:

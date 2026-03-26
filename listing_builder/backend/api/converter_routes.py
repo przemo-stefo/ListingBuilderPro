@@ -265,7 +265,7 @@ async def _fetch_products_smart(
 @router.post("/scrape", response_model=ScrapeResponse)
 @limiter.limit("5/minute")
 async def scrape_allegro(
-    request: Request, body: ScrapeRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
+    request: Request, body: ScrapeRequest, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
 ):
     """Fetch product data from Allegro (API if OAuth connected, else scrape).
 
@@ -289,7 +289,7 @@ async def scrape_allegro(
 @router.post("/convert", response_model=ConvertResponse)
 @limiter.limit("5/minute")
 async def convert_to_marketplace(
-    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
+    request: Request, body: ConvertRequest, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
 ):
     """Full pipeline: Fetch Allegro (API or scrape) → Translate → Map → JSON.
 
@@ -344,7 +344,7 @@ async def convert_to_marketplace(
 @router.post("/download")
 @limiter.limit("3/minute")
 async def download_template(
-    request: Request, body: ConvertRequest = None, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
+    request: Request, body: ConvertRequest, db: Session = Depends(get_db), user_id: str = Depends(require_user_id)
 ):
     """Full pipeline: Fetch (API/scrape) → Translate → Map → Download file.
 

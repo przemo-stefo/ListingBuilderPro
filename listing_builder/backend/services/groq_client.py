@@ -60,7 +60,9 @@ def call_groq(prompt: str, temperature: float, max_tokens: int) -> Tuple[str, Op
     Returns (text, usage_dict | None) — usage_dict contains token counts for tracing.
     """
     keys = settings.groq_api_keys
-    last_error = None
+    if not keys:
+        raise RuntimeError("No Groq API keys configured — set GROQ_API_KEYS env var")
+    last_error: Optional[Exception] = None
 
     for i, key in enumerate(keys):
         try:
