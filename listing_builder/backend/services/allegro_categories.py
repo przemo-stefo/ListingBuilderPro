@@ -191,7 +191,8 @@ async def fetch_category_parameters(category_id: str) -> List[dict]:
                 "name": p.get("name", ""),
                 "type": p.get("type", "STRING"),
                 "required": p.get("required", False),
-                "unit": p.get("unit", {}).get("name") if p.get("unit") else None,
+                # WHY: Allegro returns unit as dict {"name": "kg"} OR plain str "kg" depending on category
+                "unit": p["unit"].get("name") if isinstance(p.get("unit"), dict) else p.get("unit"),
                 "options": [],
                 "restrictions": p.get("restrictions", {}),
             }
