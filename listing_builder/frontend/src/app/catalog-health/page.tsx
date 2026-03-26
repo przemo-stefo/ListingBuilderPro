@@ -75,7 +75,7 @@ export default function CatalogHealthPage() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'dashboard' && <DashboardTab />}
+        {activeTab === 'dashboard' && <DashboardTab onGoToScan={() => setActiveTab('scan')} />}
         {activeTab === 'scan' && <ScanTab onViewIssues={handleViewIssues} />}
         {activeTab === 'issues' && issuesScanId && (
           <IssuesTab scanId={issuesScanId} onBack={handleBackFromIssues} />

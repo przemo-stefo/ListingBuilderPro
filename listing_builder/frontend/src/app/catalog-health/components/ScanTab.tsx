@@ -5,6 +5,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useStartScan, useScanStatus, useScanHistory, useCatalogHealthStatus } from '@/lib/hooks/useCatalogHealth'
 import { Play, Loader2, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react'
 
@@ -56,7 +57,14 @@ export default function ScanTab({ onViewIssues }: ScanTabProps) {
           <div className="text-sm text-amber-300">
             {!status.credentials_configured
               ? 'Amazon SP-API nie jest skonfigurowane. Skontaktuj sie z administratorem.'
-              : 'Polacz konto Amazon w Ustawieniach aby uruchomic skan.'}
+              : (
+                <>
+                  Aby uruchomic skan, najpierw polacz konto Amazon.{' '}
+                  <Link href="/integrations" className="font-medium underline hover:text-amber-200">
+                    Przejdz do Integracji &rarr;
+                  </Link>
+                </>
+              )}
           </div>
         </div>
       )}
